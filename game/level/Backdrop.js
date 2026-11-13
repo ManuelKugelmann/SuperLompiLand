@@ -106,9 +106,11 @@ export default class Backdrop {
         const depthFade = Math.max(0.25, 1 - depth * 0.8);
         for (const sc of this.schools) {
             sc.x += sc.dir * sc.speed;
-            const span = W + 900;
+            // Far away = moves less than the world, by the same factor sideways and up/down,
+            // and wraps around smoothly well outside the picture on both axes.
+            const span = W + 900, tall = H + 700;
             const sx = (((sc.x - camX * sc.depthFactor) % span) + span) % span - 450;
-            const sy = sc.y - (camY * sc.depthFactor * 0.3) % 200;
+            const sy = (((sc.y - camY * sc.depthFactor) % tall) + tall) % tall - 350;
             for (const f of sc.fish) {
                 f.body.setPosition(sx + f.ox + Math.sin(t * 0.7 + f.phase) * 18, sy + f.oy + Math.sin(t * 1.1 + f.phase) * 10);
                 f.body.setScale(sc.dir * f.body.base.sx * (1 + Math.sin(t * 9 + f.phase) * 0.12), f.body.base.sy);   // tail beat

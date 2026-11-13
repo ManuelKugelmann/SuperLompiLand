@@ -82,7 +82,8 @@ export default class WaterLight {
         const W = scene.scale.width, H = scene.scale.height;
         const t = scene.time.now / 1000;
         // Light where the upper third of the view is: that is where shafts and caustics read.
-        const light = sunlightAt(cam.scrollY + H * 0.35, WATER_LIGHT.fadeTo);
+        // (Never above the waterline: when the view rises into the sky, the water below it is the shallowest there is.)
+        const light = sunlightAt(Math.max(0, cam.scrollY + H * 0.35), WATER_LIGHT.fadeTo);
         const above = cam.scrollY < 0 ? Math.min(1, -cam.scrollY / (H * 0.5)) : 0;   // view partly in the sky
 
         for (const s of this.shafts) {
@@ -90,7 +91,9 @@ export default class WaterLight {
             if (s.x < -260) s.x += W + 400; else if (s.x > W + 260) s.x -= W + 400;
             s.y = Math.max(-40, -cam.scrollY - 30);   // shafts start at the water surface
             const flicker = 0.85 + 0.15 * Math.sin(t * 0.18 + s.phase);   // slow breathing, never a flicker
-            s.setAlpha(WATER_LIGHT.shafts * s.base * flicker * light * (1 - above));
+            // The shafts hang from the water surface, so they stay when the view rises into the
+            // sky with a jumping player: what is under water is still lit.
+            s.setAlpha(WATER_LIGHT.shafts * s.base * flicker * light);
         }
 
         if (this.caustics.length) {
