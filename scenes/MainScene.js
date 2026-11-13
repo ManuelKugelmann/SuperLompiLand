@@ -304,6 +304,11 @@ export default class MainScene extends Phaser.Scene {
         this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth });
     }
 
+    /** Playing together: what the room has collected, from the shared record, so every screen shows the same number. */
+    teamCoins() {
+        return this.world.count('coin') + WORLD.friendBonus * this.world.count('friend');
+    }
+
     depthMeters() {
         return Math.max(0, Math.round(this.fish.sprite.y / 100));
     }
