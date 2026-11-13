@@ -130,7 +130,8 @@ export default class HudScene extends Phaser.Scene {
     update() {
         const m = this.main;
         if (!m?.fish) return;
-        this.coinText.setText(String(m.coins));
+        // Playing together the counter is the team's: everything the room has collected.
+        this.coinText.setText(String(m.mp ? m.world.count('coin') : m.coins));
         this.depthText.setText(`${this.depthLabel} ${m.depthMeters()} m`);
         this.mapYou.x = this.toMap(m.fish.sprite.x);
         this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });

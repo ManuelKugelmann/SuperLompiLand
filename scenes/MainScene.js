@@ -25,7 +25,11 @@ const WORLD = {
     maxHealth: 5,
     hitStopMs: 70,
     ventLift: 0.0026,     // upward force per unit mass inside a bubble column
-    friendBonus: 5
+    friendBonus: 5,
+    schoolRadius: 420,    // friends (other players) this close swim as a school ...
+    schoolBoost: 0.1,     // ... each of up to two makes you this much faster
+    downedMs: 5000,       // playing together: how long friends have to revive you before the nest respawn
+    reviveHealth: 2
 };
 
 export default class MainScene extends Phaser.Scene {
@@ -53,7 +57,8 @@ export default class MainScene extends Phaser.Scene {
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
         // What has been collected stays collected (per chunk bitfields, see worldState.js).
-        this.world = new WorldState(window.localStorage, 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
+        // Playing together, the room has its own memory, separate from the solo journey.
+        this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
         this.level = new LevelGenerator(this, this.world);
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -234,6 +239,30 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
+    /** Out of health. Alone: straight back to the nest. Together: friends get a moment to revive you first. */
+    goDown() {
+        this.respawning = true;
+        if (!this.mp) { this.respawn(); return; }
+        const de = this.lang === 'de', sp = this.fish.sprite;
+        this.mp.downed(sp.x, sp.y);
+        sp.setVelocity(0, 0);
+        this.fish.guard = WORLD.downedMs;                 // nothing can hurt or push a downed player
+        this.announce(de ? 'Hilfe!' : 'Help!', de ? 'Ein Freund kann dich anstupsen' : 'A friend can nudge you awake');
+        this.downTimer = this.time.delayedCall(WORLD.downedMs, () => { this.downTimer = null; this.respawn(); });
+    }
+
+    /** A friend touched our revive bubble (called by Multiplayer): carry on right here. */
+    revive() {
+        if (!this.downTimer) return;
+        this.downTimer.remove();
+        this.downTimer = null;
+        this.respawning = false;
+        this.health = Math.min(this.maxHealth, WORLD.reviveHealth);
+        this.fish.guard = 2000;
+        play('friend');
+        this.announce(this.lang === 'de' ? 'Weiter geht’s!' : 'Back in the swim!');
+    }
+
     /** Out of health: no fail screen — back to the last nest with what was saved there. */
     respawn() {
         const de = this.lang === 'de';
@@ -307,6 +336,7 @@ export default class MainScene extends Phaser.Scene {
             this.tweens.killTweensOf(c.img);
             c.img.destroy();
             this.world.set(c.chunkKey, 'coin', c.index);
+            this.mp?.claim(c.chunkKey, 'coin', c.index);
             this.coins++;
             play('coin');
             for (let i = 0; i < 5; i++) {           // sparkle
@@ -323,7 +353,12 @@ export default class MainScene extends Phaser.Scene {
             play('friend');
             this.health = Math.min(this.maxHealth, this.health + 1); // friends cheer you up
             const bonus = f.rewarded ? 0 : WORLD.friendBonus;      // coins only the first time ever
-            if (bonus) { f.rewarded = true; this.world.set(f.chunkKey, 'friend', f.index); this.coins += bonus; }
+            if (bonus) {
+                f.rewarded = true;
+                this.world.set(f.chunkKey, 'friend', f.index);
+                this.mp?.claim(f.chunkKey, 'friend', f.index);
+                this.coins += bonus;
+            }
             const heart = this.add.text(f.img.x, f.img.y - f.r, bonus ? `♥ +${bonus}` : '♥', {
                 fontFamily: 'Arial', fontSize: '54px', color: '#ff6b9a', fontStyle: 'bold',
                 stroke: '#ffffff', strokeThickness: 8
@@ -342,21 +377,23 @@ export default class MainScene extends Phaser.Scene {
                 this.fish.squash = -0.3;
                 this.health = Math.max(0, this.health - (this.character.armor ?? 1));
                 this.cameras.main.shake(180, 0.008);
-                if (this.health <= 0 && !this.respawning) { this.respawning = true; this.respawn(); return; }
+                if (this.health <= 0 && !this.respawning) { this.goDown(); return; }
             }
         }
     }
 
     /** One fixed 60 Hz simulation step: all forces + physics, display-rate independent. */
     fixedStep() {
-        this.controller.update(STEP_MS);
+        if (!this.downTimer) this.controller.update(STEP_MS);
+        // Swimming close to friends makes everyone a little faster (a school).
+        this.fish.boost = 1 + WORLD.schoolBoost * Math.min(2, this.mp?.nearFriends(this.fish.sprite.x, this.fish.sprite.y, WORLD.schoolRadius) ?? 0);
         if (this.keys) {
             const k = this.keys;
             this.keyDir.set(
                 (k.RIGHT.isDown || k.D.isDown ? 1 : 0) - (k.LEFT.isDown || k.A.isDown ? 1 : 0),
                 (k.DOWN.isDown || k.S.isDown ? 1 : 0) - (k.UP.isDown || k.W.isDown ? 1 : 0));
             this.fish.steered = this.keyDir.lengthSq() > 0;
-            if (this.fish.steered) this.fish.thrust(this.keyDir.normalize());
+            if (this.fish.steered && !this.downTimer) this.fish.thrust(this.keyDir.normalize());
         }
         // Bubble plants carry the fish upward.
         const fsp = this.fish.sprite;

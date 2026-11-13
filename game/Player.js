@@ -61,6 +61,7 @@ export default class Player {
         this.pushed = 0;        // ms left during which a knock-back must not turn the body
         this.steered = false;   // set by the scene while keyboard input is active
         this.effort = 0;
+        this.boost = 1;         // speed multiplier set by the scene (swimming in a school)
 
         // `rig` is what you see. `sprite` is the physics body (invisible, advanced
         // in fixed 60 Hz steps); the rig is drawn every frame at a position
@@ -106,7 +107,7 @@ export default class Player {
 
     thrust(dir) {
         if (this.inAir) { this.airSteer(dir, 1); return; }
-        this.sprite.applyForce(dir.clone().scale(this.move.thrust * this.body.mass));
+        this.sprite.applyForce(dir.clone().scale(this.move.thrust * this.boost * this.body.mass));
         this.effort = Math.min(1, this.effort + dir.length() * 0.25);
     }
 
@@ -247,8 +248,9 @@ export default class Player {
         }
         const vel = this.body.velocity;
         const speed = Math.hypot(vel.x, vel.y);
-        if (speed > this.move.maxSpeed) {
-            this.sprite.setVelocity(vel.x * this.move.maxSpeed / speed, vel.y * this.move.maxSpeed / speed);
+        const top = this.move.maxSpeed * this.boost;
+        if (speed > top) {
+            this.sprite.setVelocity(vel.x * top / speed, vel.y * top / speed);
         }
     }
 

@@ -523,6 +523,20 @@ export default class LevelGenerator {
         tex.refresh();
     }
 
+    /** Someone else collected this (playing together): take it out of the world if it is on stage. */
+    take(chunkKey, kind, index) {
+        if (kind === 'coin') {
+            const c = this.coins.find(o => o.chunkKey === chunkKey && o.index === index && o.img.active);
+            if (!c) return;
+            this.scene.tweens.killTweensOf(c.img);
+            this.scene.tweens.add({ targets: c.img, scale: c.img.scale * 0.2, alpha: 0, duration: 220, onComplete: () => c.img.destroy() });
+            c.r = -1e6;                                   // out of reach while it fades
+        } else if (kind === 'friend') {
+            const f = this.friends.find(o => o.chunkKey === chunkKey && o.index === index);
+            if (f) f.rewarded = true;                     // still greets, the bonus is already the team's
+        }
+    }
+
     drop(key) {
         const chunk = this.chunks.get(key);
         for (const b of chunk.bodies) this.scene.matter.world.remove(b);
