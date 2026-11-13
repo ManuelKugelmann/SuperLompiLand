@@ -27,9 +27,10 @@ export default class Backdrop {
         this.foam = scene.add.graphics().setDepth(6);    // bright crest line, in front of the fish
 
         // The volcano's glow on the eastern horizon: always shows which way the journey goes.
-        this.eastGlow = scene.add.ellipse(W + 120, H * 0.5, 520, H * 1.5, 0xff3b1f, 0.12)
+        makeSoft(scene);
+        this.eastGlow = scene.add.image(W + 120, H * 0.5, 'bd_glow').setDisplaySize(900, H * 1.9).setTint(0xff3b1f).setAlpha(0.2)
             .setScrollFactor(0).setDepth(-11).setBlendMode(Phaser.BlendModes.ADD);
-        scene.tweens.add({ targets: this.eastGlow, alpha: 0.2, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        scene.tweens.add({ targets: this.eastGlow, alpha: 0.32, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
         // Distant schools of small fish: silhouettes far behind the play plane that
         // drift past slower than the world (parallax) and never interact.
@@ -42,7 +43,9 @@ export default class Backdrop {
             const n = Phaser.Math.Between(7, 13);
             for (let i = 0; i < n; i++) {
                 const size = Phaser.Math.Between(16, 26) * (0.7 + k * 0.12);
-                const body = scene.add.ellipse(0, 0, size, size * 0.42, 0x0d4763, 0.3 + k * 0.05).setScrollFactor(0).setDepth(-16 + k * 0.1);
+                // Soft, out-of-focus shapes: the farther school is blurrier and fainter.
+                const body = scene.add.image(0, 0, 'bd_fish').setDisplaySize(size * 1.5, size * 0.75).setTint(0x0d4763).setScrollFactor(0).setDepth(-16 + k * 0.1);
+                body.base = { sx: body.scaleX, sy: body.scaleY, alpha: 0.42 + k * 0.08 };
                 school.fish.push({ body, ox: Phaser.Math.Between(-150, 150), oy: Phaser.Math.Between(-70, 70), phase: Math.random() * 6.28 });
             }
             this.schools.push(school);
@@ -51,9 +54,10 @@ export default class Backdrop {
         this.rays = [];
         for (let i = 0; i < 6; i++) {
             const x = (W / 6) * i + Phaser.Math.Between(-60, 60);
-            const ray = scene.add.triangle(x, 0, 0, 0, 190, 0, 380, H * 0.95, 0xffffff, 0.07)
-                .setOrigin(0).setScrollFactor(0).setDepth(-12).setBlendMode(Phaser.BlendModes.ADD);
-            ray.baseAlpha = Phaser.Math.FloatBetween(0.04, 0.09);
+            // A soft shaft of light: feathered along both sides, fading in below the surface and out with depth.
+            const ray = scene.add.image(x, -20, 'bd_ray').setOrigin(0.5, 0).setDisplaySize(Phaser.Math.Between(240, 420), H * Phaser.Math.FloatBetween(0.85, 1.1))
+                .setRotation(-0.2 + Phaser.Math.FloatBetween(-0.04, 0.04)).setScrollFactor(0).setDepth(-12).setBlendMode(Phaser.BlendModes.ADD);
+            ray.baseAlpha = Phaser.Math.FloatBetween(0.1, 0.2);
             ray.phase = Math.random() * 6.28;
             ray.baseX = x;
             this.rays.push(ray);
@@ -117,8 +121,8 @@ export default class Backdrop {
             const sy = sc.y - (camY * sc.depthFactor * 0.3) % 200;
             for (const f of sc.fish) {
                 f.body.setPosition(sx + f.ox + Math.sin(t * 0.7 + f.phase) * 18, sy + f.oy + Math.sin(t * 1.1 + f.phase) * 10);
-                f.body.setScale(sc.dir * (1 + Math.sin(t * 9 + f.phase) * 0.12), 1);   // tail beat
-                f.body.setVisible(camY + f.body.y > 60).setAlpha(f.body.fillAlpha * 0 + 0.32 * depthFade);
+                f.body.setScale(sc.dir * f.body.base.sx * (1 + Math.sin(t * 9 + f.phase) * 0.12), f.body.base.sy);   // tail beat
+                f.body.setVisible(camY + f.body.y > 60).setAlpha(f.body.base.alpha * depthFade);
             }
         }
         for (const ray of this.rays) {
@@ -132,6 +136,38 @@ export default class Backdrop {
             if (b.y < -60 || b.y > H + 80 || b.x < -80 || b.x > W + 80) this.resetBubble(b, b.y > H + 80 || b.x < -80 || b.x > W + 80);
         }
     }
+}
+
+/** Soft-edged textures for everything far away: nothing in the backdrop has a hard outline. */
+function makeSoft(scene) {
+    if (scene.textures.exists('bd_ray')) return;
+    // Light shaft: bright along the middle, feathered to both sides, fading in at the top and out at the bottom.
+    const ray = scene.textures.createCanvas('bd_ray', 128, 256), rc = ray.getContext();
+    const img = rc.createImageData(128, 256);
+    for (let y = 0; y < 256; y++) {
+        const v = y / 255, along = Math.min(1, v * 9) * Math.pow(1 - v, 1.4);
+        for (let x = 0; x < 128; x++) {
+            const u = Math.abs(x / 127 - 0.5) * 2, across = Math.pow(Math.max(0, 1 - u * u), 2.2);
+            const i = (y * 128 + x) * 4;
+            img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+            img.data[i + 3] = 255 * along * across;
+        }
+    }
+    rc.putImageData(img, 0, 0);
+    ray.refresh();
+    // Round glow that fades smoothly to nothing.
+    const glow = scene.textures.createCanvas('bd_glow', 128, 128), gc = glow.getContext();
+    const g = gc.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    gc.fillStyle = g; gc.fillRect(0, 0, 128, 128);
+    glow.refresh();
+    // A fish far away, out of focus: a blurred body with a tail.
+    const fish = scene.textures.createCanvas('bd_fish', 96, 48), fc = fish.getContext();
+    fc.filter = 'blur(3px)';
+    fc.fillStyle = '#ffffff';
+    fc.beginPath(); fc.ellipse(54, 24, 28, 11, 0, 0, Math.PI * 2); fc.fill();
+    fc.beginPath(); fc.moveTo(30, 24); fc.lineTo(10, 12); fc.lineTo(14, 24); fc.lineTo(10, 36); fc.closePath(); fc.fill();
+    fish.refresh();
 }
 
 function makeGradient(scene, key, h, stops) {
