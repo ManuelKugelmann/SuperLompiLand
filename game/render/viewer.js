@@ -158,7 +158,8 @@ async function build(c) {
             const pivot = [px(c.fin.pivotX), py(c.fin.pivotY), z];
             animate = pose => {
                 const beat = Math.sin(pose.phase * 1.15);
-                fin.part = hinge(...pivot, beat * (0.12 + pose.swim * 0.25), -0.25 - beat * 0.2 * (0.4 + pose.swim));
+                // The fin trails backward from its hinge; a positive spread lifts its tip away from the flank.
+                fin.part = hinge(...pivot, beat * (0.12 + pose.swim * 0.25), 0.3 + beat * 0.22 * (0.4 + pose.swim));
             };
         }
         return { ...c, meshes, animate, triangles: body.triangles + 2 * (meshes.length - 1), lit: 1 };

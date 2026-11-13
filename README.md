@@ -64,6 +64,17 @@ Puff:
 
 ![Puff in motion: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-puff.webp)
 
+**Round 2 — a procedural body in a controlled view.** No full 3D after all: a character
+is only ever shown from the angle it was painted from, so its rest pose is the painting
+itself. A procedural body — 8 rings of 8 points along the spine, 132 triangles, fitted to
+the picture's body — carries the art; the picture's alpha cuts the exact outline, the
+triangles only give volume, light and bending. The side fin is a card on its own hinge.
+The loop shows swimming, banking 25° to either side, the mirror turn-around and the puff.
+The motion is still the viewer's simple test motion, not the final swim drivers, and the
+jagged edge when banking away is a known defect of this round.
+
+![Procedural Lompi, 132 triangles: swim, bank, turn-around, puff](docs/devlog/anim-02-procedural.webp)
+
 A colorful 2D pufferfish game — underwater, Super Mario Land-ish — built as an
 installable PWA with **switchable control schemes** for experimentation.
 
