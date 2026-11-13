@@ -25,7 +25,10 @@ export const gameMeta = {
 const IMAGES = {
     puffer_normal: 'puffer_normal.png', puffer_inflated: 'puffer_inflated.png',
     coin: 'coin.png', bubble: 'bubble.png', mine: 'mine.png', urchin: 'urchin.png',
-    coral_1: 'coral_1.png', coral_2: 'coral_2.png', rock_1: 'rock_1.png', bg_far: 'bg_far.jpg'
+    coral_1: 'coral_1.png', coral_2: 'coral_2.png', rock_1: 'rock_1.png', bg_far: 'bg_far.jpg',
+    friend_turtle: 'friend_turtle.png', friend_clownfish: 'friend_clownfish.png',
+    friend_jellyfish: 'friend_jellyfish.png', friend_seahorse: 'friend_seahorse.png',
+    friend_starfish: 'friend_starfish.png', enemy_angler: 'enemy_angler.png', spikes: 'spikes.png'
 };
 
 export default class IntroScene extends Phaser.Scene {

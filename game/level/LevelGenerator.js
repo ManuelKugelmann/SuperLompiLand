@@ -8,6 +8,15 @@ export const LEVEL = {
     seed: 'lompi'
 };
 
+/** Lompi's friends. Art faces right; `swim` = patrol distance, `ground` = sits on the seabed. */
+const FRIENDS = [
+    { key: 'friend_turtle', size: 240, swim: 420, bob: 18 },
+    { key: 'friend_clownfish', size: 170, swim: 520, bob: 10 },
+    { key: 'friend_jellyfish', size: 180, bob: 60 },
+    { key: 'friend_seahorse', size: 150, bob: 26 },
+    { key: 'friend_starfish', size: 170, ground: true, bob: 4 }
+];
+
 /**
  * Endless procedural seabed. The terrain height is a continuous function of x,
  * so chunks join seamlessly; everything else (coral, rocks, coins, hazards) is
@@ -21,6 +30,8 @@ export default class LevelGenerator {
         this.chunks = new Map(); // index -> { objects[], bodies[] }
         this.coins = [];
         this.hazards = [];
+        this.friends = [];
+        this.currents = [];
     }
 
     /** Seabed surface y at world x. */
@@ -115,7 +126,59 @@ export default class LevelGenerator {
             }
         }
 
+        // --- Currents: ride one to keep your momentum ------------------------
+        if (i > 1 && rng.frac() < 0.4) {
+            const w = rng.between(700, 1100), h = 230;
+            const zx = rng.between(x0, x1 - 300);
+            const zy = rng.between(200, this.H - 620);
+            for (let k = 0; k < 9; k++) {
+                const ly = zy + rng.between(10, h - 10);
+                const len = rng.between(90, 220);
+                const streak = keep(s.add.rectangle(zx, ly, len, 6, 0xffffff, 0.0).setOrigin(0, 0.5).setDepth(1));
+                s.tweens.add({
+                    targets: streak, x: zx + w - len, duration: rng.between(1100, 1900), repeat: -1,
+                    delay: rng.between(0, 1500), ease: 'Sine.easeIn',
+                    onUpdate: tw => streak.setAlpha(0.42 * Math.sin(tw.progress * Math.PI))
+                });
+            }
+            this.currents.push({ x: zx, y: zy, w, h, chunk: i });
+        }
+
+        // --- Friends: meet one for a bonus -----------------------------------
+        if (i > 0 && rng.frac() < 0.6) {
+            const f = rng.pick(FRIENDS.filter(d => s.textures.exists(d.key)));
+            if (f) {
+                const x = rng.between(x0 + 200, x1 - 200);
+                const y = f.ground ? this.groundY(x) - f.size * 0.3 : rng.between(230, Math.max(260, this.groundY(x) - 280));
+                const img = keep(s.add.image(x, y, f.key).setDepth(f.ground ? 1 : 4));
+                img.setDisplaySize(f.size, f.size * (img.height / img.width));
+                if (f.swim) {
+                    const dir = rng.sign();
+                    img.setFlipX(dir < 0);
+                    s.tweens.add({
+                        targets: img, x: x + dir * f.swim, duration: rng.between(5000, 8000), yoyo: true, repeat: -1,
+                        ease: 'Sine.easeInOut', onYoyo: () => img.toggleFlipX(), onRepeat: () => img.toggleFlipX()
+                    });
+                }
+                s.tweens.add({ targets: img, y: y - (f.bob || 12), duration: rng.between(1400, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+                this.friends.push({ img, r: f.size * 0.38, greeted: false });
+            }
+        }
+
         // --- Hazards --------------------------------------------------------
+        if (i > 2 && s.textures.exists('spikes') && rng.frac() < 0.25 + difficulty * 0.3) {
+            const x = rng.between(x0 + 150, x1 - 150);
+            this.addHazard(chunk, 'spikes', x, this.groundY(x) - 34, 200, 62);
+        }
+        if (i > 3 && s.textures.exists('enemy_angler') && rng.frac() < 0.2 + difficulty * 0.4) {
+            const x = rng.between(x0 + 500, x1 - 100);
+            const y = rng.between(260, Math.max(280, this.groundY(x) - 300));
+            const angler = this.addHazard(chunk, 'enemy_angler', x, y, 230, 78);
+            s.tweens.add({
+                targets: angler, x: x - 520, duration: rng.between(3800, 5200), yoyo: true, repeat: -1,
+                ease: 'Sine.easeInOut', onYoyo: () => angler.toggleFlipX(), onRepeat: () => angler.toggleFlipX()
+            });
+        }
         if (i > 1) {
             if (rng.frac() < 0.35 + difficulty * 0.45) {
                 const x = rng.between(x0 + 120, x1 - 120);
@@ -144,13 +207,18 @@ export default class LevelGenerator {
 
     addHazard(chunk, key, x, y, size, r, bob = false) {
         const s = this.scene;
-        const img = s.textures.exists(key)
-            ? s.add.image(x, y, key).setDisplaySize(size, size * 0.95)
-            : s.add.star(x, y, 12, r * 0.6, r, key === 'mine' ? 0x33414a : 0x6a2d86);
+        let img;
+        if (s.textures.exists(key)) {
+            img = s.add.image(x, y, key);
+            img.setDisplaySize(size, size * (img.height / img.width));
+        } else {
+            img = s.add.star(x, y, 12, r * 0.6, r, key === 'mine' ? 0x33414a : 0x6a2d86);
+        }
         img.setDepth(3);
         if (bob) s.tweens.add({ targets: img, y: y - 18, angle: 6, duration: 1900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(img);
         this.hazards.push({ img, r });
+        return img;
     }
 
     drop(i) {
@@ -160,5 +228,12 @@ export default class LevelGenerator {
         this.chunks.delete(i);
         this.coins = this.coins.filter(c => c.img.active);
         this.hazards = this.hazards.filter(h => h.img.active);
+        this.friends = this.friends.filter(f => f.img.active);
+        this.currents = this.currents.filter(c => c.chunk !== i);
+    }
+
+    /** True if the point is inside a current stream. */
+    inCurrent(x, y) {
+        return this.currents.some(c => x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h);
     }
 }

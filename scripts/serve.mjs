@@ -10,7 +10,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const PORT = process.env.PORT || 4178;
 const TYPES = {
     '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
-    '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml',
+    '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
     '.webp': 'image/webp', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
     '.woff2': 'font/woff2'
 };

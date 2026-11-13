@@ -16,7 +16,9 @@ const WORLD = {
     gravity: 0.22,        // gentle sink
     current: 0.00028,     // constant rightward drift (force per unit mass)
     cameraLead: 0.34,     // fish sits at this fraction of the screen width
-    coinLossOnHit: 3
+    streamBoost: 0.0016,  // extra push inside a current stream
+    coinLossOnHit: 3,
+    friendBonus: 5
 };
 
 export default class MainScene extends Phaser.Scene {
@@ -140,6 +142,17 @@ export default class MainScene extends Phaser.Scene {
             const pop = this.add.circle(x, y, 30, 0xfff3b0, 0.8).setDepth(3);
             this.tweens.add({ targets: pop, scale: 2.6, alpha: 0, duration: 260, onComplete: () => pop.destroy() });
         }
+        for (const f of this.level.friends) {
+            if (f.greeted || !f.img.active || p.distance(f.img) > fr + f.r) continue;
+            f.greeted = true;
+            this.coins += WORLD.friendBonus;
+            const heart = this.add.text(f.img.x, f.img.y - f.r, `♥ +${WORLD.friendBonus}`, {
+                fontFamily: 'Arial', fontSize: '54px', color: '#ff6b9a', fontStyle: 'bold',
+                stroke: '#ffffff', strokeThickness: 8
+            }).setOrigin(0.5).setDepth(8);
+            this.tweens.add({ targets: heart, y: heart.y - 120, alpha: 0, duration: 1100, onComplete: () => heart.destroy() });
+            this.tweens.add({ targets: f.img, scale: f.img.scale * 1.18, duration: 160, yoyo: true });
+        }
         for (const h of this.level.hazards) {
             if (!h.img.active || p.distance(h.img) > fr + h.r) continue;
             if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
@@ -152,7 +165,8 @@ export default class MainScene extends Phaser.Scene {
     /** One fixed 60 Hz simulation step: all forces + physics, display-rate independent. */
     fixedStep() {
         const sp = this.fish.sprite;
-        sp.applyForce({ x: WORLD.current * sp.body.mass, y: 0 });
+        const stream = this.level.inCurrent(sp.x, sp.y) ? WORLD.streamBoost : 0;
+        sp.applyForce({ x: (WORLD.current + stream) * sp.body.mass, y: 0 });
         this.controller.update(STEP_MS);
         if (this.keys) {
             const k = this.keys;
@@ -181,6 +195,17 @@ export default class MainScene extends Phaser.Scene {
         if (sp.x < leftEdge) {
             sp.setPosition(leftEdge, sp.y);
             if (sp.body.velocity.x < 0) sp.setVelocityX(0);
+        }
+
+        // Bubble trail when moving fast.
+        const v = sp.body.velocity, speed = Math.hypot(v.x, v.y);
+        this.trailAt = (this.trailAt || 0) - delta;
+        if (speed > 9 && this.trailAt <= 0) {
+            this.trailAt = 55;
+            const r = Phaser.Math.Between(6, 15);
+            const b = this.add.circle(sp.x - v.x * 3 + Phaser.Math.Between(-20, 20), sp.y - v.y * 3 + Phaser.Math.Between(-20, 20),
+                r, 0xffffff, 0.35).setStrokeStyle(2, 0xffffff, 0.7).setDepth(4);
+            this.tweens.add({ targets: b, y: b.y - 70, alpha: 0, scale: 1.5, duration: 700, onComplete: () => b.destroy() });
         }
 
         this.level.update(this.camX);
