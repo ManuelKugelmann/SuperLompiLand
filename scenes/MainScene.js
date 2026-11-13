@@ -9,6 +9,7 @@ import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
 import ParticleLayer from '../game/fx/ParticleLayer.js';
+import SwarmLayer from '../game/ai/SwarmLayer.js';
 import BackLayers from '../game/level/BackLayers.js';
 import MidLayers from '../game/level/MidLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
@@ -100,6 +101,12 @@ export default class MainScene extends Phaser.Scene {
         this.flow = createFlow(LEVEL.seed);     // currents and swell: one field for player and particles
         this.flowAt = { x: 0, y: 0 };
         this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
+        this.swarms = new SwarmLayer(this, {   // shoals of small fish around the view (spec 6.2)
+            isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK),
+            flowAt: this.particles.env.flowAt,
+            biomeAt: x => BIOMES[biomeIndexAt(x)].id
+        });
+        this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK) });   // shows the way when stuck (spec 1.4)
 
@@ -183,6 +190,9 @@ export default class MainScene extends Phaser.Scene {
             }
         });
 
+        // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
+        this.events.on('fish-special', ({ x, y }) => this.swarms.startle(x, y));
+
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed, entering }) => {
             if (speed < 2 || this.time.now - (this.lastSplash || -999) < 180) return; // no plop for a gentle bob
@@ -230,6 +240,8 @@ export default class MainScene extends Phaser.Scene {
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             saveNow();
             this.particles.destroy();
+            this.swarms.destroy();
+            this.events.off('fish-special');
             document.removeEventListener('visibilitychange', saveNow);
             window.removeEventListener('pagehide', saveNow);
             this.scene.stop(HUD_KEY);
@@ -770,6 +782,9 @@ export default class MainScene extends Phaser.Scene {
             this.streamBubbles %= 1;
         }
         this.particles.update(delta / 1000);
+        const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step
+        pl.x = view.x; pl.y = view.y; pl.vx = v.x * 60; pl.vy = v.y * 60;
+        this.swarms.update(delta / 1000, view.x, view.y, pl);
         this.oilExposure(delta / 1000);
         this.bobCoins();
         this.discover(delta);
