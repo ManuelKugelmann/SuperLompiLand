@@ -85,6 +85,7 @@ export default class HudScene extends Phaser.Scene {
 
         new BurgerMenu(this, 60, 60, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
+            { label: de ? 'RIFFBUCH' : 'REEF BOOK', color: 0x1d6f9a, callback: () => main.openBook() },
             { label: de ? 'NEU ANFANGEN' : 'START OVER', color: 0x6d4c41, callback: () => main.startOver() },
             main.relaxed
                 ? { label: de ? 'MODUS: ENTSPANNT' : 'MODE: RELAXED', color: 0x00897b, callback: () => main.setRelaxed(false) }

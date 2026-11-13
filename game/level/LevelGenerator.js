@@ -491,7 +491,7 @@ export default class LevelGenerator {
         // Friends are numbered per chunk too. They greet you every time you come
         // back; only the coin bonus is given once per friend, for good.
         const index = chunk.friendCount = (chunk.friendCount ?? -1) + 1;
-        this.friends.push({ img, r: f.size * 0.38, chunkKey: chunk.key, index, greeted: false, rewarded: !!this.state?.has(chunk.key, 'friend', index) });
+        this.friends.push({ img, key, r: f.size * 0.38, chunkKey: chunk.key, index, greeted: false, rewarded: !!this.state?.has(chunk.key, 'friend', index) });
         return img;
     }
 

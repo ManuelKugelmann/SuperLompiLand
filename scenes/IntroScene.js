@@ -5,6 +5,7 @@ import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
 import HudScene, { HUD_KEY } from './HudScene.js';
 import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
+import ReefBookScene, { BOOK_KEY } from './ReefBookScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import Rig from '../game/Rig.js';
@@ -75,6 +76,7 @@ export default class IntroScene extends Phaser.Scene {
             this.scene.add(SCENE_KEYS.END, EndScene, false);
             this.scene.add(HUD_KEY, HudScene, false);
             this.scene.add(STORY_KEY, StoryScene, false);
+            this.scene.add(BOOK_KEY, ReefBookScene, false);
         }
 
         if (this.textures.exists('bg_far')) {

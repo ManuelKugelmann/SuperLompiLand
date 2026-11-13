@@ -19,6 +19,8 @@ import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak } from '../game/music/melody.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
+import { createBook } from '../game/reefbook.js';
+import { BOOK_KEY } from './ReefBookScene.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 
@@ -33,6 +35,8 @@ const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 const OPEN_SLACK = 0.04;
 /** Fin-tip contrails: from this speed (px per step), at these tips (× body radius, nose = +x). */
 const CONTRAIL = { speed: 11, tips: [[-0.35, -0.55], [-0.35, 0.55]] };
+/** Reef book: how often to look around, and how close counts as seen up close (px). */
+const BOOK = { scanMs: 300, seePx: 420 };
 /** How high coins hop on each beat (px). */
 const COIN_BOB_PX = 12;
 
@@ -94,6 +98,7 @@ export default class MainScene extends Phaser.Scene {
         this.flow = createFlow(LEVEL.seed);     // currents and swell: one field for player and particles
         this.flowAt = { x: 0, y: 0 };
         this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
+        this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -509,6 +514,52 @@ export default class MainScene extends Phaser.Scene {
         if (state === 'leave' && g.alpha <= 0) { g.setVisible(false); this.guide.gone(); }
     }
 
+    /**
+     * Reef book: whatever Lompi sees up close (friends, leftovers) and every biome he
+     * enters fills in an entry; the first time, a small card pops up.
+     */
+    discover(delta) {
+        this.seeAt = (this.seeAt || 0) - delta;
+        if (this.seeAt > 0) return;
+        this.seeAt = BOOK.scanMs;
+        const p = this.fish.sprite, r2 = BOOK.seePx * BOOK.seePx;
+        const near = o => o.img.active && (o.img.x - p.x) ** 2 + (o.img.y - p.y) ** 2 < r2;
+        const ids = [BIOMES[biomeIndexAt(p.x)].id];
+        for (const f of this.level.friends) if (f.key && near(f)) ids.push(f.key);
+        for (const h of this.level.hazards) if (h.key && near(h)) ids.push(h.key);
+        for (const id of ids) {
+            const e = this.reefBook.discover(id);
+            if (!e) continue;
+            this.progression.set?.('reefbook', this.reefBook.toJSON());
+            this.bookToast(e);
+        }
+    }
+
+    /** A small card in the corner: "New in the reef book" + picture + name. */
+    bookToast(e) {
+        if (this.ambientMode) return;
+        const de = this.lang === 'de', H = this.scale.height;
+        const box = this.add.container(30, H - 170).setScrollFactor(0).setDepth(55).setAlpha(0);
+        box.add(this.add.rectangle(0, 0, 420, 130, 0x0d3b5c, 0.92).setOrigin(0).setStrokeStyle(3, 0xfff3b0, 0.9));
+        if (e.image && this.textures.exists(e.image)) {
+            const img = this.add.image(70, 65, e.image);
+            img.setScale(Math.min(100 / img.width, 100 / img.height));
+            box.add(img);
+        }
+        box.add(this.add.text(140, 24, de ? 'Neu im Riffbuch' : 'New in the reef book', { fontFamily: 'Arial', fontSize: '24px', color: '#fff3b0', fontStyle: 'bold' }));
+        box.add(this.add.text(140, 60, e.name[this.lang] || e.name.en, { fontFamily: 'Arial', fontSize: '34px', color: '#ffffff', fontStyle: 'bold' }));
+        play('nest');
+        this.tweens.add({ targets: box, alpha: 1, y: H - 190, duration: 300, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: box, alpha: 0, delay: 2600, duration: 500, onComplete: () => box.destroy() });
+    }
+
+    /** Menu: open the reef book over the paused game. */
+    openBook() {
+        this.scene.pause();
+        this.scene.launch(BOOK_KEY, { main: this });
+        this.scene.bringToTop(BOOK_KEY);
+    }
+
     /** Coins hop on the music's beat, all together (spec ch.12, music-synced world). */
     bobCoins() {
         const lift = COIN_BOB_PX * musicClock.pulse(nowSeconds(), 4);
@@ -705,6 +756,7 @@ export default class MainScene extends Phaser.Scene {
         this.particles.update(delta / 1000);
         this.oilExposure(delta / 1000);
         this.bobCoins();
+        this.discover(delta);
         if (!this.ambientMode) this.updateGuide(delta / 1000);
 
         // Bubble trail when moving fast.
