@@ -3,7 +3,7 @@ import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
 import { heartRow, textStyle } from '../game/ui/kit.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, BIOME_WIDTH } from '../game/level/biomes.js';
+import { BIOMES, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
 import { feedbackMenuItems } from '../game/feedback.js';
 import { soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
@@ -56,8 +56,8 @@ export default class HudScene extends Phaser.Scene {
         this.toMap = toMap;
         const mg = this.add.graphics();
         mg.fillStyle(0x06343a, 0.55).fillRoundedRect(this.mapX - 10, this.mapY - 16, this.mapW + 20, 32, 14);
-        BIOMES.forEach((b, i) => {
-            const x0 = toMap(b.from), x1 = toMap(BIOMES[i + 1] ? BIOMES[i + 1].from : b.from + BIOME_WIDTH);
+        BIOMES.forEach(b => {
+            const x0 = toMap(b.from), x1 = toMap(b.from + b.width);
             mg.fillStyle(b.rock[1], 1).fillRect(x0, this.mapY - 7, Math.max(2, x1 - x0 - 2), 14);
         });
         mg.fillStyle(0x0a1436, 1).fillTriangle(toMap(ABYSS.x) - 7, this.mapY + 7, toMap(ABYSS.x) + 7, this.mapY + 7, toMap(ABYSS.x), this.mapY + 20);

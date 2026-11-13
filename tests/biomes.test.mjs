@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BIOMES, BIOME_WIDTH, WORLD_WEST, WORLD_END, ABYSS, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted
 } from '../game/level/biomes.js';
 
 test('biomes are ordered west to east and every table is complete', () => {
     for (let i = 1; i < BIOMES.length; i++) assert.ok(BIOMES[i].from > BIOMES[i - 1].from);
     assert.equal(BIOMES[0].from, WORLD_WEST);
-    assert.equal(WORLD_END, BIOMES.at(-1).from + BIOME_WIDTH);
+    assert.equal(WORLD_END, BIOMES.at(-1).from + BIOMES.at(-1).width);
+    for (let i = 1; i < BIOMES.length; i++) assert.equal(BIOMES[i].from, BIOMES[i - 1].from + BIOMES[i - 1].width, 'no gaps');
+    assert.ok(WORLD_END - WORLD_WEST >= 80000, 'a big world');
     for (const b of BIOMES) {
         assert.equal(b.rock.length, 5, `${b.id}: five rock bands`);
         assert.equal(b.water.length, 2, `${b.id}: water tint`);

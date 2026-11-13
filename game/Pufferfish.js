@@ -22,7 +22,7 @@ export const FISH = {
     sinkForce: 0.00012,    // what the world gravity does to a fish, per unit mass (used to cancel part of it)    // cancels the sink while inflated (hover in place)     // upward force per unit mass while inflated
     airGravity: 0.0011,    // extra downward force per unit mass above the water
     airDrag: 0.0015,        // almost no drag in the air
-    airTurn: 0.022,        // radians per step the flight path can be bent in the air (no speed gain)
+    airTurn: 0.009,        // radians per step the flight path can be bent in the air (no speed gain)
     shoveRadius: 340,
     shovePower: 16
 };
@@ -122,8 +122,12 @@ export default class Pufferfish {
         this.view.setPosition(old.x, old.y).setRotation(old.rotation).setAlpha(1).setVisible(true);
         if (old !== this.view) { old.setVisible(false); old.fin?.setVisible(false); }
         this.view.fin?.setVisible(true);
+        // Rebuild the collision circle AT THE CURRENT PLACE. Phaser would otherwise
+        // put the new body where the sprite was last positioned by hand (the
+        // start point), teleporting the fish there on every puff.
+        const at = sp.body ? { x: sp.body.position.x, y: sp.body.position.y } : { x: sp.x, y: sp.y };
         sp.setScale(1);
-        sp.setBody({ type: 'circle', radius: s.radius });
+        sp.setBody({ type: 'circle', radius: s.radius, x: at.x, y: at.y });
         sp.setFixedRotation()
             .setMass(FISH.mass)
             .setFrictionAir(this.inAir ? FISH.airDrag : s.air * this.move.drag)
