@@ -26,6 +26,8 @@ export default class VirtualStickController extends ControllerBase {
         this.listen(this.scene.input, 'pointerdown', this.onDown);
         this.listen(this.scene.input, 'pointermove', this.onMove);
         this.listen(this.scene.input, 'pointerup', this.onUp);
+        // Losing the window (another app, a system dialog) lets go of the stick too.
+        this.listen(this.scene.game.events, 'blur', this.recenter);
     }
 
     onDown(pointer) {
@@ -49,6 +51,11 @@ export default class VirtualStickController extends ControllerBase {
 
     onUp(pointer) {
         if (!this.active || pointer.id !== this.pointerId) return;
+        this.recenter();
+    }
+
+    /** Let go: the thumb springs back to the middle and the fish gets no more push. */
+    recenter() {
         this.active = false;
         this.pointerId = null;
         this.vec.set(0, 0);
@@ -56,6 +63,9 @@ export default class VirtualStickController extends ControllerBase {
     }
 
     update() {
+        // A press can also end without any event reaching us (the pointer was taken away by
+        // the system): the pointer itself knows whether it is still down.
+        if (this.active && !this.scene.input.manager.pointers.some(p => p.id === this.pointerId && p.isDown)) this.recenter();
         if (this.active && this.vec.length() > 0.05) this.fish.thrust(this.vec);
     }
 }

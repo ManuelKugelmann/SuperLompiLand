@@ -20,6 +20,10 @@ export default class ControllerBase {
     listen(target, event, fn) {
         target.on(event, fn, this);
         this._listeners.push([target, event, fn]);
+        // A press that is let go outside the game picture (beside it on a wide window, over
+        // the browser frame) arrives as a different event. Without it a scheme would never
+        // learn that the finger is up and would keep steering.
+        if (event === 'pointerup') this.listen(target, 'pointerupoutside', fn);
         return this;
     }
 
