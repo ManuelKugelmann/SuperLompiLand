@@ -7,6 +7,8 @@ export const FISH = {
     brake: 0.9,
     alignFrom: 3,          // below this speed the fish stays level
     alignFull: 8,          // from this speed it fully points along its movement
+    finFlapMin: 7,         // side fin swing in degrees when idle ...
+    finFlapMore: 14,       // ... plus this much at full effort (kept small: the retouch under the fin is rough)
     wiggleSegments: 12,    // strips the sprite is cut into for the swim animation
     turnRate: 0.2,         // radians per step the nose turns toward the travel direction            // velocity kept per step while braking
     mass: 6,
@@ -54,8 +56,22 @@ export default class Pufferfish {
         // swim animation (see render()).
         this.views = {};
         for (const [name, s] of Object.entries(FISH.states)) {
-            const rope = scene.add.rope(x, y, s.key, null, FISH.wiggleSegments, true).setDepth(5).setVisible(false);
+            // With the layered art (body without side fin + the fin on its own)
+            // the fin flaps separately; otherwise the single image is used as is.
+            const pivot = scene.cache.json.get('fins')?.[s.key];
+            const layered = !!pivot && scene.textures.exists(`${s.key}_body`) && scene.textures.exists(`${s.key}_fin`);
+            const rope = scene.add.rope(x, y, layered ? `${s.key}_body` : s.key, null, FISH.wiggleSegments, true)
+                .setDepth(5).setVisible(false);
             rope.baseScale = s.width / rope.frame.width;
+            if (layered) {
+                const fin = scene.add.image(x, y, `${s.key}_fin`).setDepth(5.1).setVisible(false);
+                fin.setOrigin((pivot.pivotX - pivot.finX) / fin.width, (pivot.pivotY - pivot.finY) / fin.height);
+                // fin joint relative to the body centre, in texture pixels
+                fin.jointX = pivot.pivotX - rope.frame.width / 2;
+                fin.jointY = pivot.pivotY - rope.frame.height / 2;
+                fin.tail = 1 - pivot.pivotX / rope.frame.width; // 1 = at the tail end
+                rope.fin = fin;
+            }
             this.views[name] = rope;
         }
         this.view = this.views.normal;
@@ -80,7 +96,8 @@ export default class Pufferfish {
         const old = this.view;
         this.view = this.views[name];
         this.view.setPosition(old.x, old.y).setRotation(old.rotation).setAlpha(1).setVisible(true);
-        if (old !== this.view) old.setVisible(false);
+        if (old !== this.view) { old.setVisible(false); old.fin?.setVisible(false); }
+        this.view.fin?.setVisible(true);
         sp.setScale(1);
         sp.setBody({ type: 'circle', radius: s.radius });
         sp.setFixedRotation()
@@ -228,10 +245,16 @@ export default class Pufferfish {
         // heading left it is mirrored vertically so it never swims belly-up.
         const v = this.body.velocity;
         const speed = Math.hypot(v.x, v.y);
-        if (Math.abs(v.x) > 0.8) this.facing = v.x < 0 ? -1 : 1;
+        const facing = Math.abs(v.x) > 0.8 ? (v.x < 0 ? -1 : 1) : this.facing;
+        if (facing !== this.facing) {
+            // Turning round mirrors the fish; mirror its angle too so it flips
+            // in place instead of rolling over its back.
+            this.facing = facing;
+            this.view.rotation = Phaser.Math.Angle.Wrap(Math.PI - this.view.rotation);
+        }
         const level = this.facing < 0 ? Math.PI : 0;
         const follow = Phaser.Math.Clamp((speed - FISH.alignFrom) / (FISH.alignFull - FISH.alignFrom), 0, 1);
-        const target = level + Phaser.Math.Angle.Wrap(Math.atan2(v.y, v.x) - level) * follow;
+        const target = Phaser.Math.Angle.Wrap(level + Phaser.Math.Angle.Wrap(Math.atan2(v.y, v.x) - level) * follow);
         this.view.setScale(this.view.baseScale, this.view.baseScale * (this.facing < 0 ? -1 : 1));
         this.view.rotation = Phaser.Math.Angle.RotateTo(this.view.rotation, target, FISH.turnRate * frames);
 
@@ -248,6 +271,22 @@ export default class Pufferfish {
             pts[i].y = Math.sin(this.swimPhase - tail * 2.6) * amp * tail * tail;
         }
         this.view.setDirty();
+
+        // Side fin: paddles around its joint, faster and wider the harder the
+        // fish swims. It rides on the body (position, turn, mirroring, wiggle).
+        const fin = this.view.fin;
+        if (fin) {
+            const flip = this.facing < 0 ? -1 : 1;
+            const sc = this.view.baseScale;
+            const wave = Math.sin(this.swimPhase - fin.tail * 2.6) * amp * fin.tail * fin.tail;
+            const lx = fin.jointX * sc, ly = (fin.jointY + wave) * sc * flip;
+            const cos = Math.cos(this.view.rotation), sin = Math.sin(this.view.rotation);
+            fin.setPosition(this.view.x + lx * cos - ly * sin, this.view.y + lx * sin + ly * cos);
+            fin.setScale(sc, sc * flip);
+            const flap = Math.sin(this.swimPhase * 1.15) * Phaser.Math.DegToRad(FISH.finFlapMin + drive * FISH.finFlapMore);
+            fin.rotation = this.view.rotation + flap * flip;
+            fin.setAlpha(this.view.alpha);
+        }
     }
 }
 

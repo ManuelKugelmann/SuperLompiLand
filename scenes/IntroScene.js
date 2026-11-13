@@ -29,7 +29,10 @@ const IMAGES = {
     coral_1: 'coral_1.png', coral_2: 'coral_2.png', rock_1: 'rock_1.png', bg_far: 'bg_far.jpg',
     friend_turtle: 'friend_turtle.png', friend_clownfish: 'friend_clownfish.png',
     friend_jellyfish: 'friend_jellyfish.png', friend_seahorse: 'friend_seahorse.png',
-    friend_starfish: 'friend_starfish.png', enemy_angler: 'enemy_angler.png', spikes: 'spikes.png'
+    friend_starfish: 'friend_starfish.png', enemy_angler: 'enemy_angler.png', spikes: 'spikes.png',
+    // Lompi split into body + side fin so the fin can flap (see fins.json for the pivots).
+    puffer_normal_body: 'puffer_normal_body.png', puffer_normal_fin: 'puffer_normal_fin.png',
+    puffer_inflated_body: 'puffer_inflated_body.png', puffer_inflated_fin: 'puffer_inflated_fin.png'
 };
 
 export default class IntroScene extends Phaser.Scene {
@@ -47,6 +50,7 @@ export default class IntroScene extends Phaser.Scene {
         for (const [key, file] of Object.entries(IMAGES)) {
             if (!this.textures.exists(key)) this.load.image(key, `img/${file}`);
         }
+        if (!this.cache.json.exists('fins')) this.load.json('fins', 'img/fins.json');
     }
 
     create() {
