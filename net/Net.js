@@ -95,6 +95,8 @@ export default class Net {
     async rejoin() {
         const old = this.room;
         this.room = null;
+        // The old connections are gone: say so, so ghosts disappear until the peers come back.
+        for (const id of this.peers) this.leaveCbs.forEach(cb => cb(id));
         this.peers.clear();
         try { await old?.leave(); } catch { /* already gone */ }
         return this.open();

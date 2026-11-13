@@ -1,7 +1,9 @@
 import { openNet } from '../net/config.js';
 import RemoteFish from './RemoteFish.js';
 import { EMOTES, EMOTE_ICON, isEmote, colorsFor, RateLimit } from '../net/social.js';
-import { cleanState, cleanEvent, Strikes } from '../net/validate.js';
+import { cleanState, cleanEvent, Strikes, bitsOf, syncBatches, WORLD_KINDS } from '../net/validate.js';
+import { roomStorageKey } from '../net/keys.js';
+import { normalizeSecret } from '../net/secret.js';
 import { HUD_KEY } from '../scenes/HudScene.js';
 import { pillButton, textStyle } from './ui/kit.js';
 
@@ -10,6 +12,8 @@ const WAKE_REJOIN_MS = 5000; // hidden at least this long -> rejoin on return
 const EMOTE_GAP_MS = 700;    // one emote per this long, per player
 const BUBBLE_MS = 5000;      // a downed friend's revive bubble lasts this long (then they respawn solo)
 const BUBBLE_R = 110;        // revive bubble radius (px)
+const LOST_MS = 6000;        // friends all quiet this long -> reconnect (public relays can drop us)
+const RETRY_MAX_MS = 60000;  // back off up to this between reconnect attempts
 
 /**
  * Glue between a MainScene and the network: broadcasts the local fish and
@@ -18,10 +22,19 @@ const BUBBLE_R = 110;        // revive bubble radius (px)
  *   update():   this.mp?.tick(this.fish)
  *   SHUTDOWN:   this.mp?.destroy()
  * and may use: mp.nearFriends(x, y, r) (school boost), mp.downed(x, y) (0 hearts),
- * and implement scene.revive() (a friend touched our revive bubble).
+ * mp.claim(chunkKey, kind, index) (a pickup was collected here), and implement
+ * scene.revive() (a friend touched our revive bubble) and
+ * scene.level.take(chunkKey, kind, index) (a friend collected it: remove it if spawned).
+ * Multiplayer.worldKey(registry) is the save key for the room's shared world.
  * The room name comes from the scene registry key 'room' (set by IntroScene).
  */
 export default class Multiplayer {
+    /** localStorage key for this room's shared world (a hash, never the name), or null when solo. */
+    static worldKey(registry) {
+        const room = normalizeSecret(registry.get('room'));
+        return room ? roomStorageKey(room) : null;
+    }
+
     static create(scene) {
         const secret = scene.registry.get('room');
         return secret ? new Multiplayer(scene, secret) : null;
@@ -46,13 +59,23 @@ export default class Multiplayer {
         this.menu = null;         // room menu (word + invite), behind a tap on the badge
         this.bubbles = new Map(); // userId -> { x, y, until, ring, label }
         this.downAt = -Infinity;
+        // Watchdog: if we had friends and all of them went quiet, rejoin (with back-off).
+        this.hadFriends = false;
+        this.quietSince = 0;
+        this.retryGap = LOST_MS;
+        this.retryAt = 0;
 
         this.net.onState((id, raw) => {
             if (this.strikes.blocked(id)) return;
             const snap = cleanState(raw);
             if (!snap) { this.strikes.bad(id); return; }
             let g = this.ghosts.get(id);
-            if (!g) this.ghosts.set(id, g = new RemoteFish(scene));
+            if (!g) {
+                this.ghosts.set(id, g = new RemoteFish(scene));
+                // First snapshot from someone new: the channel is open both ways now, so send
+                // them what this room has collected so far (they OR-merge it).
+                this.sendSync();
+            }
             g.push(snap, performance.now());
         });
         this.net.onLeave(id => {
@@ -72,6 +95,8 @@ export default class Multiplayer {
             const ev = cleanEvent(raw);
             if (!ev) { this.strikes.bad(id); return; }
             if (ev.t === 'down' && this.ghosts.has(id)) this.addBubble(id, ev.x, ev.y);
+            if (ev.t === 'claim') this.applyClaim(ev.c, ev.k, ev.i);
+            if (ev.t === 'sync') for (const [c, k, b] of ev.e) for (const i of bitsOf(b, WORLD_KINDS[k])) this.applyClaim(c, k, i);
             if (ev.t === 'revive') {
                 this.dropBubble(ev.id);
                 // Someone touched our bubble: back in the game (only if we are actually down).
@@ -103,6 +128,27 @@ export default class Multiplayer {
         let n = 0;
         for (const g of this.ghosts.values()) if (g.pos && Math.hypot(g.pos.x - x, g.pos.y - y) <= r) n++;
         return n;
+    }
+
+    /** We collected pickup `index` of `kind` in chunk `chunkKey`: it is gone for the whole team. */
+    claim(chunkKey, kind, index) {
+        this.net.sendEvent?.({ t: 'claim', c: chunkKey, k: kind, i: index });
+    }
+
+    /** A friend collected it (or it arrived in a sync): mark it, and take it out of the level if it is there. */
+    applyClaim(chunkKey, kind, index) {
+        const world = this.scene.world;
+        if (!world || world.has(chunkKey, kind, index)) return;
+        world.set(chunkKey, kind, index);
+        this.scene.level?.take?.(chunkKey, kind, index);
+    }
+
+    /** Our room bitfields, a few chunks per message, spaced out so no rate limit trips. */
+    sendSync() {
+        const world = this.scene.world;
+        if (!world?.chunks) return;
+        const batches = syncBatches(world.chunks).slice(0, 200);
+        batches.forEach((ev, i) => setTimeout(() => this.net.sendEvent?.(ev), 120 + i * 60));
     }
 
     /** Our fish has 0 hearts at (x, y): friends get a revive bubble there for a few seconds. */
@@ -139,8 +185,22 @@ export default class Multiplayer {
         this.myRing.setVisible(together);
         if (together) this.myRing.setPosition(fish.view.x, fish.view.y).setRadius(fish.radius * 1.25);
         this.updateBubbles(now);
+        this.watchdog(now);
         this.ensureHud();
         this.updateBadge();
+    }
+
+    /** Reconnect when every friend has gone quiet (dropped relay, sleeping network), backing off. */
+    watchdog(now) {
+        let live = 0;
+        for (const g of this.ghosts.values()) if (g.pos) live++;
+        if (live > 0) { this.hadFriends = true; this.quietSince = 0; this.retryGap = LOST_MS; return; }
+        if (!this.hadFriends || document.hidden) return;
+        if (!this.quietSince) { this.quietSince = now; this.retryAt = now + LOST_MS; return; }
+        if (now < this.retryAt) return;
+        this.retryAt = now + this.retryGap;
+        this.retryGap = Math.min(RETRY_MAX_MS, this.retryGap * 2);
+        this.net.rejoin();
     }
 
     /** Same colours on every screen: sorted player ids -> palette. */

@@ -7,6 +7,22 @@ export const APP_ID = 'reef-swim-pals-v1';
 
 const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 
+/**
+ * Local save key for a room's shared world (spec: keyed by a derived id, no names).
+ * Synchronous (FNV-1a, 2 x 32 bit) because the scene needs it while it builds;
+ * it only names a localStorage entry on this device, nothing leaves the device.
+ */
+export function roomStorageKey(secret) {
+    const s = `${APP_ID}|${secret}`;
+    let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995;
+    for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        a = Math.imul(a ^ c, 0x01000193) >>> 0;
+        b = Math.imul(b ^ c, 0x5bd1e995) >>> 0;
+    }
+    return `sll_room_${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
+}
+
 /** normalised name -> { room, password }: 48 + 80 hex chars, PBKDF2-SHA-256, 120k rounds. */
 export async function deriveKeys(secret) {
     const enc = new TextEncoder();
