@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/SuperLompiLand/phaser4/sw.js', { scope: '/SuperLompiLand/phaser4/' })})}
