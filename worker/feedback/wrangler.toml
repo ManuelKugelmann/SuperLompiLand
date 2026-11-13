@@ -1,0 +1,21 @@
+name = "lompi-feedback"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+GITHUB_REPO = "ManuelKugelmann/SuperLompiLand"
+ALLOWED_ORIGINS = "https://manuelkugelmann.github.io,http://localhost:8080,http://localhost:4178"
+# Optional place filter (leave empty to skip a field). Country is an ISO code, e.g. "DE".
+ALLOWED_COUNTRY = ""
+ALLOWED_REGION = ""
+ALLOWED_CITY = ""
+
+# Hourly counter. Create once with:  npx wrangler kv namespace create RATE
+# and paste the id it prints here.
+[[kv_namespaces]]
+binding = "RATE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Secrets (never in this file):
+#   npx wrangler secret put GITHUB_TOKEN   # fine-grained token: Issues read & write, this repo only
+#   npx wrangler secret put FAMILY_CODE    # optional shared code

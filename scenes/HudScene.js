@@ -3,6 +3,7 @@ import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, BIOME_WIDTH } from '../game/level/biomes.js';
+import { feedbackMenuItems } from '../game/feedback.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
@@ -84,6 +85,10 @@ export default class HudScene extends Phaser.Scene {
             main.relaxed
                 ? { label: de ? 'MODUS: ENTSPANNT' : 'MODE: RELAXED', color: 0x00897b, callback: () => main.setRelaxed(false) }
                 : { label: de ? 'MODUS: ABENTEUER' : 'MODE: ADVENTURE', color: 0xc62828, callback: () => main.setRelaxed(true) },
+            ...feedbackMenuItems(main.lang, () => ({
+                biome: BIOMES[main.biomeIndex]?.id, x: Math.round(main.fish.sprite.x), depth: main.depthMeters(),
+                character: main.character.id, controls: main.activeScheme, mode: main.relaxed ? 'relaxed' : 'adventure'
+            })),
             ...pwaMenuItems(this, main.lang),
             { label: de ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => main.scene.start('MainMenuScene') }
         ]);

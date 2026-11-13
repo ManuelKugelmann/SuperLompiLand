@@ -7,6 +7,7 @@ import HudScene, { HUD_KEY } from './HudScene.js';
 import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
+import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const gameMeta = {
@@ -80,6 +81,7 @@ export default class IntroScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         this.buildCarousel(lang);
+        flushFeedbackQueue();
 
         this.add.text(W - 24, H - 20, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
@@ -87,6 +89,7 @@ export default class IntroScene extends Phaser.Scene {
 
         new BurgerMenu(this, 60, 60, [
             { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => this.scene.start(STORY_KEY) },
+            ...feedbackMenuItems(lang, () => ({ screen: 'title' })),
             ...pwaMenuItems(this, lang),
             { label: lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
         ]);
