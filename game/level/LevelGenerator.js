@@ -67,6 +67,7 @@ export default class LevelGenerator {
         this.animated = [];
         this.lights = [];     // glows that follow a creature
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
+        this.buildMs = { last: 0, max: 0, count: 0 };   // cost of building chunks, shown by ?debug=perf
         this.makeKelpTexture();
         this.makeRootTextures();
         this.nests = this.findNests();
@@ -147,7 +148,13 @@ export default class LevelGenerator {
             // at yet anyway); everything else, including the margin, one per frame.
             const onScreen = ([cx, cy]) => cx * CH < camX + W && (cx + 1) * CH > camX && cy * CH < camY + H && (cy + 1) * CH > camY;
             const batch = this.chunks.size === 0 ? missing.filter(onScreen) : missing.slice(0, 1);
-            for (const [cx, cy] of (batch.length ? batch : missing.slice(0, 1))) this.build(cx, cy);
+            for (const [cx, cy] of (batch.length ? batch : missing.slice(0, 1))) {
+                const t0 = performance.now();
+                this.build(cx, cy);
+                const ms = performance.now() - t0;
+                this.buildMs.last = ms; this.buildMs.count++;
+                if (ms > this.buildMs.max) this.buildMs.max = ms;
+            }
         }
         for (const key of [...this.chunks.keys()]) {
             const [cx, cy] = key.split(',').map(Number);

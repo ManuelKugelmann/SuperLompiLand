@@ -89,6 +89,23 @@ npm test         # unit tests (node --test, no extra dependencies)
 - Never put project, personal or studio names into prompts sent to outside
   services.
 
+## Performance
+
+Check with `?debug=perf` (on a real phone when it matters) after any change to
+world generation, effects or per-frame code. Budgets on a mid-range phone:
+
+- game logic (physics + world+fx) well under 4 ms per frame; it is ~0.3 ms on desktop
+- building one chunk under ~15 ms, never more than one per frame after start-up
+- at rest: objects < 600, tweens < 300; both must fall back after effects end
+  (spawned circles/stars are destroyed by their tween's onComplete)
+- terrain is baked into render textures once per chunk — never redraw vector
+  shapes every frame (that cost more than everything else together)
+
+The automation browser tab is often throttled to a few fps and its frame rate
+means nothing; measure logic time and object counts there, frame rate on a device.
+When stepping the scene by hand in a test, tweens do not advance reliably, so
+object counts grow — use the real loop for leak checks.
+
 ## Verifying changes
 
 Build must pass, then check the running game in the browser (desktop landscape

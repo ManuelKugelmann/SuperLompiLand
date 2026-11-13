@@ -109,6 +109,7 @@ export default class HudScene extends Phaser.Scene {
             `fps ${Math.round(loop.actualFps)}   frame ${loop.delta.toFixed(1)} ms`,
             `physics ${avg(p.physics)} ms  (max ${p.physics.max.toFixed(1)})`,
             `world+fx ${avg(p.world)} ms  (max ${p.world.max.toFixed(1)})`,
+            `chunk build ${m.level.buildMs.last.toFixed(1)} ms  (max ${m.level.buildMs.max.toFixed(1)}, n ${m.level.buildMs.count})`,
             `chunks ${m.level.chunks.size}  bodies ${m.matter.world.localWorld.bodies.length}`,
             `objects ${m.children.list.length}  tweens ${m.tweens.getTweens().length}`,
             `dpr ${window.devicePixelRatio}  ${this.game.renderer.type === 2 ? 'webgl' : 'canvas'}`
