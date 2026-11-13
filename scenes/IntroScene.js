@@ -5,6 +5,7 @@ import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
 import HudScene, { HUD_KEY } from './HudScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
+import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const gameMeta = {
@@ -30,6 +31,7 @@ const IMAGES = {
     friend_turtle: 'friend_turtle.png', friend_clownfish: 'friend_clownfish.png',
     friend_jellyfish: 'friend_jellyfish.png', friend_seahorse: 'friend_seahorse.png',
     friend_starfish: 'friend_starfish.png', enemy_angler: 'enemy_angler.png', spikes: 'spikes.png',
+    player_shark: 'player_shark.png', player_firefish: 'player_firefish.png', player_flyingfish: 'player_flyingfish.png',
     // Lompi split into body + side fin so the fin can flap (see fins.json for the pivots).
     puffer_normal_body: 'puffer_normal_body.png', puffer_normal_fin: 'puffer_normal_fin.png',
     puffer_inflated_body: 'puffer_inflated_body.png', puffer_inflated_fin: 'puffer_inflated_fin.png'
@@ -67,21 +69,12 @@ export default class IntroScene extends Phaser.Scene {
             this.add.image(W / 2, H / 2, 'bg_far').setDisplaySize(W, H);
         }
 
-        this.add.text(W / 2, H * 0.2, 'Super Lompi Land', {
+        this.add.text(W / 2, H * 0.13, 'Super Lompi Land', {
             fontFamily: 'Arial, sans-serif', fontSize: '128px', color: '#ffffff',
             fontStyle: 'bold', stroke: '#0a5c7a', strokeThickness: 14
         }).setOrigin(0.5);
 
-        if (this.textures.exists('puffer_inflated')) {
-            const fish = this.add.image(W / 2, H * 0.62, 'puffer_inflated').setScale(0.85);
-            this.tweens.add({ targets: fish, y: fish.y - 28, angle: 4, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-        }
-
-        const startText = this.add.text(W / 2, H * 0.9,
-            lang === 'de' ? 'Tippen zum Starten' : 'Tap to Start',
-            { fontFamily: 'Arial, sans-serif', fontSize: '52px', color: '#ffffff', fontStyle: 'bold' }
-        ).setOrigin(0.5).setAlpha(0.35);
-        this.tweens.add({ targets: startText, alpha: 1, duration: 800, yoyo: true, repeat: -1 });
+        this.buildCarousel(lang);
 
         this.add.text(W - 24, H - 20, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
@@ -92,9 +85,94 @@ export default class IntroScene extends Phaser.Scene {
             { label: lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
         ]);
 
-        this.input.on('pointerdown', (pointer, currentlyOver) => {
-            if (currentlyOver.length > 0) return;
-            this.scene.start(SCENE_KEYS.MAIN);
+    }
+
+    /** Character carousel: swipe, arrows or tap a neighbour to choose; tap the middle one or GO to start. */
+    buildCarousel(lang) {
+        const W = this.scale.width, H = this.scale.height;
+        const cy = H * 0.52, SPACING = 430;
+        this.index = Math.max(0, CHARACTERS.findIndex(c => c.id === loadSelectedId()));
+        this.slot = this.index; // animated, fractional position
+
+        this.cards = CHARACTERS.map((c, i) => {
+            const key = this.textures.exists(c.states.normal.key) ? c.states.normal.key : 'puffer_normal';
+            const img = this.add.image(W / 2, cy, key).setInteractive({ useHandCursor: true });
+            img.fit = Math.min(360 / img.width, 300 / img.height);
+            img.on('pointerup', () => { if (!this.swiped) (i === this.index ? this.start() : this.select(i)); });
+            return img;
+        });
+
+        this.nameText = this.add.text(W / 2, H * 0.74, '', {
+            fontFamily: 'Arial', fontSize: '64px', color: '#ffffff', fontStyle: 'bold', stroke: '#0a5c7a', strokeThickness: 10
+        }).setOrigin(0.5);
+        this.blurbText = this.add.text(W / 2, H * 0.805, '', {
+            fontFamily: 'Arial', fontSize: '34px', color: '#eafcff', stroke: '#0a3f6e', strokeThickness: 6
+        }).setOrigin(0.5);
+        this.lang = lang;
+
+        const arrow = (x, label, step) => {
+            const t = this.add.text(x, cy, label, {
+                fontFamily: 'Arial', fontSize: '110px', color: '#ffffff', fontStyle: 'bold', stroke: '#0a5c7a', strokeThickness: 10
+            }).setOrigin(0.5).setAlpha(0.85).setInteractive({ useHandCursor: true });
+            t.on('pointerdown', () => this.select(this.index + step));
+        };
+        arrow(110, '‹', -1);
+        arrow(W - 110, '›', 1);
+
+        const go = this.add.text(W / 2, H * 0.905, lang === 'de' ? 'Los geht\u2019s!' : 'Let\u2019s go!', {
+            fontFamily: 'Arial', fontSize: '52px', color: '#06343a', fontStyle: 'bold',
+            backgroundColor: '#ffc266', padding: { x: 54, y: 18 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        go.on('pointerdown', () => this.start());
+        this.tweens.add({ targets: go, scale: 1.06, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+        // Swipe anywhere to turn the carousel.
+        this.swiped = false;
+        this.input.on('pointerdown', p => { this.swipeX = p.x; this.swiped = false; });
+        this.input.on('pointerup', p => {
+            const dx = p.x - (this.swipeX ?? p.x);
+            if (Math.abs(dx) > 90) { this.swiped = true; this.select(this.index + (dx < 0 ? 1 : -1)); }
+        });
+        this.input.keyboard?.on('keydown-LEFT', () => this.select(this.index - 1));
+        this.input.keyboard?.on('keydown-RIGHT', () => this.select(this.index + 1));
+        this.input.keyboard?.on('keydown-ENTER', () => this.start());
+        this.input.keyboard?.on('keydown-SPACE', () => this.start());
+        this.carousel = { cy, SPACING };
+        this.select(this.index);
+    }
+
+    select(i) {
+        const n = CHARACTERS.length;
+        this.index = ((i % n) + n) % n;
+        const c = CHARACTERS[this.index];
+        saveSelectedId(c.id);
+        this.registry.set('character', c.id);
+        this.nameText.setText(c.name);
+        this.blurbText.setText(c.blurb[this.lang] || c.blurb.en);
+    }
+
+    start() {
+        this.scene.start(SCENE_KEYS.MAIN);
+    }
+
+    update(time, delta) {
+        if (!this.cards) return;
+        const W = this.scale.width, n = CHARACTERS.length;
+        // Ease the (wrapping) carousel position toward the selected index.
+        let d = this.index - this.slot;
+        if (d > n / 2) d -= n;
+        if (d < -n / 2) d += n;
+        this.slot += d * Math.min(1, delta / 110);
+        const bob = Math.sin(time / 600) * 12;
+        this.cards.forEach((img, i) => {
+            let off = i - this.slot;
+            off = ((off % n) + n) % n;
+            if (off > n / 2) off -= n;
+            const near = Math.max(0, 1 - Math.abs(off));
+            img.setPosition(W / 2 + off * this.carousel.SPACING, this.carousel.cy + (near > 0.5 ? bob : 0));
+            img.setScale(img.fit * (0.5 + near * 0.6));
+            img.setAlpha(Math.abs(off) > 2.2 ? 0 : 0.45 + near * 0.55);
+            img.setDepth(near > 0.5 ? 2 : 1);
         });
     }
 }

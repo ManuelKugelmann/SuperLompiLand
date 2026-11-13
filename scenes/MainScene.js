@@ -4,6 +4,7 @@ import Pufferfish from '../game/Pufferfish.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
+import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { waveY } from '../game/level/surface.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
@@ -17,7 +18,7 @@ const WORLD = {
     lookAhead: 9,         // camera leads the fish by velocity * this
     doubleTapMs: 320,
     doubleTapDist: 110,
-    coinLossOnHit: 3,
+    maxHealth: 5,
     friendBonus: 5
 };
 
@@ -45,7 +46,10 @@ export default class MainScene extends Phaser.Scene {
         this.level = new LevelGenerator(this);
         this.level.update(this.camX, this.camY);
 
-        this.fish = new Pufferfish(this, LEVEL.spawn.x, LEVEL.spawn.y);
+        this.character = getCharacter(this.registry.get('character') || loadSelectedId());
+        this.fish = new Pufferfish(this, LEVEL.spawn.x, LEVEL.spawn.y, this.character);
+        this.health = WORLD.maxHealth;
+        this.maxHealth = WORLD.maxHealth;
 
         const saved = this.progression.get?.('scheme', null);
         this.activeScheme = CONTROL_SCHEMES.some(s => s.id === saved) ? saved : CONTROL_SCHEMES[0].id;
@@ -63,11 +67,11 @@ export default class MainScene extends Phaser.Scene {
         this.prevTopOnly = this.input.manager.globalTopOnly;
         this.input.manager.globalTopOnly = false;
 
-        // Double tap = puff, in every control scheme except flap (rapid taps
-        // are swimming there; it uses a long press instead).
+        // Double tap = puff, except in the tap-driven schemes (flap, tilt), where
+        // rapid taps are swimming; those use a long press instead.
         this.lastTap = { t: -9999, x: 0, y: 0 };
         this.input.on('pointerdown', pointer => {
-            if (this.isOverHud(pointer) || this.activeScheme === 'flap') return;
+            if (this.isOverHud(pointer) || this.activeScheme === 'flap' || this.activeScheme === 'tilt') return;
             const now = this.time.now, last = this.lastTap;
             const near = Phaser.Math.Distance.Between(pointer.x, pointer.y, last.x, last.y) < WORLD.doubleTapDist;
             if (now - last.t < WORLD.doubleTapMs && near) {
@@ -162,6 +166,7 @@ export default class MainScene extends Phaser.Scene {
             if (f.greeted || !f.img.active || p.distance(f.img) > fr + f.r) continue;
             f.greeted = true;
             this.coins += WORLD.friendBonus;
+            this.health = Math.min(WORLD.maxHealth, this.health + 1); // friends cheer you up
             const heart = this.add.text(f.img.x, f.img.y - f.r, `♥ +${WORLD.friendBonus}`, {
                 fontFamily: 'Arial', fontSize: '54px', color: '#ff6b9a', fontStyle: 'bold',
                 stroke: '#ffffff', strokeThickness: 8
@@ -171,8 +176,9 @@ export default class MainScene extends Phaser.Scene {
         for (const h of this.level.hazards) {
             if (!h.img.active || p.distance(h.img) > fr + h.r) continue;
             if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
-                this.coins = Math.max(0, this.coins - WORLD.coinLossOnHit);
+                this.health = Math.max(0, this.health - (this.character.armor ?? 1));
                 this.cameras.main.shake(180, 0.008);
+                if (this.health <= 0) { this.finish(); return; }
             }
         }
     }
@@ -223,6 +229,7 @@ export default class MainScene extends Phaser.Scene {
         }
 
         this.level.update(this.camX, this.camY);
+        this.level.animate(time / 1000);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY);
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());

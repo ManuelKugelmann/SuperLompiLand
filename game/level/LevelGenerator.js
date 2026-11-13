@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
+import { makeCritter } from './critters.js';
 
 export const LEVEL = {
-    cell: 160,            // marching-squares cell size (world px)
-    cells: 6,             // cells per chunk side  -> chunk = 960 px
+    cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
+    cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
     threshold: 0.53,      // density above this is rock
     maxDepth: 5600,       // solid seabed below this
@@ -11,13 +12,24 @@ export const LEVEL = {
 };
 const CH = LEVEL.cell * LEVEL.cells;
 
+/** How hazards move. Art of enemies faces left, so their tail is on the right. */
+const HAZARD_ANIM = {
+    enemy_angler: { anim: 'swim', tail: 'right', speed: 0.7 },
+    urchin: { anim: 'throb' },
+    mine: { anim: 'wobble' },
+    hazard_barrel: { anim: 'wobble' },
+    hazard_claw: { anim: 'sway' },
+    hazard_net: { anim: 'sway' },
+    hazard_buoy: { anim: 'wobble' }
+};
+
 /** Lompi's friends. Art faces right; `swim` = patrol distance, `ground` = sits on rock. */
 const FRIENDS = [
-    { key: 'friend_turtle', size: 240, swim: 380, bob: 18 },
-    { key: 'friend_clownfish', size: 170, swim: 440, bob: 10 },
-    { key: 'friend_jellyfish', size: 180, bob: 60 },
-    { key: 'friend_seahorse', size: 150, bob: 26 },
-    { key: 'friend_starfish', size: 170, ground: true, bob: 4 }
+    { key: 'friend_turtle', size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5 },
+    { key: 'friend_clownfish', size: 170, swim: 440, bob: 10, anim: 'swim' },
+    { key: 'friend_jellyfish', size: 180, bob: 60, anim: 'pulse' },
+    { key: 'friend_seahorse', size: 150, bob: 26, anim: 'sway' },
+    { key: 'friend_starfish', size: 170, ground: true, bob: 4, anim: 'wobble' }
 ];
 
 // Terrain colour bands, outer rim -> core. Each is drawn at a higher density
@@ -62,11 +74,18 @@ export default class LevelGenerator {
         this.coins = [];
         this.hazards = [];
         this.friends = [];
+        this.animated = [];
+    }
+
+    /** Per frame: bend / pulse every creature. `t` in seconds. */
+    animate(t) {
+        for (const o of this.animated) if (o.active) o.animate(t);
     }
 
     /** Rock density at a world point (> LEVEL.threshold = solid). */
     density(x, y) {
-        let n = 0.65 * vnoise(x / 900, y / 900, LEVEL.seed) + 0.35 * vnoise(x / 330, y / 330, LEVEL.seed + 7);
+        // Two broad octaves only: big soft blobs and winding passages, no jagged detail.
+        let n = 0.72 * vnoise(x / 1000, y / 1000, LEVEL.seed) + 0.28 * vnoise(x / 420, y / 420, LEVEL.seed + 7);
         if (y < 520) n -= ((520 - y) / 520) * 0.6;                       // open water under the surface
         if (y > LEVEL.maxDepth) n += (y - LEVEL.maxDepth) / 500;         // seabed
         const ds = Math.hypot(x - LEVEL.spawn.x, y - LEVEL.spawn.y);
@@ -147,7 +166,7 @@ export default class LevelGenerator {
                     this.addHazard(chunk, 'urchin', f.x + up.x * 40, f.y + up.y * 40, 130, 54);
                 }
             } else if (roll > 0.5 && roll < 0.56 && s.textures.exists('friend_starfish')) {
-                this.addFriend(chunk, FRIENDS[4], f.x + Math.sin(f.angle) * 40, f.y - Math.cos(f.angle) * 40, rng).setRotation(f.angle);
+                this.addFriend(chunk, { ...FRIENDS[4], rotation: f.angle }, f.x + Math.sin(f.angle) * 40, f.y - Math.cos(f.angle) * 40, rng);
             }
         }
 
@@ -190,7 +209,7 @@ export default class LevelGenerator {
                 const angler = this.addHazard(chunk, 'enemy_angler', p.x + 260, p.y, 230, 78);
                 s.tweens.add({
                     targets: angler, x: p.x - 260, duration: rng.between(3800, 5200), yoyo: true, repeat: -1,
-                    ease: 'Sine.easeInOut', onYoyo: () => angler.toggleFlipX(), onRepeat: () => angler.toggleFlipX()
+                    ease: 'Sine.easeInOut', onYoyo: () => angler.face?.(-1), onRepeat: () => angler.face?.(1)
                 });
             }
         }
@@ -205,7 +224,7 @@ export default class LevelGenerator {
         const len = Math.hypot(b.x - a.x, b.y - a.y);
         chunk.bodies.push(this.scene.matter.add.rectangle(mx + nx * 26, my + ny * 26, len + 8, 52,
             { isStatic: true, angle: ang, friction: 0.05 }));
-        if (ny > 0.8 && len > 70) floors.push({ x: mx, y: my, angle: b.x > a.x ? ang : ang + Math.PI });
+        if (ny > 0.8 && len > 45) floors.push({ x: mx, y: my, angle: b.x > a.x ? ang : ang + Math.PI });
     }
 
     addCoin(chunk, x, y) {
@@ -223,8 +242,14 @@ export default class LevelGenerator {
         const s = this.scene;
         let img;
         if (s.textures.exists(key)) {
-            img = s.add.image(x, y, key);
-            img.setDisplaySize(size, size * (img.height / img.width));
+            const anim = HAZARD_ANIM[key];
+            if (anim) {
+                img = makeCritter(s, key, x, y, size, anim.anim, anim);
+                this.animated.push(img);
+            } else {
+                img = s.add.image(x, y, key);
+                img.setDisplaySize(size, size * (img.height / img.width));
+            }
         } else {
             img = s.add.star(x, y, 12, r * 0.6, r, key === 'mine' ? 0x33414a : 0x6a2d86);
         }
@@ -236,14 +261,15 @@ export default class LevelGenerator {
 
     addFriend(chunk, f, x, y, rng) {
         const s = this.scene;
-        const img = s.add.image(x, y, f.key).setDepth(f.ground ? 1 : 4);
-        img.setDisplaySize(f.size, f.size * (img.height / img.width));
+        const img = makeCritter(s, f.key, x, y, f.size, f.anim, f).setDepth(f.ground ? 1 : 4);
+        this.animated.push(img);
         if (f.swim) {
             const dir = rng.sign();
-            img.setFlipX(dir < 0).setX(x - dir * f.swim / 2);
+            img.face(dir);
+            img.setX(x - dir * f.swim / 2);
             s.tweens.add({
                 targets: img, x: x + dir * f.swim / 2, duration: rng.between(5000, 8000), yoyo: true, repeat: -1,
-                ease: 'Sine.easeInOut', onYoyo: () => img.toggleFlipX(), onRepeat: () => img.toggleFlipX()
+                ease: 'Sine.easeInOut', onYoyo: () => img.face(-dir), onRepeat: () => img.face(dir)
             });
         }
         if (!f.ground) s.tweens.add({ targets: img, y: y - f.bob, duration: rng.between(1400, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -260,6 +286,7 @@ export default class LevelGenerator {
         this.coins = this.coins.filter(c => c.img.active);
         this.hazards = this.hazards.filter(h => h.img.active);
         this.friends = this.friends.filter(f => f.img.active);
+        this.animated = this.animated.filter(o => o.active);
     }
 }
 

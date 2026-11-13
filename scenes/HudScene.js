@@ -41,6 +41,12 @@ export default class HudScene extends Phaser.Scene {
         this.depthText = hudText(40, 232, '34px');
         this.depthLabel = de ? 'Tiefe' : 'Depth';
 
+        // Health bar.
+        this.hpW = 300;
+        this.add.rectangle(40, 300, this.hpW + 8, 34, 0x06343a, 0.7).setOrigin(0, 0.5).setStrokeStyle(3, 0xffffff, 0.6);
+        this.hpFill = this.add.rectangle(44, 300, this.hpW, 26, 0x5fd35f).setOrigin(0, 0.5);
+        this.add.text(44 + this.hpW + 18, 300, '♥', { fontFamily: 'Arial', fontSize: '34px', color: '#ff6b9a' }).setOrigin(0, 0.5);
+
         this.add.text(this.scale.width - 16, this.scale.height - 12, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '20px', color: '#ffffff'
         }).setOrigin(1, 1).setAlpha(0.4);
@@ -57,5 +63,8 @@ export default class HudScene extends Phaser.Scene {
         if (!m?.fish) return;
         this.coinText.setText(String(m.coins));
         this.depthText.setText(`${this.depthLabel} ${m.depthMeters()} m`);
+        const hp = Phaser.Math.Clamp(m.health / m.maxHealth, 0, 1);
+        this.hpFill.width = Phaser.Math.Linear(this.hpFill.width, this.hpW * hp, 0.2);
+        this.hpFill.setFillStyle(hp > 0.5 ? 0x5fd35f : hp > 0.25 ? 0xffc23d : 0xff5a4f);
     }
 }

@@ -82,6 +82,7 @@ function install(game) {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         rotated = vh > vw && handheld;
+        game.registry.set('landscapeRotated', rotated); // tilt steering needs to know
 
         app.style.position = 'fixed';
         app.style.left = '50%';

@@ -7,6 +7,13 @@ Phaser 3 + Matter.js, Vite, plain JS (ESM). Design notes: `_ref/gamedesign/`
 (local only, gitignored) — read `gamedesign.md` and the `lookdev*.png` images before
 touching look, controls or level design.
 
+## Goal
+
+A polished, well-rounded, fun game for 10-year-olds. Every change is judged
+against that: readable at a glance, forgiving, rewarding to explore, no rough
+edges left in what is shipped. Prefer finishing and polishing what exists over
+adding half-done features.
+
 ## Hard rules
 
 - **`@gks/sdk` is fine in code, never front-facing.** No mention in README, repo

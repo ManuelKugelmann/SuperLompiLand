@@ -2,6 +2,7 @@ import VirtualStickController from './VirtualStickController.js';
 import TapToMoveController from './TapToMoveController.js';
 import FlingController from './FlingController.js';
 import FlapController from './FlapController.js';
+import TiltController from './TiltController.js';
 
 /**
  * Registry of switchable control schemes. Add one here and it appears in the
@@ -10,6 +11,7 @@ import FlapController from './FlapController.js';
 export const CONTROL_SCHEMES = [
     { id: 'fling', label: 'Schubsen', Ctor: FlingController },
     { id: 'flap', label: 'Flattern', Ctor: FlapController },
+    { id: 'tilt', label: 'Neigen', Ctor: TiltController },
     { id: 'stick', label: 'Stick', Ctor: VirtualStickController },
     { id: 'tap', label: 'Tippen', Ctor: TapToMoveController }
 ];

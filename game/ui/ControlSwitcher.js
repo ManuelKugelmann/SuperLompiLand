@@ -8,7 +8,7 @@ import { CONTROL_SCHEMES } from '../controls/index.js';
 export default class ControlSwitcher {
     constructor(scene, activeId, onSelect, onToggleDebug) {
         const W = scene.scale.width;
-        const bw = 250, bh = 78, gap = 14, y = 62;
+        const bw = 232, bh = 78, gap = 12, y = 62;
         const total = CONTROL_SCHEMES.length * bw + (CONTROL_SCHEMES.length - 1) * gap;
         let x = (W - total) / 2 + bw / 2;
         this.buttons = {};

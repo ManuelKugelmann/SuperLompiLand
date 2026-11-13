@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { CHARACTERS } from './characters.js';
 
 /** Tunables — physics feel is adjusted here (velocities are px per physics step). */
 export const FISH = {
@@ -14,8 +15,10 @@ export const FISH = {
     turnRate: 0.2,         // radians per step the nose turns toward the travel direction            // velocity kept per step while braking
     mass: 6,
     inflateMs: 2600,
+    puffGuardMs: 1300,     // invincibility right after puffing up
     cooldownMs: 500,
-    hoverLift: 0.00012,    // cancels the sink while inflated (hover in place)     // upward force per unit mass while inflated
+    hoverLift: 0.00012,
+    sinkForce: 0.00012,    // what the world gravity does to a fish, per unit mass (used to cancel part of it)    // cancels the sink while inflated (hover in place)     // upward force per unit mass while inflated
     airGravity: 0.0011,    // extra downward force per unit mass above the water
     airDrag: 0.0015,        // almost no drag in the air
     airTurn: 0.022,        // radians per step the flight path can be bent in the air (no speed gain)
@@ -38,8 +41,22 @@ export const CAT = { WORLD: 1, FISH: 2, PADDLE: 4 };
  *   puff()        toggle the inflated state
  */
 export default class Pufferfish {
-    constructor(scene, x, y) {
+    /** @param character one entry of CHARACTERS (movement profile, art, special) */
+    constructor(scene, x, y, character = CHARACTERS[0]) {
         this.scene = scene;
+        this.char = character;
+        // States = looks + collision size. Missing art falls back to Lompi's.
+        this.states = {};
+        for (const [name, st] of Object.entries(character.states)) {
+            this.states[name] = scene.textures.exists(st.key) ? st : { ...st, key: FISH.states.normal.key };
+        }
+        const m = (k, d = 1) => character[k] ?? d;
+        this.move = {
+            thrust: FISH.thrust * m('thrust'), maxSpeed: FISH.maxSpeed * m('maxSpeed'), drag: m('drag'),
+            turn: FISH.turnRate * m('turn'), airGravity: FISH.airGravity * m('airGravity'),
+            airTurn: FISH.airTurn * m('airTurn'), sink: m('sink')
+        };
+        this.shield = 0;
         this.state = 'normal';
         this.inflateLeft = 0;
         this.cooldown = 0;
@@ -52,11 +69,11 @@ export default class Pufferfish {
         // `sprite` is the physics body (invisible, advanced in fixed 60 Hz steps).
         // `view` is what you see: drawn every frame at a position interpolated
         // between the last two physics steps, so motion is smooth at any refresh rate.
-        this.sprite = scene.matter.add.sprite(x, y, FISH.states.normal.key).setVisible(false);
+        this.sprite = scene.matter.add.sprite(x, y, this.states.normal.key).setVisible(false);
         // One bendable strip-mesh per state: the tail end is waved for the fin /
         // swim animation (see render()).
         this.views = {};
-        for (const [name, s] of Object.entries(FISH.states)) {
+        for (const [name, s] of Object.entries(this.states)) {
             // With the layered art (body without side fin + the fin on its own)
             // the fin flaps separately; otherwise the single image is used as is.
             const pivot = scene.cache.json.get('fins')?.[s.key];
@@ -77,6 +94,8 @@ export default class Pufferfish {
         }
         this.view = this.views.normal;
         this.swimPhase = 0;
+        this.guard = 0;         // ms of invincibility left after a puff
+        this.aura = scene.add.circle(x, y, 80, 0xfff3b0, 0.12).setStrokeStyle(5, 0xfff3b0, 0.8).setDepth(4.9).setVisible(false);
         this.effort = 0;
         this.prev = new Phaser.Math.Vector2(x, y);
         this.cur = new Phaser.Math.Vector2(x, y);
@@ -85,11 +104,11 @@ export default class Pufferfish {
 
     get body() { return this.sprite.body; }
     get pos() { return new Phaser.Math.Vector2(this.sprite.x, this.sprite.y); }
-    get radius() { return FISH.states[this.state].radius; }
+    get radius() { return this.states[this.state].radius; }
     get inflated() { return this.state === 'inflated'; }
 
     applyState(name) {
-        const s = FISH.states[name];
+        const s = this.states[name];
         const sp = this.sprite;
         const vel = sp.body ? { x: sp.body.velocity.x, y: sp.body.velocity.y } : { x: 0, y: 0 };
         this.state = name;
@@ -103,7 +122,7 @@ export default class Pufferfish {
         sp.setBody({ type: 'circle', radius: s.radius });
         sp.setFixedRotation()
             .setMass(FISH.mass)
-            .setFrictionAir(this.inAir ? FISH.airDrag : s.air)
+            .setFrictionAir(this.inAir ? FISH.airDrag : s.air * this.move.drag)
             .setBounce(s.bounce)
             .setFriction(0.02)
             .setCollisionCategory(CAT.FISH)
@@ -113,7 +132,7 @@ export default class Pufferfish {
 
     thrust(dir) {
         if (this.inAir) { this.airSteer(dir, 1); return; }
-        this.sprite.applyForce(dir.clone().scale(FISH.thrust * this.body.mass));
+        this.sprite.applyForce(dir.clone().scale(this.move.thrust * this.body.mass));
         this.effort = Math.min(1, this.effort + dir.length() * 0.25);
     }
 
@@ -127,7 +146,7 @@ export default class Pufferfish {
         if (speed < 0.5 || dir.lengthSq() < 0.0001) return;
         const heading = Math.atan2(v.y, v.x);
         const want = Phaser.Math.Angle.Wrap(Math.atan2(dir.y, dir.x) - heading);
-        const max = FISH.airTurn * Math.min(1, dir.length()) * strength;
+        const max = this.move.airTurn * Math.min(1, dir.length()) * strength;
         const a = heading + Phaser.Math.Clamp(want, -max, max);
         this.sprite.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
     }
@@ -157,24 +176,28 @@ export default class Pufferfish {
     /** Replace the velocity outright (release of a grab = the throw). */
     throwAt(vec) {
         const v = vec.clone();
-        if (v.length() > FISH.maxSpeed) v.setLength(FISH.maxSpeed);
+        if (v.length() > this.move.maxSpeed) v.setLength(this.move.maxSpeed);
         this.sprite.setVelocity(v.x, v.y);
     }
 
     launch(vec) {
         if (this.inAir) { this.airSteer(vec, 6); return; } // a kick in the air only steers
         const v = new Phaser.Math.Vector2(this.body.velocity.x + vec.x, this.body.velocity.y + vec.y);
-        if (v.length() > FISH.maxSpeed) v.setLength(FISH.maxSpeed);
+        if (v.length() > this.move.maxSpeed) v.setLength(this.move.maxSpeed);
         this.sprite.setVelocity(v.x, v.y);
     }
 
+    /** The character's special move (double tap / long press / Space). */
     puff() {
+        const kind = this.char.special;
+        if (kind !== 'puff' || !this.states.inflated) { this.special(kind); return; }
         if (this.inflated) { this.deflate(); return; }
         if (this.cooldown > 0) return;
         this.applyState('inflated');
         this.inflateLeft = FISH.inflateMs;
         // Air brake: puffing up stops the fish where it is (in the water).
-        if (!this.inAir) this.sprite.setVelocity(this.body.velocity.x * 0.25, this.body.velocity.y * 0.25);
+        if (!this.inAir) this.sprite.setVelocity(this.body.velocity.x * 0.08, this.body.velocity.y * 0.08);
+        this.guard = FISH.puffGuardMs;
 
         // Shove loose bodies away + ring flash.
         const origin = this.pos;
@@ -192,6 +215,37 @@ export default class Pufferfish {
         this.scene.events.emit('fish-puff', origin);
     }
 
+    special(kind) {
+        if (this.cooldown > 0) return;
+        const v = this.body.velocity;
+        const ahead = Math.hypot(v.x, v.y) > 1
+            ? new Phaser.Math.Vector2(v.x, v.y).normalize()
+            : new Phaser.Math.Vector2(this.facing, 0);
+        let color = 0xffffff;
+        if (kind === 'dash') {                      // burst forward
+            if (this.inAir) return;
+            this.sprite.setVelocity(v.x + ahead.x * 15, v.y + ahead.y * 15);
+            this.invulnerable = Math.max(this.invulnerable, 350);
+            this.cooldown = 900;
+        } else if (kind === 'leap') {               // launch up and forward, made for breaking the surface
+            if (this.inAir) return;
+            this.sprite.setVelocity(v.x + this.facing * 9, Math.min(v.y, 0) - 17);
+            this.cooldown = 1100;
+        } else if (kind === 'pulse') {              // jellyfish pump
+            if (this.inAir) return;
+            this.sprite.setVelocity(v.x * 0.6, Math.min(v.y, 0) - 13);
+            this.cooldown = 500;
+        } else if (kind === 'shield') {             // hazards cannot hurt for a while
+            this.shield = 2600;
+            this.cooldown = 4200;
+            color = 0xffe08a;
+        } else {
+            return;
+        }
+        const ring = this.scene.add.circle(this.sprite.x, this.sprite.y, this.radius, color, 0.4).setDepth(4);
+        this.scene.tweens.add({ targets: ring, scale: 2.6, alpha: 0, duration: 380, onComplete: () => ring.destroy() });
+    }
+
     deflate() {
         if (!this.inflated) return;
         this.applyState('normal');
@@ -201,6 +255,7 @@ export default class Pufferfish {
 
     /** Hazard contact. Returns true if it hurt (normal state, not invulnerable). */
     hit(from) {
+        if (this.guard > 0 || this.shield > 0) return false; // fully protected: not even pushed
         const away = this.pos.subtract(from);
         if (away.lengthSq() < 1) away.set(0, -1);
         away.setLength(this.inflated ? 15 : 11);
@@ -223,12 +278,16 @@ export default class Pufferfish {
         const inAir = this.sprite.y < waterY - 6;
         if (inAir !== this.inAir) {
             this.inAir = inAir;
-            this.sprite.setFrictionAir(inAir ? FISH.airDrag : FISH.states[this.state].air);
+            this.sprite.setFrictionAir(inAir ? FISH.airDrag : this.states[this.state].air * this.move.drag);
             this.scene.events.emit('fish-splash', {
                 x: this.sprite.x, y: waterY, speed: Math.hypot(this.body.velocity.x, this.body.velocity.y), entering: !inAir
             });
         }
-        if (this.inAir) this.sprite.applyForce({ x: 0, y: FISH.airGravity * this.body.mass });
+        if (this.inAir) this.sprite.applyForce({ x: 0, y: this.move.airGravity * this.body.mass });
+        // Light swimmers sink less than the world gravity alone would make them.
+        else if (this.move.sink < 1) this.sprite.applyForce({ x: 0, y: -FISH.sinkForce * (1 - this.move.sink) * this.body.mass });
+        if (this.shield > 0) this.shield -= dt;
+        if (this.guard > 0) this.guard -= dt;
 
         if (this.inflated) {
             if (!this.inAir) this.sprite.applyForce({ x: 0, y: -FISH.hoverLift * this.body.mass });
@@ -237,8 +296,8 @@ export default class Pufferfish {
         }
         const vel = this.body.velocity;
         const speed = Math.hypot(vel.x, vel.y);
-        if (speed > FISH.maxSpeed) {
-            this.sprite.setVelocity(vel.x * FISH.maxSpeed / speed, vel.y * FISH.maxSpeed / speed);
+        if (speed > this.move.maxSpeed) {
+            this.sprite.setVelocity(vel.x * this.move.maxSpeed / speed, vel.y * this.move.maxSpeed / speed);
         }
     }
 
@@ -270,10 +329,10 @@ export default class Pufferfish {
             this.view.rotation = Phaser.Math.Angle.Wrap(Math.PI - this.view.rotation);
         }
         const level = this.facing < 0 ? Math.PI : 0;
-        const follow = Phaser.Math.Clamp((speed - FISH.alignFrom) / (FISH.alignFull - FISH.alignFrom), 0, 1);
+        const follow = this.char.upright ? 0 : Phaser.Math.Clamp((speed - FISH.alignFrom) / (FISH.alignFull - FISH.alignFrom), 0, 1);
         const target = Phaser.Math.Angle.Wrap(level + Phaser.Math.Angle.Wrap(Math.atan2(v.y, v.x) - level) * follow);
         this.view.setScale(this.view.baseScale, this.view.baseScale * (this.facing < 0 ? -1 : 1));
-        this.view.rotation = Phaser.Math.Angle.RotateTo(this.view.rotation, target, FISH.turnRate * frames);
+        this.view.rotation = Phaser.Math.Angle.RotateTo(this.view.rotation, target, this.move.turn * frames);
 
         // Fin / tail animation: wave the strip mesh, strongest at the tail (left
         // end of the art), driven by how hard the fish is swimming and how fast
@@ -281,13 +340,20 @@ export default class Pufferfish {
         this.effort = Math.max(0, this.effort - 0.035 * frames);
         const drive = Phaser.Math.Clamp(Math.max(this.effort, speed / 14), 0.12, 1);
         this.swimPhase += (0.1 + drive * 0.42) * frames;
-        const amp = FISH.states[this.state].wiggle * (0.25 + drive * 0.75);
+        const amp = this.states[this.state].wiggle * (0.25 + drive * 0.75);
         const pts = this.view.points, n = pts.length - 1;
         for (let i = 0; i <= n; i++) {
             const tail = 1 - i / n;                       // 1 at the tail, 0 at the nose
             pts[i].y = Math.sin(this.swimPhase - tail * 2.6) * amp * tail * tail;
         }
         this.view.setDirty();
+        // Protective glow while a shield or the short puff invincibility is active.
+        const safe = this.shield > 0 || this.guard > 0;
+        this.aura.setVisible(safe);
+        if (safe) {
+            this.aura.setPosition(this.view.x, this.view.y).setRadius(this.radius + 16)
+                .setAlpha(0.35 + 0.2 * Math.sin(this.swimPhase * 1.7));
+        }
 
         // Side fin: paddles around its joint, faster and wider the harder the
         // fish swims. It rides on the body (position, turn, mirroring, wiggle).
