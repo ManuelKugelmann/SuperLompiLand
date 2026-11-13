@@ -38,10 +38,12 @@ const chrome = process.env.CHROME_PATH || [
 if (!chrome) { console.error('No Chrome/Edge found — set CHROME_PATH.'); process.exit(1); }
 
 mkdirSync(OUT, { recursive: true });
-// A visible window: headless software GL renders the lighting differently.
+// Headless (no window on the desktop), but on the real GPU through ANGLE, so the
+// lighting renders exactly as in a normal browser. Set GL=swiftshader without a GPU.
+const gl = process.env.GL === 'swiftshader' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'];
 const browser = await puppeteer.launch({
-    executablePath: chrome, headless: false, defaultViewport: null,
-    args: [`--window-size=${W},${H + 80}`, '--no-first-run', '--no-default-browser-check']
+    executablePath: chrome, headless: 'new', defaultViewport: null,
+    args: [`--window-size=${W},${H}`, '--no-first-run', '--no-default-browser-check', ...(process.platform === 'win32' || process.env.GL ? gl : ['--enable-gpu', '--ignore-gpu-blocklist'])]
 });
 const [page] = await browser.pages();
 await page.setViewport({ width: W, height: H });

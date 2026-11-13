@@ -51,17 +51,7 @@ export default class Backdrop {
             this.schools.push(school);
         }
 
-        this.rays = [];
-        for (let i = 0; i < 6; i++) {
-            const x = (W / 6) * i + Phaser.Math.Between(-60, 60);
-            // A soft shaft of light: feathered along both sides, fading in below the surface and out with depth.
-            const ray = scene.add.image(x, -20, 'bd_ray').setOrigin(0.5, 0).setDisplaySize(Phaser.Math.Between(240, 420), H * Phaser.Math.FloatBetween(0.85, 1.1))
-                .setRotation(-0.2 + Phaser.Math.FloatBetween(-0.04, 0.04)).setScrollFactor(0).setDepth(-12).setBlendMode(Phaser.BlendModes.ADD);
-            ray.baseAlpha = Phaser.Math.FloatBetween(0.1, 0.2);
-            ray.phase = Math.random() * 6.28;
-            ray.baseX = x;
-            this.rays.push(ray);
-        }
+        // Light shafts live in game/fx/WaterLight.js (one system with caustics and the grade).
 
         this.bubbles = [];
         for (let i = 0; i < 16; i++) {
@@ -124,10 +114,6 @@ export default class Backdrop {
                 f.body.setScale(sc.dir * f.body.base.sx * (1 + Math.sin(t * 9 + f.phase) * 0.12), f.body.base.sy);   // tail beat
                 f.body.setVisible(camY + f.body.y > 60).setAlpha(f.body.base.alpha * depthFade);
             }
-        }
-        for (const ray of this.rays) {
-            ray.x = ray.baseX + Math.sin(t * 0.25 + ray.phase) * 70 - (camX * 0.05) % 40;
-            ray.setAlpha(ray.baseAlpha * (0.6 + 0.4 * Math.sin(t * 0.6 + ray.phase)) * Math.max(0, 1 - depth * 2.2));
         }
         for (const b of this.bubbles) {
             b.y -= b.speed + dy * 0.5;

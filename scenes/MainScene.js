@@ -7,6 +7,7 @@ import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor } from '../game/level/biomes.js';
 import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
+import WaterLight from '../game/fx/WaterLight.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
@@ -58,6 +59,7 @@ export default class MainScene extends Phaser.Scene {
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
+        this.waterLight = new WaterLight(this);   // light shafts, caustics, depth grade
         // What has been collected stays collected (per chunk bitfields, see worldState.js).
         // Playing together, the room has its own memory, separate from the solo journey.
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
@@ -510,6 +512,7 @@ export default class MainScene extends Phaser.Scene {
         this.level.update(this.camX, this.camY);
         this.level.animate(time / 1000, view, speed);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
+        this.waterLight.update();
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
         const t2 = performance.now();
