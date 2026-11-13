@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CHARACTERS, MOTION, glideLift, skim } from './characters.js';
+import { FLIGHT, fly } from './flight.js';
 import { SPECIALS, canUse, chainStep } from './specials.js';
 import Rig from './Rig.js';
 import { play } from './audio.js';
@@ -20,7 +21,7 @@ export const PLAYER = {
     mass: 6,
     hoverLift: 0.00012,    // upward force per unit mass while holding a pose (hover in place)
     sinkForce: 0.00012,    // what the world gravity does to a swimmer, per unit mass (used to cancel part of it)
-    airTurn: 0.009,        // radians per step the flight path can be bent in the air (no speed gain)
+    airTurn: 0.009,        // ballistic flight: radians per step the path can be bent (bird flight: see flight.js)
     shoveRadius: 340,
     shovePower: 16
 };
@@ -65,6 +66,8 @@ export default class Player {
         this.poseCooldown = 0;  // cooldown that starts when the pose ends
         this.cooldown = 0;
         this.skips = 0;         // wave tops skipped off in the current flight
+        this.steer = { x: 0, y: 0, steps: 0 };   // steering input for the flight model, and how many steps it lasts
+        this.wings = {};        // scratch for the flight model
         this.mode = null;       // a special's temporary behaviour: { left, drag, sink, flow, bounce, tuck }
         this.hold = null;       // { x, y } rock the character holds on to (anchor special)
         this.findHold = null;   // set by the scene: reach -> { x, y } to hold on to, or null
@@ -128,7 +131,7 @@ export default class Player {
 
     /** Resistance of the medium the body is in right now (a special's mode can change it). */
     waterDrag() {
-        if (this.inAir) return PLAYER.airDrag;
+        if (this.inAir) return FLIGHT.model === 'bird' && this.posed ? FLIGHT.brakeDrag : PLAYER.airDrag;
         return Math.min(0.5, this.states[this.state].air * this.move.drag * PLAYER.waterDrag * (this.mode?.drag ?? 1));
     }
 
@@ -151,6 +154,12 @@ export default class Player {
      * it never adds speed. `strength` scales how far it may turn this step.
      */
     airSteer(dir, strength) {
+        if (FLIGHT.model === 'bird') {
+            // The wings do the turning in update(); a one-shot kick keeps steering for a few steps.
+            const len = dir.length();
+            if (len > 0.0001) { this.steer.x = dir.x / len * Math.min(1, len); this.steer.y = dir.y / len * Math.min(1, len); this.steer.steps = strength; }
+            return;
+        }
         const v = this.body.velocity;
         const speed = Math.hypot(v.x, v.y);
         if (speed < 0.5 || dir.lengthSq() < 0.0001) return;
@@ -313,8 +322,23 @@ export default class Player {
         if (this.inAir) {
             // Wings carry part of the weight while the flight is fast (also of the world's own
             // gravity), and a gliding character skips off wave tops instead of diving in.
-            const bv = this.body.velocity, lift = glideLift(this.char, bv.x);
-            this.sprite.applyForce({ x: 0, y: (this.move.airGravity * (1 - lift) - PLAYER.sinkForce * lift) * this.body.mass });
+            const bv = this.body.velocity;
+            if (FLIGHT.model === 'bird') {
+                // Bird flight (flight.js): input turns the heading, wings carry part of the weight,
+                // a dive gains speed. A held pose (the puffed ball) has no wings: it brakes and drops.
+                const on = this.steer.steps > 0 && !this.posed;
+                const w = this.posed ? null : fly({
+                    vx: bv.x, vy: bv.y, ix: on ? this.steer.x : 0, iy: on ? this.steer.y : 0,
+                    gravity: this.move.airGravity + PLAYER.sinkForce,
+                    lift: this.char.glide?.lift, agility: this.move.airTurn / PLAYER.airTurn
+                }, FLIGHT, this.wings);
+                this.steer.steps--;
+                if (w && on) this.sprite.setVelocity(w.vx, w.vy);
+                this.sprite.applyForce({ x: (w ? w.ax : 0) * this.body.mass, y: (this.move.airGravity + (w ? w.ay : 0)) * this.body.mass });
+            } else {
+                const lift = glideLift(this.char, bv.x);
+                this.sprite.applyForce({ x: 0, y: (this.move.airGravity * (1 - lift) - PLAYER.sinkForce * lift) * this.body.mass });
+            }
             const hop = skim(this.char, { vx: bv.x, vy: bv.y, height: waterY - this.sprite.y, skips: this.skips });
             if (hop) {
                 this.skips++;
