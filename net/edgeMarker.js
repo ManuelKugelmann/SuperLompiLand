@@ -1,7 +1,7 @@
 // Where to show a friend who is off screen (pure, unit-tested).
 
-/** Inset from each screen edge (px). The top clears the HUD's button row. */
-export const MARKER_INSET = { top: 190, right: 70, bottom: 70, left: 70 };
+/** Inset from each screen edge (px). The top clears the HUD buttons, journey strip and room badge. */
+export const MARKER_INSET = { top: 250, right: 70, bottom: 70, left: 70 };
 
 /**
  * `view` = the camera's world rectangle { x, y, width, height }, `target` = the
