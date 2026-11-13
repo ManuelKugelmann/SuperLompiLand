@@ -162,7 +162,7 @@ export default class TiltController extends ControllerBase {
         if (!this.held) return;
         if (!this.held.isDown) { this.held = null; return; }
         if (this.scene.time.now - this.heldSince > LONG_PRESS_MS) {
-            this.fish.puff();
+            this.fish.special();
             this.held = null;
         }
     }

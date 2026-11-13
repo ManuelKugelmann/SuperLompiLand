@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import ProgressionManager from '../systems/ProgressionManager.js';
 import WorldState from '../systems/worldState.js';
-import Pufferfish from '../game/Pufferfish.js';
+import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor } from '../game/level/biomes.js';
@@ -65,7 +65,7 @@ export default class MainScene extends Phaser.Scene {
         this.level.update(this.camX, this.camY);
 
         this.character = getCharacter(this.registry.get('character') || loadSelectedId());
-        this.fish = new Pufferfish(this, start.x, start.y, this.character);
+        this.fish = new Player(this, start.x, start.y, this.character);
 
         // Lighting layers (screen-fixed): ambient multiply + a soft vignette.
         this.ambient = this.add.rectangle(0, 0, W, H, 0xffffff).setOrigin(0).setScrollFactor(0).setDepth(40)
@@ -108,7 +108,7 @@ export default class MainScene extends Phaser.Scene {
             const now = this.time.now, last = this.lastTap;
             const near = Phaser.Math.Distance.Between(pointer.x, pointer.y, last.x, last.y) < WORLD.doubleTapDist;
             if (now - last.t < WORLD.doubleTapMs && near) {
-                this.fish.puff();
+                this.fish.special();
                 this.lastTap = { t: -9999, x: 0, y: 0 };
             } else {
                 this.lastTap = { t: now, x: pointer.x, y: pointer.y };
@@ -149,7 +149,7 @@ export default class MainScene extends Phaser.Scene {
         const kb = this.input.keyboard;
         if (kb) {
             this.keys = kb.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D');
-            kb.on('keydown-SPACE', () => this.fish.puff());
+            kb.on('keydown-SPACE', () => this.fish.special());
         }
         this.keyDir = new Phaser.Math.Vector2();
 
@@ -232,7 +232,7 @@ export default class MainScene extends Phaser.Scene {
         play('respawn');
         this.cameras.main.fadeOut(260, 10, 40, 70);
         this.time.delayedCall(280, () => {
-            this.fish.deflate();
+            this.fish.endPose();
             this.fish.sprite.setPosition(p.x, p.y).setVelocity(0, 0);
             this.fish.prev.set(p.x, p.y);
             this.fish.cur.set(p.x, p.y);

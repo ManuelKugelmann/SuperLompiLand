@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
-import { CAT } from '../Pufferfish.js';
+import { CAT } from '../Player.js';
 
 const PADDLE_R = 62;
 const PADDLE_MAX_SPEED = 20;   // px per step the paddle can move (caps how hard a shove can be)
@@ -49,7 +49,7 @@ export default class FlingController extends ControllerBase {
             this.mode = 'paddle';
             this.paddle = this.scene.matter.add.circle(p.x, p.y, PADDLE_R, {
                 ignoreGravity: true, frictionAir: 0, restitution: 0.25, mass: 14,
-                collisionFilter: { category: CAT.PADDLE, mask: CAT.FISH }
+                collisionFilter: { category: CAT.PADDLE, mask: CAT.PLAYER }
             });
             this.paddleGfx.setPosition(p.x, p.y).setVisible(true);
         }

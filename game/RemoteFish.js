@@ -1,23 +1,25 @@
 import Phaser from 'phaser';
 import { getCharacter } from './characters.js';
+import Rig from './Rig.js';
 import { SnapshotBuffer } from '../net/snapshots.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 
 const ICON_W = 78; // off-screen marker size (px)
 
 /**
- * Another player's fish: view only, no Matter body, never collides. Draws a
- * slightly see-through copy of that player's character. All the smoothing is
- * in net/snapshots.js; this class only draws.
+ * Another player: view only, no Matter body, never collides. Draws a slightly
+ * see-through copy of that player's character with the same Rig as the local
+ * one, driven by network snapshots (smoothing: net/snapshots.js).
  */
 export default class RemoteFish {
     constructor(scene) {
         this.scene = scene;
         this.snaps = new SnapshotBuffer();
-        this.img = scene.add.image(0, 0, 'puffer_normal').setDepth(4.8).setAlpha(0).setVisible(false);
+        this.rig = null;        // built when the first snapshot says which character it is
+        this.alpha = 0;
+        this.last = 0;
         this.char = null;
         this.stateName = 'normal';
-        this.scale = 1;
         // Off-screen marker: a small picture of the friend at the screen edge plus an arrow.
         this.icon = scene.add.image(0, 0, 'puffer_normal').setScrollFactor(0).setDepth(59).setAlpha(0.95).setVisible(false);
         // Dart pointing right at rotation 0, drawn once into a texture. It must be long
@@ -58,28 +60,30 @@ export default class RemoteFish {
     }
 
     setLook(charId, stateName) {
-        this.char = getCharacter(charId);
-        this.stateName = this.char.states[stateName] ? stateName : 'normal';
-        const st = this.char.states[this.stateName];
-        const key = this.scene.textures.exists(st.key) ? st.key : 'puffer_normal';
-        this.img.setTexture(key);
-        this.scale = st.width / this.img.width;
-        this.img.setScale(this.scale);
-        this.icon.setTexture(key);
+        const char = getCharacter(charId);
+        if (char !== this.char) {
+            this.rig?.destroy();
+            this.char = char;
+            this.rig = new Rig(this.scene, char, 0, 0, 4.8).setVisible(false);
+        }
+        this.stateName = char.states[stateName] ? stateName : 'normal';
+        this.rig.setState(this.stateName);
+        const st = char.states[this.stateName];
+        this.icon.setTexture(this.rig.view.texture.key);
         this.icon.setScale(ICON_W / this.icon.width);
         this.radius = (st.radius || 60) * 1.25;
         this.ring.setRadius(this.radius);
     }
 
     /** Where to show an emote over this fish (world position), or null if it is not drawn. */
-    get head() { return this.img.visible ? { x: this.img.x, y: this.img.y - this.radius - 30 } : null; }
+    get head() { return this.alpha > 0 ? { x: this.rig.view.x, y: this.rig.view.y - this.radius - 30 } : null; }
 
     render(now) {
         const p = this.char && this.snaps.sample(now);
-        const img = this.img;
         if (!p) return;
         if (p.stale) {
-            img.setVisible(false).setAlpha(0);
+            this.rig.setVisible(false);
+            this.alpha = 0;
             for (const o of [this.icon, this.arrow, this.ring, this.iconRing]) o.setVisible(false);
             return;
         }
@@ -93,17 +97,16 @@ export default class RemoteFish {
             this.iconRing.setPosition(m.x, m.y + bob);
             this.arrow.setPosition(m.x + Math.cos(m.angle) * 58, m.y + Math.sin(m.angle) * 58).setRotation(m.angle);
         }
-        const facing = p.f < 0 ? -1 : 1;
-        const speed = Math.hypot(p.vx, p.vy);
-        const follow = this.char.upright ? 0 : Phaser.Math.Clamp((speed - 3) / 8, 0, 1);
-        const level = facing < 0 ? Math.PI : 0;
-        const target = Phaser.Math.Angle.Wrap(level + Phaser.Math.Angle.Wrap(Math.atan2(p.vy, p.vx) - level) * follow);
-        img.setPosition(p.x, p.y);
-        img.setScale(this.scale, this.scale * facing);
-        img.rotation = Phaser.Math.Angle.RotateTo(img.rotation, target, 0.12);
-        img.setVisible(true).setAlpha(Math.min(0.8, img.alpha + 0.05));
-        this.ring.setPosition(p.x, p.y).setVisible(true).setAlpha(img.alpha);
+        const frames = Phaser.Math.Clamp((now - this.last) / (1000 / 60), 0, 3);
+        this.last = now;
+        this.alpha = Math.min(0.8, this.alpha + 0.05);
+        this.rig.setVisible(true).setAlpha(this.alpha);
+        this.rig.draw({ x: p.x, y: p.y, vx: p.vx, vy: p.vy, facing: p.f < 0 ? -1 : 1, frames, turn: 0.12 });
+        this.ring.setPosition(p.x, p.y).setVisible(true).setAlpha(this.alpha);
     }
 
-    destroy() { for (const o of [this.img, this.icon, this.arrow, this.ring, this.iconRing]) o.destroy(); }
+    destroy() {
+        this.rig?.destroy();
+        for (const o of [this.icon, this.arrow, this.ring, this.iconRing]) o.destroy();
+    }
 }

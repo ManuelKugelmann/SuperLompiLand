@@ -7,6 +7,7 @@ import HudScene, { HUD_KEY } from './HudScene.js';
 import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
+import Rig from '../game/Rig.js';
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
@@ -110,11 +111,13 @@ export default class IntroScene extends Phaser.Scene {
         this.slot = this.index; // animated, fractional position
 
         this.cards = CHARACTERS.map((c, i) => {
-            const key = this.textures.exists(c.states.normal.key) ? c.states.normal.key : 'puffer_normal';
-            const img = this.add.image(W / 2, cy, key).setInteractive({ useHandCursor: true });
-            img.fit = Math.min(360 / img.width, 300 / img.height);
-            img.on('pointerup', () => { if (!this.swiped) (i === this.index ? this.start() : this.select(i)); });
-            return img;
+            // The same animated rig as in the game, over an invisible tap area.
+            const rig = new Rig(this, c, W / 2, cy, 1);
+            const frame = rig.view.frame;
+            rig.fit = Math.min(360 / frame.width, 300 / frame.height) / rig.view.baseScale;
+            rig.hit = this.add.zone(W / 2, cy, 360, 300).setInteractive({ useHandCursor: true });
+            rig.hit.on('pointerup', () => { if (!this.swiped) (i === this.index ? this.start() : this.select(i)); });
+            return rig;
         });
 
         this.nameText = this.add.text(W / 2, H * 0.74, '', {
@@ -355,21 +358,21 @@ export default class IntroScene extends Phaser.Scene {
         if (d < -n / 2) d += n;
         this.slot += d * Math.min(1, delta / 110);
         const bob = Math.sin(time / 600) * 12;
-        this.cards.forEach((img, i) => {
+        const frames = Math.min(3, delta / (1000 / 60));
+        this.cards.forEach((rig, i) => {
             let off = i - this.slot;
             off = ((off % n) + n) % n;
             if (off > n / 2) off -= n;
             const near = Math.max(0, 1 - Math.abs(off));
-            // Never a frozen sprite: every card breathes, bobs and rocks a little,
-            // each with its own rhythm; the chosen one moves the most.
+            // Never a frozen picture: every character swims on the spot, bobs and
+            // breathes with its own rhythm; the chosen one moves the most.
             const ph = i * 1.7, live = 0.45 + near * 0.55;
-            const breathe = 1 + Math.sin(time / 520 + ph) * 0.035 * live;
-            img.setPosition(W / 2 + off * this.carousel.SPACING + Math.sin(time / 1300 + ph) * 10 * live,
-                this.carousel.cy + Math.sin(time / 600 + ph) * 14 * live + (near > 0.5 ? bob * 0.5 : 0));
-            img.setScale(img.fit * (0.5 + near * 0.6) * breathe, img.fit * (0.5 + near * 0.6) / breathe);
-            img.setRotation(Math.sin(time / 900 + ph) * 0.06 * live);
-            img.setAlpha(Math.abs(off) > 2.2 ? 0 : 0.45 + near * 0.55);
-            img.setDepth(near > 0.5 ? 2 : 1);
+            const x = W / 2 + off * this.carousel.SPACING + Math.sin(time / 1300 + ph) * 10 * live;
+            const y = this.carousel.cy + Math.sin(time / 600 + ph) * 14 * live + (near > 0.5 ? bob * 0.5 : 0);
+            rig.zoom = rig.fit * (0.5 + near * 0.6);
+            rig.setAlpha(Math.abs(off) > 2.2 ? 0 : 0.45 + near * 0.55).setDepth(near > 0.5 ? 2 : 1);
+            rig.draw({ x, y, frames, facing: 1, effort: 0.15 + near * 0.3, squash: Math.sin(time / 520 + ph) * 0.03 * live });
+            rig.hit.setPosition(x, y);
         });
     }
 }

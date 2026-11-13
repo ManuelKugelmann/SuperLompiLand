@@ -1,7 +1,7 @@
 // Playable characters. Each one moves differently and has its own special
-// (triggered by the puff gesture: double tap / long press / Space).
+// (specials.js; triggered by double tap / long press / Space).
 //
-// Movement numbers are multipliers on the base feel in Pufferfish.js (FISH):
+// Movement numbers are multipliers on the base feel in Player.js (PLAYER):
 //   thrust    swim power                 drag      water resistance (higher = stops sooner)
 //   maxSpeed  top speed                  turn      how quickly the nose follows the movement
 //   sink      gravity in water           airGravity / airTurn  flight behaviour above the surface
