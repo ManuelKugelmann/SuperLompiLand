@@ -9,7 +9,10 @@
 //   coral    chance that a floor spot gets coral          kelp    chance that it gets a kelp stalk
 //   Friends are the sea's own creatures (anglerfish and urchins included).
 //   Hazards are what the volcano's eruption and people left behind, all of
-//   it inanimate: mines, warning buoys, nets, spike plates. No machines with faces.
+//   it inanimate and realistic: lost anchors on chains, rusty drums, wreck
+//   scrap, drifting ghost nets. No machines with faces, no cartoon enemies.
+//   (Texture keys are historical: mine = anchor on a chain, hazard_buoy = oil
+//   drum, spikes = wreck scrap, hazard_net = ghost net.) Animals never hurt.
 //   coins    coin trails per chunk                        friends / hazards: weighted spawn tables
 //   friendRate / hazardRate: chance per chunk
 export const BIOME_WIDTH = 5000;
@@ -54,7 +57,7 @@ export const BIOMES = [
         friends: { friend_jellyfish: 4, friend_turtle: 2 }, hazards: { mine: 2, hazard_buoy: 1 }
     },
     {
-        id: 'wreck', name: { de: 'Minenfeld', en: 'Minefield' }, from: 17500,
+        id: 'wreck', name: { de: 'Schiffsfriedhof', en: 'Ship Graveyard' }, from: 17500,
         rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.1,
         coral: 0.12, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.55,
         friends: { friend_starfish: 1, friend_seahorse: 1, urchin: 1 },

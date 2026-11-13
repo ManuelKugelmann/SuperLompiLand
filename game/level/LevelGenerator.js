@@ -141,7 +141,11 @@ export default class LevelGenerator {
         if (missing.length) {
             const mx = (camX + W / 2) / CH - 0.5, my = (camY + H / 2) / CH - 0.5;
             missing.sort((p, q) => Math.hypot(p[0] - mx, p[1] - my) - Math.hypot(q[0] - mx, q[1] - my));
-            for (const [cx, cy] of (this.chunks.size === 0 ? missing : missing.slice(0, 1))) this.build(cx, cy);
+            // At the very start, build what is on screen in one go (nothing to look
+            // at yet anyway); everything else, including the margin, one per frame.
+            const onScreen = ([cx, cy]) => cx * CH < camX + W && (cx + 1) * CH > camX && cy * CH < camY + H && (cy + 1) * CH > camY;
+            const batch = this.chunks.size === 0 ? missing.filter(onScreen) : missing.slice(0, 1);
+            for (const [cx, cy] of (batch.length ? batch : missing.slice(0, 1))) this.build(cx, cy);
         }
         for (const key of [...this.chunks.keys()]) {
             const [cx, cy] = key.split(',').map(Number);
@@ -194,8 +198,8 @@ export default class LevelGenerator {
                 back[j].push(vnoise(x / 1500, y / 1500, LEVEL.seed + 31) > 0.56 && y > 600 ? d + 0.05 : -1);
             }
         }
-        const val = [];
-        for (let j = 0; j <= N; j++) val.push(fine[j * F].filter((_, i) => i % F === 0));
+        const coarse = grid => { const out = []; for (let j = 0; j <= N; j++) out.push(grid[j * F].filter((_, i) => i % F === 0)); return out; };
+        const val = coarse(fine), backCoarse = coarse(back);
         const eachCell = (grid, t, fn) => marchGrid(grid, ox, oy, CH, t, fn);
         const depthMix = Phaser.Math.Clamp((oy + CH / 2) / LEVEL.maxDepth, 0, 1) * 0.5;
         const bandColor = k => mixColor(mixColor(blend.a.rock[k], blend.b.rock[k], blend.t), DEEP_TINT, depthMix);
@@ -218,11 +222,11 @@ export default class LevelGenerator {
         // --- Back layer: cave back walls + ambient occlusion in the water ------
         const wall = scratch();
         wall.fillStyle(mixColor(bandColor(2), 0x0a2a44, 0.4), 0.42);
-        eachCell(back, T, shape => { if (shape.poly.length >= 3) wall.fillPoints(shape.poly, true); });
+        eachCell(backCoarse, T, shape => { if (shape.poly.length >= 3) wall.fillPoints(shape.poly, true); });
         const ao = scratch();
         for (const [dt, alpha] of [[-0.05, 0.06], [-0.03, 0.07], [-0.014, 0.09]]) {
             ao.fillStyle(0x04162a, alpha);
-            eachCell(fine, T + dt, c => { if (c.poly.length >= 3) ao.fillPoints(c.poly, true); });
+            eachCell(val, T + dt, c => { if (c.poly.length >= 3) ao.fillPoints(c.poly, true); });
         }
         bake(-6, LEVEL.backRes, [[wall], [ao]]);
 
@@ -249,7 +253,8 @@ export default class LevelGenerator {
         const bands = scratch();
         BAND_DT.forEach((dt, k) => {
             bands.fillStyle(bandColor(k), textured ? [0.42, 0.46, 0.62, 0.74, 0.84][k] : 1);
-            eachCell(fine, T + dt, c => {
+            // Only the outermost band is the visible outline and needs the fine grid.
+            eachCell(k === 0 ? fine : val, T + dt, c => {
                 if (c.poly.length >= 3) bands.fillPoints(c.poly, true);
                 if (k === 0) for (const [p, q] of c.edges) this.drawRim(p, q, rim);
             });
