@@ -37,3 +37,12 @@ test('grade: grey stays grey near the surface; deep down red fades first', () =>
     const deep = apply(gradeMatrix(0), [0.8, 0.8, 0.8]);
     assert.ok(deep[0] < deep[1] && deep[1] < deep[2], `deep: red < green < blue (${deep.map(v => v.toFixed(2))})`);
 });
+
+test('exposure brightens sunlit water and does nothing in the dark', () => {
+    const apply = (m, [r, g, b]) => [0, 1, 2].map(i => m[i * 5] * r + m[i * 5 + 1] * g + m[i * 5 + 2] * b + m[i * 5 + 4]);
+    const lit = apply(gradeMatrix(1, 0, 0, 0.3), [0.5, 0.5, 0.5]);
+    for (const c of lit) assert.ok(Math.abs(c - 0.65) < 0.01, `grey lifted by 30 % (${c})`);
+    const darkNo = apply(gradeMatrix(0, 0, 0, 0.3), [0.5, 0.5, 0.5]);
+    const darkRef = apply(gradeMatrix(0, 0, 0, 0), [0.5, 0.5, 0.5]);
+    assert.deepEqual(darkNo, darkRef);
+});

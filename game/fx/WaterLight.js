@@ -21,6 +21,7 @@ export const WATER_LIGHT = {
     grade: 1,             // depth colour grade on the camera (0 = off)
     gradeSaturation: 0.2, // extra saturation in full sunlight
     gradeAbsorb: 0.32,    // how much red is lost at full depth
+    gradeExposure: 0.22,  // brightness lift in full sunlight (style guide: shallow water is bright)
     fadeTo: 2600          // depth (px below the surface) where the sunlight has faded away
 };
 
@@ -106,7 +107,7 @@ export default class WaterLight {
             const q = Math.round(light * 40) / 40;   // only rebuild the matrix when the light changes visibly
             if (q !== this.lastLight) {
                 this.lastLight = q;
-                const m = gradeMatrix(q, WATER_LIGHT.gradeSaturation * WATER_LIGHT.grade, WATER_LIGHT.gradeAbsorb * WATER_LIGHT.grade);
+                const m = gradeMatrix(q, WATER_LIGHT.gradeSaturation * WATER_LIGHT.grade, WATER_LIGHT.gradeAbsorb * WATER_LIGHT.grade, WATER_LIGHT.gradeExposure * WATER_LIGHT.grade);
                 // Phaser's ColorMatrix keeps offsets in 0..255.
                 this.grade.set(m.map((v, i) => (i % 5 === 4 ? v * 255 : v)));
             }
