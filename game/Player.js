@@ -6,10 +6,16 @@ import { play } from './audio.js';
 
 /** Tunables — physics feel is adjusted here (velocities are px per physics step). */
 export const PLAYER = {
-    thrust: 0.0013,        // swim force per unit mass; terminal swim speed ~ thrust * 278 / drag
+    // Momentum ("ballistic" feel): little water drag, so a push carries far; less thrust, so
+    // the top speed stays the same but it takes longer to get going and to turn; a gentle
+    // brake, so letting go means coasting. The puff is the real brake.
+    // Before this change: thrust 0.0013, waterDrag 1, brake 0.9, bounce 1.
+    thrust: 0.00078,       // swim force per unit mass; terminal swim speed ~ thrust * 278 / (drag * waterDrag)
+    waterDrag: 0.6,        // multiplier on every state's water resistance
+    bounce: 1.5,           // multiplier on every state's bounciness off rock (capped at 0.9)
     maxSpeed: 26,
     carrySpeed: 16,        // top speed while being carried by a finger
-    brake: 0.9,            // velocity kept per step while braking
+    brake: 0.975,          // velocity kept per step while braking
     turnRate: 0.2,         // radians per step the nose turns toward the travel direction
     mass: 6,
     hoverLift: 0.00012,    // upward force per unit mass while holding a pose (hover in place)
@@ -20,6 +26,18 @@ export const PLAYER = {
     shoveRadius: 340,
     shovePower: 16
 };
+
+// Tuning on a device without a rebuild: ?tune=waterDrag:0.5,thrust:0.0009,brake:0.98
+// overrides any number in PLAYER for this page load.
+if (typeof window !== 'undefined') {
+    for (const pair of (new URLSearchParams(window.location.search).get('tune') || '').split(',')) {
+        const [key, value] = pair.split(':');
+        if (key in PLAYER && Number.isFinite(Number(value))) PLAYER[key] = Number(value);
+    }
+    // Short form for the one number tried most: ?drag=0.4
+    const drag = Number(new URLSearchParams(window.location.search).get('drag'));
+    if (drag > 0) PLAYER.waterDrag = drag;
+}
 
 export const CAT = { WORLD: 1, PLAYER: 2, PADDLE: 4 };
 
@@ -98,8 +116,8 @@ export default class Player {
         sp.setBody({ type: 'circle', radius: s.radius, x: at.x, y: at.y });
         sp.setFixedRotation()
             .setMass(PLAYER.mass)
-            .setFrictionAir(this.inAir ? PLAYER.airDrag : s.air * this.move.drag)
-            .setBounce(s.bounce)
+            .setFrictionAir(this.inAir ? PLAYER.airDrag : s.air * this.move.drag * PLAYER.waterDrag)
+            .setBounce(Math.min(0.9, s.bounce * PLAYER.bounce))
             .setFriction(0.02)
             .setCollisionCategory(CAT.PLAYER)
             .setCollidesWith([CAT.WORLD, CAT.PADDLE]);
@@ -243,7 +261,7 @@ export default class Player {
         const inAir = this.inAir ? this.sprite.y < waterY + 10 : this.sprite.y < waterY - 16;
         if (inAir !== this.inAir) {
             this.inAir = inAir;
-            this.sprite.setFrictionAir(inAir ? PLAYER.airDrag : this.states[this.state].air * this.move.drag);
+            this.sprite.setFrictionAir(inAir ? PLAYER.airDrag : this.states[this.state].air * this.move.drag * PLAYER.waterDrag);
             this.scene.events.emit('fish-splash', {
                 x: this.sprite.x, y: waterY, speed: Math.hypot(this.body.velocity.x, this.body.velocity.y), entering: !inAir
             });
