@@ -7,7 +7,7 @@
 //             &pose=turntable|swim|turn|puff   hold one pose (default: all, in a loop)
 //             &t=1.25                     freeze time (seconds) for repeatable shots
 //             &only=inflate               one candidate only
-import MeshRenderer from './meshRenderer.js';
+import MeshRenderer, { hinge } from './meshRenderer.js';
 import { parseGlb, normalize } from './glb.js';
 import { inflate, vertexNormals, shrinkMask } from '../rig/inflate.js';
 import { loftBody, fitProfile } from '../rig/loft.js';
@@ -30,7 +30,19 @@ const CREATURES = {
     lompi: [
         { id: 'sprite', label: 'Current sprite', note: 'flat picture', kind: 'card', image: 'img/puffer_normal.png' },
         { id: 'inflate', label: 'Silhouette inflation', note: 'scripted, from the picture', kind: 'inflate', image: 'img/puffer_normal.png', cells: 44 },
-        { id: 'loft', label: 'Procedural (fitted)', note: 'lofted rings + fin card', kind: 'loft', image: 'img/puffer_normal.png', stations: 28, sides: 20, width: 0.86, box: 2.3 },
+        {
+            id: 'loft', label: 'Procedural + fin card', note: 'lofted rings, side fin on its own bone', kind: 'loft',
+            image: 'img/puffer_normal_body.png', stations: 28, sides: 20, width: 0.86, box: 2.3,
+            // The side fin as its own picture: where it sits in the body picture and where it hinges (pixels).
+            fin: { image: 'img/puffer_normal_fin.png', x: 216, y: 155, pivotX: 310, pivotY: 188 }
+        },
+        {
+            // The same body with very few triangles, made a little larger than the painted outline:
+            // the picture's alpha cuts the exact edge, triangles only give volume, light and bending.
+            id: 'loftlow', label: 'Procedural, low-poly', note: 'alpha cuts the outline', kind: 'loft',
+            image: 'img/puffer_normal_body.png', stations: 8, sides: 8, width: 0.86, box: 2.3, grow: 1.1,
+            fin: { image: 'img/puffer_normal_fin.png', x: 216, y: 155, pivotX: 310, pivotY: 188 }
+        },
         { id: 'trellis1', label: 'TRELLIS v1', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis1.glb', turn: [90, 0] },
         { id: 'trellis2', label: 'TRELLIS.2', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis2.glb', turn: [90, 0] },
         { id: 'rodin', label: 'Rodin Gen-2', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/rodin.glb', turn: [90, 0] }
@@ -117,7 +129,8 @@ async function build(c) {
         const fit = fitProfile(bodyMask, small.w, small.h, { width: c.width, box: c.box });
         const profile = t => {
             const p = fit.profile(t);
-            return { x: p.x / small.w - 0.5, y: (small.h / 2 - p.y) / small.w, h: p.h / small.w, w: p.w / small.w, n: p.n };
+            const grow = c.grow || 1;
+            return { x: p.x / small.w - 0.5, y: (small.h / 2 - p.y) / small.w, h: p.h / small.w * grow, w: p.w / small.w * grow, n: p.n };
         };
         const body = loftBody({ stations: c.stations, sides: c.sides, profile, uv: (x, y) => [x + 0.5, 0.5 - y / aspect] });
         body.normals = vertexNormals(body.positions, body.indices);
@@ -126,7 +139,29 @@ async function build(c) {
             normals: Float32Array.from([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
             uvs: Float32Array.from([0, 0, 1, 0, 1, 1, 0, 1]), indices: Uint32Array.from([0, 2, 1, 0, 3, 2])
         };
-        return { ...c, meshes: [renderer.upload(card, img), renderer.upload(body, img)], triangles: body.triangles + 2, lit: 1 };
+        const meshes = [renderer.upload(card, img), renderer.upload(body, img)];
+        let animate = null;
+        if (c.fin) {
+            // A card just outside the flank, hinged where the fin joins the body; it paddles and
+            // spreads a little, and rides outward with the body when it puffs up.
+            const finImg = await loadImage(c.fin.image), px = v => v / img.width - 0.5, py = v => (img.height / 2 - v) / img.width;
+            const at = fit.profile(Math.min(1, Math.max(0, (c.fin.pivotX / img.width * small.w - fit.x0) / (fit.x1 - fit.x0))));
+            const z = at.w / small.w * 0.96;
+            const x0 = px(c.fin.x), x1 = px(c.fin.x + finImg.width), y0 = py(c.fin.y), y1 = py(c.fin.y + finImg.height);
+            const fin = renderer.upload({
+                positions: Float32Array.from([x0, y0, z, x1, y0, z, x1, y1, z, x0, y1, z]),
+                normals: Float32Array.from([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+                uvs: Float32Array.from([0, 0, 1, 0, 1, 1, 0, 1]), indices: Uint32Array.from([0, 2, 1, 0, 3, 2])
+            }, finImg);
+            fin.lift = 0.06;
+            meshes.push(fin);
+            const pivot = [px(c.fin.pivotX), py(c.fin.pivotY), z];
+            animate = pose => {
+                const beat = Math.sin(pose.phase * 1.15);
+                fin.part = hinge(...pivot, beat * (0.12 + pose.swim * 0.25), -0.25 - beat * 0.2 * (0.4 + pose.swim));
+            };
+        }
+        return { ...c, meshes, animate, triangles: body.triangles + 2 * (meshes.length - 1), lit: 1 };
     }
     const res = await fetch(c.url).catch(() => null);
     if (!res || !res.ok || (res.headers.get('content-type') || '').includes('text/html')) return null;
@@ -240,6 +275,7 @@ function frame(at = null) {
                 }
                 if (flat) yaw = 0;                                                         // today's sprite: no banking at all
             }
+            c.animate?.(pose);
             renderer.draw(c.meshes, { ...pose, yaw, mirror, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
         }
     });

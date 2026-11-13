@@ -7,7 +7,8 @@
 //   light   soft key light from above, teal fill from the water, warm bounce
 //           from below, up to two point lights, a rim, a depth tint
 //   motion  in the vertex shader: swim (a wave running to the tail), puff
-//           (toward a ball), on top of the model rotation
+//           (toward a ball), on top of the model rotation; a mesh can carry a
+//           `part` matrix (hinge) to move on its own bone first
 // Model space: +x nose, +y up, +z toward the viewer; the creature fits a unit box.
 
 export const LIGHT = {
@@ -23,17 +24,29 @@ export const LIGHT = {
     deep: [0.07, 0.2, 0.36]            // the colour everything fades toward with depth
 };
 
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+/** Column-major matrix that turns a part about a pivot: first around z (flap), then around y (spread). */
+export function hinge(px, py, pz, flap, spread = 0) {
+    const cz = Math.cos(flap), sz = Math.sin(flap), cy = Math.cos(spread), sy = Math.sin(spread);
+    // R = Ry(spread) * Rz(flap)
+    const r = [cy * cz, sz, -sy * cz, 0, -cy * sz, cz, sy * sz, 0, sy, 0, cy, 0];
+    const tx = px - (r[0] * px + r[4] * py + r[8] * pz), ty = py - (r[1] * px + r[5] * py + r[9] * pz), tz = pz - (r[2] * px + r[6] * py + r[10] * pz);
+    return [...r, tx, ty, tz, 1];
+}
+
 const VERT = `#version 300 es
 in vec3 aPos; in vec3 aNormal; in vec2 aUv;
-uniform mat4 uProj; uniform mat4 uModel;
-uniform float uSwim; uniform float uPhase; uniform float uPuff;
+uniform mat4 uProj; uniform mat4 uModel; uniform mat4 uPart;
+uniform float uSwim; uniform float uPhase; uniform float uPuff; uniform float uLift;
 out vec3 vNormal; out vec2 vUv; out vec3 vWorld;
 void main() {
-    vec3 p = aPos, n = aNormal;
+    // A part (a fin card on its own bone) is first moved within the creature.
+    vec3 p = (uPart * vec4(aPos, 1.0)).xyz, n = normalize(mat3(uPart) * aNormal);
     // Puff: every point moves toward a ball around the centre.
     float r = length(p);
     vec3 ball = r > 1e-5 ? p / r : vec3(0.0, 1.0, 0.0);
-    p = mix(p, ball * 0.4, uPuff * 0.7) * (1.0 + uPuff * 0.2);
+    p = mix(p, ball * 0.4, uPuff * 0.7) * (1.0 + uPuff * 0.2) + ball * uLift * uPuff;   // parts stay on top of the puffed skin
     n = normalize(mix(n, ball, uPuff * 0.7));
     // Swim: the body bends sideways in a wave that grows toward the tail (-x).
     float t = clamp(0.5 - p.x, 0.0, 1.0);
@@ -122,7 +135,7 @@ export default class MeshRenderer {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         }
-        return { vao, count: indices.length, texture, color };
+        return { vao, count: indices.length, texture, color, part: IDENTITY, lift: 0 };
     }
 
     /**
@@ -168,6 +181,8 @@ export default class MeshRenderer {
         for (const m of meshes) {
             gl.bindTexture(gl.TEXTURE_2D, m.texture);
             gl.uniform4fv(u.uColor, m.color);
+            gl.uniformMatrix4fv(u.uPart, false, m.part);
+            gl.uniform1f(u.uLift, m.lift);
             gl.bindVertexArray(m.vao);
             gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0);
         }
