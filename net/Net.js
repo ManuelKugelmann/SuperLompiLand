@@ -55,6 +55,8 @@ export default class Net {
             const anon = typeof location !== 'undefined' && /[?&]anon\b/.test(location.search);
             const cfg = { appId: APP_ID, password: this.keys.password, maxUsers: MAX_PLAYERS };
             if (anon) cfg.identity = 'none';
+            // ?relay = only ever connect through the TURN server (tests the fallback).
+            if (typeof location !== 'undefined' && /[?&]relay\b/.test(location.search)) cfg.rtcConfig = { iceTransportPolicy: 'relay' };
             // Optional TURN relay for networks where direct peer-to-peer is
             // blocked (symmetric NAT, some mobile carriers). Set at build time:
             //   VITE_TURN_URLS=turn:host:3478,turns:host:443 VITE_TURN_USER=... VITE_TURN_PASS=...
