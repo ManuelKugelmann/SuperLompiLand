@@ -6,6 +6,7 @@ import { SnapshotBuffer, SNAP } from '../net/snapshots.js';
 const X = t => 2200 * Math.sin(t / 1900), Y = t => 700 * Math.sin(t / 1300) + 900;
 const VX = t => (2200 / 1900) * Math.cos(t / 1900) * (1000 / 60), VY = t => (700 / 1300) * Math.cos(t / 1300) * (1000 / 60);
 const SKEW = 987654; // the sender's clock is unrelated to ours
+const STEP_MS = 1000 / 60;
 
 const rng = seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 
@@ -124,4 +125,33 @@ test('a slow sender (low frame rate, one snapshot per 100 ms) is interpolated, n
     }
     assert.ok(b.delay >= 200, `cushion covers the slow send rate (${Math.round(b.delay)} ms)`);
     assert.ok(worst < 6, `drawn position always sits on the true path (worst ${worst.toFixed(1)} px off)`);
+});
+
+test('prediction: water slows a starved fish down, air makes it fall on an arc', async () => {
+    const { predict, PREDICT } = await import('../net/snapshots.js');
+    const water = predict({ x: 0, y: 500, vx: 10, vy: 0 }, 500);
+    assert.ok(water.vx < 10 && water.vx > 0, 'slowed, still moving');
+    assert.ok(water.x > 0 && water.x < 10 * 30, 'travelled less than at full speed');
+    const air = predict({ x: 0, y: PREDICT.surfaceY - 50, vx: 6, vy: -8 }, 500);
+    assert.ok(air.vy > -8, 'gravity pulls the jump down');
+    assert.ok(air.vx < 6 && air.vx > 5.5, 'almost no drag in the air');
+});
+
+test('a late packet after a prediction is blended in, never snapped', () => {
+    const b = new SnapshotBuffer();
+    // Steady swim east, 20 Hz.
+    let now = 1000;
+    for (let k = 0; k < 10; k++, now += 50) b.push({ n: k, t: k * 50 + SKEW, x: k * 30, y: 500, vx: 10, vy: 0, s: 'normal', f: 1, c: 'lompi' }, now);
+    // Starve for 400 ms: the fish is predicted east.
+    let prev = b.sample(now);
+    for (let T = now; T < now + 400; T += STEP_MS) prev = b.sample(T);
+    // The real fish had turned north: packets arrive late in a burst.
+    for (let k = 10; k < 18; k++) b.push({ n: k, t: k * 50 + SKEW, x: 270, y: 500 - (k - 9) * 25, vx: 0, vy: -8, s: 'normal', f: 1, c: 'lompi' }, now + 400);
+    let worst = 0;
+    for (let T = now + 400; T < now + 900; T += STEP_MS) {
+        const p = b.sample(T);
+        worst = Math.max(worst, Math.hypot(p.x - prev.x, p.y - prev.y));
+        prev = p;
+    }
+    assert.ok(worst < 40, `largest frame step after the correction: ${worst.toFixed(1)} px`);
 });
