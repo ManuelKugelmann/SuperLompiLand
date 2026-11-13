@@ -88,6 +88,6 @@ frame rate on a device; use the real loop for leak checks.
 ## Verifying changes
 
 Build and tests pass, then check the running game in the browser (desktop landscape and an
-emulated portrait phone) before calling a gameplay or layout change done. Visual changes
-get a screenshot set in the dev log. Physics feel is tuned with the user on a device:
+emulated portrait phone) before calling a gameplay or layout change done. Milestones (not
+every commit) get a short dev log entry with 1-3 screenshots. Physics feel is tuned with the user on a device:
 expose constants, never guess silently.

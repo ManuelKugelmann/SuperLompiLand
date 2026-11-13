@@ -4,7 +4,7 @@ import WorldState from '../systems/worldState.js';
 import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
-import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor } from '../game/level/biomes.js';
+import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor } from '../game/level/biomes.js';
 import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
@@ -185,6 +185,15 @@ export default class MainScene extends Phaser.Scene {
 
     /** Where a (re)start puts the fish: above the current nest, or the start pool. */
     startPoint() {
+        // ?at=kelp | abyss | x,y : start at a named place (repeatable screenshots, reviews).
+        const spot = spotFor(new URLSearchParams(window.location.search).get('at'));
+        if (spot) {
+            // Move into open water: try further and further above and below.
+            for (let d = 0; d < 1500; d += 60) {
+                for (const y of [spot.y - d, spot.y + d]) if (this.level.isOpen(spot.x, y)) return { x: spot.x, y };
+            }
+            return spot;
+        }
         if (this.nestIndex === 0) return { x: LEVEL.spawn.x, y: LEVEL.spawn.y };
         const nest = this.level.nests[this.nestIndex];
         return { x: nest.x, y: nest.y - 240 };

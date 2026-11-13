@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor
 } from '../game/level/biomes.js';
 
 test('biomes are ordered west to east and every table is complete', () => {
@@ -76,4 +76,17 @@ test('pickWeighted respects weights, skips missing art and handles empty tables'
     assert.equal(pickWeighted(rng, { a: 1, b: 3 }, key => key === 'a'), 'a');
     assert.equal(pickWeighted(rng, {}, () => true), null);
     assert.equal(pickWeighted(rng, { a: 1 }, () => false), null);
+});
+
+test('named spots for screenshots: biome ids, the abyss, plain coordinates', () => {
+    assert.deepEqual(spotFor('1200,-340'), { x: 1200, y: -340 });
+    assert.equal(spotFor('nowhere'), null);
+    assert.equal(spotFor(undefined), null);
+    for (const b of BIOMES) {
+        const p = spotFor(b.id);
+        assert.equal(biomeIndexAt(p.x), BIOMES.indexOf(b), b.id);
+        assert.ok(p.y >= 400 && p.y < floorY(p.x), `${b.id}: above the seabed`);
+    }
+    const deep = spotFor('abyss');
+    assert.ok(Math.abs(deep.x - ABYSS.x) < 1 && deep.y > 6000);
 });

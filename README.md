@@ -5,6 +5,10 @@
 <!-- devlog:start -->
 ## Dev log
 
+**Kelp forest with the new per-pixel terrain light: smooth rock, sand on top, shade in the caves** — [`4f0b6bd`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/4f0b6bd) · 2026-11-13 21:59
+
+![Kelp forest with the new per-pixel terrain light: smooth rock, sand on top, shade in the caves](docs/devlog/13-kelp-forest-with-the-new-per-pixel-terrain-light.jpg)
+
 **Biomes, nests, reef world with lighting, abyss** — [`2ef5125`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/2ef5125) · 2026-11-13 20:15
 
 ![Biomes, nests, reef world with lighting, abyss](docs/devlog/12-lagoon.jpg)
@@ -12,10 +16,6 @@
 **Boxfish-shaped Lompi, fin animation, puff as air brake** — [`6d0f7c5`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/6d0f7c5) · 2026-11-13 19:41
 
 ![Boxfish-shaped Lompi, fin animation, puff as air brake](docs/devlog/05-boxfish-lompi.jpg)
-
-**Waves at the surface, jumping out of the water** — [`47d2cff`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/47d2cff) · 2026-11-13 19:37
-
-![Waves at the surface, jumping out of the water](docs/devlog/04-waves-and-jumping.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->

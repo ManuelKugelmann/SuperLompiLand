@@ -150,3 +150,18 @@ export function pickWeighted(rng, table, exists) {
     for (const [key, w] of entries) { roll -= w; if (roll <= 0) return key; }
     return entries[entries.length - 1][0];
 }
+
+/**
+ * A named place in the world, for repeatable screenshots and reviews
+ * (`?at=kelp`, `?at=abyss`, `?at=12000,1800`): a biome id, "abyss" or "x,y".
+ * Returns { x, y } or null. The caller moves it into open water if needed.
+ */
+export function spotFor(spec) {
+    const xy = /^(-?\d+),(-?\d+)$/.exec(spec || '');
+    if (xy) return { x: Number(xy[1]), y: Number(xy[2]) };
+    if (spec === 'abyss') return { x: ABYSS.x, y: floorY(ABYSS.x - ABYSS.halfWidth * 3) + ABYSS.depth * 0.4 };
+    const b = BIOMES.find(bi => bi.id === spec);
+    if (!b) return null;
+    const x = b.from + b.width / 2;
+    return { x, y: Math.max(400, floorY(x) * 0.55) };
+}

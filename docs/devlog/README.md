@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Kelp forest with the new per-pixel terrain light: smooth rock, sand on top, shade in the caves
+
+[`4f0b6bd`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/4f0b6bd) · 2026-11-13 21:59
+
+![Kelp forest with the new per-pixel terrain light: smooth rock, sand on top, shade in the caves](13-kelp-forest-with-the-new-per-pixel-terrain-light.jpg)
+
 ## Biomes, nests, reef world with lighting, abyss
 
 [`2ef5125`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/2ef5125) · 2026-11-13 20:15
