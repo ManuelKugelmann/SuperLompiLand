@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Nests rebuilt: a level sand basin with raked-sand relief and shells
+
+[`a51137f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/a51137f) · 2026-11-14 00:08
+
+![Nests rebuilt: a level sand basin with raked-sand relief and shells](15-nests-rebuilt-a-level-sand-basin-with-raked-sand.jpg)
+
 ## Lompi in 3D: four techniques compared with the same light and pose
 
 [`9c70f65`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9c70f65) · 2026-11-13 23:04

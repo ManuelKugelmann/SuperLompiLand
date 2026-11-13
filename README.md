@@ -5,6 +5,10 @@
 <!-- devlog:start -->
 ## Dev log
 
+**Nests rebuilt: a level sand basin with raked-sand relief and shells** — [`da155c1`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/da155c1) · 2026-11-14 00:08
+
+![Nests rebuilt: a level sand basin with raked-sand relief and shells](docs/devlog/15-nests-rebuilt-a-level-sand-basin-with-raked-sand.jpg)
+
 **Lompi in 3D: four techniques compared with the same light and pose** — [`9c70f65`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9c70f65) · 2026-11-13 23:04
 
 ![Lompi in 3D: four techniques compared with the same light and pose](docs/devlog/14-lompi-in-3d-four-techniques-compared-with-the-sa.jpg)
