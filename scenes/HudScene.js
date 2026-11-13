@@ -51,11 +51,31 @@ export default class HudScene extends Phaser.Scene {
             fontFamily: 'Arial', fontSize: '20px', color: '#ffffff'
         }).setOrigin(1, 1).setAlpha(0.4);
 
+        // Banner line for announcements (biome names, nest reached, ...).
+        const W = this.scale.width, H = this.scale.height;
+        this.bannerTitle = this.add.text(W / 2, H * 0.26, '', {
+            fontFamily: 'Arial', fontSize: '96px', color: '#ffffff', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 14
+        }).setOrigin(0.5).setAlpha(0);
+        this.bannerSub = this.add.text(W / 2, H * 0.26 + 86, '', {
+            fontFamily: 'Arial', fontSize: '40px', color: '#fff3b0', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 8
+        }).setOrigin(0.5).setAlpha(0);
+
         new BurgerMenu(this, 60, 60, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
+            { label: de ? 'NEU ANFANGEN' : 'START OVER', color: 0x6d4c41, callback: () => main.startOver() },
             ...pwaMenuItems(this, main.lang),
             { label: de ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => main.scene.start('MainMenuScene') }
         ]);
+    }
+
+    banner(title, subtitle = '') {
+        const targets = [this.bannerTitle, this.bannerSub];
+        this.tweens.killTweensOf(targets);
+        this.bannerTitle.setText(title).setAlpha(0).setScale(0.8);
+        this.bannerSub.setText(subtitle).setAlpha(0);
+        this.tweens.add({ targets: this.bannerTitle, alpha: 1, scale: 1, duration: 320, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: this.bannerSub, alpha: 1, duration: 320, delay: 150 });
+        this.tweens.add({ targets, alpha: 0, duration: 600, delay: 2400 });
     }
 
     update() {

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { waveY } from './surface.js';
+import { biomeBlendAt, mixColor } from './biomes.js';
 
 /**
  * Calm backdrop for the open world: a depth gradient that darkens as you dive,
@@ -15,6 +16,7 @@ export default class Backdrop {
         makeGradient(scene, 'bd_grad', H, [[0, 0x7fdce6], [0.25, 0x35b3cc], [0.6, 0x1480a8], [1, 0x0d5a8c]]);
         scene.add.image(0, 0, 'bd_grad').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(-30);
         this.dark = scene.add.rectangle(0, 0, W, H, 0x04122e, 0).setOrigin(0).setScrollFactor(0).setDepth(-25);
+        this.tint = scene.add.rectangle(0, 0, W, H, 0xffffff, 0).setOrigin(0).setScrollFactor(0).setDepth(-26);
 
         // Sky and waterline live in the world (scroll vertically, follow x).
         // Both are redrawn every frame so the waterline can wave.
@@ -60,7 +62,10 @@ export default class Backdrop {
     update(camX, camY, dx, dy) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         const depth = Phaser.Math.Clamp((camY + H / 2) / this.maxDepth, 0, 1);
-        this.dark.setAlpha(depth * 0.78);
+        this.dark.setAlpha(Phaser.Math.Clamp((camY + H / 2 - 2200) / 3400, 0, 1) * 0.7);
+        // Each biome colours the water; neighbours fade into each other.
+        const bl = biomeBlendAt(camX + W / 2);
+        this.tint.setFillStyle(mixColor(bl.a.water[0], bl.b.water[0], bl.t), Phaser.Math.Linear(bl.a.water[1], bl.b.water[1], bl.t));
 
         const t = this.scene.time.now / 1000;
 

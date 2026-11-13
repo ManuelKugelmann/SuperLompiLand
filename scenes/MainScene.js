@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import ProgressionManager from '../systems/ProgressionManager.js';
 import Pufferfish from '../game/Pufferfish.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
+import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor } from '../game/level/biomes.js';
 import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
@@ -19,6 +20,7 @@ const WORLD = {
     doubleTapMs: 320,
     doubleTapDist: 110,
     maxHealth: 5,
+    ventLift: 0.0026,     // upward force per unit mass inside a bubble column
     friendBonus: 5
 };
 
@@ -38,16 +40,35 @@ export default class MainScene extends Phaser.Scene {
         this.matter.world.autoUpdate = false; // stepped manually in fixedStep()
         this.acc = 0;
         this.debugOn = false;
-        this.camX = LEVEL.spawn.x - W / 2;
-        this.camY = LEVEL.spawn.y - H / 2;
         this.maxDepth = 0;
 
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
         this.level = new LevelGenerator(this);
+
+        // Start at the last nest reached (kept across sessions), else the start pool.
+        this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
+        this.banked = this.progression.get?.('banked', 0) || 0;
+        const start = this.startPoint();
+        this.camX = start.x - W / 2;
+        this.camY = start.y - H / 2;
         this.level.update(this.camX, this.camY);
 
         this.character = getCharacter(this.registry.get('character') || loadSelectedId());
-        this.fish = new Pufferfish(this, LEVEL.spawn.x, LEVEL.spawn.y, this.character);
+        this.fish = new Pufferfish(this, start.x, start.y, this.character);
+
+        // Lighting layers (screen-fixed): ambient multiply + a soft vignette.
+        this.ambient = this.add.rectangle(0, 0, W, H, 0xffffff).setOrigin(0).setScrollFactor(0).setDepth(40)
+            .setBlendMode(Phaser.BlendModes.MULTIPLY);
+        if (!this.textures.exists('vignette')) {
+            const tex = this.textures.createCanvas('vignette', 256, 144);
+            const ctx = tex.getContext();
+            const grad = ctx.createRadialGradient(128, 72, 40, 128, 72, 150);
+            grad.addColorStop(0, 'rgba(0,10,30,0)'); grad.addColorStop(1, 'rgba(0,10,30,0.55)');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 144);
+            tex.refresh();
+        }
+        this.add.image(0, 0, 'vignette').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(41).setAlpha(0.5);
+        this.glow = this.add.circle(start.x, start.y, 260, 0xbfe9ff, 0).setDepth(42).setBlendMode(Phaser.BlendModes.ADD);
         this.health = WORLD.maxHealth;
         this.maxHealth = WORLD.maxHealth;
 
@@ -55,7 +76,8 @@ export default class MainScene extends Phaser.Scene {
         this.activeScheme = CONTROL_SCHEMES.some(s => s.id === saved) ? saved : CONTROL_SCHEMES[0].id;
         this.controller = makeController(this.activeScheme, this, this.fish);
 
-        this.coins = 0;
+        this.coins = this.banked;
+        this.biomeIndex = -1;
         this.best = this.progression.get?.('best_coins', 0) || 0;
 
         // HUD (menu, scheme switcher, puff button, counters) runs as its own
@@ -122,6 +144,74 @@ export default class MainScene extends Phaser.Scene {
         return hud.consumedDown === pointer.downTime || hud.input.hitTestPointer(pointer).length > 0;
     }
 
+    /** Where a (re)start puts the fish: above the current nest, or the start pool. */
+    startPoint() {
+        if (this.nestIndex === 0) return { x: LEVEL.spawn.x, y: LEVEL.spawn.y };
+        const nest = this.level.nests[this.nestIndex];
+        return { x: nest.x, y: nest.y - 240 };
+    }
+
+    /** Big friendly line of text in the middle of the screen (shown by the HUD). */
+    announce(title, subtitle = '') {
+        this.scene.get(HUD_KEY)?.banner?.(title, subtitle);
+    }
+
+    /** Swam into a nest: coins are safe, this is the new restart point. */
+    reachNest(nest) {
+        const de = this.lang === 'de';
+        const first = nest.index > this.nestIndex;
+        if (first) this.nestIndex = nest.index;
+        if (!first && this.coins === this.banked && this.health >= this.maxHealth) return;
+        this.banked = this.coins;
+        this.health = this.maxHealth;
+        this.progression.set?.('nest', this.nestIndex);
+        this.progression.set?.('banked', this.banked);
+        if (nest.grand) {
+            this.progression.set?.('nest', 0);
+            this.progression.set?.('banked', 0);
+            this.time.delayedCall(900, () => this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, won: true }));
+            this.announce(de ? 'Das große Nest!' : 'The Grand Nest!', de ? 'Du hast es geschafft!' : 'You made it!');
+        } else if (first) {
+            this.announce(de ? 'Nest erreicht!' : 'Nest reached!', de ? 'Münzen gesichert · hier geht es weiter' : 'Coins saved · you restart here');
+        }
+        for (let i = 0; i < 14; i++) {
+            const a = (i / 14) * Math.PI * 2;
+            const star = this.add.star(nest.x, nest.y - 40, 5, 9, 20, 0xfff3b0).setDepth(8);
+            this.tweens.add({
+                targets: star, x: nest.x + Math.cos(a) * 260, y: nest.y - 160 + Math.sin(a) * 150, alpha: 0, angle: 220,
+                duration: 900, ease: 'Quad.easeOut', onComplete: () => star.destroy()
+            });
+        }
+    }
+
+    /** Out of health: no fail screen — back to the last nest with what was saved there. */
+    respawn() {
+        const de = this.lang === 'de';
+        const p = this.startPoint();
+        this.cameras.main.fadeOut(260, 10, 40, 70);
+        this.time.delayedCall(280, () => {
+            this.fish.deflate();
+            this.fish.sprite.setPosition(p.x, p.y).setVelocity(0, 0);
+            this.fish.prev.set(p.x, p.y);
+            this.fish.cur.set(p.x, p.y);
+            this.fish.guard = 2500;
+            this.health = this.maxHealth;
+            this.coins = this.banked;
+            this.camX = p.x - this.scale.width / 2;
+            this.camY = p.y - this.scale.height / 2;
+            this.respawning = false;
+            this.cameras.main.fadeIn(320, 10, 40, 70);
+            this.announce(de ? 'Nochmal!' : 'Try again!', de ? 'Zurück am letzten Nest' : 'Back at the last nest');
+        });
+    }
+
+    /** Menu: forget the saved nest and coins and begin at the home reef again. */
+    startOver() {
+        this.progression.set?.('nest', 0);
+        this.progression.set?.('banked', 0);
+        this.scene.restart();
+    }
+
     finish() {
         if (this.coins > this.best) this.progression.set?.('best_coins', this.coins);
         this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth });
@@ -173,12 +263,15 @@ export default class MainScene extends Phaser.Scene {
             }).setOrigin(0.5).setDepth(8);
             this.tweens.add({ targets: heart, y: heart.y - 120, alpha: 0, duration: 1100, onComplete: () => heart.destroy() });
         }
+        for (const nest of this.level.nests) {
+            if (Math.abs(p.x - nest.x) < 230 && p.y > nest.y - 260 && p.y < nest.y + 40) this.reachNest(nest);
+        }
         for (const h of this.level.hazards) {
-            if (!h.img.active || p.distance(h.img) > fr + h.r) continue;
+            if (!h.img.active || p.distance(h.img) > fr * LEVEL.hitSlack + h.r) continue;
             if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
                 this.health = Math.max(0, this.health - (this.character.armor ?? 1));
                 this.cameras.main.shake(180, 0.008);
-                if (this.health <= 0) { this.finish(); return; }
+                if (this.health <= 0 && !this.respawning) { this.respawning = true; this.respawn(); return; }
             }
         }
     }
@@ -194,6 +287,9 @@ export default class MainScene extends Phaser.Scene {
             this.fish.steered = this.keyDir.lengthSq() > 0;
             if (this.fish.steered) this.fish.thrust(this.keyDir.normalize());
         }
+        // Bubble plants carry the fish upward.
+        const fsp = this.fish.sprite;
+        if (this.level.liftAt(fsp.x, fsp.y)) fsp.applyForce({ x: 0, y: -WORLD.ventLift * fsp.body.mass });
         this.fish.update(STEP_MS, waveY(this.fish.sprite.x, this.time.now / 1000));
         this.matter.world.step(STEP_MS);
         this.fish.afterStep();
@@ -228,10 +324,47 @@ export default class MainScene extends Phaser.Scene {
             this.tweens.add({ targets: b, y: b.y - 70, alpha: 0, scale: 1.5, duration: 700, onComplete: () => b.destroy() });
         }
 
+        // Sand is kicked up when swimming fast just above the ground.
+        this.sandAt = (this.sandAt || 0) - delta;
+        if (speed > 4 && this.sandAt <= 0 && !this.fish.inAir) {
+            const ground = this.level.groundBelow(view.x, view.y + this.fish.radius * 0.5, 130);
+            if (ground) {
+                this.sandAt = 70;
+                for (let i = 0; i < 2 + Math.min(4, speed / 4); i++) {
+                    const puff = this.add.circle(view.x + Phaser.Math.Between(-50, 50), ground.y - Phaser.Math.Between(0, 14),
+                        Phaser.Math.Between(5, 13), ground.color, 0.55).setDepth(6);
+                    this.tweens.add({
+                        targets: puff, x: puff.x - v.x * Phaser.Math.Between(4, 9), y: puff.y - Phaser.Math.Between(30, 90),
+                        scale: 2.4, alpha: 0, duration: Phaser.Math.Between(600, 1000), ease: 'Quad.easeOut',
+                        onComplete: () => puff.destroy()
+                    });
+                }
+            }
+        }
+
+        // Ambient light: one multiply layer over the whole world — warm and bright
+        // near the surface, taking on the biome's water colour and dimming with depth.
+        const bl = biomeBlendAt(view.x);
+        // Bright down to the reef floor, dimming only in real depth; the abyss is dark.
+        const depth01 = Phaser.Math.Clamp((view.y - 2200) / 3400, 0, 1) * 0.55 + Phaser.Math.Clamp((view.y - 5600) / 3000, 0, 1) * 0.45;
+        const water = mixColor(bl.a.water[0], bl.b.water[0], bl.t);
+        const waterAmt = Phaser.Math.Linear(bl.a.water[1], bl.b.water[1], bl.t);
+        const lit = mixColor(mixColor(0xffffff, water, 0.1 + waterAmt * 0.6), 0x0c1436, depth01 * 0.8);
+        this.ambient.setFillStyle(lit, 1);
+        // In the dark the fish carries a little light of its own.
+        this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
+
         this.level.update(this.camX, this.camY);
         this.level.animate(time / 1000);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY);
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
+
+        // Announce a biome when the fish swims into it.
+        const bi = biomeIndexAt(sp.x);
+        if (bi !== this.biomeIndex) {
+            if (this.biomeIndex !== -1 || time > 0) this.announce(BIOMES[bi].name[this.lang] || BIOMES[bi].name.en);
+            this.biomeIndex = bi;
+        }
     }
 }

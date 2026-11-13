@@ -7,6 +7,8 @@
 //   sway   seahorse: the whole body curls gently from the head down
 //   wobble sitters (starfish, snail, slug): tiny rocking and breathing
 //   throb  urchin: spines swell in and out
+//   still  no deformation (spike plates)
+// Plants use `sway` with `root: 'bottom'` (fixed at the base, free at the tip).
 
 const SEGMENTS = 10;
 
@@ -21,16 +23,17 @@ export function makeCritter(scene, key, x, y, width, anim = 'wobble', opts = {})
         ? scene.add.rope(x, y, key, null, SEGMENTS, !vertical)
         : scene.add.image(x, y, key);
     const base = width / obj.frame.width;
+    const baseY = opts.scaleY ?? base;   // plants set their own height
     const phase = (Math.abs(x) * 0.013 + Math.abs(y) * 0.007) % 6.28; // desync neighbours
     const speed = opts.speed ?? 1;
     let dir = 1;
-    obj.setScale(base);
+    obj.setScale(base, baseY);
     obj.face = d => { dir = d < 0 ? -1 : 1; };
     obj.facing = () => dir;
 
     obj.animate = t => {
         const p = t * speed + phase;
-        let sx = base, sy = base;
+        let sx = base, sy = baseY;
         if (anim === 'swim') {
             const amp = obj.frame.height * 0.07;
             const pts = obj.points, n = pts.length - 1;
@@ -54,13 +57,15 @@ export function makeCritter(scene, key, x, y, width, anim = 'wobble', opts = {})
             const amp = obj.frame.width * 0.05;
             const pts = obj.points, n = pts.length - 1;
             for (let i = 0; i <= n; i++) {
-                const f = i / n;
-                pts[i].x = Math.sin(p * 2.2 - f * 2) * amp * f;
+                const f = opts.root === 'bottom' ? 1 - i / n : i / n;
+                pts[i].x = Math.sin(p * 2.2 - f * 2) * amp * f * (opts.root === 'bottom' ? 2.4 : 1);
             }
             obj.setDirty();
         } else if (anim === 'throb') {
             const beat = Math.sin(p * 3);
             sx = sy = base * (1 + beat * 0.045);
+        } else if (anim === 'still') {
+            obj.rotation = opts.rotation ?? 0;
         } else {
             obj.rotation = (opts.rotation ?? 0) + Math.sin(p * 1.6) * 0.05;
             sy = base * (1 + Math.sin(p * 2.3) * 0.025);
