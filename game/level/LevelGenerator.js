@@ -68,6 +68,7 @@ export default class LevelGenerator {
         this.lights = [];     // glows that follow a creature
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
         this.makeKelpTexture();
+        this.makeRootTextures();
         this.nests = this.findNests();
         const lang = scene.registry.get('currentLanguage') || 'de';
         const ground = x => { let y = floorY(x) + 260; while (y > 400 && this.density(x, y) > LEVEL.threshold) y -= 12; return y + 12; };
@@ -319,6 +320,21 @@ export default class LevelGenerator {
             if (sign.x >= ox && sign.x < ox + CH && sign.y >= oy && sign.y < oy + CH) this.drawSign(chunk, sign);
         }
 
+        // --- Mangrove roots hanging from the surface --------------------------
+        // Most stand behind the fish, a few in front (a place to hide). They are
+        // scenery only, and front ones are kept away from where hazards float.
+        if (biome.roots && cy === 0) {
+            for (let k = 0; k < biome.roots; k++) {
+                const x = ox + rng.between(40, CH - 40);
+                const front = rng.frac() < 0.25;
+                const root = keep(s.add.image(x, -40, `root_${rng.between(1, 3)}`).setOrigin(0.5, 0)
+                    .setScale(rng.realInRange(1.1, 2.1) * (front ? 1.25 : 1), rng.realInRange(1.2, 2.4))
+                    .setDepth(front ? 7.5 : -7).setAlpha(front ? 0.9 : 0.8));
+                if (rng.frac() < 0.5) root.setFlipX(true);
+                if (!front) root.setTint(0x6f8f86);
+            }
+        }
+
         // --- Coin trails through open water ----------------------------------
         for (let trails = rng.between(Math.max(0, biome.coins - 2), biome.coins); trails > 0; trails--) {
             let x = ox + rng.between(80, CH - 80), y = oy + rng.between(80, CH - 80);
@@ -509,6 +525,37 @@ export default class LevelGenerator {
             fontFamily: 'Arial', fontSize: '46px', color: '#fff3d0', fontStyle: 'bold', stroke: '#3a2713', strokeThickness: 6
         }).setOrigin(0.5).setDepth(0.1);
         chunk.objects.push(g, t);
+    }
+
+    /** Three branching mangrove root shapes, drawn once (procedural, seeded). */
+    makeRootTextures() {
+        const s = this.scene;
+        for (let n = 1; n <= 3; n++) {
+            const key = `root_${n}`;
+            if (s.textures.exists(key)) continue;
+            const w = 256, h = 512;
+            const tex = s.textures.createCanvas(key, w, h);
+            const ctx = tex.getContext();
+            let seed = n * 7919;
+            const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+            ctx.lineCap = 'round';
+            const branch = (x, y, angle, len, width, depth) => {
+                const x2 = x + Math.sin(angle) * len, y2 = y + Math.cos(angle) * len;
+                const grad = ctx.createLinearGradient(x, y, x2, y2);
+                grad.addColorStop(0, '#7a5a3a'); grad.addColorStop(1, '#4e3a28');
+                ctx.strokeStyle = grad; ctx.lineWidth = width;
+                ctx.beginPath(); ctx.moveTo(x, y);
+                ctx.quadraticCurveTo(x + Math.sin(angle + 0.5) * len * 0.5, y + Math.cos(angle + 0.5) * len * 0.5, x2, y2);
+                ctx.stroke();
+                if (depth <= 0 || y2 > h - 30) return;
+                const kids = 2 + (rnd() < 0.35 ? 1 : 0);
+                for (let k = 0; k < kids; k++) {
+                    branch(x2, y2, angle + (rnd() - 0.5) * 1.1, len * (0.62 + rnd() * 0.25), Math.max(4, width * 0.66), depth - 1);
+                }
+            };
+            branch(w / 2, 0, (rnd() - 0.5) * 0.2, 150, 26, 4);
+            tex.refresh();
+        }
     }
 
     /** Kelp leaf strip, drawn once; bent every frame like the creatures. */

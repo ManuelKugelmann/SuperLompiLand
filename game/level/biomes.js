@@ -19,7 +19,7 @@ const ROCK_REEF = [0xf3dba0, 0xd2ae6c, 0x9c7a54, 0x6a5748, 0x4b4350];
 
 export const BIOMES = [
     {
-        id: 'lagoon', name: { de: 'Lagune', en: 'Lagoon' }, from: WORLD_WEST,
+        id: 'beach', name: { de: 'Sandstrand', en: 'Sandy Beach' }, from: WORLD_WEST,
         rock: [0xfff0c0, 0xf2d894, 0xd9b877, 0xb89868, 0x937a5c], water: [0x7ff0e0, 0.22], open: 0.2,
         coral: 0.35, kelp: 0.1, coins: 2, friendRate: 0.5, hazardRate: 0,
         friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, friend_clownfish: 2, urchin: 1 }, hazards: {}
@@ -32,34 +32,43 @@ export const BIOMES = [
         hazards: { spikes: 1 }
     },
     {
-        id: 'kelp', name: { de: 'Tangwald', en: 'Kelp Forest' }, from: 2500,
+        // Shallow, sheltered, full of roots to weave through. `roots` = mangrove
+        // roots hanging from the surface, some in front of the fish, most behind.
+        id: 'mangrove', name: { de: 'Mangroven-Lagune', en: 'Mangrove Lagoon' }, from: 2500,
+        rock: [0xe8d9a6, 0xbfae77, 0x8f8257, 0x665d44, 0x474233], water: [0x4fb98a, 0.22], open: 0.22,
+        coral: 0.25, kelp: 0.3, coins: 3, friendRate: 0.55, hazardRate: 0.1, roots: 4,
+        friends: { friend_seahorse: 2, friend_snail: 2, friend_nudibranch: 2, friend_turtle: 1, friend_starfish: 1, urchin: 1 },
+        hazards: { hazard_net: 1 }
+    },
+    {
+        id: 'kelp', name: { de: 'Tangwald', en: 'Kelp Forest' }, from: 7500,
         rock: [0xc9d08a, 0x9fae62, 0x6f8250, 0x4d5f44, 0x384238], water: [0x2f9a5c, 0.26], open: 0.05,
         coral: 0.15, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
         friends: { friend_seahorse: 3, friend_nudibranch: 3, friend_snail: 1, urchin: 1 },
         hazards: { hazard_net: 2, spikes: 1 }
     },
     {
-        id: 'blue', name: { de: 'Blaues Meer', en: 'Open Blue' }, from: 7500,
+        id: 'blue', name: { de: 'Blaues Meer', en: 'Open Blue' }, from: 12500,
         rock: [0xd9e2ee, 0xa9b8cc, 0x7d8fa8, 0x5a6a84, 0x414c63], water: [0x1b5fd0, 0.24], open: 0.3,
         coral: 0.15, kelp: 0.05, coins: 3, friendRate: 0.45, hazardRate: 0.25,
         friends: { friend_jellyfish: 4, friend_turtle: 2 }, hazards: { mine: 2, hazard_buoy: 1 }
     },
     {
-        id: 'wreck', name: { de: 'Minenfeld', en: 'Minefield' }, from: 12500,
+        id: 'wreck', name: { de: 'Minenfeld', en: 'Minefield' }, from: 17500,
         rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.1,
         coral: 0.12, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.55,
         friends: { friend_starfish: 1, friend_seahorse: 1, urchin: 1 },
         hazards: { mine: 4, hazard_buoy: 2, spikes: 2 }
     },
     {
-        id: 'harbour', name: { de: 'Hafen', en: 'Harbour' }, from: 17500,
+        id: 'harbour', name: { de: 'Hafen', en: 'Harbour' }, from: 22500,
         rock: [0xb7b9b0, 0x8d9088, 0x676b66, 0x4a4e4c, 0x353838], water: [0x6f8f3a, 0.26], open: 0.08,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
         friends: { friend_snail: 1, friend_nudibranch: 1 },
         hazards: { hazard_net: 3, hazard_claw: 3, hazard_barrel: 3, spikes: 1, hazard_buoy: 1 }
     },
     {
-        id: 'trench', name: { de: 'Tiefsee', en: 'Deep Trench' }, from: 22500,
+        id: 'trench', name: { de: 'Tiefsee', en: 'Deep Trench' }, from: 27500,
         rock: [0x7f86c4, 0x5b5f9c, 0x434576, 0x303158, 0x21213f], water: [0x1a0f4a, 0.42], open: 0.04,
         coral: 0.2, kelp: 0.05, coins: 4, friendRate: 0.25, hazardRate: 0.5,
         friends: { friend_jellyfish: 2, friend_nudibranch: 1, enemy_angler: 4, urchin: 1 },
@@ -96,11 +105,11 @@ export function mixColor(c1, c2, t) {
 }
 
 /** The abyss: a narrow chasm in the deep-sea biome that drops far below everything else. */
-export const ABYSS = { x: 25300, halfWidth: 650, depth: 7500 };
+export const ABYSS = { x: BIOMES[BIOMES.length - 1].from + 2800, halfWidth: 650, depth: 7500 };
 
 /** Seabed depth: shallow in the west, dropping steadily toward the east, plus the abyss. */
 export function floorY(x) {
-    const base = clamp(1150 + (x - WORLD_WEST) * 0.14, 1000, 5600);
+    const base = clamp(1050 + (x - WORLD_WEST) * 0.125, 1000, 5600);
     const d = (x - ABYSS.x) / ABYSS.halfWidth;
     return base + ABYSS.depth * Math.exp(-d * d * 1.6);
 }

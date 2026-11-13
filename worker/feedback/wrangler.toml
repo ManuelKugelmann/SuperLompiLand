@@ -18,4 +18,5 @@ id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
 # Secrets (never in this file):
 #   npx wrangler secret put GITHUB_TOKEN   # fine-grained token: Issues read & write, this repo only
+#   npx wrangler secret put ALLOWED_NAMES  # optional: comma-separated first names allowed to post
 #   npx wrangler secret put FAMILY_CODE    # optional shared code

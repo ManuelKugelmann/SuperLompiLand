@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LIMITS, sanitize, hourBucket, placeAllowed, originAllowed, buildIssue } from '../worker/feedback/lib.js';
+import { LIMITS, sanitize, hourBucket, placeAllowed, originAllowed, buildIssue, matchName } from '../worker/feedback/lib.js';
 
 test('the hourly limit is 42', () => {
     assert.equal(LIMITS.perHour, 42);
@@ -47,4 +47,21 @@ test('buildIssue makes a labelled issue with context and no raw mentions', () =>
     assert.ok(!issue.body.includes('@team'));
     assert.ok(!issue.body.includes('<b>'));
     assert.equal(buildIssue('', null).title, 'Feedback: Feedback');
+});
+
+test('matchName forgives case, accents and one typo, and returns the canonical name', () => {
+    const allowed = ['Anna', 'Ben', 'Cl\u00e9o'];
+    assert.equal(matchName('anna', allowed), 'anna');
+    assert.equal(matchName('  ANNA ', allowed), 'anna');
+    assert.equal(matchName('Ana', allowed), 'anna');      // one letter missing
+    assert.equal(matchName('Cleo', allowed), 'cleo');     // accent ignored
+    assert.equal(matchName('Bem', allowed), 'ben');       // one letter wrong
+    assert.equal(matchName('Robert', allowed), null);
+    assert.equal(matchName('', allowed), null);
+    assert.equal(matchName('An', allowed), null);         // two edits away
+});
+
+test('buildIssue records who it is from when a name matched', () => {
+    assert.ok(buildIssue('hi', {}, 'anna').body.includes('- from: anna'));
+    assert.ok(!buildIssue('hi', {}).body.includes('from:'));
 });

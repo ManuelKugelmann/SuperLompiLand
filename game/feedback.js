@@ -7,6 +7,7 @@ import { VERSION_TAG } from './pwa.js';
 export const FEEDBACK_URL = ''; // e.g. 'https://lompi-feedback.<account>.workers.dev'
 
 const CODE_KEY = 'sll_family_code';
+const NAME_KEY = 'sll_feedback_name';
 const QUEUE_KEY = 'sll_feedback_queue';
 const store = {
     get: (k, d) => { try { return JSON.parse(window.localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -19,7 +20,7 @@ async function post(entry) {
     const res = await fetch(FEEDBACK_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...entry, code: store.get(CODE_KEY, '') })
+        body: JSON.stringify({ ...entry, code: store.get(CODE_KEY, ''), name: store.get(NAME_KEY, '') })
     });
     return res.status;
 }
@@ -41,13 +42,13 @@ export async function flushFeedbackQueue() {
 const TEXT = {
     de: {
         title: 'Feedback', hint: 'Was gefällt dir? Was stört? Was fehlt?', send: 'Senden', cancel: 'Abbrechen',
-        code: 'Familien-Code', sent: 'Danke! Ist angekommen.', queued: 'Gespeichert – wird gesendet, sobald du online bist.',
+        code: 'Familien-Code (falls ihr einen habt)', name: 'Dein Vorname', badName: 'Name oder Code stimmt nicht.', sent: 'Danke! Ist angekommen.', queued: 'Gespeichert – wird gesendet, sobald du online bist.',
         badCode: 'Der Familien-Code stimmt nicht.', place: 'Feedback geht nur von zu Hause aus.',
         rate: 'Gerade zu viele Nachrichten – bitte später nochmal.', fail: 'Das hat nicht geklappt. Bitte später nochmal.'
     },
     en: {
         title: 'Feedback', hint: 'What do you like? What bothers you? What is missing?', send: 'Send', cancel: 'Cancel',
-        code: 'Family code', sent: 'Thanks! Got it.', queued: 'Saved – will be sent once you are online.',
+        code: 'Family code (if you have one)', name: 'Your first name', badName: 'Name or code is not right.', sent: 'Thanks! Got it.', queued: 'Saved – will be sent once you are online.',
         badCode: 'The family code is not right.', place: 'Feedback only works from home.',
         rate: 'Too many messages right now – please try later.', fail: 'That did not work. Please try later.'
     }
@@ -68,7 +69,8 @@ export function openFeedback(lang, context) {
       <div style="background:#0d5568;color:#fff;border-radius:18px;padding:22px;width:min(92vw,560px);box-shadow:0 10px 40px rgba(0,0,0,.5)">
         <div style="font-size:26px;font-weight:bold;margin-bottom:10px">${t.title}</div>
         <textarea maxlength="1000" placeholder="${t.hint}" style="width:100%;height:150px;box-sizing:border-box;font-size:18px;padding:12px;border-radius:12px;border:0;resize:none"></textarea>
-        ${needCode ? `<input type="text" inputmode="text" autocomplete="off" placeholder="${t.code}" style="width:100%;box-sizing:border-box;font-size:18px;padding:12px;border-radius:12px;border:0;margin-top:10px">` : ''}
+        <input data-name type="text" autocomplete="off" maxlength="20" placeholder="${t.name}" style="width:100%;box-sizing:border-box;font-size:18px;padding:12px;border-radius:12px;border:0;margin-top:10px">
+        ${needCode ? `<input data-code type="text" inputmode="text" autocomplete="off" placeholder="${t.code}" style="width:100%;box-sizing:border-box;font-size:18px;padding:12px;border-radius:12px;border:0;margin-top:10px">` : ''}
         <div data-msg style="min-height:24px;margin:10px 0;font-size:16px;color:#ffe08a"></div>
         <div style="display:flex;gap:12px;justify-content:flex-end">
           <button data-cancel style="font-size:18px;padding:12px 20px;border-radius:12px;border:0;background:#33555f;color:#fff">${t.cancel}</button>
@@ -76,7 +78,8 @@ export function openFeedback(lang, context) {
         </div>
       </div>`;
     document.body.appendChild(wrap);
-    const area = wrap.querySelector('textarea'), codeInput = wrap.querySelector('input');
+    const area = wrap.querySelector('textarea'), codeInput = wrap.querySelector('[data-code]'), nameInput = wrap.querySelector('[data-name]');
+    nameInput.value = store.get(NAME_KEY, '');
     const msg = wrap.querySelector('[data-msg]'), sendBtn = wrap.querySelector('[data-send]');
     const close = () => wrap.remove();
     // Keep key and pointer events away from the game underneath.
@@ -90,6 +93,7 @@ export function openFeedback(lang, context) {
         const text = area.value.trim();
         if (!text) return;
         if (codeInput?.value.trim()) store.set(CODE_KEY, codeInput.value.trim());
+        store.set(NAME_KEY, nameInput.value.trim());
         const entry = { text, context: { version: VERSION_TAG, ...context() } };
         sendBtn.disabled = true;
         let status = 0;
@@ -99,7 +103,7 @@ export function openFeedback(lang, context) {
             store.set(QUEUE_KEY, [...store.get(QUEUE_KEY, []), entry].slice(-10));
             msg.textContent = t.queued; setTimeout(close, 1800); return;
         }
-        if (status === 401) { store.set(CODE_KEY, ''); msg.textContent = t.badCode; }
+        if (status === 401) { store.set(CODE_KEY, ''); msg.textContent = t.badName; }
         else if (status === 403) msg.textContent = t.place;
         else if (status === 429) msg.textContent = t.rate;
         else msg.textContent = t.fail;

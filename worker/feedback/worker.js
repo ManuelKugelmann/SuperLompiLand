@@ -7,10 +7,13 @@
 //   GITHUB_TOKEN     secret — fine-grained token, Issues: read & write, this repo only
 //   GITHUB_REPO      "owner/repo"
 //   ALLOWED_ORIGINS  comma-separated page origins that may post
+//   ALLOWED_NAMES    secret, optional — comma-separated first names; if set, the
+//                    sender's name must match one of them (case, accents and one
+//                    typo are forgiven). Kept out of the public repo on purpose.
 //   FAMILY_CODE      secret, optional — if set, posts must carry this code
 //   ALLOWED_COUNTRY / ALLOWED_REGION / ALLOWED_CITY   optional place filter
 // Binding: KV namespace RATE (hourly counter).
-import { LIMITS, sanitize, hourBucket, placeAllowed, originAllowed, buildIssue } from './lib.js';
+import { LIMITS, sanitize, hourBucket, placeAllowed, originAllowed, buildIssue, matchName } from './lib.js';
 
 const json = (status, body, origin) => new Response(JSON.stringify(body), {
     status,
@@ -47,6 +50,11 @@ export default {
         let data;
         try { data = await request.json(); } catch { return json(400, { error: 'json' }, origin); }
         if (env.FAMILY_CODE && String(data.code ?? '') !== env.FAMILY_CODE) return json(401, { error: 'code' }, origin);
+        let from = '';
+        if (env.ALLOWED_NAMES) {
+            from = matchName(data.name, env.ALLOWED_NAMES.split(','));
+            if (!from) return json(401, { error: 'name' }, origin);
+        }
         if (!sanitize(data.text)) return json(400, { error: 'empty' }, origin);
 
         // 42 per hour, all senders together.
@@ -63,7 +71,7 @@ export default {
                 'user-agent': 'feedback-relay',
                 'content-type': 'application/json'
             },
-            body: JSON.stringify(buildIssue(data.text, data.context))
+            body: JSON.stringify(buildIssue(data.text, data.context, from))
         });
         if (!res.ok) return json(502, { error: 'github', status: res.status }, origin);
         return json(200, { ok: true }, origin);

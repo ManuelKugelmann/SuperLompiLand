@@ -21,7 +21,8 @@ test('friends are never listed as hazards', () => {
         for (const key of Object.keys(b.friends)) assert.ok(!(key in b.hazards), `${b.id}: ${key} is both`);
         assert.ok(!('urchin' in b.hazards) && !('enemy_angler' in b.hazards), `${b.id}: urchin/angler are friends`);
     }
-    assert.equal(BIOMES[0].hazardRate, 0, 'the lagoon is safe');
+    assert.equal(BIOMES[0].hazardRate, 0, 'the beach is safe');
+    assert.ok(ABYSS.x > BIOMES.at(-1).from && ABYSS.x < WORLD_END, 'the abyss lies in the last biome');
 });
 
 test('biomeIndexAt picks the biome containing x', () => {
