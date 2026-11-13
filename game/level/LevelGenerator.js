@@ -11,7 +11,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 3,           // bump when generation changes what index a coin or friend gets
+    version: 4,           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
@@ -21,7 +21,9 @@ export const LEVEL = {
     sheenSpeed: 0.1,      // how fast its colours travel (turns of the colour wheel per second)
     sheenSpread: 1.3,     // how much of the colour wheel lies across one friend
     wakeRadius: 300,      // how close the fish must swim to bend a plant
-    coinGap: 92           // minimum distance between two coins
+    coinGap: 92,          // minimum distance between two coins
+    coinStep: 110,        // distance between the coins of a trail
+    trailChance: 0.13     // chance of a coin trail in a chunk, per point of the biome's `coins` value
 };
 const CH = LEVEL.cell * LEVEL.cells;
 
@@ -319,11 +321,14 @@ export default class LevelGenerator {
         const chunkKey = `${cx},${cy}`;
         const placed = [];
         let coinIndex = 0;
-        for (let trails = rng.between(Math.max(0, biome.coins - 2), biome.coins); trails > 0; trails--) {
-            let x = ox + rng.between(80, CH - 80), y = oy + rng.between(80, CH - 80);
-            let heading = rng.realInRange(0, Math.PI * 2);
-            const bend = rng.realInRange(-0.35, 0.35);
-            for (let k = rng.between(4, 7); k > 0; k--) {
+        // Coins are accents, not filling: at most one trail per chunk, and not in
+        // every chunk. A trail is a gentle arc leading east, the way the journey
+        // goes, so following coins always means making progress.
+        if (rng.frac() < biome.coins * LEVEL.trailChance) {
+            let x = ox + rng.between(80, CH * 0.4), y = oy + rng.between(140, CH - 140);
+            let heading = rng.realInRange(-0.45, 0.45);
+            const bend = rng.realInRange(-0.12, 0.12);
+            for (let k = rng.between(5, 8); k > 0; k--) {
                 if (this.isOpen(x, y, 0.09) && coinIndex < 64
                     && !placed.some(q => Math.abs(q.x - x) < LEVEL.coinGap && Math.abs(q.y - y) < LEVEL.coinGap)) {
                     placed.push({ x, y });
@@ -331,8 +336,8 @@ export default class LevelGenerator {
                     if (!this.state?.has(chunkKey, 'coin', index)) this.addCoin(chunk, x, y, chunkKey, index);
                 }
                 heading += bend;
-                x += Math.cos(heading) * 100;
-                y += Math.sin(heading) * 100;
+                x += Math.cos(heading) * LEVEL.coinStep;
+                y += Math.sin(heading) * LEVEL.coinStep;
             }
         }
 
