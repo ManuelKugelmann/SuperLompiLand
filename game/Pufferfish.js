@@ -2,18 +2,24 @@ import Phaser from 'phaser';
 
 /** Tunables — physics feel is adjusted here (velocities are px per physics step). */
 export const FISH = {
-    thrust: 0.0021,        // swim force per unit mass
+    thrust: 0.0013,        // terminal swim speed ~ thrust * 278 / drag        // swim force per unit mass
     maxSpeed: 34,
-    brake: 0.9,            // velocity kept per step while braking
+    brake: 0.9,
+    alignFrom: 3,          // below this speed the fish stays level
+    alignFull: 8,          // from this speed it fully points along its movement
+    turnRate: 0.2,         // radians per step the nose turns toward the travel direction            // velocity kept per step while braking
     mass: 6,
     inflateMs: 2600,
     cooldownMs: 500,
-    buoyancy: 0.00075,     // upward force per unit mass while inflated
+    buoyancy: 0.0005,     // upward force per unit mass while inflated
+    airGravity: 0.0011,    // extra downward force per unit mass above the water
+    airDrag: 0.0015,        // almost no drag in the air
+    airControl: 0.06,      // fraction of swim thrust available in the air
     shoveRadius: 340,
     shovePower: 16,
     states: {
-        normal: { key: 'puffer_normal', width: 170, radius: 56, air: 0.05, bounce: 0.35 },
-        inflated: { key: 'puffer_inflated', width: 255, radius: 98, air: 0.085, bounce: 0.75 }
+        normal: { key: 'puffer_normal', width: 170, radius: 56, air: 0.03, bounce: 0.35 },
+        inflated: { key: 'puffer_inflated', width: 255, radius: 98, air: 0.05, bounce: 0.75 }
     }
 };
 
@@ -34,6 +40,9 @@ export default class Pufferfish {
         this.inflateLeft = 0;
         this.cooldown = 0;
         this.invulnerable = 0;
+        this.inAir = false;
+        this.steered = false;   // set by the scene while keyboard input is active
+        this.facing = 1;        // 1 = right, -1 = left
 
         ensureFallbackTextures(scene);
         this.sprite = scene.matter.add.sprite(x, y, FISH.states.normal.key).setDepth(5);
@@ -56,7 +65,7 @@ export default class Pufferfish {
         sp.setBody({ type: 'circle', radius: s.radius });
         sp.setFixedRotation()
             .setMass(FISH.mass)
-            .setFrictionAir(s.air)
+            .setFrictionAir(this.inAir ? FISH.airDrag : s.air)
             .setBounce(s.bounce)
             .setFriction(0.02)
             .setCollisionCategory(CAT.FISH)
@@ -65,7 +74,8 @@ export default class Pufferfish {
     }
 
     thrust(dir) {
-        this.sprite.applyForce(dir.clone().scale(FISH.thrust * this.body.mass));
+        const k = this.inAir ? FISH.airControl : 1; // fins do little out of the water
+        this.sprite.applyForce(dir.clone().scale(FISH.thrust * this.body.mass * k));
     }
 
     seekTo(point) {
@@ -77,6 +87,7 @@ export default class Pufferfish {
     }
 
     dragTo(point) {
+        if (this.inAir) return; // cannot be carried through the air
         const v = point.clone().subtract(this.pos).scale(0.3);
         if (v.length() > FISH.maxSpeed) v.setLength(FISH.maxSpeed);
         this.sprite.setVelocity(v.x, v.y);
@@ -84,6 +95,7 @@ export default class Pufferfish {
 
     /** Actively slow down (call every step while braking). */
     brake() {
+        if (this.inAir || this.steered) return; // never fight a jump or other input
         const v = this.body.velocity;
         this.sprite.setVelocity(v.x * FISH.brake, v.y * FISH.brake);
     }
@@ -145,11 +157,24 @@ export default class Pufferfish {
         return true;
     }
 
-    update(dt) {
+    /** @param {number} dt ms  @param {number} waterY world y of the water surface at the fish */
+    update(dt, waterY = -Infinity) {
         if (this.cooldown > 0) this.cooldown -= dt;
         if (this.invulnerable > 0) this.invulnerable -= dt;
+
+        // Water <-> air. In the air: no drag, real gravity, hardly any control.
+        const inAir = this.sprite.y < waterY - 6;
+        if (inAir !== this.inAir) {
+            this.inAir = inAir;
+            this.sprite.setFrictionAir(inAir ? FISH.airDrag : FISH.states[this.state].air);
+            this.scene.events.emit('fish-splash', {
+                x: this.sprite.x, y: waterY, speed: Math.hypot(this.body.velocity.x, this.body.velocity.y), entering: !inAir
+            });
+        }
+        if (this.inAir) this.sprite.applyForce({ x: 0, y: FISH.airGravity * this.body.mass });
+
         if (this.inflated) {
-            this.sprite.applyForce({ x: 0, y: -FISH.buoyancy * this.body.mass });
+            if (!this.inAir) this.sprite.applyForce({ x: 0, y: -FISH.buoyancy * this.body.mass });
             this.inflateLeft -= dt;
             if (this.inflateLeft <= 0) this.deflate();
         }
@@ -158,11 +183,17 @@ export default class Pufferfish {
         if (speed > FISH.maxSpeed) {
             this.sprite.setVelocity(vel.x * FISH.maxSpeed / speed, vel.y * FISH.maxSpeed / speed);
         }
-        const vx = this.body.velocity.x;
-        if (Math.abs(vx) > 0.6) this.sprite.setFlipX(vx < 0);
-        // Gentle tilt toward travel direction.
-        const tilt = Phaser.Math.Clamp(this.body.velocity.y * 1.6, -22, 22) * (this.sprite.flipX ? -1 : 1);
-        this.sprite.setAngle(Phaser.Math.Linear(this.sprite.angle, tilt, 0.15));
+        // Orientation depends on speed: slow = level, just hovering up and down;
+        // faster = the nose follows the movement vector. The art faces right;
+        // heading left it is mirrored vertically so it never swims belly-up.
+        const v = this.body.velocity;
+        const speed2 = Math.hypot(v.x, v.y);
+        if (Math.abs(v.x) > 0.8) this.facing = v.x < 0 ? -1 : 1;
+        const level = this.facing < 0 ? Math.PI : 0;
+        const follow = Phaser.Math.Clamp((speed2 - FISH.alignFrom) / (FISH.alignFull - FISH.alignFrom), 0, 1);
+        const target = level + Phaser.Math.Angle.Wrap(Math.atan2(v.y, v.x) - level) * follow;
+        this.sprite.setFlipX(false).setFlipY(this.facing < 0);
+        this.sprite.rotation = Phaser.Math.Angle.RotateTo(this.sprite.rotation, target, FISH.turnRate);
     }
 }
 

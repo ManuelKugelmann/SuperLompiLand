@@ -1,9 +1,9 @@
 {
     "name": "super-lompi-land",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "private": true,
     "type": "module",
-    "description": "SuperLompiLand — a GKS standalone test-case game. 2D pufferfish platformer with switchable control schemes.",
+    "description": "Super Lompi Land — colorful 2D underwater pufferfish game with switchable control schemes.",
     "scripts": {
         "icons": "node scripts/gen-icons.mjs",
         "predev": "node scripts/gen-icons.mjs",

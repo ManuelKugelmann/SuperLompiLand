@@ -124,7 +124,6 @@ export default class LevelGenerator {
                 }
             }
         }
-        if (cy === 0) chunk.bodies.push(s.matter.add.rectangle(ox + CH / 2, -50, CH, 100, { isStatic: true }));
 
         // --- Decor on upward-facing rock ------------------------------------
         const safe = Math.hypot(ox + CH / 2 - LEVEL.spawn.x, oy + CH / 2 - LEVEL.spawn.y) < CH * 1.6;

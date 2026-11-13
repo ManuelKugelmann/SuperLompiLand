@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
-import { pwaMenuItems } from '../game/pwa.js';
+import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
@@ -40,6 +40,10 @@ export default class HudScene extends Phaser.Scene {
         this.coinText = hudText(116, 162, '50px');
         this.depthText = hudText(40, 232, '34px');
         this.depthLabel = de ? 'Tiefe' : 'Depth';
+
+        this.add.text(this.scale.width - 16, this.scale.height - 12, VERSION_TAG, {
+            fontFamily: 'Arial', fontSize: '20px', color: '#ffffff'
+        }).setOrigin(1, 1).setAlpha(0.4);
 
         new BurgerMenu(this, 60, 60, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },

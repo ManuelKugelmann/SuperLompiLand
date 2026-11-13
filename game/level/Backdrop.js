@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { waveY } from './surface.js';
 
 /**
  * Calm backdrop for the open world: a depth gradient that darkens as you dive,
@@ -16,10 +17,13 @@ export default class Backdrop {
         this.dark = scene.add.rectangle(0, 0, W, H, 0x04122e, 0).setOrigin(0).setScrollFactor(0).setDepth(-25);
 
         // Sky and waterline live in the world (scroll vertically, follow x).
-        this.sky = scene.add.rectangle(0, -1200, W * 2, 1200, 0xd9f6f0).setOrigin(0.5, 0).setDepth(-28).setScrollFactor(0, 1);
-        this.sky.x = W / 2;
-        this.sun = scene.add.circle(W * 0.5, -260, 120, 0xffffff, 0.75).setDepth(-27).setScrollFactor(0, 1);
-        this.surface = scene.add.rectangle(W / 2, 0, W * 2, 14, 0xffffff, 0.75).setDepth(-9).setScrollFactor(0, 1);
+        // Both are redrawn every frame so the waterline can wave.
+        makeGradient(scene, 'bd_sky', 1400, [[0, 0x6fc3ee], [0.6, 0xbfe9f5], [1, 0xf2fbf4]]);
+        this.sun = scene.add.circle(W * 0.72, -420, 110, 0xfffbe0, 0.95).setDepth(-29).setScrollFactor(0, 1);
+        this.skyImg = scene.add.image(0, -1400, 'bd_sky').setOrigin(0).setDisplaySize(W, 1460)
+            .setDepth(-29.5).setScrollFactor(0, 1);
+        this.sea = scene.add.graphics().setDepth(-28);   // water body drawn over the sky, wavy top edge
+        this.foam = scene.add.graphics().setDepth(6);    // bright crest line, in front of the fish
 
         this.rays = [];
         for (let i = 0; i < 6; i++) {
@@ -59,6 +63,26 @@ export default class Backdrop {
         this.dark.setAlpha(depth * 0.78);
 
         const t = this.scene.time.now / 1000;
+
+        // Waterline: only when it is on screen.
+        this.sea.clear();
+        this.foam.clear();
+        if (camY < 80) {
+            const pts = [];
+            for (let sx = -40; sx <= W + 40; sx += 32) pts.push({ x: camX + sx, y: waveY(camX + sx, t) });
+            // Sky is a screen-wide image; hide the part below the waves with sea colour.
+            // The sky image reaches a little below sea level; cover it from the
+            // wave line down with a bright band that fades into the depth gradient.
+            const x0 = pts[0].x, x1 = pts[pts.length - 1].x;
+            this.sea.fillStyle(0x9be9ef, 1).beginPath().moveTo(x0, 62);
+            for (const p of pts) this.sea.lineTo(p.x, p.y);
+            this.sea.lineTo(x1, 62).closePath().fillPath();
+            for (let k = 0; k < 6; k++) this.sea.fillStyle(0x9be9ef, 0.85 - k * 0.15).fillRect(x0, 62 + k * 26, x1 - x0, 26);
+            this.foam.lineStyle(7, 0xffffff, 0.85).beginPath().moveTo(pts[0].x, pts[0].y);
+            for (const p of pts) this.foam.lineTo(p.x, p.y);
+            this.foam.strokePath();
+        }
+
         for (const ray of this.rays) {
             ray.x = ray.baseX + Math.sin(t * 0.25 + ray.phase) * 70 - (camX * 0.05) % 40;
             ray.setAlpha(ray.baseAlpha * (0.6 + 0.4 * Math.sin(t * 0.6 + ray.phase)) * Math.max(0, 1 - depth * 2.2));
@@ -66,6 +90,7 @@ export default class Backdrop {
         for (const b of this.bubbles) {
             b.y -= b.speed + dy * 0.5;
             b.x += Math.sin(t * 1.4 + b.phase) * 0.5 - dx * 0.5;
+            b.setVisible(camY + b.y > 40); // no bubbles in the sky
             if (b.y < -60 || b.y > H + 80 || b.x < -80 || b.x > W + 80) this.resetBubble(b, b.y > H + 80 || b.x < -80 || b.x > W + 80);
         }
     }

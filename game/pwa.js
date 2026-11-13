@@ -1,4 +1,4 @@
-/* global __BUILD__ */
+/* global __BUILD__, __VERSION__ */
 // PWA: install prompt, updates and cache busting.
 //
 // How a new deploy reaches the player:
@@ -11,6 +11,9 @@
 //      (hardRefresh) — this also rescues clients stuck on a very old build.
 
 export const BUILD = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
+export const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : '0.0.0';
+/** Human-readable tag, e.g. "v0.2.0 · 2026-11-13 18:30". */
+export const VERSION_TAG = `v${VERSION} · ${BUILD === 'dev' ? 'dev' : BUILD.slice(0, 16)}`;
 const IS_DEV = BUILD === 'dev';
 const RELOAD_GUARD = 'slld-reloaded-for';
 
@@ -141,8 +144,8 @@ async function manualUpdate(scene, lang) {
     try { sessionStorage.removeItem(RELOAD_GUARD); } catch { /* ignore */ }
     const result = await checkForUpdate(true);
     if (result === 'updating') toast(scene, de ? 'Update wird geladen …' : 'Loading update …');
-    else if (result === 'offline') toast(scene, de ? `Offline – Build ${BUILD}.` : `Offline – build ${BUILD}.`);
-    else toast(scene, de ? `Alles aktuell (Build ${BUILD}).` : `Up to date (build ${BUILD}).`);
+    else if (result === 'offline') toast(scene, de ? `Offline – ${VERSION_TAG}` : `Offline – ${VERSION_TAG}`);
+    else toast(scene, de ? `Alles aktuell: ${VERSION_TAG}` : `Up to date: ${VERSION_TAG}`);
 }
 
 /** Menu entries for the in-game burger menu. */

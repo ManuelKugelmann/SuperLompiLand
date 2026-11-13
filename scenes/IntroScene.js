@@ -4,7 +4,7 @@ import cardImg from '../assets/card_preview.png';
 import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
 import HudScene, { HUD_KEY } from './HudScene.js';
-import { pwaMenuItems, BUILD, install, isStandalone, canPromptInstall, onInstallChange } from '../game/pwa.js';
+import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const gameMeta = {
@@ -79,23 +79,9 @@ export default class IntroScene extends Phaser.Scene {
         ).setOrigin(0.5).setAlpha(0.35);
         this.tweens.add({ targets: startText, alpha: 1, duration: 800, yoyo: true, repeat: -1 });
 
-        this.add.text(W - 24, H - 20, `build ${BUILD}`, {
+        this.add.text(W - 24, H - 20, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
         }).setOrigin(1, 1).setAlpha(0.45);
-
-        // Install button: shown unless the app already runs installed.
-        if (!isStandalone() && BUILD !== 'dev') {
-            const label = lang === 'de' ? '⬇  App installieren' : '⬇  Install app';
-            const btn = this.add.text(W - 40, 44, label, {
-                fontFamily: 'Arial', fontSize: '38px', color: '#ffffff', fontStyle: 'bold',
-                backgroundColor: '#1565c0', padding: { x: 26, y: 16 }
-            }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-            btn.on('pointerdown', () => install(this, lang));
-            const refresh = () => btn.setAlpha(canPromptInstall() ? 1 : 0.6);
-            refresh();
-            const off = onInstallChange(() => { if (isStandalone()) btn.destroy(); else refresh(); });
-            this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
-        }
 
         new BurgerMenu(this, 60, 60, [
             ...pwaMenuItems(this, lang),

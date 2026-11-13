@@ -8,7 +8,13 @@ import { forceLandscape } from './game/orientation.js';
 const game = bootStandalone({
     IntroScene,
     introKey: SCENE_KEYS.INTRO,
-    language: 'de'
+    language: 'de',
+    config: {
+        // Listen on the whole window, not just the canvas: on desktop the mouse
+        // keeps steering when it is over the letterbox bars or dragged outside
+        // the game area, and touches on the bars count too.
+        input: { mouse: { target: window }, touch: { target: window } }
+    }
 });
 
 // Always display landscape — rotate 90° when the viewport is portrait, even if

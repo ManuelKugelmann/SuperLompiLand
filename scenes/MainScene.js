@@ -4,6 +4,7 @@ import Pufferfish from '../game/Pufferfish.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
+import { waveY } from '../game/level/surface.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 
@@ -11,7 +12,7 @@ const STEP_MS = 1000 / 60;
 
 /** World tunables. */
 const WORLD = {
-    gravity: 0.2,         // gentle sink
+    gravity: 0.12,         // gentle sink
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
     lookAhead: 9,         // camera leads the fish by velocity * this
     doubleTapMs: 320,
@@ -77,6 +78,22 @@ export default class MainScene extends Phaser.Scene {
             }
         });
 
+        // Splash when the fish breaks the surface in either direction.
+        this.events.on('fish-splash', ({ x, y, speed }) => {
+            const n = Phaser.Math.Clamp(Math.round(speed * 0.9), 5, 22);
+            for (let i = 0; i < n; i++) {
+                const d = this.add.circle(x + Phaser.Math.Between(-40, 40), y, Phaser.Math.Between(4, 11), 0xffffff, 0.85).setDepth(6);
+                const up = Phaser.Math.Between(40, 60 + speed * 9);
+                this.tweens.add({ targets: d, x: d.x + Phaser.Math.Between(-130, 130), duration: 620, ease: 'Linear' });
+                this.tweens.add({
+                    targets: d, y: y - up, duration: 310, ease: 'Quad.easeOut', yoyo: true,
+                    onComplete: () => d.destroy()
+                });
+            }
+            const ring = this.add.ellipse(x, y, 60, 14, 0xffffff, 0.6).setDepth(6);
+            this.tweens.add({ targets: ring, scaleX: 5, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
+        });
+
         // Keyboard (always on, alongside the touch scheme): arrows / WASD swim, space puffs.
         const kb = this.input.keyboard;
         if (kb) {
@@ -90,6 +107,7 @@ export default class MainScene extends Phaser.Scene {
             this.input.manager.globalTopOnly = this.prevTopOnly;
             this.controller?.destroy();
             kb?.removeAllListeners('keydown-SPACE');
+            this.events.off('fish-splash');
         });
     }
 
@@ -167,9 +185,10 @@ export default class MainScene extends Phaser.Scene {
             this.keyDir.set(
                 (k.RIGHT.isDown || k.D.isDown ? 1 : 0) - (k.LEFT.isDown || k.A.isDown ? 1 : 0),
                 (k.DOWN.isDown || k.S.isDown ? 1 : 0) - (k.UP.isDown || k.W.isDown ? 1 : 0));
-            if (this.keyDir.lengthSq() > 0) this.fish.thrust(this.keyDir.normalize());
+            this.fish.steered = this.keyDir.lengthSq() > 0;
+            if (this.fish.steered) this.fish.thrust(this.keyDir.normalize());
         }
-        this.fish.update(STEP_MS);
+        this.fish.update(STEP_MS, waveY(this.fish.sprite.x, this.time.now / 1000));
         this.matter.world.step(STEP_MS);
     }
 
@@ -186,7 +205,7 @@ export default class MainScene extends Phaser.Scene {
         const prevX = this.camX, prevY = this.camY;
         this.camX = Phaser.Math.Linear(this.camX, sp.x + v.x * WORLD.lookAhead - W / 2, k);
         this.camY = Phaser.Math.Linear(this.camY, sp.y + v.y * WORLD.lookAhead - H / 2, k);
-        this.camY = Math.max(this.camY, -220); // a strip of sky at the surface, no more
+        this.camY = Math.max(this.camY, -760); // room for a jump, not the whole sky
         this.cameras.main.setScroll(this.camX, this.camY);
 
         // Bubble trail when moving fast.
