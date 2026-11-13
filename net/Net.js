@@ -30,7 +30,10 @@ export default class Net {
         this.joinCbs = [];
         this.leaveCbs = [];
         this.msgCbs = [];
-        this.room = joinRoom({ appId: APP_ID }, `room-${code}`);
+        // ?anon in the URL = throwaway identity, so two tabs of one browser
+        // profile count as two players (local testing).
+        const anon = typeof location !== 'undefined' && /[?&]anon\b/.test(location.search);
+        this.room = joinRoom(anon ? { appId: APP_ID, identity: 'none' } : { appId: APP_ID }, `room-${code}`);
         this.state = this.room.makeAction('fish');
         this.state.onMessage((data, ctx) => this.msgCbs.forEach(cb => cb(ctx.userId, data)));
         this.room.onUserJoin(({ userId }) => {
