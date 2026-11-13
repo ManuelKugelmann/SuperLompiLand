@@ -31,6 +31,10 @@ const CREATURES = {
 const POSES = ['turntable', 'swim', 'turn', 'puff'];
 const POSE_SECONDS = 4;
 const GAME_SIZE = 170 / 1080;      // Lompi's width in the game as a share of the screen height
+// A character swims turned a little toward the camera, so its face always reads
+// (the art is a three-quarter view; in exact profile a 3D body loses mouth and far eye).
+// It passes through profile only briefly while turning around.
+const FACE_YAW = -30 * Math.PI / 180;
 
 const query = new URLSearchParams(window.location.search);
 const canvas = document.getElementById('view');
@@ -113,11 +117,14 @@ function poseAt(t) {
     const index = fixed ? Math.max(0, POSES.indexOf(fixed)) : Math.floor(t / POSE_SECONDS) % POSES.length;
     const u = (t % POSE_SECONDS) / POSE_SECONDS, name = POSES[index];
     const ease = v => v * v * (3 - 2 * v);
-    const pose = { name, yaw: 0, pitch: 0, swim: 0.15, phase: t * 7, puff: 0 };
-    if (name === 'turntable') pose.yaw = Math.sin(u * Math.PI * 2) * Math.PI / 3;                 // ±60°
-    else if (name === 'swim') { pose.swim = 1; pose.yaw = Math.sin(t * 7) * 0.1; }
-    else if (name === 'turn') pose.yaw = Math.PI * (u < 0.5 ? ease(Math.min(1, u * 4)) : 1 - ease(Math.min(1, (u - 0.5) * 4)));
-    else pose.puff = ease(Math.min(1, Math.sin(u * Math.PI) * 1.6));
+    const pose = { name, yaw: FACE_YAW, pitch: 0, swim: 0.15, phase: t * 7, puff: 0 };
+    if (name === 'turntable') pose.yaw = Math.sin(u * Math.PI * 2) * Math.PI / 3;                 // ±60° around true profile
+    else if (name === 'swim') { pose.swim = 1; pose.yaw += Math.sin(t * 7) * 0.1; }
+    else if (name === 'turn') {
+        // From facing right to facing left and back: the far side also ends turned toward the camera.
+        const k = u < 0.5 ? ease(Math.min(1, u * 4)) : 1 - ease(Math.min(1, (u - 0.5) * 4));
+        pose.yaw = FACE_YAW + (Math.PI - 2 * FACE_YAW) * k;
+    } else pose.puff = ease(Math.min(1, Math.sin(u * Math.PI) * 1.6));
     return pose;
 }
 
