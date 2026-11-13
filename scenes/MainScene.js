@@ -12,7 +12,8 @@ import BackLayers from '../game/level/BackLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
-import { play } from '../game/audio.js';
+import { play, nowSeconds } from '../game/audio.js';
+import { createStreak } from '../game/music/melody.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 
@@ -59,6 +60,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
+        this.streak = createStreak();        // coins in a row play a melody (game/music/melody.js)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
         this.backLayers = new BackLayers(this);   // far haze, far reef, back floor (parallax)
         this.waterLight = new WaterLight(this);   // light shafts, caustics, depth grade
@@ -307,6 +309,7 @@ export default class MainScene extends Phaser.Scene {
             this.fish.guard = 2500;
             this.health = this.maxHealth;
             this.coins = this.banked;
+            this.streak.reset();
             this.camX = p.x - this.scale.width / 2;
             this.camY = p.y - this.scale.height / 2;
             this.respawning = false;
@@ -363,6 +366,21 @@ export default class MainScene extends Phaser.Scene {
         return this.debugOn;
     }
 
+    /** Streak feedback: "x2", "x3"... when the counter steps up, a ring of light when a phrase completes. */
+    streakFx(x, y, note) {
+        if (note.stepped) {
+            const t = this.add.text(x, y - 60, `x${note.multiplier}`, {
+                fontFamily: 'Arial', fontSize: '46px', color: '#fff3b0', fontStyle: 'bold',
+                stroke: '#0a3f6e', strokeThickness: 8
+            }).setOrigin(0.5).setDepth(8);
+            this.tweens.add({ targets: t, y: y - 140, alpha: 0, scale: 1.3, duration: 700, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+        }
+        if (note.completed) {
+            const ring = this.add.circle(x, y, 40, 0xfff3b0, 0).setStrokeStyle(6, 0xfff3b0, 0.9).setDepth(3);
+            this.tweens.add({ targets: ring, scale: 4, alpha: 0, duration: 520, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
+        }
+    }
+
     collect() {
         const p = this.fish.pos, fr = this.fish.radius;
         for (const c of this.level.coins) {
@@ -373,7 +391,10 @@ export default class MainScene extends Phaser.Scene {
             this.world.set(c.chunkKey, 'coin', c.index);
             this.mp?.claim(c.chunkKey, 'coin', c.index);
             this.coins++;
-            play('coin');
+            const bl = biomeBlendAt(x);
+            const note = this.streak.add(nowSeconds(), (bl.t < 0.5 ? bl.a : bl.b).id);
+            play('coin', note);
+            this.streakFx(x, y, note);
             for (let i = 0; i < 5; i++) {           // sparkle
                 const a = (i / 5) * Math.PI * 2 + Math.random();
                 const star = this.add.star(x, y, 4, 4, 11, 0xffffff).setDepth(3);

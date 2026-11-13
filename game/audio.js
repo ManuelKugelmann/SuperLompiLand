@@ -3,6 +3,15 @@
 // Browsers only allow sound after a tap, so the context is created lazily on the
 // first play() that follows user input.
 
+import { createClock } from './music/clock.js';
+
+/**
+ * The one music clock (spec ch.12): visual animation may lock to its beat via
+ * musicClock.pulse(nowSeconds()); gameplay never does. Runs even when muted.
+ */
+export const musicClock = createClock();
+export const nowSeconds = () => performance.now() / 1000;
+
 const MUTE_KEY = 'sll_muted';
 let ctx = null, master = null, noiseBuf = null;
 let muted = (() => { try { return window.localStorage.getItem(MUTE_KEY) === '1'; } catch { return false; } })();
@@ -15,7 +24,7 @@ export function setMuted(on) {
 }
 
 const VOLUME = 0.5;
-// C major pentatonic, so any run of coin notes sounds like a little tune.
+// Fallback when play('coin') is called without a streak note: C major pentatonic.
 const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
 
 function ready() {
@@ -69,13 +78,27 @@ function noise({ at = 0, dur = 0.3, vol = 0.3, from = 1200, to = 300, q = 0.8 })
 let coinStreak = 0, lastCoin = 0, lastVoice = -1;
 
 const SOUNDS = {
-    /** Coins collected in quick succession climb the scale. */
-    coin() {
-        const now = performance.now();
-        coinStreak = now - lastCoin < 900 ? Math.min(coinStreak + 1, SCALE.length - 1) : 0;
-        lastCoin = now;
-        tone({ f: SCALE[coinStreak], type: 'triangle', dur: 0.16, vol: 0.22 });
-        tone({ f: SCALE[coinStreak] * 2, type: 'sine', at: 0.03, dur: 0.12, vol: 0.1 });
+    /**
+     * A coin: the next note of the streak melody (game/music/melody.js), snapped to the
+     * music's 1/16 grid in sound only (the pickup itself is instant). Brighter as the
+     * streak grows; a completed phrase ends with a little flourish.
+     */
+    coin(note) {
+        if (!note) {                                  // no streak info: climb the fallback scale
+            const now = performance.now();
+            coinStreak = now - lastCoin < 900 ? Math.min(coinStreak + 1, SCALE.length - 1) : 0;
+            lastCoin = now;
+            note = { hz: SCALE[coinStreak], harmonyHz: SCALE[coinStreak] * 1.25, multiplier: 1 };
+        }
+        const at = musicClock.untilGrid(nowSeconds(), 4);
+        const bright = Math.min(0.08, 0.02 * (note.multiplier - 1));
+        tone({ f: note.hz, type: 'triangle', at, dur: 0.18, vol: 0.2 + bright });
+        tone({ f: note.hz * 2, type: 'sine', at: at + 0.02, dur: 0.12, vol: 0.07 + bright });
+        if (note.multiplier > 1) tone({ f: note.harmonyHz, type: 'sine', at, dur: 0.16, vol: 0.06 + bright });
+        if (note.flourish) {
+            const step = 60 / musicClock.bpm / 4;
+            note.flourish.forEach((f, i) => tone({ f, type: 'triangle', at: at + (i + 1) * step, dur: 0.22, vol: 0.16 }));
+        }
     },
     puff() {
         noise({ dur: 0.28, vol: 0.32, from: 500, to: 1800, q: 0.6 });
