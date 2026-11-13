@@ -11,8 +11,6 @@ const BAND_FULL = 520; // finger distance at which the pull is at full strength
 export default class TapToMoveController extends ControllerBase {
     enter() {
         this.held = null;
-        this.band = this.scene.add.graphics();
-        this.world.add(this.band);
         this.hint('Halten = Gummiband zum Finger · Loslassen = bremsen · Doppeltipp = aufblasen');
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
@@ -38,16 +36,5 @@ export default class TapToMoveController extends ControllerBase {
         } else {
             this.fish.brake();
         }
-    }
-
-    draw() {
-        this.band.clear();
-        if (!this.held) return;
-        const target = this.worldPoint(this.held);
-        const v = this.fish.view;
-        const pull = Phaser.Math.Clamp(Phaser.Math.Distance.Between(v.x, v.y, target.x, target.y) / BAND_FULL, 0, 1);
-        this.band.lineStyle(2 + pull * 3, 0xffffff, 0.1 + pull * 0.18);
-        this.band.lineBetween(v.x, v.y, target.x, target.y);
-        this.band.fillStyle(0xffffff, 0.25).fillCircle(target.x, target.y, 9);
     }
 }

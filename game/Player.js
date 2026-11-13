@@ -14,7 +14,6 @@ export const PLAYER = {
     waterDrag: 0.6,        // multiplier on every state's water resistance
     bounce: 1.5,           // multiplier on every state's bounciness off rock (capped at 0.9)
     maxSpeed: 26,
-    carrySpeed: 16,        // top speed while being carried by a finger
     brake: 0.975,          // velocity kept per step while braking
     turnRate: 0.2,         // radians per step the nose turns toward the travel direction
     mass: 6,
@@ -39,7 +38,7 @@ if (typeof window !== 'undefined') {
     if (drag > 0) PLAYER.waterDrag = drag;
 }
 
-export const CAT = { WORLD: 1, PLAYER: 2, PADDLE: 4 };
+export const CAT = { WORLD: 1, PLAYER: 2 };
 
 /**
  * A playable character: body, water/air movement, health reactions and the
@@ -47,7 +46,6 @@ export const CAT = { WORLD: 1, PLAYER: 2, PADDLE: 4 };
  * (characters.js, specials.js); the look is a Rig. Control schemes drive it
  * ONLY through this API:
  *   thrust(dir)   steady swim force (dir length 0..1)
- *   dragTo(point) follow a finger (grab) — release keeps the velocity = fling
  *   launch(vec)   one-shot velocity kick
  *   special()     the character's special move
  */
@@ -120,7 +118,7 @@ export default class Player {
             .setBounce(Math.min(0.9, s.bounce * PLAYER.bounce))
             .setFriction(0.02)
             .setCollisionCategory(CAT.PLAYER)
-            .setCollidesWith([CAT.WORLD, CAT.PADDLE]);
+            .setCollidesWith([CAT.WORLD]);
         sp.setVelocity(vel.x, vel.y);
     }
 
@@ -145,25 +143,11 @@ export default class Player {
         this.sprite.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
     }
 
-    dragTo(point) {
-        if (this.inAir) return; // cannot be carried through the air
-        const v = point.clone().subtract(this.pos).scale(0.22);
-        if (v.length() > PLAYER.carrySpeed) v.setLength(PLAYER.carrySpeed);
-        this.sprite.setVelocity(v.x, v.y);
-    }
-
     /** Actively slow down (call every step while braking). */
     brake() {
         if (this.inAir || this.steered) return; // never fight a jump or other input
         const v = this.body.velocity;
         this.sprite.setVelocity(v.x * PLAYER.brake, v.y * PLAYER.brake);
-    }
-
-    /** Replace the velocity outright (release of a grab = the throw). */
-    throwAt(vec) {
-        const v = vec.clone();
-        if (v.length() > this.move.maxSpeed) v.setLength(this.move.maxSpeed);
-        this.sprite.setVelocity(v.x, v.y);
     }
 
     launch(vec) {

@@ -24,7 +24,7 @@ AAA-detailed world. Polish what exists before adding more.
   input changes must keep that working.
 - **Control schemes are switchable at runtime:** one per file in `game/controls/`, extends
   `ControllerBase`, registered in `game/controls/index.js`, drives the fish only through the
-  `Player` API (`thrust`, `dragTo`, `launch`, `special`), removes everything in `destroy()`.
+  `Player` API (`thrust`, `launch`, `special`), removes everything in `destroy()`.
 - **Hazards are realistic and inanimate** (chains, anchors, nets, lines, ships, waste,
   spills). No mines, atomic/biohazard items, faces, skulls or symbols.
 - **Never put project, personal or studio names into prompts sent to outside services.**

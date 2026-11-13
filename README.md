@@ -155,7 +155,6 @@ harbour down into the deep trench, to reach the grand nest.
 | Scheme | Move | Special |
 |---|---|---|
 | **Tippen** (rubber band) | touch and hold: the fish is pulled to your finger; let go and it brakes | double tap |
-| **Schubsen** (air hockey) | grab the fish and throw it, or shove it with your finger | double tap |
 | **Flattern** (flap) | every tap is a fin stroke: tap position = direction, tap rate = speed | long press |
 | **Neigen** (tilt) | tilt the phone to steer, tap for speed | long press |
 | **Stick** | floating virtual stick, drag to swim | double tap |

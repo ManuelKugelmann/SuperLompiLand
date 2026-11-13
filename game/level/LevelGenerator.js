@@ -46,7 +46,10 @@ const HAZARDS = {
     spikes: { size: 240, r: 62, place: 'floor', lift: 26 },
     hazard_buoy: { size: 170, r: 74, place: 'floor', lift: 104 },
     mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6 },
-    hazard_net: { size: 150, r: 84, place: 'water', anim: 'sway', bob: 34, speed: 0.7 }
+    // A ghost net never just hangs in the water: where the seabed is within `tether` px below,
+    // it is caught on a line to a stone and tugs at it; near the surface it hangs from a float;
+    // otherwise it drifts `drift` px to and fro.
+    hazard_net: { size: 150, r: 84, place: 'water', anim: 'sway', bob: 34, speed: 0.7, tether: 620, drift: 300 }
 };
 
 // One turn of the colour wheel, saturated and bright, looked up instead of converted every frame.
@@ -82,6 +85,7 @@ export default class LevelGenerator {
         // then drawn on the main thread, one per frame.
         this.pending = new Set();   // chunk keys requested from the worker
         this.early = new Map();     // chunk key -> collision bodies laid down while the worker is busy
+        this.tethers = [];          // lines that hold drifting things: stretched between them and their anchor every frame
         this.ready = [];            // grids that came back, waiting to be drawn
         try {
             this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
@@ -191,6 +195,12 @@ export default class LevelGenerator {
                 o.bend += (push - o.bend) * 0.1;
             }
             o.animate(t, o.bend || 0);
+        }
+        for (const line of this.tethers) {
+            if (!line.active || !line.follow.active) continue;
+            const fx = line.follow.x, fy = line.follow.y + line.hang, dx = line.toX - fx, dy = line.toY - fy;
+            line.setPosition(fx, fy).setRotation(-Math.atan2(dx, dy));
+            line.setDisplaySize(7, Math.hypot(dx, dy));
         }
         for (const l of this.lights) {
             if (!l.active || !l.follow.active) continue;
@@ -395,6 +405,38 @@ export default class LevelGenerator {
                 targets: img, x: x - h.patrol / 2, duration: rng.between(3800, 5200), yoyo: true, repeat: -1,
                 ease: 'Sine.easeInOut', onYoyo: () => img.face(-1), onRepeat: () => img.face(1)
             });
+        } else if (h.tether || h.drift) {
+            const ground = h.tether ? this.groundBelow(x, y, h.tether) : null;
+            if (ground) {
+                // Caught: a line runs from the net down to a stone on the seabed. The net
+                // tugs at it from side to side and bobs only a little.
+                makeLineTexture(s);
+                const stone = s.add.ellipse(x, ground.y - 4, 46, 26, 0x4d4a48).setDepth(2.8);
+                const line = s.add.image(x, y, 'hz_line').setOrigin(0.5, 0).setDepth(2.9);
+                line.follow = img; line.hang = h.size * 0.32; line.toX = x; line.toY = ground.y - 10;
+                chunk.objects.push(stone, line);
+                this.tethers.push(line);
+                img.setX(x - 46);
+                s.tweens.add({ targets: img, x: x + 46, duration: rng.between(2600, 3600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+                s.tweens.add({ targets: img, y: y - h.bob * 0.4, duration: rng.between(1700, 2400), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+            } else if (h.tether && y < h.tether * 1.6) {
+                // Near the surface: the net hangs on a line from a float that rides on the water.
+                makeLineTexture(s);
+                const float = s.add.ellipse(x, 4, 54, 30, 0xd9642b).setStrokeStyle(4, 0x8f3d17).setDepth(5.9);
+                const line = s.add.image(x, y, 'hz_line').setOrigin(0.5, 0).setDepth(2.9);
+                line.follow = img; line.hang = -h.size * 0.32; line.toX = x; line.toY = 14;
+                chunk.objects.push(float, line);
+                this.tethers.push(line);
+                img.setX(x - 60);
+                s.tweens.add({ targets: img, x: x + 60, duration: rng.between(3200, 4600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+                s.tweens.add({ targets: img, y: y - h.bob * 0.5, duration: rng.between(1900, 2700), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+            } else {
+                // Adrift: carried slowly to and fro by the water, rising and sinking, turning a little.
+                const reach = h.drift / 2, dir = rng.sign();
+                img.setX(x - dir * reach);
+                s.tweens.add({ targets: img, x: x + dir * reach, duration: rng.between(9000, 14000), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+                s.tweens.add({ targets: img, y: y - h.bob, duration: rng.between(2600, 3800), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+            }
         } else if (h.bob) {
             s.tweens.add({ targets: img, y: y - h.bob, duration: rng.between(1700, 2600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         }
@@ -585,6 +627,7 @@ export default class LevelGenerator {
         this.friends = this.friends.filter(f => f.img.active);
         this.animated = this.animated.filter(o => o.active);
         this.lights = this.lights.filter(o => o.active);
+        this.tethers = this.tethers.filter(o => o.active);
         this.vents = this.vents.filter(v => v.chunk !== key);
     }
 }
@@ -633,4 +676,16 @@ function makeNestTextures(scene) {
     sc.strokeStyle = 'rgba(120, 100, 90, 0.35)'; sc.lineWidth = 1.5;
     for (let k = -3; k <= 3; k++) { sc.beginPath(); sc.moveTo(32, 49); sc.quadraticCurveTo(32 + k * 9, 26, 32 + k * 7.5, 8 + Math.abs(k) * 3); sc.stroke(); }
     shell.refresh();
+}
+
+/** A piece of old fishing line, soft-edged, stretched to any length. */
+function makeLineTexture(scene) {
+    if (scene.textures.exists('hz_line')) return;
+    const tex = scene.textures.createCanvas('hz_line', 8, 32), ctx = tex.getContext();
+    const across = ctx.createLinearGradient(0, 0, 8, 0);
+    across.addColorStop(0, 'rgba(60, 70, 60, 0)'); across.addColorStop(0.35, 'rgba(92, 104, 84, 0.95)');
+    across.addColorStop(0.65, 'rgba(58, 66, 56, 0.95)'); across.addColorStop(1, 'rgba(60, 70, 60, 0)');
+    ctx.fillStyle = across;
+    ctx.fillRect(0, 0, 8, 32);
+    tex.refresh();
 }
