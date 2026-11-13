@@ -9,6 +9,8 @@
 //   anim      how the body moves: swim (default, tail waves), pulse (jellyfish),
 //             sway (seahorse), paddle (turtle: stiff shell, flipper strokes)
 //   soft      how loose the thin parts are — fins, spines, tassels, tentacles (0 = stiff, 1 = flowing)
+//   glide     wings: lift = share of gravity carried at full `speed` (px per step), `skips` off
+//             wave tops per flight within `reach` px of the water, each keeping `refresh` of the speed
 //   armor     share of hazard damage taken (1 = normal)
 //
 // The specials other than Lompi's puff are first proposals, to be tuned by play.
@@ -32,6 +34,9 @@ export const CHARACTERS = [
     {
         id: 'flyingfish', name: 'Flitzi', blurb: { de: 'Segelt weit über das Wasser · Sprung', en: 'Glides far above the water · leap' },
         special: 'leap', thrust: 1.1, maxSpeed: 1.15, drag: 0.85, airGravity: 0.3, airTurn: 2.4, soft: 0.5,
+        // Wings: while fast they carry most of the weight, so it skims along just above the waves;
+        // touching a wave top on the way down bounces it up again a few times, like a real flying fish.
+        glide: { lift: 0.85, speed: 9, skips: 3, reach: 28, refresh: 1.04 },
         states: one('player_flyingfish', 230, 50, 26)
     },
     {
@@ -68,6 +73,22 @@ export function loadSelectedId() {
 
 export function saveSelectedId(id) {
     try { window.localStorage.setItem(STORE_KEY, id); } catch { /* storage blocked */ }
+}
+
+/** Share of gravity (0..1) that a character's wings carry at this horizontal speed. */
+export function glideLift(character, vx) {
+    const g = character.glide;
+    return g ? g.lift * Math.min(1, Math.abs(vx) / g.speed) : 0;
+}
+
+/**
+ * Skipping off a wave top. `height` = px above the water, `skips` = skips so far in this flight.
+ * Returns the new velocity { vx, vy }, or null when the flight just goes on (or ends in the water).
+ */
+export function skim(character, { vx, vy, height, skips }) {
+    const g = character.glide;
+    if (!g || skips >= g.skips || vy <= 0 || height > g.reach || Math.abs(vx) < g.speed * 0.6) return null;
+    return { vx: vx * g.refresh, vy: -Math.max(1.4, vy * 0.5) };
 }
 
 // How a character's body moves through water and air, per 60 Hz physics step — the

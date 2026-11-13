@@ -43,10 +43,11 @@ export const SPECIALS = {
         cooldown: 110, air: false, chain: { max: 5, window: 900, rest: 1700 },
         start: c => { const a = ahead(c); return { vx: c.vx + a.x * 7.5, vy: c.vy + a.y * 7.5, invulnerable: 300, squash: 0.22, ring: 0 }; }
     },
-    // Up and forward, made for breaking the surface.
+    // A flat, fast launch through the surface: more forward than up — the flight after it
+    // is a glide (see `glide` in characters.js), not a high jump.
     leap: {
         cooldown: 1100, air: false,
-        start: ({ vx, vy, facing }) => ({ vx: vx + facing * 9, vy: Math.min(vy, 0) - 17 })
+        start: ({ vx, vy, facing }) => ({ vx: vx + facing * 13, vy: Math.min(vy, 0) - 9 })
     },
     // Jellyfish pump.
     pulse: {

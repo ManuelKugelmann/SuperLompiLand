@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SPECIALS, canUse, chainStep } from '../game/specials.js';
-import { motionOf } from '../game/characters.js';
+import { motionOf, glideLift, skim } from '../game/characters.js';
 import { CHARACTERS } from '../game/characters.js';
 
 const still = { vx: 0, vy: 0, facing: 1, inAir: false };
@@ -51,10 +51,33 @@ test('dash goes where the character is heading, or where it faces when resting',
     assert.ok(down.vy > 15 && Math.abs(down.vx) < 1e-9);
 });
 
-test('leap and pulse always go up', () => {
+test('leap and pulse always go up; the leap is flat: more forward than up', () => {
     for (const name of ['leap', 'pulse']) {
-        assert.ok(SPECIALS[name].start({ vx: 3, vy: 8, facing: 1, inAir: false }).vy < -10, name);
+        assert.ok(SPECIALS[name].start({ vx: 3, vy: 8, facing: 1, inAir: false }).vy < -6, name);
     }
+    const leap = SPECIALS.leap.start({ vx: 0, vy: 0, facing: 1, inAir: false });
+    assert.ok(leap.vx > -leap.vy, `forward ${leap.vx}, up ${-leap.vy}`);
+});
+
+test('wings carry a fast glider and do nothing for anyone else', () => {
+    const flyer = CHARACTERS.find(c => c.id === 'flyingfish'), lompi = CHARACTERS[0];
+    assert.equal(glideLift(lompi, 20), 0);
+    assert.equal(glideLift(flyer, 0), 0);
+    assert.ok(glideLift(flyer, 4) > 0 && glideLift(flyer, 4) < glideLift(flyer, 9));
+    assert.equal(glideLift(flyer, 30), flyer.glide.lift);
+    assert.ok(flyer.glide.lift < 1, 'it still comes down in the end');
+});
+
+test('a glider skips off wave tops: only on the way down, close to the water, fast, and a few times', () => {
+    const flyer = CHARACTERS.find(c => c.id === 'flyingfish');
+    const down = { vx: 12, vy: 3, height: 10, skips: 0 };
+    const hop = skim(flyer, down);
+    assert.ok(hop && hop.vy < 0 && hop.vx > 12, JSON.stringify(hop));
+    assert.equal(skim(flyer, { ...down, vy: -2 }), null, 'not while rising');
+    assert.equal(skim(flyer, { ...down, height: 200 }), null, 'not high up');
+    assert.equal(skim(flyer, { ...down, vx: 2 }), null, 'not when slow');
+    assert.equal(skim(flyer, { ...down, skips: flyer.glide.skips }), null, 'not for ever');
+    assert.equal(skim(CHARACTERS[0], down), null, 'Lompi has no wings');
 });
 
 test('the sprint chains: up to five bursts in a row, then a rest', () => {

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CHARACTERS } from './characters.js';
+import { CHARACTERS, glideLift, skim } from './characters.js';
 import { SPECIALS, canUse, chainStep } from './specials.js';
 import Rig from './Rig.js';
 import { play } from './audio.js';
@@ -65,6 +65,7 @@ export default class Player {
         this.poseLeft = 0;      // ms left in a special's pose
         this.poseCooldown = 0;  // cooldown that starts when the pose ends
         this.cooldown = 0;
+        this.skips = 0;         // wave tops skipped off in the current flight
         this.chain = { count: 0, left: 0 };   // uses of a chained special so far, ms left to continue
         this.shield = 0;        // ms hazards cannot hurt
         this.guard = 0;         // ms fully protected (not even pushed)
@@ -251,12 +252,24 @@ export default class Player {
         const inAir = this.inAir ? this.sprite.y < waterY + 10 : this.sprite.y < waterY - 16;
         if (inAir !== this.inAir) {
             this.inAir = inAir;
+            if (!inAir) this.skips = 0;
             this.sprite.setFrictionAir(inAir ? PLAYER.airDrag : this.states[this.state].air * this.move.drag * PLAYER.waterDrag);
             this.scene.events.emit('fish-splash', {
                 x: this.sprite.x, y: waterY, speed: Math.hypot(this.body.velocity.x, this.body.velocity.y), entering: !inAir
             });
         }
-        if (this.inAir) this.sprite.applyForce({ x: 0, y: this.move.airGravity * this.body.mass });
+        if (this.inAir) {
+            // Wings carry part of the weight while the flight is fast (also of the world's own
+            // gravity), and a gliding character skips off wave tops instead of diving in.
+            const bv = this.body.velocity, lift = glideLift(this.char, bv.x);
+            this.sprite.applyForce({ x: 0, y: (this.move.airGravity * (1 - lift) - PLAYER.sinkForce * lift) * this.body.mass });
+            const hop = skim(this.char, { vx: bv.x, vy: bv.y, height: waterY - this.sprite.y, skips: this.skips });
+            if (hop) {
+                this.skips++;
+                this.sprite.setVelocity(hop.vx, hop.vy);
+                this.scene.events.emit('fish-splash', { x: this.sprite.x, y: waterY, speed: 4, entering: false });
+            }
+        }
         // Light swimmers sink less than the world gravity alone would make them.
         else if (this.move.sink < 1) this.sprite.applyForce({ x: 0, y: -PLAYER.sinkForce * (1 - this.move.sink) * this.body.mass });
         if (this.shield > 0) this.shield -= dt;
