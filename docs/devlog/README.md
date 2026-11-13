@@ -2,12 +2,6 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
-## Lagoon with banner and bubble plants
-
-[`ffa5594`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/ffa5594) · 2026-11-13 20:16
-
-![Lagoon with banner and bubble plants](16-lagoon-with-banner-and-bubble-plants.jpg)
-
 ## Biomes, nests, reef world with lighting, abyss
 
 [`2ef5125`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/2ef5125) · 2026-11-13 20:15

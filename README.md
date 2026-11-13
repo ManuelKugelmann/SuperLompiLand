@@ -5,10 +5,6 @@
 <!-- devlog:start -->
 ## Dev log
 
-**Lagoon with banner and bubble plants** — [`ffa5594`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/ffa5594) · 2026-11-13 20:16
-
-![Lagoon with banner and bubble plants](docs/devlog/16-lagoon-with-banner-and-bubble-plants.jpg)
-
 **Biomes, nests, reef world with lighting, abyss** — [`2ef5125`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/2ef5125) · 2026-11-13 20:15
 
 ![Biomes, nests, reef world with lighting, abyss](docs/devlog/12-lagoon.jpg)
@@ -16,6 +12,10 @@
 **Playable characters with a title carousel, health bar, tilt controls** — [`84b4750`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/84b4750) · 2026-11-13 20:00
 
 ![Playable characters with a title carousel, health bar, tilt controls](docs/devlog/09-character-carousel.jpg)
+
+**Fin and tail animation, clean turn-around** — [`9ff697e`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9ff697e) · 2026-11-13 19:46
+
+![Fin and tail animation, clean turn-around](docs/devlog/07-fin-animation.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->

@@ -14,9 +14,14 @@ const LOG = resolve(LOG_DIR, 'README.md');
 const README = resolve(ROOT, 'README.md');
 const SHOWN = 3; // screenshots shown in the main README
 
-const [, , image, title] = process.argv;
-if (!image || !title) {
-    console.error('usage: node scripts/devlog-add.mjs <screenshot> "<title>"');
+// No near-duplicates: one entry per commit, and each entry should show a
+// different scene or feature from the ones before it (pick the shot accordingly).
+//   --rebuild   only refresh the README section from docs/devlog/README.md
+const args = process.argv.slice(2);
+const rebuild = args[0] === '--rebuild';
+const [image, title] = args;
+if (!rebuild && (!image || !title)) {
+    console.error('usage: node scripts/devlog-add.mjs <screenshot> "<title>"   |   --rebuild');
     process.exit(1);
 }
 
@@ -25,6 +30,11 @@ const sha = git('rev-parse --short HEAD');
 const date = git('log -1 --format=%ad --date=format:"%Y-%m-%d %H:%M"');
 const repo = git('remote get-url origin').replace(/\.git$/, '');
 
+if (!rebuild) {
+if (readFileSync(LOG, 'utf8').includes(`/commit/${sha})`)) {
+    console.error(`dev log: commit ${sha} already has an entry — nothing added`);
+    process.exit(0);
+}
 const next = Math.max(0, ...readdirSync(LOG_DIR).map(f => parseInt(f, 10)).filter(Number.isFinite)) + 1;
 const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
 const file = `${String(next).padStart(2, '0')}-${slug}${extname(image) || '.jpg'}`;
@@ -35,6 +45,8 @@ const entry = `## ${title}\n\n[\`${sha}\`](${repo}/commit/${sha}) · ${date}\n\n
 const log = readFileSync(LOG, 'utf8');
 const firstEntry = log.indexOf('\n## ');
 writeFileSync(LOG, firstEntry < 0 ? `${log.trimEnd()}\n\n${entry}` : `${log.slice(0, firstEntry + 1)}${entry}\n${log.slice(firstEntry + 1)}`);
+
+}
 
 // --- main README: "Dev log" section with the newest screenshots ------------
 const entries = [...readFileSync(LOG, 'utf8').matchAll(/^## (.+)\n\n\[`([0-9a-f]+)`\]\((\S+)\) · ([^\n]+)\n\n((?:!\[[^\]]*\]\([^)]+\)\n\n?)+)/gm)]
@@ -58,4 +70,4 @@ if (readme.includes(START)) {
     readme = readme.replace(/(\*\*▶ Play:\*\*[^\n]*\n)/, `$1\n${block}\n`);
 }
 writeFileSync(README, readme);
-console.log(`dev log: ${file} -> ${sha}`);
+console.log(rebuild ? 'dev log: README section rebuilt' : `dev log: entry added for ${sha}`);
