@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import ProgressionManager from '../systems/ProgressionManager.js';
 import Pufferfish from '../game/Pufferfish.js';
+import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor } from '../game/level/biomes.js';
 import Backdrop from '../game/level/Backdrop.js';
@@ -155,7 +156,11 @@ export default class MainScene extends Phaser.Scene {
             this.controller?.destroy();
             kb?.removeAllListeners('keydown-SPACE');
             this.events.off('fish-splash');
+            this.mp?.destroy();
+            this.mp = null;
         });
+
+        this.mp = Multiplayer.create(this); // null unless a room code was chosen on the title
     }
 
     /** True if the pointer is on a HUD element (button, open menu). */
@@ -351,6 +356,7 @@ export default class MainScene extends Phaser.Scene {
         const t1 = performance.now();
         this.fish.render(this.acc / STEP_MS, delta / STEP_MS);
         this.controller.draw?.();
+        this.mp?.tick(this.fish);
         const view = this.fish.view;
 
         // Camera follows in both axes, leading slightly in the travel direction.

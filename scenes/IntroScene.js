@@ -10,6 +10,9 @@ import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.j
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
+import { makeRoomCode, cleanRoomCode, CODE_LENGTH } from '../net/Net.js';
+
+const CODE_KEYS = 'BCDFGHJKLMNPQRSTVWXZ2346789'.split('');
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -83,6 +86,7 @@ export default class IntroScene extends Phaser.Scene {
 
         this.buildCarousel(lang);
         flushFeedbackQueue();
+        this.buildTogether(lang);
 
         this.add.text(W - 24, H - 20, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
@@ -152,7 +156,86 @@ export default class IntroScene extends Phaser.Scene {
         this.select(this.index);
     }
 
+    /** "Together" button + room-code panel: make a room, or type a friend's code. */
+    buildTogether(lang) {
+        const W = this.scale.width, H = this.scale.height, de = lang === 'de';
+        const label = { fontFamily: 'Arial', fontStyle: 'bold' };
+        const btn = this.add.text(W - 150, H * 0.905, de ? 'Zusammen' : 'Together', {
+            ...label, fontSize: '40px', color: '#ffffff', backgroundColor: '#1d8fb5', padding: { x: 30, y: 14 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        btn.on('pointerdown', () => this.openTogether(de));
+    }
+
+    openTogether(de) {
+        if (this.modal) return;
+        this.modal = true;
+        const W = this.scale.width, H = this.scale.height;
+        const label = { fontFamily: 'Arial', fontStyle: 'bold' };
+        const ui = [];
+        const add = o => { ui.push(o); return o.setDepth(100); };
+        let code = '';
+
+        // Dim backdrop that also swallows taps meant for the title behind it.
+        add(this.add.rectangle(W / 2, H / 2, W, H, 0x04213a, 0.88).setInteractive());
+        add(this.add.text(W / 2, H * 0.1, de ? 'Zusammen schwimmen' : 'Swim together', {
+            ...label, fontSize: '70px', color: '#ffffff', stroke: '#0a5c7a', strokeThickness: 10
+        }).setOrigin(0.5));
+        add(this.add.text(W / 2, H * 0.18, de ? 'Gleicher Code = gleiches Meer' : 'Same code = same sea', {
+            ...label, fontSize: '34px', color: '#eafcff'
+        }).setOrigin(0.5));
+
+        const codeText = add(this.add.text(W / 2, H * 0.3, '', {
+            ...label, fontSize: '120px', color: '#ffc266', stroke: '#06343a', strokeThickness: 12
+        }).setOrigin(0.5));
+        const refresh = () => {
+            codeText.setText(code.padEnd(CODE_LENGTH, '_').split('').join(' '));
+            go.setAlpha(code.length === CODE_LENGTH ? 1 : 0.35);
+        };
+        const setCode = c => { code = cleanRoomCode(c); refresh(); };
+
+        const pill = (x, y, text, color, fn, size = 40) => {
+            const t = add(this.add.text(x, y, text, {
+                ...label, fontSize: `${size}px`, color: '#06343a', backgroundColor: color, padding: { x: 24, y: 12 }
+            }).setOrigin(0.5).setInteractive({ useHandCursor: true }));
+            t.on('pointerdown', fn);
+            return t;
+        };
+
+        // Keypad: 27 keys in 3 rows of 9, plus erase.
+        const cols = 9, kw = 112, kh = 96, x0 = W / 2 - (cols - 1) * kw / 2, y0 = H * 0.47;
+        CODE_KEYS.forEach((k, i) => {
+            pill(x0 + (i % cols) * kw, y0 + Math.floor(i / cols) * kh, k, '#b8ecf7',
+                () => { if (code.length < CODE_LENGTH) setCode(code + k); }, 46);
+        });
+
+        const close = () => {
+            ui.forEach(o => o.destroy());
+            this.input.keyboard?.off('keydown', onKey);
+            this.modal = false;
+        };
+        const onKey = e => {
+            if (e.key === 'Backspace') setCode(code.slice(0, -1));
+            else if (e.key === 'Escape') close();
+            else if (e.key === 'Enter') { if (code.length === CODE_LENGTH) go.emit('pointerdown'); }
+            else if (e.key.length === 1) setCode(code + e.key);
+        };
+        this.input.keyboard?.on('keydown', onKey);
+
+        const row = H * 0.47 + 3 * kh + 10;
+        pill(W / 2 - 330, row, '⌫', '#ffd0d0', () => setCode(code.slice(0, -1)), 46);
+        pill(W / 2, row, de ? 'Neuer Raum' : 'New room', '#ffe9a8', () => setCode(makeRoomCode()));
+        const go = pill(W / 2 + 330, row, de ? 'Los!' : 'Go!', '#7ee08a', () => {
+            if (code.length !== CODE_LENGTH) return;
+            close();
+            this.registry.set('room', code);
+            this.scene.start(SCENE_KEYS.MAIN);
+        });
+        pill(W - 70, 60, '✕', '#ffd0d0', close);
+        refresh();
+    }
+
     select(i) {
+        if (this.modal) return;
         const n = CHARACTERS.length;
         this.index = ((i % n) + n) % n;
         const c = CHARACTERS[this.index];
@@ -164,6 +247,8 @@ export default class IntroScene extends Phaser.Scene {
     }
 
     start() {
+        if (this.modal) return;
+        this.registry.set('room', null); // plain start = solo
         // First time: tell the story of the eruption before the journey begins.
         this.scene.start(storySeen() ? SCENE_KEYS.MAIN : STORY_KEY);
     }

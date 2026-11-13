@@ -23,6 +23,12 @@ export default class Multiplayer {
         this.net = new Net(code);
         this.ghosts = new Map(); // userId -> RemoteFish
         this.sendAt = 0;
+        // Room code + player count, pinned to the screen.
+        this.badge = scene.add.text(scene.scale.width - 24, 20, '', {
+            fontFamily: 'Arial', fontSize: '34px', color: '#ffffff', fontStyle: 'bold',
+            stroke: '#0a3f6e', strokeThickness: 7
+        }).setOrigin(1, 0).setScrollFactor(0).setDepth(60).setAlpha(0.9);
+        this.shown = -1;
         this.net.onState((id, snap) => {
             let g = this.ghosts.get(id);
             if (!g) this.ghosts.set(id, g = new RemoteFish(scene));
@@ -48,11 +54,16 @@ export default class Multiplayer {
             });
         }
         for (const g of this.ghosts.values()) g.render(now);
+        if (this.shown !== this.players) {
+            this.shown = this.players;
+            this.badge.setText(`${this.code}  ×${this.players}`);
+        }
     }
 
     destroy() {
         for (const g of this.ghosts.values()) g.destroy();
         this.ghosts.clear();
+        this.badge.destroy();
         this.net.leave();
     }
 }
