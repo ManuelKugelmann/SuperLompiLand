@@ -31,9 +31,9 @@ const CREATURES = {
         { id: 'sprite', label: 'Current sprite', note: 'flat picture', kind: 'card', image: 'img/puffer_normal.png' },
         { id: 'inflate', label: 'Silhouette inflation', note: 'scripted, from the picture', kind: 'inflate', image: 'img/puffer_normal.png', cells: 44 },
         { id: 'loft', label: 'Procedural (fitted)', note: 'lofted rings + fin card', kind: 'loft', image: 'img/puffer_normal.png', stations: 28, sides: 20, width: 0.86, box: 2.3 },
-        { id: 'trellis1', label: 'Image-to-3D (TRELLIS)', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis1.glb', turn: [90, 0] },
-        { id: 'trellis2', label: 'Image-to-3D (TRELLIS.2)', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis2.glb', turn: [90, 0] },
-        { id: 'rodin', label: 'Image-to-3D (Rodin)', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/rodin.glb', turn: [90, 0] }
+        { id: 'trellis1', label: 'TRELLIS v1', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis1.glb', turn: [90, 0] },
+        { id: 'trellis2', label: 'TRELLIS.2', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis2.glb', turn: [90, 0] },
+        { id: 'rodin', label: 'Rodin Gen-2', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/rodin.glb', turn: [90, 0] }
     ]
 };
 
@@ -162,12 +162,40 @@ const only = query.get('only');
 const wanted = (CREATURES[query.get('creature')] || CREATURES.lompi).filter(c => !only || c.id === only);
 const candidates = (await Promise.all(wanted.map(c => build(c).catch(e => { console.warn(c.id, e.message); return null; })))).filter(Boolean);
 
-const labels = document.getElementById('labels');
-for (const c of candidates) {
-    const el = document.createElement('div');
-    el.innerHTML = `${c.label}<small>${c.note} · ${c.triangles.toLocaleString('en')} triangles</small>`;
-    labels.appendChild(el);
-    c.el = el;
+// Labels are painted on a canvas of their own over the picture, so saved frames carry them too.
+const labels = document.getElementById('labels'), pen = labels.getContext('2d');
+const POSE_TEXT = { turntable: 'Banking / turntable', swim: 'Swim', turn: 'Turn-around', puff: 'Puff' };
+
+function paintLabels(pose, W, H, cw, dpr) {
+    if (labels.width !== W || labels.height !== H) { labels.width = W; labels.height = H; }
+    pen.clearRect(0, 0, W, H);
+    pen.lineJoin = 'round';
+    const text = (str, x, y, size, weight = 'bold') => {
+        pen.font = `${weight} ${Math.round(size * dpr)}px Arial, sans-serif`;
+        pen.lineWidth = Math.max(3, size * dpr * 0.22);
+        pen.strokeStyle = 'rgba(3, 30, 50, 0.9)';
+        pen.strokeText(str, x, y);
+        pen.fillStyle = '#ffffff';
+        pen.fillText(str, x, y);
+    };
+    pen.textAlign = 'left'; pen.textBaseline = 'top';
+    const size = Math.max(11, Math.min(22, cw / dpr / 11));
+    candidates.forEach((c, i) => {
+        text(c.label, i * cw + 10 * dpr, 8 * dpr, size);
+        text(`${c.triangles.toLocaleString('en')} triangles`, i * cw + 10 * dpr, (8 + size * 1.25) * dpr, size * 0.78, 'normal');
+    });
+    pen.textAlign = 'right'; pen.textBaseline = 'bottom';
+    text(POSE_TEXT[pose.name] || pose.name, W - 10 * dpr, H - 8 * dpr, size);
+}
+
+/** The picture with its labels as one image (for screenshots and capture scripts). */
+function capture(type = 'image/png', quality = 0.92) {
+    const out = document.createElement('canvas');
+    out.width = canvas.width; out.height = canvas.height;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    ctx.drawImage(labels, 0, 0);
+    return out.toDataURL(type, quality);
 }
 const bar = document.getElementById('bar');
 for (const name of [null, ...POSES]) {
@@ -179,7 +207,7 @@ for (const name of [null, ...POSES]) {
 }
 const shot = document.createElement('button');
 shot.textContent = 'screenshot';
-shot.onclick = () => { const a = document.createElement('a'); a.download = `creature-${poseAt(now()).name}.png`; a.href = canvas.toDataURL('image/png'); a.click(); };
+shot.onclick = () => { const a = document.createElement('a'); a.download = `creature-${poseAt(now()).name}.png`; a.href = capture(); a.click(); };
 bar.appendChild(shot);
 
 const start = performance.now();
@@ -214,11 +242,10 @@ function frame(at = null) {
             }
             renderer.draw(c.meshes, { ...pose, yaw, mirror, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
         }
-        c.el.style.left = `${(i * cw) / dpr}px`;
-        c.el.style.width = `${cw / dpr}px`;
     });
+    paintLabels(pose, W, H, cw, dpr);
     gl.disable(gl.SCISSOR_TEST);
-    window.__viewer = { pose: pose.name, seconds: POSE_SECONDS, draw: (name, t) => frame({ pose: name, t }), candidates: candidates.map(c => ({ id: c.id, label: c.label, triangles: c.triangles })) };
+    window.__viewer = { pose: pose.name, seconds: POSE_SECONDS, draw: (name, t) => frame({ pose: name, t }), capture, candidates: candidates.map(c => ({ id: c.id, label: c.label, triangles: c.triangles })) };
     if (!at) requestAnimationFrame(() => frame());
 }
 frame();
