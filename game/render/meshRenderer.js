@@ -50,13 +50,13 @@ const FRAG = `#version 300 es
 precision highp float;
 in vec3 vNormal; in vec2 vUv; in vec3 vWorld;
 uniform sampler2D uTex; uniform vec4 uColor; uniform float uLit; uniform float uDepth;
-uniform vec3 uSun, uKey, uSky, uBounce, uDeep, uP0, uC0, uP1, uC1; uniform float uRim;
+uniform vec3 uSun, uKey, uSky, uBounce, uDeep, uP0, uC0, uP1, uC1; uniform float uRim; uniform float uMirror;
 out vec4 o;
 void main() {
     vec4 a = texture(uTex, vUv) * uColor;
     if (a.a < 0.4) discard;
     vec3 n = normalize(vNormal);
-    if (!gl_FrontFacing) n = -n;
+    if (gl_FrontFacing == (uMirror < 0.0)) n = -n;        // a mirrored model shows its faces the other way round
     float up = n.y * 0.5 + 0.5;
     float wrap = dot(n, uSun) * 0.5 + 0.5;                          // half-Lambert: soft, no black side
     vec3 light = mix(uBounce, uSky, up) + uKey * wrap * wrap;
@@ -129,11 +129,12 @@ export default class MeshRenderer {
      * Draw meshes into the current viewport.
      * @param o.yaw,o.pitch  model rotation (radians)   @param o.scale  size on screen (1 = fills the view's height)
      * @param o.aspect       viewport width / height
+     * @param o.mirror       1 = as built, -1 = mirrored left-right; values in between squash it flat (the turn-around)
      * @param o.swim 0..1, o.phase, o.puff 0..1         motion
      * @param o.lit 0..1     0 = show the picture as painted, 1 = fully lit by the scene
      * @param o.depth 0..1   fade toward the deep-water colour
      */
-    draw(meshes, { yaw = 0, pitch = 0, scale = 1, aspect = 1, swim = 0, phase = 0, puff = 0, lit = 1, depth = 0, light = LIGHT }) {
+    draw(meshes, { yaw = 0, pitch = 0, scale = 1, aspect = 1, swim = 0, phase = 0, puff = 0, lit = 1, depth = 0, mirror = 1, light = LIGHT }) {
         const gl = this.gl, u = this.u;
         gl.useProgram(this.program);
         gl.enable(gl.DEPTH_TEST);
@@ -144,9 +145,11 @@ export default class MeshRenderer {
         gl.uniformMatrix4fv(u.uProj, false, [
             f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0]);
         const cy = Math.cos(yaw), sy = Math.sin(yaw), cx = Math.cos(pitch), sx = Math.sin(pitch), s = scale;
-        // model = translate(0, 0, -dist) * rotateX(pitch) * rotateY(yaw) * scale
+        // model = translate(0, 0, -dist) * rotateX(pitch) * rotateY(yaw) * scale * mirror(x)
+        const m = mirror;
+        gl.uniform1f(u.uMirror, m);
         gl.uniformMatrix4fv(u.uModel, false, [
-            cy * s, sx * sy * s, -cx * sy * s, 0,
+            cy * s * m, sx * sy * s * m, -cx * sy * s * m, 0,
             0, cx * s, sx * s, 0,
             sy * s, -sx * cy * s, cx * cy * s, 0,
             0, 0, -dist, 1]);

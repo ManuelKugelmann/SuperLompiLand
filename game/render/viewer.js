@@ -20,6 +20,10 @@ import { softnessMap } from '../rig/soft.js';
  *   loft     a procedural body lofted over rings (rig/loft.js), fitted to the picture's body; fins and
  *            tail stay on a flat card in the middle plane
  *   glb      a 3D model file; `turn` = [yaw, pitch] in degrees to bring its nose to +x
+ * Picture-based candidates use the CONTROLLED VIEW: the character is only ever seen from the
+ * angle it was painted from, so its rest pose is the painting exactly; it banks a little
+ * (VIEW_YAW) and turns around by mirroring with a quick squash, never by rotating through
+ * profile. Generated 3D models rotate freely, for comparison.
  * Model files from experiments live under _ref/ (not in the repo); missing ones are skipped.
  */
 const CREATURES = {
@@ -40,6 +44,8 @@ const GAME_SIZE = 170 / 1080;      // Lompi's width in the game as a share of th
 // (the art is a three-quarter view; in exact profile a 3D body loses mouth and far eye).
 // It passes through profile only briefly while turning around.
 const FACE_YAW = -30 * Math.PI / 180;
+const VIEW_YAW = 25 * Math.PI / 180;     // controlled view: how far a picture-based character may bank to either side
+const FLIP_SHARE = 0.15;                 // controlled view: share of the turn pose spent on each mirror flip
 
 const query = new URLSearchParams(window.location.search);
 const canvas = document.getElementById('view');
@@ -141,7 +147,7 @@ function poseAt(t, fixed = query.get('pose')) {
     const index = fixed ? Math.max(0, POSES.indexOf(fixed)) : Math.floor(t / POSE_SECONDS) % POSES.length;
     const u = (t % POSE_SECONDS) / POSE_SECONDS, name = POSES[index];
     const ease = v => v * v * (3 - 2 * v);
-    const pose = { name, yaw: FACE_YAW, pitch: 0, swim: 0.15, phase: t * 7, puff: 0 };
+    const pose = { name, u, yaw: FACE_YAW, pitch: 0, swim: 0.15, phase: t * 7, puff: 0 };
     if (name === 'turntable') pose.yaw = Math.sin(u * Math.PI * 2) * Math.PI / 3;                 // ±60° around true profile
     else if (name === 'swim') { pose.swim = 1; pose.yaw += Math.sin(t * 7) * 0.1; }
     else if (name === 'turn') {
@@ -194,10 +200,19 @@ function frame(at = null) {
             gl.scissor(i * cw, y, cw - 2, h - 2);
             gl.clearColor(...clear, 1);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            // A flat picture cannot turn: it mirrors instead, as the game does today.
             const flat = c.kind === 'card';
-            const yaw = flat ? (Math.abs(pose.yaw) > Math.PI / 2 ? Math.PI : 0) : pose.yaw;
-            renderer.draw(c.meshes, { ...pose, yaw, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
+            let yaw = pose.yaw, mirror = 1;
+            if (c.kind !== 'glb') {
+                // Controlled view (see CREATURES): bank a little, mirror to turn around.
+                yaw = pose.name === 'turntable' ? pose.yaw / (Math.PI / 3) * VIEW_YAW : pose.name === 'swim' ? pose.yaw - FACE_YAW : 0;
+                if (pose.name === 'turn') {
+                    const flip = v => Math.cos(Math.PI * Math.min(1, Math.max(0, v)));     // 1 -> -1 through a flat squash
+                    mirror = pose.u < 0.5 ? flip(pose.u / FLIP_SHARE) : -flip((pose.u - 0.5) / FLIP_SHARE);
+                    if (Math.abs(mirror) < 0.08) mirror = mirror < 0 ? -0.08 : 0.08;
+                }
+                if (flat) yaw = 0;                                                         // today's sprite: no banking at all
+            }
+            renderer.draw(c.meshes, { ...pose, yaw, mirror, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
         }
         c.el.style.left = `${(i * cw) / dpr}px`;
         c.el.style.width = `${cw / dpr}px`;
