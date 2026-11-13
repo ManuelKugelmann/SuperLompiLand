@@ -12,7 +12,7 @@ export default class WsNet {
         this.url = url.replace(/\/+$/, '');
         this.status = 'connecting';
         this.peers = new Set();
-        this.joinCbs = []; this.leaveCbs = []; this.msgCbs = []; this.emoteCbs = [];
+        this.joinCbs = []; this.leaveCbs = []; this.msgCbs = []; this.emoteCbs = []; this.evtCbs = [];
         this.selfId = null;
         this.ws = null;
         this.tries = 0;
@@ -65,6 +65,8 @@ export default class WsNet {
             this.msgCbs.forEach(cb => cb(m.from, m.d));
         } else if (m.k === 'e') {
             this.emoteCbs.forEach(cb => cb(m.from, m.d));
+        } else if (m.k === 'v') {
+            this.evtCbs.forEach(cb => cb(m.from, m.d));
         } else if (m.k === 'full') {
             this.status = 'full';
         }
@@ -83,17 +85,19 @@ export default class WsNet {
     onLeave(cb) { this.leaveCbs.push(cb); }
     onState(cb) { this.msgCbs.push(cb); }
     onEmote(cb) { this.emoteCbs.push(cb); }
+    onEvent(cb) { this.evtCbs.push(cb); }
 
     put(obj) {
         if (this.ws?.readyState === 1 && this.peers.size > 0) this.ws.send(JSON.stringify(obj));
     }
     send(data) { this.put({ k: 's', d: data }); }
     sendEmote(id) { this.put({ k: 'e', d: id }); }
+    sendEvent(obj) { this.put({ k: 'v', d: obj }); }
 
     leave() {
         this.closed = true;
         clearTimeout(this.timer);
-        this.joinCbs = []; this.leaveCbs = []; this.msgCbs = []; this.emoteCbs = [];
+        this.joinCbs = []; this.leaveCbs = []; this.msgCbs = []; this.emoteCbs = []; this.evtCbs = [];
         this.peers.clear();
         try { this.ws?.close(); } catch { /* gone */ }
         this.ws = null;

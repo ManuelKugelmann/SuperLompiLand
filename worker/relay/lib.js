@@ -8,7 +8,10 @@
 //                     { k: 'join', id } / { k: 'leave', id }
 //                     { k: 's' | 'e', from: id, d }    forwarded from another player
 //                     { k: 'full' }                    room has MAX_PEERS already (then closed)
+//   client -> relay   { k: 'v', d: { t: 'down', x, y } | { t: 'revive', id } }   one-shot event
 // The relay never sees room names (only a hash in the URL) and stores nothing.
+
+import { cleanState, cleanEvent } from '../../net/validate.js';
 
 export const RELAY = {
     maxPeers: 4,          // spec: max 4 fish per room
@@ -24,7 +27,6 @@ export function validRoom(hash) {
 }
 
 const EMOTES = new Set(['wave', 'heart', 'follow', 'puff']);
-const STATE_KEYS = { n: 'number', t: 'number', x: 'number', y: 'number', vx: 'number', vy: 'number', s: 'string', f: 'number', c: 'string' };
 
 /** Parse and check one client frame. Returns { k, d } or null if malformed. */
 export function parseFrame(text) {
@@ -33,18 +35,8 @@ export function parseFrame(text) {
     try { m = JSON.parse(text); } catch { return null; }
     if (!m || typeof m !== 'object') return null;
     if (m.k === 'e') return EMOTES.has(m.d) ? { k: 'e', d: m.d } : null;
-    if (m.k === 's') {
-        const d = m.d;
-        if (!d || typeof d !== 'object') return null;
-        const out = {};
-        for (const [key, type] of Object.entries(STATE_KEYS)) {
-            if (typeof d[key] !== type) return null;
-            if (type === 'number' && !Number.isFinite(d[key])) return null;
-            if (type === 'string' && d[key].length > 24) return null;
-            out[key] = d[key];
-        }
-        return { k: 's', d: out };
-    }
+    if (m.k === 's') { const d = cleanState(m.d); return d ? { k: 's', d } : null; }
+    if (m.k === 'v') { const d = cleanEvent(m.d); return d ? { k: 'v', d } : null; }
     return null;
 }
 

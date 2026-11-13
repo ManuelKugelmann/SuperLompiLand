@@ -27,6 +27,7 @@ export default class Net {
         this.leaveCbs = [];
         this.msgCbs = [];
         this.emoteCbs = [];
+        this.evtCbs = [];
         this.selfId = null;
         this.room = null;
         this.gen = 0; // bumped on every (re)join so late async results are ignored
@@ -65,6 +66,9 @@ export default class Net {
             // One-shot emotes (a short id string only, never free text).
             this.emote = room.makeAction('emote');
             this.emote.onMessage((data, ctx) => { if (gen === this.gen) this.emoteCbs.forEach(cb => cb(ctx.userId, data)); });
+            // One-shot events: a friend is down / was revived.
+            this.evt = room.makeAction('evt');
+            this.evt.onMessage((data, ctx) => { if (gen === this.gen) this.evtCbs.forEach(cb => cb(ctx.userId, data)); });
             room.getSelf().then(s => { if (gen === this.gen) this.selfId = s.userId; }).catch(() => {});
             room.onUserJoin(({ userId }) => {
                 if (gen !== this.gen) return;
@@ -100,6 +104,12 @@ export default class Net {
     onLeave(cb) { this.leaveCbs.push(cb); }
     onState(cb) { this.msgCbs.push(cb); }
     onEmote(cb) { this.emoteCbs.push(cb); }
+    onEvent(cb) { this.evtCbs.push(cb); }
+
+    sendEvent(obj) {
+        if (!this.room || this.peers.size === 0) return;
+        this.evt.send(obj).catch(() => {});
+    }
 
     sendEmote(id) {
         if (!this.room || this.peers.size === 0) return;
@@ -114,7 +124,7 @@ export default class Net {
 
     leave() {
         this.gen++;
-        this.joinCbs = []; this.leaveCbs = []; this.msgCbs = []; this.emoteCbs = [];
+        this.joinCbs = []; this.leaveCbs = []; this.msgCbs = []; this.emoteCbs = []; this.evtCbs = [];
         this.peers.clear();
         const room = this.room;
         this.room = null;

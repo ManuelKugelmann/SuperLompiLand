@@ -112,3 +112,16 @@ test('room keys: same name -> same keys; the hash fits the relay; the name is no
     assert.ok(!k1.room.includes('keks') && !k1.password.includes('keks'));
     assert.notEqual(k1.room, k1.password.slice(0, 48));
 });
+
+test('down / revive events are forwarded; malformed ones are not', () => {
+    const { core, sent } = room();
+    const a = {}, b = {};
+    core.connect(a); core.connect(b);
+    core.message(a, JSON.stringify({ k: 'v', d: { t: 'down', x: 5, y: 6 } }));
+    assert.deepEqual(sent.get(b).at(-1), { k: 'v', from: 'p1', d: { t: 'down', x: 5, y: 6 } });
+    core.message(a, JSON.stringify({ k: 'v', d: { t: 'revive', id: 'p2' } }));
+    assert.deepEqual(sent.get(b).at(-1), { k: 'v', from: 'p1', d: { t: 'revive', id: 'p2' } });
+    const n = sent.get(b).length;
+    core.message(a, JSON.stringify({ k: 'v', d: { t: 'chat', text: 'hi' } }));
+    assert.equal(sent.get(b).length, n);
+});

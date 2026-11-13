@@ -20,6 +20,7 @@ export default class RemoteFish {
         this.last = 0;
         this.char = null;
         this.stateName = 'normal';
+        this.pos = null;        // last drawn world position, null while gone quiet
         // Off-screen marker: a small picture of the friend at the screen edge plus an arrow.
         this.icon = scene.add.image(0, 0, 'puffer_normal').setScrollFactor(0).setDepth(59).setAlpha(0.95).setVisible(false);
         // Dart pointing right at rotation 0, drawn once into a texture. It must be long
@@ -84,9 +85,11 @@ export default class RemoteFish {
         if (p.stale) {
             this.rig.setVisible(false);
             this.alpha = 0;
+            this.pos = null;
             for (const o of [this.icon, this.arrow, this.ring, this.iconRing]) o.setVisible(false);
             return;
         }
+        this.pos = { x: p.x, y: p.y };
         const m = edgeMarker(this.scene.cameras.main.worldView, p);
         this.icon.setVisible(!!m);
         this.arrow.setVisible(!!m);
