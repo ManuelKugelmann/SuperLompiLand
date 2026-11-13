@@ -6,7 +6,7 @@ import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor } from '../game/level/biom
 import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
-import { waveY } from '../game/level/surface.js';
+import { WaterSurface } from '../game/level/surface.js';
 import { play } from '../game/audio.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
@@ -21,6 +21,7 @@ const WORLD = {
     doubleTapMs: 320,
     doubleTapDist: 110,
     maxHealth: 5,
+    hitStopMs: 70,
     ventLift: 0.0026,     // upward force per unit mass inside a bubble column
     friendBonus: 5
 };
@@ -46,6 +47,8 @@ export default class MainScene extends Phaser.Scene {
         this.debugOn = false;
         this.maxDepth = 0;
 
+        this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
+        this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
         this.level = new LevelGenerator(this);
 
@@ -109,20 +112,33 @@ export default class MainScene extends Phaser.Scene {
         });
 
         // Splash when the fish breaks the surface in either direction.
-        this.events.on('fish-splash', ({ x, y, speed }) => {
+        this.events.on('fish-splash', ({ x, y, speed, entering }) => {
+            if (speed < 2 || this.time.now - (this.lastSplash || -999) < 180) return; // no plop for a gentle bob
+            this.lastSplash = this.time.now;
             play('splash', speed);
-            const n = Phaser.Math.Clamp(Math.round(speed * 0.9), 5, 22);
+            // Kick the surface springs: a dent going in, a small bulge coming out (ripples of ~10-35 px).
+            this.surface.splash(x, (entering ? 1 : -0.7) * Math.min(5.5, 1.2 + speed * 0.3), 2.5);
+            this.fish.squash = entering ? 0.28 : -0.2;
+            // Droplets: water-coloured with a bright rim so they read against sky and sea.
+            const n = Phaser.Math.Clamp(Math.round(6 + speed), 8, 26);
             for (let i = 0; i < n; i++) {
-                const d = this.add.circle(x + Phaser.Math.Between(-40, 40), y, Phaser.Math.Between(4, 11), 0xffffff, 0.85).setDepth(6);
-                const up = Phaser.Math.Between(40, 60 + speed * 9);
-                this.tweens.add({ targets: d, x: d.x + Phaser.Math.Between(-130, 130), duration: 620, ease: 'Linear' });
-                this.tweens.add({
-                    targets: d, y: y - up, duration: 310, ease: 'Quad.easeOut', yoyo: true,
-                    onComplete: () => d.destroy()
-                });
+                const d = this.add.circle(x + Phaser.Math.Between(-46, 46), y, Phaser.Math.Between(6, 15), 0x7fd6f0, 0.95)
+                    .setStrokeStyle(3, 0xffffff, 1).setDepth(9);
+                const up = Phaser.Math.Between(70, 110 + speed * 12);
+                this.tweens.add({ targets: d, x: d.x + Phaser.Math.Between(-170, 170), duration: 720, ease: 'Linear' });
+                this.tweens.add({ targets: d, y: y - up, duration: 360, ease: 'Quad.easeOut', yoyo: true, onComplete: () => d.destroy() });
+                this.tweens.add({ targets: d, scale: 0.4, duration: 720 });
             }
-            const ring = this.add.ellipse(x, y, 60, 14, 0xffffff, 0.6).setDepth(6);
-            this.tweens.add({ targets: ring, scaleX: 5, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
+            // Foam ring on the surface and a burst of bubbles underneath.
+            const ring = this.add.ellipse(x, y, 90, 22, 0xffffff, 0.85).setDepth(9);
+            this.tweens.add({ targets: ring, scaleX: 5.5, scaleY: 1.6, alpha: 0, duration: 650, onComplete: () => ring.destroy() });
+            if (entering) {
+                for (let i = 0; i < 9; i++) {
+                    const bub = this.add.circle(x + Phaser.Math.Between(-60, 60), y + Phaser.Math.Between(20, 90), Phaser.Math.Between(6, 16), 0xffffff, 0.35)
+                        .setStrokeStyle(2, 0xffffff, 0.8).setDepth(6);
+                    this.tweens.add({ targets: bub, y: y + 6, alpha: 0, duration: Phaser.Math.Between(500, 1000), onComplete: () => bub.destroy() });
+                }
+            }
         });
 
         // Keyboard (always on, alongside the touch scheme): arrows / WASD swim, space puffs.
@@ -263,6 +279,11 @@ export default class MainScene extends Phaser.Scene {
             c.img.destroy();
             this.coins++;
             play('coin');
+            for (let i = 0; i < 5; i++) {           // sparkle
+                const a = (i / 5) * Math.PI * 2 + Math.random();
+                const star = this.add.star(x, y, 4, 4, 11, 0xffffff).setDepth(3);
+                this.tweens.add({ targets: star, x: x + Math.cos(a) * 70, y: y + Math.sin(a) * 70, alpha: 0, angle: 180, scale: 0.3, duration: 380, onComplete: () => star.destroy() });
+            }
             const pop = this.add.circle(x, y, 30, 0xfff3b0, 0.8).setDepth(3);
             this.tweens.add({ targets: pop, scale: 2.6, alpha: 0, duration: 260, onComplete: () => pop.destroy() });
         }
@@ -286,6 +307,8 @@ export default class MainScene extends Phaser.Scene {
             if (!h.img.active || p.distance(h.img) > fr * LEVEL.hitSlack + h.r) continue;
             if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
                 play('hit');
+                this.hitStop = WORLD.hitStopMs;
+                this.fish.squash = -0.3;
                 this.health = Math.max(0, this.health - (this.character.armor ?? 1));
                 this.cameras.main.shake(180, 0.008);
                 if (this.health <= 0 && !this.respawning) { this.respawning = true; this.respawn(); return; }
@@ -310,7 +333,9 @@ export default class MainScene extends Phaser.Scene {
         if (lifted) fsp.applyForce({ x: 0, y: -WORLD.ventLift * fsp.body.mass });
         // Whatever carries the fish upward inside a bubble column is the water's doing.
         this.fish.flow.set(0, lifted ? Math.min(0, fsp.body.velocity.y) : 0);
-        this.fish.update(STEP_MS, waveY(this.fish.sprite.x, this.time.now / 1000));
+        this.surface.recenter(fsp.x);
+        this.surface.step();
+        this.fish.update(STEP_MS, this.surface.heightAt(fsp.x, this.time.now / 1000));
         this.matter.world.step(STEP_MS);
         this.fish.afterStep();
     }
@@ -320,6 +345,7 @@ export default class MainScene extends Phaser.Scene {
         const sp = this.fish.sprite;
 
         const t0 = performance.now();
+        if (this.hitStop > 0) { this.hitStop -= delta; delta = 0; }   // freeze-frame on impact
         this.acc = Math.min(this.acc + delta, STEP_MS * 5);
         while (this.acc >= STEP_MS) { this.fixedStep(); this.acc -= STEP_MS; }
         const t1 = performance.now();
@@ -377,8 +403,8 @@ export default class MainScene extends Phaser.Scene {
         this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
 
         this.level.update(this.camX, this.camY);
-        this.level.animate(time / 1000);
-        this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY);
+        this.level.animate(time / 1000, view, speed);
+        this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
         const t2 = performance.now();

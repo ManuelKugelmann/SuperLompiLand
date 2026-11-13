@@ -31,7 +31,7 @@ export function makeCritter(scene, key, x, y, width, anim = 'wobble', opts = {})
     obj.face = d => { dir = d < 0 ? -1 : 1; };
     obj.facing = () => dir;
 
-    obj.animate = t => {
+    obj.animate = (t, bend = 0) => {
         const p = t * speed + phase;
         let sx = base, sy = baseY;
         if (anim === 'swim') {
@@ -58,7 +58,8 @@ export function makeCritter(scene, key, x, y, width, anim = 'wobble', opts = {})
             const pts = obj.points, n = pts.length - 1;
             for (let i = 0; i <= n; i++) {
                 const f = opts.root === 'bottom' ? 1 - i / n : i / n;
-                pts[i].x = Math.sin(p * 2.2 - f * 2) * amp * f * (opts.root === 'bottom' ? 2.4 : 1);
+                pts[i].x = Math.sin(p * 2.2 - f * 2) * amp * f * (opts.root === 'bottom' ? 2.4 : 1)
+                    + bend * obj.frame.width * 0.9 * f * f;   // pushed aside by a passing fish
             }
             obj.setDirty();
         } else if (anim === 'throb') {

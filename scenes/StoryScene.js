@@ -53,7 +53,7 @@ export default class StoryScene extends Phaser.Scene {
 
         // Cast.
         this.lompi = this.add.image(W * 0.33, H * 0.6, has('puffer_normal') ? 'puffer_normal' : 'coin').setScale(0.55);
-        this.friends = [['friend_turtle', 0.18, 0.47, 0.42], ['friend_clownfish', 0.47, 0.7, 0.36], ['friend_seahorse', 0.12, 0.72, 0.3],
+        this.friends = [['friend_turtle', 0.18, 0.47, 0.42], ['friend_seahorse', 0.12, 0.72, 0.3],
             ['friend_starfish', 0.36, 0.86, 0.3]].filter(([k]) => has(k))
             .map(([k, fx, fy, sc]) => this.add.image(W * fx, H * fy, k).setScale(sc));
         [this.lompi, ...this.friends].forEach((o, i) => this.tweens.add({

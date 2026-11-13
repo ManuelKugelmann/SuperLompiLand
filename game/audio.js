@@ -84,9 +84,10 @@ const SOUNDS = {
     deflate() { noise({ dur: 0.35, vol: 0.2, from: 1600, to: 300, q: 0.7 }); },
     special() { tone({ f: 330, to: 990, type: 'sawtooth', dur: 0.2, vol: 0.14 }); noise({ dur: 0.2, vol: 0.18, from: 900, to: 2600 }); },
     splash(strength = 1) {
-        const v = Math.min(0.5, 0.16 + strength * 0.03);
-        noise({ dur: 0.45, vol: v, from: 2400, to: 500, q: 0.5 });
-        noise({ at: 0.05, dur: 0.6, vol: v * 0.5, from: 900, to: 200, q: 0.9 });
+        // Soft and airy; a hard dive is only a little louder than a gentle one.
+        const v = Math.min(0.14, 0.04 + strength * 0.006);
+        noise({ dur: 0.4, vol: v, from: 3200, to: 900, q: 0.4 });
+        noise({ at: 0.06, dur: 0.5, vol: v * 0.45, from: 1200, to: 400, q: 0.7 });
     },
     hit() { tone({ f: 190, to: 70, type: 'square', dur: 0.22, vol: 0.22 }); noise({ dur: 0.12, vol: 0.2, from: 400, to: 150 }); },
     friend() { tone({ f: 659.25, type: 'triangle', dur: 0.14, vol: 0.2 }); tone({ f: 987.77, type: 'triangle', at: 0.11, dur: 0.24, vol: 0.2 }); },

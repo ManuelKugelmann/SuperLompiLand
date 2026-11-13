@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { waveY } from './surface.js';
 import { biomeBlendAt, mixColor } from './biomes.js';
 
 /**
@@ -31,6 +30,23 @@ export default class Backdrop {
         this.eastGlow = scene.add.ellipse(W + 120, H * 0.5, 520, H * 1.5, 0xff3b1f, 0.12)
             .setScrollFactor(0).setDepth(-11).setBlendMode(Phaser.BlendModes.ADD);
         scene.tweens.add({ targets: this.eastGlow, alpha: 0.2, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+        // Distant schools of small fish: silhouettes far behind the play plane that
+        // drift past slower than the world (parallax) and never interact.
+        this.schools = [];
+        for (let k = 0; k < 4; k++) {
+            const school = {
+                x: Phaser.Math.Between(0, 4000), y: Phaser.Math.Between(120, H - 160), dir: k % 2 ? 1 : -1,
+                speed: Phaser.Math.FloatBetween(0.5, 1.1), depthFactor: 0.25 + k * 0.08, fish: []
+            };
+            const n = Phaser.Math.Between(7, 13);
+            for (let i = 0; i < n; i++) {
+                const size = Phaser.Math.Between(16, 26) * (0.7 + k * 0.12);
+                const body = scene.add.ellipse(0, 0, size, size * 0.42, 0x0d4763, 0.3 + k * 0.05).setScrollFactor(0).setDepth(-16 + k * 0.1);
+                school.fish.push({ body, ox: Phaser.Math.Between(-150, 150), oy: Phaser.Math.Between(-70, 70), phase: Math.random() * 6.28 });
+            }
+            this.schools.push(school);
+        }
 
         this.rays = [];
         for (let i = 0; i < 6; i++) {
@@ -64,7 +80,7 @@ export default class Backdrop {
         b.phase = Math.random() * 6.28;
     }
 
-    update(camX, camY, dx, dy) {
+    update(camX, camY, dx, dy, surface) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         const depth = Phaser.Math.Clamp((camY + H / 2) / this.maxDepth, 0, 1);
         this.dark.setAlpha(Phaser.Math.Clamp((camY + H / 2 - 2200) / 3400, 0, 1) * 0.7);
@@ -79,7 +95,7 @@ export default class Backdrop {
         this.foam.clear();
         if (camY < 80) {
             const pts = [];
-            for (let sx = -40; sx <= W + 40; sx += 32) pts.push({ x: camX + sx, y: waveY(camX + sx, t) });
+            for (let sx = -40; sx <= W + 40; sx += 32) pts.push({ x: camX + sx, y: surface.heightAt(camX + sx, t) });
             // Sky is a screen-wide image; hide the part below the waves with sea colour.
             // The sky image reaches a little below sea level; cover it from the
             // wave line down with a bright band that fades into the depth gradient.
@@ -93,6 +109,18 @@ export default class Backdrop {
             this.foam.strokePath();
         }
 
+        const depthFade = Math.max(0.25, 1 - depth * 0.8);
+        for (const sc of this.schools) {
+            sc.x += sc.dir * sc.speed;
+            const span = W + 900;
+            const sx = (((sc.x - camX * sc.depthFactor) % span) + span) % span - 450;
+            const sy = sc.y - (camY * sc.depthFactor * 0.3) % 200;
+            for (const f of sc.fish) {
+                f.body.setPosition(sx + f.ox + Math.sin(t * 0.7 + f.phase) * 18, sy + f.oy + Math.sin(t * 1.1 + f.phase) * 10);
+                f.body.setScale(sc.dir * (1 + Math.sin(t * 9 + f.phase) * 0.12), 1);   // tail beat
+                f.body.setVisible(camY + f.body.y > 60).setAlpha(f.body.fillAlpha * 0 + 0.32 * depthFade);
+            }
+        }
         for (const ray of this.rays) {
             ray.x = ray.baseX + Math.sin(t * 0.25 + ray.phase) * 70 - (camX * 0.05) % 40;
             ray.setAlpha(ray.baseAlpha * (0.6 + 0.4 * Math.sin(t * 0.6 + ray.phase)) * Math.max(0, 1 - depth * 2.2));

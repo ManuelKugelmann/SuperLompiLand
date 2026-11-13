@@ -27,13 +27,13 @@ export const BIOMES = [
         id: 'beach', name: { de: 'Sandstrand', en: 'Sandy Beach' },
         rock: [0xfff0c0, 0xf2d894, 0xd9b877, 0xb89868, 0x937a5c], water: [0x7ff0e0, 0.22], open: 0.2,
         coral: 0.35, kelp: 0.1, coins: 2, friendRate: 0.5, hazardRate: 0,
-        friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, friend_clownfish: 2, urchin: 1 }, hazards: {}
+        friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, urchin: 1 }, hazards: {}
     },
     {
         id: 'reef', name: { de: 'Heimatriff', en: 'Home Reef' },
         rock: ROCK_REEF, water: [0x3fd0e8, 0.0], open: 0.0,
         coral: 0.6, kelp: 0.12, coins: 2, friendRate: 0.4, hazardRate: 0.12,
-        friends: { friend_starfish: 2, friend_snail: 2, friend_clownfish: 3, friend_turtle: 1, friend_seahorse: 1, urchin: 2 },
+        friends: { friend_starfish: 2, friend_snail: 2, friend_turtle: 1, friend_seahorse: 1, urchin: 2 },
         hazards: { spikes: 1 }
     },
     {

@@ -16,6 +16,7 @@ export const LEVEL = {
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     friendSheen: 0.16,    // strength of the rainbow shimmer on friends
     visualDetail: 2,      // drawn outline grid is this many times finer than the collision grid
+    wakeRadius: 300,      // how close the fish must swim to bend a plant
     coinGap: 92,          // minimum distance between two coins
     rockRes: 0.6,         // baked terrain resolution (1 = full; lower saves GPU memory)
     backRes: 0.3,         // baked back-wall / shadow layer resolution (soft anyway)
@@ -26,7 +27,6 @@ const CH = LEVEL.cell * LEVEL.cells;
 /** How each creature / object looks and moves. Sizes are display widths in px. */
 const FRIENDS = {
     friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5 },
-    friend_clownfish: { size: 170, swim: 440, bob: 10, anim: 'swim' },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse' },
     friend_seahorse: { size: 120, bob: 26, anim: 'sway' },
     friend_starfish: { size: 170, ground: true, anim: 'wobble' },
@@ -38,10 +38,12 @@ const FRIENDS = {
 };
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
 const HAZARDS = {
-    spikes: { size: 210, r: 62, place: 'floor', lift: 30 },
-    mine: { size: 150, r: 64, place: 'water', anim: 'wobble', bob: 18 },
-    hazard_buoy: { size: 130, r: 70, place: 'water', anim: 'wobble', bob: 26 },
-    hazard_net: { size: 230, r: 96, place: 'water', anim: 'sway' }
+    // Keys are historical; what they show now: spikes = wreck scrap, hazard_buoy =
+    // leaking oil drum, mine = lost anchor on its chain, hazard_net = ghost net.
+    spikes: { size: 240, r: 62, place: 'floor', lift: 26 },
+    hazard_buoy: { size: 170, r: 74, place: 'floor', lift: 104 },
+    mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6 },
+    hazard_net: { size: 150, r: 84, place: 'water', anim: 'sway', bob: 34, speed: 0.7 }
 };
 const BAND_DT = [0, 0.03, 0.075, 0.14, 0.22]; // density steps of the terrain colour bands
 const DEEP_TINT = 0x1a3a62;
@@ -154,8 +156,17 @@ export default class LevelGenerator {
     }
 
     /** Per frame: bend / pulse every creature and plant. `t` in seconds. */
-    animate(t) {
-        for (const o of this.animated) if (o.active) o.animate(t);
+    animate(t, fish, speed = 0) {
+        for (const o of this.animated) {
+            if (!o.active) continue;
+            if (o.isPlant && fish) {
+                // Swimming past pushes plants aside; they swing back when it is calm.
+                const dx = o.x - fish.x, d = Math.hypot(dx, o.y - fish.y);
+                const push = d < LEVEL.wakeRadius ? Math.sign(dx || 1) * (1 - d / LEVEL.wakeRadius) * Math.min(1, speed / 9) : 0;
+                o.bend += (push - o.bend) * 0.1;
+            }
+            o.animate(t, o.bend || 0);
+        }
         for (const l of this.lights) {
             if (!l.active || !l.follow.active) continue;
             l.setPosition(l.follow.x, l.follow.y);
@@ -301,6 +312,8 @@ export default class LevelGenerator {
                 const stalk = makeCritter(s, 'kelp', f.x + up.x * h * 0.48, f.y + up.y * h * 0.48, h * 0.19, 'sway',
                     { root: 'bottom', speed: rng.realInRange(0.5, 0.9), scaleY: h / 512 });
                 stalk.setDepth(rng.frac() < 0.25 ? 7 : -4);
+                stalk.isPlant = true;
+                stalk.bend = 0;
                 keep(stalk);
                 this.animated.push(stalk);
                 stalks++;

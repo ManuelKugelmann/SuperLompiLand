@@ -65,6 +65,7 @@ export default class Pufferfish {
         // the scene. Being carried by the water must never turn the fish around:
         // it points where it SWIMS, i.e. along its velocity relative to the water.
         this.flow = new Phaser.Math.Vector2(0, 0);
+        this.squash = 0;        // >0 = stretched along the travel direction, <0 = squashed; springs back
         this.pushed = 0;        // ms left during which a knock-back must not turn the fish
         this.steered = false;   // set by the scene while keyboard input is active
         this.facing = 1;        // 1 = right, -1 = left
@@ -194,6 +195,7 @@ export default class Pufferfish {
         if (this.inflated) { this.deflate(); return; }
         if (this.cooldown > 0) return;
         this.applyState('inflated');
+        this.squash = -0.3;
         play('puff');
         this.inflateLeft = FISH.inflateMs;
         // Air brake: puffing up stops the fish where it is (in the water).
@@ -279,7 +281,9 @@ export default class Pufferfish {
         if (this.invulnerable > 0) this.invulnerable -= dt;
 
         // Water <-> air. In the air: no drag, real gravity, hardly any control.
-        const inAir = this.sprite.y < waterY - 6;
+        // Hysteresis, so a fish bobbing right at the waterline does not flip between
+        // air and water (and splash) every few frames.
+        const inAir = this.inAir ? this.sprite.y < waterY + 10 : this.sprite.y < waterY - 16;
         if (inAir !== this.inAir) {
             this.inAir = inAir;
             this.sprite.setFrictionAir(inAir ? FISH.airDrag : this.states[this.state].air * this.move.drag);
@@ -337,7 +341,9 @@ export default class Pufferfish {
         const level = this.facing < 0 ? Math.PI : 0;
         const follow = this.char.upright ? 0 : Phaser.Math.Clamp((speed - FISH.alignFrom) / (FISH.alignFull - FISH.alignFrom), 0, 1);
         const target = Phaser.Math.Angle.Wrap(level + Phaser.Math.Angle.Wrap(Math.atan2(v.y, v.x) - level) * follow);
-        this.view.setScale(this.view.baseScale, this.view.baseScale * (this.facing < 0 ? -1 : 1));
+        this.squash *= Math.pow(0.86, frames);
+        const sq = Phaser.Math.Clamp(this.squash, -0.35, 0.35);
+        this.view.setScale(this.view.baseScale * (1 + sq), this.view.baseScale * (1 - sq) * (this.facing < 0 ? -1 : 1));
         this.view.rotation = Phaser.Math.Angle.RotateTo(this.view.rotation, target, this.move.turn * frames);
 
         // Fin / tail animation: wave the strip mesh, strongest at the tail (left
@@ -371,7 +377,7 @@ export default class Pufferfish {
             const lx = fin.jointX * sc, ly = (fin.jointY + wave) * sc * flip;
             const cos = Math.cos(this.view.rotation), sin = Math.sin(this.view.rotation);
             fin.setPosition(this.view.x + lx * cos - ly * sin, this.view.y + lx * sin + ly * cos);
-            fin.setScale(sc, sc * flip);
+            fin.setScale(sc * (1 + sq), sc * (1 - sq) * flip);
             const flap = Math.sin(this.swimPhase * 1.15) * Phaser.Math.DegToRad(FISH.finFlapMin + drive * FISH.finFlapMore);
             fin.rotation = this.view.rotation + flap * flip;
             fin.setAlpha(this.view.alpha);
