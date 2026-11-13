@@ -99,7 +99,15 @@ export function skim(character, { vx, vy, height, skips }) {
 //   keepWater / keepAir       share of the velocity kept each step
 //   gravityWater / gravityAir downward acceleration, px per step squared
 const WORLD_GRAVITY = 0.12 * 0.001 * (1000 / 60) ** 2;     // the scene's gravity as Matter applies it
-export function motionOf(character, state = 'normal', base = { waterDrag: 0.6, airDrag: 0.0015, airGravity: 0.0011 }) {
+
+/** The shipped drag and gravity numbers (Player.js builds its tunables on these). */
+export const MOTION = {
+    waterDrag: 0.43,       // multiplier on every state's water resistance (low = a push carries far)
+    airDrag: 0.0015,       // almost no drag in the air
+    airGravity: 0.0011     // extra downward force per unit mass above the water
+};
+
+export function motionOf(character, state = 'normal', base = MOTION) {
     const st = character.states[state] || character.states.normal;
     return {
         keepWater: 1 - st.air * (character.drag ?? 1) * base.waterDrag,

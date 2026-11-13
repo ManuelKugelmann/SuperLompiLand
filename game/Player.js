@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CHARACTERS, glideLift, skim } from './characters.js';
+import { CHARACTERS, MOTION, glideLift, skim } from './characters.js';
 import { SPECIALS, canUse, chainStep } from './specials.js';
 import Rig from './Rig.js';
 import { play } from './audio.js';
@@ -9,18 +9,17 @@ export const PLAYER = {
     // Momentum ("ballistic" feel): little water drag, so a push carries far; less thrust, so
     // the top speed stays the same but it takes longer to get going and to turn; a gentle
     // brake, so letting go means coasting. The puff is the real brake.
-    // Before this change: thrust 0.0013, waterDrag 1, brake 0.9, bounce 1.
+    // First step: thrust 0.0013 -> 0.00078, waterDrag 1 -> 0.6, brake 0.9 -> 0.975, bounce x1.5.
+    // Second step (higher top speed, same acceleration): waterDrag 0.6 -> 0.43, maxSpeed 26 -> 36.
     thrust: 0.00078,       // swim force per unit mass; terminal swim speed ~ thrust * 278 / (drag * waterDrag)
-    waterDrag: 0.6,        // multiplier on every state's water resistance
+    ...MOTION,             // waterDrag, airDrag, airGravity (shared with the network prediction)
     bounce: 1.5,           // multiplier on every state's bounciness off rock (capped at 0.9)
-    maxSpeed: 26,
+    maxSpeed: 36,
     brake: 0.975,          // velocity kept per step while braking
     turnRate: 0.2,         // radians per step the nose turns toward the travel direction
     mass: 6,
     hoverLift: 0.00012,    // upward force per unit mass while holding a pose (hover in place)
     sinkForce: 0.00012,    // what the world gravity does to a swimmer, per unit mass (used to cancel part of it)
-    airGravity: 0.0011,    // extra downward force per unit mass above the water
-    airDrag: 0.0015,       // almost no drag in the air
     airTurn: 0.009,        // radians per step the flight path can be bent in the air (no speed gain)
     shoveRadius: 340,
     shovePower: 16

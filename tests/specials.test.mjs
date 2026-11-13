@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SPECIALS, canUse, chainStep } from '../game/specials.js';
-import { motionOf, glideLift, skim } from '../game/characters.js';
+import { MOTION, motionOf, glideLift, skim } from '../game/characters.js';
 import { CHARACTERS } from '../game/characters.js';
 
 const still = { vx: 0, vy: 0, facing: 1, inAir: false };
@@ -114,7 +114,7 @@ test('every sprint burst adds speed along the nose and draws no ring', () => {
 
 test('motion numbers per character match the physics rules', () => {
     const lompi = CHARACTERS[0], m = motionOf(lompi), puffed = motionOf(lompi, 'inflated');
-    assert.ok(Math.abs(m.keepWater - 0.982) < 1e-9, `Lompi keeps ${m.keepWater}`);
+    assert.ok(Math.abs(m.keepWater - (1 - 0.03 * MOTION.waterDrag)) < 1e-9, `Lompi keeps ${m.keepWater}`);
     assert.ok(puffed.keepWater < m.keepWater, 'the puffed ball is slowed more');
     assert.ok(Math.abs(m.keepAir - 0.9985) < 1e-9);
     assert.ok(m.gravityAir > m.gravityWater * 5, 'air pulls down much harder than water');
