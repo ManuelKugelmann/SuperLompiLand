@@ -1,117 +1,93 @@
 # Super Lompi Land — working instructions
 
-## What this is
+Colourful 2D underwater platformer for 10-year-olds. Mobile-first installable PWA.
+Phaser 3 (WebGL) + Matter.js, Vite, plain JS (ESM).
 
-Colorful 2D underwater pufferfish game. Mobile-first installable PWA.
-Phaser 3 + Matter.js, Vite, plain JS (ESM). Design notes: `_ref/gamedesign/`
-(local only, gitignored) — read `gamedesign.md` before
-touching look, controls or level design.
+**Design lives in `_ref/gamedesign/gamedesign.md`** (local only, gitignored). It is the
+source of truth for look, gameplay, creatures, hazards, world and multiplayer. Read the
+relevant chapter before changing any of them. Key chapters: 1.1-1.2 (simple to play,
+AAA detail bar), 4.2a (Player core), 5.0b (world partition, bitfields), 5.5b (rooting),
+6.2 (AI, swarms), 7.1 (realistic hazards), 10.0 (PBR x animated-film look), 10.9 (rigs),
+10.10-10.11 (parallax, light), 13 (multiplayer), 14 (tech).
 
 ## Goal
 
-A polished, well-rounded, fun game for 10-year-olds. Every change is judged
-against that: readable at a glance, forgiving, rewarding to explore, no rough
-edges left in what is shipped. Prefer finishing and polishing what exists over
-adding half-done features.
+A polished, fun game for 10-year-olds: simple, forgiving gameplay inside a dense, alive,
+AAA-detailed world. Polish what exists before adding more.
 
 ## Hard rules
 
-- **`@gks/sdk` is fine in code, never front-facing.** No mention in README, repo
-  description, page titles, in-game text, store/manifest text or commit subjects.
-- **Always landscape.** Portrait viewports (incl. OS-locked portrait) render the
-  game rotated 90° via `game/orientation.js`. Anything touching scaling or input
-  must keep that working.
-- **Control schemes stay switchable at runtime.** A scheme lives in
-  `game/controls/`, extends `ControllerBase`, is registered in
-  `game/controls/index.js`, drives the fish only through the `Pufferfish` API,
-  and removes all its listeners/UI in `destroy()`.
-- **Procedural levels first**, authored content later.
-- Do not modify the SDK from this repo. SDK/portal changes are staged in the
-  local clones under `_ref/` and proposed upstream separately, after asking.
+- **`@gks/sdk` is fine in code, never front-facing:** not in README, repo description,
+  page titles, in-game text, manifest or commit subjects. Do not modify the SDK from this
+  repo; stage changes under `_ref/` and propose upstream after asking.
+- **Always landscape.** Portrait renders rotated 90° (`game/orientation.js`); scaling and
+  input changes must keep that working.
+- **Control schemes are switchable at runtime:** one per file in `game/controls/`, extends
+  `ControllerBase`, registered in `game/controls/index.js`, drives the fish only through the
+  `Player` API (`thrust`, `dragTo`, `launch`, `special`), removes everything in `destroy()`.
+- **Hazards are realistic and inanimate** (chains, anchors, nets, lines, ships, waste,
+  spills). No mines, atomic/biohazard items, faces, skulls or symbols.
+- **Never put project, personal or studio names into prompts sent to outside services.**
+- Every texture has a procedural fallback; the game runs with art files missing.
+
+## Code style: DRY and clean
+
+- **One core, data-driven.** All playables are one `Player` class with profiles from
+  `game/characters.js`; specials are entries in `game/specials.js`. NPCs become `Creature`
+  (in progress). Both share `game/Rig.js`. No per-character branches in shared code.
+- **Pure logic is Phaser-free and unit-tested** (`game/level/terrain.js`, `biomes.js`,
+  `density.js`, `characters.js`, `specials.js`, `systems/worldState.js`, `net/*`, ...).
+  New rules and tables go there with a test; Phaser classes only draw and wire up.
+- **One source of truth per thing:** tunables at the top of the file that uses them;
+  creature/hazard tables in `LevelGenerator.js`; biomes in `biomes.js`.
+- No duplication: shared behaviour goes into the shared layer, not copied per caller. No
+  frameworks, no abstraction for a single caller, no dead code; delete instead of commenting
+  out. Small files with one job; names say what things are.
+- Every expensive effect reads one named constant (quality tiers come later).
 
 ## Layout
 
 ```
-main.js            standalone entry (SDK host harness + forceLandscape)
-index.js           host entry (re-exports IntroScene + gameMeta)
-scenes/            Intro / Main / End, scene keys
-game/              Pufferfish (any playable character), characters, controls/, ui/, level/, orientation
-tests/             unit tests for the pure modules
-systems/           progression (localStorage)
-public/            manifest, icons, img/ (generated art, loaded by URL)
-scripts/           gen-icons.mjs, serve.mjs
-_ref/              local reference clones + gamedesign (gitignored)
+main.js      standalone entry (host harness, WebGL config, forceLandscape)
+index.js     host entry (IntroScene + gameMeta)
+scenes/      Intro / Story / Main / Hud / End
+game/        Player, Rig, specials, characters, controls/, level/, ui/, orientation, multiplayer
+net/         multiplayer transport, secrets, snapshots (pure parts tested)
+systems/     progression, worldState (bitfields)
+tests/       unit tests (node --test)
+public/      manifest, icons, img/ (generated art, loaded by relative URL)
+scripts/     gen-icons.mjs, serve.mjs
+_ref/        local reference clones + gamedesign (gitignored)
 ```
 
-## Commands
-
-Run npm from **Git Bash** — the SDK is a git dependency and PowerShell's npm does
-not find `git`.
+## Commands (run npm from Git Bash; the SDK is a git dependency)
 
 ```bash
-npm run dev      # dev server, port 8080, service worker OFF
-npm run build    # production build -> dist/ (regenerates icons first)
-npm run serve    # static server for dist/ on :4178 — tests the real PWA/SW
-npm test         # unit tests (node --test, no extra dependencies)
+npm run dev      # dev server :8080, service worker off
+npm run build    # production build -> dist/
+npm run serve    # serve dist/ on :4178 (real PWA/SW)
+npm test         # unit tests
 ```
-
-## Code shape
-
-- Pure logic lives in Phaser-free modules and is unit-tested: `game/level/terrain.js`
-  (noise, marching squares), `game/level/biomes.js` (journey layout, spawn tables),
-  `game/characters.js`, `game/orientationMath.js`. New rules and tables go there,
-  with a test; Phaser classes only draw and wire things up.
-- One source of truth per thing: tunables at the top of the file that uses them,
-  creature and hazard tables in `LevelGenerator.js`, biomes in `biomes.js`.
-- Keep it simple: no frameworks, no abstractions for a single caller.
 
 ## Branches and deploy
 
-- `main` -> release: https://manuelkugelmann.github.io/SuperLompiLand/
-- `dev` -> latest dev build: https://manuelkugelmann.github.io/SuperLompiLand/dev/
-- any other branch -> `/<slug>/` preview, removed when the branch is deleted
-- For now, work may be committed and pushed directly to `main` or to `dev`.
-  Unfinished or experimental work goes to `dev` first; when `main` moves, `dev`
-  is fast-forwarded so it is never behind.
-  After the first "release", development moves to sub-branches (each gets its
-  own `/<slug>/` preview) and `main` only takes finished work.
-- Vite `base` is injected per branch by the deploy workflow — keep every asset
-  URL relative (no leading `/`).
-
-## Art
-
-- The `lookdev*.png` images were the initial direction and are outdated; the
-  current direction is in `_ref/gamedesign/gamedesign.md`. In short: cute meets
-  realistic — realistic anatomy, materials, light, water and motion; cuteness
-  only in proportions, eyes and expression.
-- Hazards are realistic and inanimate things people left in the sea: chains,
-  anchors, nets, fishing lines, waste, spills, wreck scrap. No mines, no
-  atomic/biohazard items, no machines with faces, no symbols or skulls.
-- Round-1 art is generated raster (Replicate) in `public/img/`. Every texture
-  has a procedural fallback so the game runs with files missing.
-- Never put project, personal or studio names into prompts sent to outside
-  services.
+- `main` -> release, `dev` -> latest dev build (`/dev/`), other branches -> `/<slug>/` preview.
+- For now commit directly to `main` or `dev`; experimental work goes to `dev` first; `dev`
+  is fast-forwarded when `main` moves. After the first release, work moves to sub-branches.
+- Vite `base` is injected per branch: every asset URL stays relative (no leading `/`).
 
 ## Performance
 
-Check with `?debug=perf` (on a real phone when it matters) after any change to
-world generation, effects or per-frame code. Budgets on a mid-range phone:
-
-- game logic (physics + world+fx) well under 4 ms per frame; it is ~0.3 ms on desktop
-- building one chunk under ~15 ms, never more than one per frame after start-up
-- at rest: objects < 600, tweens < 300; both must fall back after effects end
-  (spawned circles/stars are destroyed by their tween's onComplete)
-- terrain is baked into render textures once per chunk — never redraw vector
-  shapes every frame (that cost more than everything else together)
-
-The automation browser tab is often throttled to a few fps and its frame rate
-means nothing; measure logic time and object counts there, frame rate on a device.
-When stepping the scene by hand in a test, tweens do not advance reliably, so
-object counts grow — use the real loop for leak checks.
+Check `?debug=perf` after changes to world generation, effects or per-frame code.
+Mid-range phone budgets: game logic well under 4 ms/frame; one chunk build under ~15 ms,
+at most one per frame after start-up; objects < 600 and tweens < 300 at rest. GPU does
+the drawing: no per-frame `Graphics` redraws or canvas texture updates, bake static things
+once. The automation browser tab is throttled: measure logic time and object counts there,
+frame rate on a device; use the real loop for leak checks.
 
 ## Verifying changes
 
-Build must pass, then check the running game in the browser (desktop landscape
-and an emulated portrait phone) before calling a gameplay or layout change done.
-Physics feel is tuned with the user playing on a device — expose constants, do
-not guess silently.
+Build and tests pass, then check the running game in the browser (desktop landscape and an
+emulated portrait phone) before calling a gameplay or layout change done. Visual changes
+get a screenshot set in the dev log. Physics feel is tuned with the user on a device:
+expose constants, never guess silently.
