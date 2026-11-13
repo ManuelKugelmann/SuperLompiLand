@@ -32,7 +32,7 @@ AAA-detailed world. Polish what exists before adding more.
 - **Open source and free only:** libraries, tools, formats and runtimes must be open source
   and free of charge (e.g. Phaser, Matter, delaunator/earcut, glTF, three.js). No paid or
   proprietary tools or SDKs (no Spine, no Live2D). Check the licence before adding a
-  dependency.
+  dependency. Exception: Replicate is OK for generating art.
 
 ## Code style: DRY and clean
 
