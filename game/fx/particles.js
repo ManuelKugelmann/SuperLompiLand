@@ -15,19 +15,20 @@ export const PARTICLES = {
  * a particle takes on the water's velocity (1/s); cool = how fast heat fades (1/s,
  * hot particles rise with `rise`, cold ones with `rise * coldRise`); surface: what
  * happens at the waterline ('pop' ends it, 'slick' spreads it along the surface,
- * 'pass' ignores it); blend: 'normal' or 'add'.
+ * 'pass' ignores it); blend: 'normal' or 'add'; soft: drawn as one blurred, merged
+ * cloud (dense plumes and spills) instead of separate dots.
  */
 export const PRESETS = {
     silt:   { life: [0.9, 1.7], size: [10, 22], grow: 1.8, drag: 3.0, rise: -10, coldRise: 1, cool: 0, alpha: 0.42, color: 0xd8c49c, colorEnd: 0xd8c49c, surface: 'pop', blend: 'normal' },
     bubble: { life: [1.0, 1.8], size: [5, 13], grow: 1.35, drag: 1.6, rise: 150, coldRise: 1, cool: 0, alpha: 0.55, color: 0xffffff, colorEnd: 0xdff6ff, surface: 'pop', blend: 'add' },
-    oil:    { life: [6, 9], size: [12, 26], grow: 2.2, drag: 0.9, rise: 55, coldRise: 0.6, cool: 0.12, alpha: 0.78, color: 0x2b2118, colorEnd: 0x3a3026, surface: 'slick', blend: 'normal' },
-    smoker: { life: [3, 5], size: [16, 34], grow: 3.0, drag: 1.1, rise: 120, coldRise: 0.15, cool: 0.45, alpha: 0.6, color: 0x2e2c30, colorEnd: 0x55575c, surface: 'pop', blend: 'normal' },
+    oil:    { life: [6, 9], size: [12, 26], grow: 2.2, drag: 0.9, rise: 55, coldRise: 0.6, cool: 0.12, alpha: 0.78, color: 0x2b2118, colorEnd: 0x3a3026, surface: 'slick', blend: 'normal', soft: true },
+    smoker: { life: [3, 5], size: [16, 34], grow: 3.0, drag: 1.1, rise: 120, coldRise: 0.15, cool: 0.45, alpha: 0.6, color: 0x2e2c30, colorEnd: 0x55575c, surface: 'pop', blend: 'normal', soft: true },
     steam:  { life: [0.8, 1.4], size: [6, 14], grow: 0.6, drag: 1.4, rise: 240, coldRise: 1, cool: 0, alpha: 0.6, color: 0xffffff, colorEnd: 0xcfe9f2, surface: 'pop', blend: 'add' },
     lava:   { life: [1.2, 2.2], size: [4, 10], grow: 0.7, drag: 0.6, rise: -180, coldRise: 1.4, cool: 0.9, alpha: 1, color: 0xffb347, colorEnd: 0x3a1a10, surface: 'pass', blend: 'add' },
-    ash:    { life: [6, 10], size: [8, 18], grow: 1.6, drag: 1.8, rise: -12, coldRise: 1, cool: 0, alpha: 0.35, color: 0x8a8c90, colorEnd: 0x6a6c70, surface: 'pass', blend: 'normal' },
+    ash:    { life: [6, 10], size: [8, 18], grow: 1.6, drag: 1.8, rise: -12, coldRise: 1, cool: 0, alpha: 0.35, color: 0x8a8c90, colorEnd: 0x6a6c70, surface: 'pass', blend: 'normal', soft: true },
     // Thin streaks of tiny bubbles left at the fin tips at high speed (vortex trails).
     contrail: { life: [0.35, 0.6], size: [4, 7], grow: 0.8, drag: 4.0, rise: 20, coldRise: 1, cool: 0, alpha: 0.5, color: 0xffffff, colorEnd: 0xd8f4ff, surface: 'pop', blend: 'add' },
-    smoke:  { life: [4, 7], size: [20, 40], grow: 3.2, drag: 0.7, rise: 60, coldRise: 0.7, cool: 0.2, alpha: 0.4, color: 0x9a9ea4, colorEnd: 0xd5d8dc, surface: 'pass', blend: 'normal' }
+    smoke:  { life: [4, 7], size: [20, 40], grow: 3.2, drag: 0.7, rise: 60, coldRise: 0.7, cool: 0.2, alpha: 0.4, color: 0x9a9ea4, colorEnd: 0xd5d8dc, surface: 'pass', blend: 'normal', soft: true }
 };
 export const PRESET_IDS = Object.keys(PRESETS);
 
@@ -132,7 +133,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
 
         /**
          * Visit every live particle with what a renderer needs:
-         * fn(x, y, size, alpha, color, blend, index).
+         * fn(x, y, size, alpha, color, blend, index, soft).
          */
         forEach(fn) {
             for (let i = 0; i < capacity; i++) {
@@ -141,7 +142,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
                 const t = age[i] / life[i];
                 const fade = Math.min(1, t / 0.12, (1 - t) / 0.3);
                 fn(x[i], y[i], size0[i] * lerp(1, p.grow, t), p.alpha * Math.max(0, fade),
-                    p.color === p.colorEnd ? p.color : mixColor(p.color, p.colorEnd, p.cool > 0 ? 1 - heat[i] : t), p.blend, i);
+                    p.color === p.colorEnd ? p.color : mixColor(p.color, p.colorEnd, p.cool > 0 ? 1 - heat[i] : t), p.blend, i, !!p.soft);
             }
         },
 
