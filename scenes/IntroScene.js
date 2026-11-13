@@ -29,6 +29,9 @@ export const gameMeta = {
 };
 
 // Generated art in public/img — loaded by relative URL so any deploy base works.
+/** Title screen idle time before the ambient reef starts by itself (spec ch.12). */
+const AMBIENT_IDLE_MS = 120000;
+
 const IMAGES = {
     puffer_normal: 'puffer_normal.png', puffer_inflated: 'puffer_inflated.png',
     coin: 'coin.png', bubble: 'bubble.png', mine: 'mine.png', urchin: 'urchin.png',
@@ -86,6 +89,7 @@ export default class IntroScene extends Phaser.Scene {
         this.buildCarousel(lang);
         flushFeedbackQueue();
         this.buildTogether(lang);
+        this.buildAmbient(lang);
         this.autoJoin();
 
         this.add.text(W - 24, H - 20, VERSION_TAG, {
@@ -158,6 +162,29 @@ export default class IntroScene extends Phaser.Scene {
         this.select(this.index);
     }
 
+    /**
+     * Ambient reef (spec ch.12): an "aquarium" button, and the same mode starts by
+     * itself after AMBIENT_IDLE_MS on the title screen without any input.
+     */
+    buildAmbient(lang) {
+        const H = this.scale.height, de = lang === 'de';
+        const btn = this.add.text(150, H * 0.905, de ? 'Aquarium' : 'Aquarium', {
+            fontFamily: 'Arial', fontStyle: 'bold', fontSize: '40px', color: '#ffffff', backgroundColor: '#2a7f6f', padding: { x: 30, y: 14 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        const go = () => {
+            if (this.modal) return;
+            this.registry.set('room', null);
+            this.registry.set('ambient', true);
+            this.scene.start(SCENE_KEYS.MAIN);
+        };
+        btn.on('pointerdown', go);
+        const idle = this.time.addEvent({ delay: AMBIENT_IDLE_MS, callback: go });
+        const reset = () => idle.reset({ delay: AMBIENT_IDLE_MS, callback: go });
+        this.input.on('pointerdown', reset);
+        this.input.on('pointermove', reset);
+        this.input.keyboard?.on('keydown', reset);
+    }
+
     /** "Together" button + room-code panel: make a room, or type a friend's code. */
     buildTogether(lang) {
         this.modal = false; // fresh title screen (the scene object is reused)
@@ -197,6 +224,7 @@ export default class IntroScene extends Phaser.Scene {
         if (test) {
             const ch = /[#&]char=([a-z]+)/.exec(window.location.hash)?.[1];
             if (ch && CHARACTERS.some(c => c.id === ch)) this.registry.set('character', ch);
+            this.registry.set('ambient', false);
             this.registry.set('room', word);
             this.time.delayedCall(300, () => this.scene.start(SCENE_KEYS.MAIN));
             return;
@@ -290,6 +318,7 @@ export default class IntroScene extends Phaser.Scene {
             // also fire start() and restart the game solo.
             window.removeEventListener('keydown', onKey);
             try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
+            this.registry.set('ambient', false);
             this.registry.set('room', word);
             this.scene.start(SCENE_KEYS.MAIN);
         }, invited ? 56 : 40);
@@ -313,6 +342,7 @@ export default class IntroScene extends Phaser.Scene {
     start() {
         if (this.modal) return;
         this.registry.set('room', null); // plain start = solo
+        this.registry.set('ambient', false);
         // First time: tell the story of the eruption before the journey begins.
         this.scene.start(storySeen() ? SCENE_KEYS.MAIN : STORY_KEY);
     }

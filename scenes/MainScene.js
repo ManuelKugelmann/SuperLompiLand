@@ -15,6 +15,7 @@ import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
 import { play, nowSeconds } from '../game/audio.js';
 import { createStreak } from '../game/music/melody.js';
+import { createAutopilot } from '../game/ambient/autopilot.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 
@@ -54,6 +55,10 @@ export default class MainScene extends Phaser.Scene {
         this.progression.init?.();
         // Relaxed = just swim and explore: hazards are only scenery and cannot hurt.
         this.relaxed = !!this.progression.get?.('relaxed', false);
+        // Ambient reef (spec ch.12): the game as a meditative background. Lompi swims
+        // on autopilot, no HUD, nothing hurts, any tap returns to the title.
+        this.ambientMode = !!this.registry.get('ambient');
+        if (this.ambientMode) this.relaxed = true;
 
         this.matter.world.setGravity(0, WORLD.gravity);
         this.matter.world.autoUpdate = false; // stepped manually in fixedStep()
@@ -119,7 +124,8 @@ export default class MainScene extends Phaser.Scene {
 
         // HUD (menu, scheme switcher, puff button, counters) runs as its own
         // scene on top — see HudScene.
-        this.scene.launch(HUD_KEY, { main: this });
+        if (this.ambientMode) this.startAmbient();
+        else this.scene.launch(HUD_KEY, { main: this });
         // Phaser lets the top scene swallow input for the scenes below, and it
         // also swallows the first tap after a HUD button was touched. Turn that
         // off: this scene always gets every tap and asks isOverHud() itself.
@@ -245,7 +251,7 @@ export default class MainScene extends Phaser.Scene {
 
     /** Big friendly line of text in the middle of the screen (shown by the HUD). */
     announce(title, subtitle = '') {
-        this.scene.get(HUD_KEY)?.banner?.(title, subtitle);
+        if (this.scene.isActive(HUD_KEY)) this.scene.get(HUD_KEY).banner?.(title, subtitle);   // no HUD in ambient mode
     }
 
     /** Swam into a nest: coins are safe, this is the new restart point. */
@@ -408,6 +414,42 @@ export default class MainScene extends Phaser.Scene {
         }
     }
 
+    /** Ambient reef: autopilot, controls hidden, the screen kept awake, any input leaves. */
+    startAmbient() {
+        this.controller.ui?.setVisible(false);
+        this.autoDir = new Phaser.Math.Vector2();
+        this.autopilot = createAutopilot({
+            isOpen: (x, y) => this.level.isOpen(x, y, 0.12),
+            poi: (x, y) => {
+                let best = null, bd = 1800;
+                for (const f of this.level.friends) {
+                    if (!f.img.active) continue;
+                    const d = Math.hypot(f.img.x - x, f.img.y - y);
+                    if (d > 300 && d < bd) { bd = d; best = { x: f.img.x, y: f.img.y - 120 }; }
+                }
+                return best;
+            }
+        });
+        const de = this.lang === 'de';
+        const hint = this.add.text(this.scale.width / 2, this.scale.height - 60, de ? 'Tippen zum Beenden' : 'Tap to leave', {
+            fontFamily: 'Arial', fontSize: '30px', color: '#eafcff', stroke: '#0a3f6e', strokeThickness: 6
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(60).setAlpha(0.8);
+        this.tweens.add({ targets: hint, alpha: 0, delay: 3500, duration: 1500, onComplete: () => hint.destroy() });
+        try { navigator.wakeLock?.request('screen').then(l => { this.wakeLock = l; }).catch(() => {}); } catch { /* not supported */ }
+        const leave = () => {
+            if (this.leaving) return;
+            this.leaving = true;
+            this.registry.set('ambient', false);
+            this.wakeLock?.release?.().catch?.(() => {});
+            this.cameras.main.fadeOut(400, 10, 40, 70);
+            this.time.delayedCall(420, () => this.scene.start(SCENE_KEYS.INTRO));
+        };
+        this.time.delayedCall(600, () => {                       // ignore the tap that started it
+            this.input.on('pointerdown', leave);
+            this.input.keyboard?.on('keydown', leave);
+        });
+    }
+
     /** Streak feedback: "x2", "x3"... when the counter steps up, a ring of light when a phrase completes. */
     streakFx(x, y, note) {
         if (note.stepped) {
@@ -482,7 +524,11 @@ export default class MainScene extends Phaser.Scene {
 
     /** One fixed 60 Hz simulation step: all forces + physics, display-rate independent. */
     fixedStep() {
-        if (!this.downTimer) this.controller.update(STEP_MS);
+        if (this.ambientMode) {
+            const p = this.fish.sprite;
+            const f = this.autopilot.step(STEP_MS / 1000, p.x, p.y);
+            if (f.x || f.y) this.fish.thrust(this.autoDir.set(f.x, f.y));
+        } else if (!this.downTimer) this.controller.update(STEP_MS);
         // Swimming close to friends makes everyone a little faster (a school).
         this.fish.boost = 1 + WORLD.schoolBoost * Math.min(2, this.mp?.nearFriends(this.fish.sprite.x, this.fish.sprite.y, WORLD.schoolRadius) ?? 0);
         if (this.keys) {
