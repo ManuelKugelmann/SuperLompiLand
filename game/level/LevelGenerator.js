@@ -398,7 +398,7 @@ export default class LevelGenerator {
         } else if (h.bob) {
             s.tweens.add({ targets: img, y: y - h.bob, duration: rng.between(1700, 2600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         }
-        this.hazards.push({ img, r: h.r * LEVEL.hitSlack });
+        this.hazards.push({ img, r: h.r * LEVEL.hitSlack, key });
         return img;
     }
 

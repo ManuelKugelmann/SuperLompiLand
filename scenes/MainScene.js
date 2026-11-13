@@ -8,6 +8,7 @@ import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor } from '../game/l
 import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
+import ParticleLayer from '../game/fx/ParticleLayer.js';
 import BackLayers from '../game/level/BackLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
@@ -20,6 +21,9 @@ import { SCENE_KEYS } from './keys.js';
 const STEP_MS = 1000 / 60;
 
 /** World tunables. */
+/** Leaking oil drums (spec 7.1): how often they puff and how much. */
+const OIL = { pulseMs: 1400, perPulse: 5, margin: 600 };
+
 const WORLD = {
     gravity: 0.12,         // gentle sink
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
@@ -69,6 +73,7 @@ export default class MainScene extends Phaser.Scene {
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
         this.level = new LevelGenerator(this, this.world);
         this.density = (x, y) => this.level.density(x, y);
+        this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
@@ -182,6 +187,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             saveNow();
+            this.particles.destroy();
             document.removeEventListener('visibilitychange', saveNow);
             window.removeEventListener('pagehide', saveNow);
             this.scene.stop(HUD_KEY);
@@ -366,6 +372,42 @@ export default class MainScene extends Phaser.Scene {
         return this.debugOn;
     }
 
+    /**
+     * How the world looks to particles. The rock test is cached on a 32 px grid
+     * (particles cluster, the noise field is not free); flowAt is the hook for the
+     * shared flow field later: for now only bubble columns move the water.
+     */
+    particleEnv() {
+        const cache = new Map();
+        let cacheAt = 0;
+        return {
+            flowAt: (x, y, out) => { out.x = 0; out.y = this.level.liftAt(x, y) ? -170 : 0; },
+            isSolid: (x, y) => {
+                const now = this.time.now;
+                if (now - cacheAt > 2000) { cache.clear(); cacheAt = now; }   // chunks come and go
+                const key = ((x >> 5) * 73856093) ^ ((y >> 5) * 19349663);
+                let v = cache.get(key);
+                if (v === undefined) { v = this.density(x, y) > LEVEL.threshold; cache.set(key, v); }
+                return v;
+            },
+            surfaceY: x => this.surface.heightAt(x, this.time.now / 1000)
+        };
+    }
+
+    /** Leaking oil drums near the view puff out pulses of oil that rise and pool at the surface (spec 7.1). */
+    leakOil(delta) {
+        this.leakAt = (this.leakAt || 0) - delta;
+        if (this.leakAt > 0) return;
+        this.leakAt = OIL.pulseMs;
+        const cam = this.cameras.main, m = OIL.margin;
+        for (const h of this.level.hazards) {
+            if (h.key !== 'hazard_buoy' || !h.img.active) continue;
+            const { x, y } = h.img;
+            if (x < cam.scrollX - m || x > cam.scrollX + cam.width + m || y < cam.scrollY - m || y > cam.scrollY + cam.height + m) continue;
+            this.particles.spawn('oil', x, y - h.r * 0.9, OIL.perPulse, { radius: 18, spread: 18, vy: -40 });
+        }
+    }
+
     /** Streak feedback: "x2", "x3"... when the counter steps up, a ring of light when a phrase completes. */
     streakFx(x, y, note) {
         if (note.stepped) {
@@ -492,14 +534,15 @@ export default class MainScene extends Phaser.Scene {
         this.camY = Math.max(this.camY, -760); // room for a jump, not the whole sky
         this.cameras.main.setScroll(this.camX, this.camY);
 
+        this.leakOil(delta);
+        this.particles.update(delta / 1000);
+
         // Bubble trail when moving fast.
         const speed = Math.hypot(v.x, v.y);
         this.trailAt = (this.trailAt || 0) - delta;
-        if (speed > 9 && this.trailAt <= 0) {
+        if (speed > 9 && this.trailAt <= 0 && !this.fish.inAir) {
             this.trailAt = 55;
-            const b = this.add.circle(view.x - v.x * 3 + Phaser.Math.Between(-20, 20), view.y - v.y * 3 + Phaser.Math.Between(-20, 20),
-                Phaser.Math.Between(6, 15), 0xffffff, 0.35).setStrokeStyle(2, 0xffffff, 0.7).setDepth(4);
-            this.tweens.add({ targets: b, y: b.y - 70, alpha: 0, scale: 1.5, duration: 700, onComplete: () => b.destroy() });
+            this.particles.spawn('bubble', view.x - v.x * 3, view.y - v.y * 3, 1, { radius: 20, spread: 20 });
         }
 
         // Sand is kicked up when swimming fast just above the ground.
@@ -508,15 +551,9 @@ export default class MainScene extends Phaser.Scene {
             const ground = this.level.groundBelow(view.x, view.y + this.fish.radius * 0.5, 130);
             if (ground) {
                 this.sandAt = 70;
-                for (let i = 0; i < 2 + Math.min(4, speed / 4); i++) {
-                    const puff = this.add.circle(view.x + Phaser.Math.Between(-50, 50), ground.y - Phaser.Math.Between(0, 14),
-                        Phaser.Math.Between(5, 13), ground.color, 0.55).setDepth(6);
-                    this.tweens.add({
-                        targets: puff, x: puff.x - v.x * Phaser.Math.Between(4, 9), y: puff.y - Phaser.Math.Between(30, 90),
-                        scale: 2.4, alpha: 0, duration: Phaser.Math.Between(600, 1000), ease: 'Quad.easeOut',
-                        onComplete: () => puff.destroy()
-                    });
-                }
+                // Silt from the shared particle simulation: thrown up and back, it drifts and settles.
+                this.particles.spawn('silt', view.x, ground.y - 6, Math.round(2 + Math.min(4, speed / 4)),
+                    { radius: 50, spread: 40, vx: -v.x * 20, vy: -60 });
             }
         }
 
