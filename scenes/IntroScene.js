@@ -3,6 +3,7 @@ import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import cardImg from '../assets/card_preview.png';
 import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
+import { pwaMenuItems, BUILD } from '../game/pwa.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const gameMeta = {
@@ -20,47 +21,65 @@ export const gameMeta = {
     difficulty: 1
 };
 
+// Generated art in public/img — loaded by relative URL so any deploy base works.
+const IMAGES = {
+    puffer_normal: 'puffer_normal.png', puffer_inflated: 'puffer_inflated.png',
+    coin: 'coin.png', bubble: 'bubble.png', mine: 'mine.png', urchin: 'urchin.png',
+    coral_1: 'coral_1.png', coral_2: 'coral_2.png', rock_1: 'rock_1.png', bg_far: 'bg_far.jpg'
+};
+
 export default class IntroScene extends Phaser.Scene {
     constructor() {
         super({ key: SCENE_KEYS.INTRO });
     }
 
+    preload() {
+        const W = this.scale.width, H = this.scale.height;
+        this.cameras.main.setBackgroundColor(0x0a3f6e);
+        const bar = this.add.rectangle(W / 2 - 300, H / 2, 4, 18, 0xffc266).setOrigin(0, 0.5);
+        this.load.on('progress', p => { bar.width = 600 * p; });
+        this.load.on('complete', () => bar.destroy());
+        // A missing file is fine: every texture has a procedural fallback.
+        for (const [key, file] of Object.entries(IMAGES)) {
+            if (!this.textures.exists(key)) this.load.image(key, `img/${file}`);
+        }
+    }
+
     create() {
-        const W = this.scale.width;
-        const H = this.scale.height;
+        const W = this.scale.width, H = this.scale.height;
         const lang = this.registry.get('currentLanguage') || 'de';
 
-        // Register internal scenes once.
         if (!this.scene.get(SCENE_KEYS.MAIN)) {
             this.scene.add(SCENE_KEYS.MAIN, MainScene, false);
             this.scene.add(SCENE_KEYS.END, EndScene, false);
         }
 
-        // Underwater gradient backdrop.
-        for (let i = 0; i < 12; i++) {
-            const t = i / 11;
-            const col = Phaser.Display.Color.Interpolate.ColorWithColor(
-                new Phaser.Display.Color(0x1aa3b5), new Phaser.Display.Color(0x04343a), 11, i
-            );
-            this.add.rectangle(W / 2, (H / 12) * (i + 0.5), W, H / 12 + 2,
-                Phaser.Display.Color.GetColor(col.r, col.g, col.b));
+        if (this.textures.exists('bg_far')) {
+            this.add.image(W / 2, H / 2, 'bg_far').setDisplaySize(W, H);
         }
 
-        this.add.text(W / 2, H * 0.38, 'Super Lompi Land', {
-            fontFamily: 'Arial, sans-serif', fontSize: '120px', color: '#fff7e6',
-            fontStyle: 'bold', stroke: '#06525c', strokeThickness: 12
+        this.add.text(W / 2, H * 0.2, 'Super Lompi Land', {
+            fontFamily: 'Arial, sans-serif', fontSize: '128px', color: '#ffffff',
+            fontStyle: 'bold', stroke: '#0a5c7a', strokeThickness: 14
         }).setOrigin(0.5);
 
-        this.add.text(W / 2, H * 0.5, '🐡', { fontSize: '140px' }).setOrigin(0.5);
+        if (this.textures.exists('puffer_inflated')) {
+            const fish = this.add.image(W / 2, H * 0.62, 'puffer_inflated').setScale(0.85);
+            this.tweens.add({ targets: fish, y: fish.y - 28, angle: 4, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        }
 
-        const startText = this.add.text(W / 2, H * 0.72,
+        const startText = this.add.text(W / 2, H * 0.9,
             lang === 'de' ? 'Tippen zum Starten' : 'Tap to Start',
-            { fontFamily: 'Arial, sans-serif', fontSize: '48px', color: '#ffffff' }
-        ).setOrigin(0.5).setAlpha(0.3);
+            { fontFamily: 'Arial, sans-serif', fontSize: '52px', color: '#ffffff', fontStyle: 'bold' }
+        ).setOrigin(0.5).setAlpha(0.35);
         this.tweens.add({ targets: startText, alpha: 1, duration: 800, yoyo: true, repeat: -1 });
 
-        const isSmall = W < 1000;
-        new BurgerMenu(this, isSmall ? 40 : 60, isSmall ? 40 : 60, [
+        this.add.text(W - 24, H - 20, `build ${BUILD}`, {
+            fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
+        }).setOrigin(1, 1).setAlpha(0.45);
+
+        new BurgerMenu(this, 60, 60, [
+            ...pwaMenuItems(this, lang),
             { label: lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
         ]);
 

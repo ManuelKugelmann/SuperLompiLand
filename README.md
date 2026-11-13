@@ -24,14 +24,22 @@ npm run serve      # zero-dep static server for dist/ (tests the real PWA/SW)
 
 Swap any time in-game:
 
-| Scheme | Move | Special (puff) |
-|---|---|---|
-| **Stick** | floating virtual stick, drag to swim | quick tap on the stick |
-| **Tap-to-Move** | tap the water, fish swims there | tap on the fish |
-| **Schleuder** (slingshot) | pull the fish back & release (Angry-Birds), aim slow-mo | — |
+| Scheme | Move |
+|---|---|
+| **Schubsen** (air hockey) | grab the fish and throw it, or shove it with your finger as a paddle |
+| **Flattern** (flap) | every tap is a fin stroke: tap position = direction, tap rate = speed |
+| **Stick** | floating virtual stick, drag to swim |
+| **Tippen** | tap the water, fish swims there |
+
+Puff (inflate): the PUFF button, a quick tap on the fish, or Space.
+Keyboard always works too: arrows / WASD swim.
+
+The pufferfish has two states — normal (small, agile) and inflated (big, buoyant,
+shrugs off hazards). Levels are endless and procedurally generated from a seed.
 
 Add a scheme in `game/controls/` and register it in `game/controls/index.js` — it
 appears in the switcher automatically. A physics-debug toggle is top-right.
+Install / update the app from the in-game menu (☰).
 
 ## Deploy — GitHub Pages (dev/release routing)
 
@@ -51,7 +59,8 @@ Netlify / Vercel / Cloudflare Pages (drag-drop or git).
 
 ```
 scenes/        Intro / Main / End
-game/          Pufferfish entity, control schemes, in-game UI
+game/          Pufferfish, control schemes, level generator, UI, orientation, PWA
+public/img/    generated art
 systems/       progression (localStorage)
 scripts/       icon generator, static server
 ```

@@ -7,22 +7,27 @@ export default class EndScene extends Phaser.Scene {
     }
 
     create(data) {
-        const W = this.scale.width;
-        const H = this.scale.height;
-        const lang = this.registry.get('currentLanguage') || 'de';
+        const W = this.scale.width, H = this.scale.height;
+        const de = (this.registry.get('currentLanguage') || 'de') === 'de';
         const score = data?.score ?? 0;
+        const distance = data?.distance ?? 0;
 
-        this.add.rectangle(W / 2, H / 2, W, H, 0x053b42).setDepth(-1);
-        this.add.text(W / 2, H * 0.38, lang === 'de' ? 'Gut gemacht!' : 'Well done!', {
-            fontFamily: 'Arial', fontSize: '110px', color: '#fff7e6', fontStyle: 'bold'
-        }).setOrigin(0.5);
-        this.add.text(W / 2, H * 0.52, (lang === 'de' ? 'Blasen gesammelt: ' : 'Bubbles collected: ') + score, {
-            fontFamily: 'Arial', fontSize: '56px', color: '#ffc266'
-        }).setOrigin(0.5);
+        if (this.textures.exists('bg_far')) this.add.image(W / 2, H / 2, 'bg_far').setDisplaySize(W, H);
+        else this.add.rectangle(W / 2, H / 2, W, H, 0x0a3f6e);
 
-        const again = this.add.text(W / 2, H * 0.7, lang === 'de' ? 'Nochmal spielen' : 'Play again', {
-            fontFamily: 'Arial', fontSize: '44px', color: '#ffffff',
-            backgroundColor: '#06525c', padding: { x: 30, y: 16 }
+        this.add.text(W / 2, H * 0.2, de ? 'Gut gemacht!' : 'Well done!', {
+            fontFamily: 'Arial', fontSize: '120px', color: '#ffffff', fontStyle: 'bold',
+            stroke: '#0a5c7a', strokeThickness: 14
+        }).setOrigin(0.5);
+        this.add.text(W / 2, H * 0.6,
+            `${de ? 'Münzen' : 'Coins'}: ${score}     ${de ? 'Strecke' : 'Distance'}: ${distance} m`, {
+                fontFamily: 'Arial', fontSize: '60px', color: '#ffe08a', fontStyle: 'bold',
+                stroke: '#0a3f6e', strokeThickness: 8
+            }).setOrigin(0.5);
+
+        const again = this.add.text(W / 2, H * 0.78, de ? 'Nochmal spielen' : 'Play again', {
+            fontFamily: 'Arial', fontSize: '48px', color: '#06343a', fontStyle: 'bold',
+            backgroundColor: '#ffc266', padding: { x: 40, y: 20 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
         again.on('pointerdown', () => this.scene.start(SCENE_KEYS.MAIN));
     }

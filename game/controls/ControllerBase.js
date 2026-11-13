@@ -1,28 +1,46 @@
 import Phaser from 'phaser';
 
 /**
- * Base for a swappable control scheme. Each scheme owns its own input listeners
- * and overlay UI, and tears them all down on destroy() so switching schemes at
- * runtime never leaks handlers. Subclasses implement enter()/update()/leave().
+ * Base for a swappable control scheme. Each scheme owns its input listeners and
+ * overlay graphics and removes them all in destroy(), so schemes can be switched
+ * at runtime without leaking handlers.
+ *
+ *   this.ui     screen-space layer (does not scroll with the camera)
+ *   this.world  world-space layer (markers that live in the level)
  */
 export default class ControllerBase {
     constructor(scene, fish) {
         this.scene = scene;
         this.fish = fish;
-        this.ui = scene.add.container(0, 0).setDepth(40);
+        this.ui = scene.add.container(0, 0).setDepth(40).setScrollFactor(0);
+        this.world = scene.add.container(0, 0).setDepth(6);
         this._listeners = [];
     }
 
-    /** Register a listener and remember it for teardown. */
     listen(target, event, fn) {
         target.on(event, fn, this);
         this._listeners.push([target, event, fn]);
         return this;
     }
 
-    /** True if a pointerdown landed on a HUD element (tagged data 'hud'). */
+    /** Pointer landed on an interactive HUD element — schemes ignore it. */
     overHud(currentlyOver) {
-        return currentlyOver && currentlyOver.some(o => o.getData && o.getData('hud'));
+        return !!currentlyOver && currentlyOver.length > 0;
+    }
+
+    /** Pointer position in world space (camera scroll applied). */
+    worldPoint(pointer) {
+        const p = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        return new Phaser.Math.Vector2(p.x, p.y);
+    }
+
+    hint(text) {
+        const t = this.scene.add.text(this.scene.scale.width / 2, this.scene.scale.height - 60, text, {
+            fontFamily: 'Arial', fontSize: '28px', color: '#ffffff'
+        }).setOrigin(0.5).setAlpha(0.75);
+        this.ui.add(t);
+        this.scene.tweens.add({ targets: t, alpha: 0, delay: 5000, duration: 800 });
+        return t;
     }
 
     enter() {}
@@ -32,5 +50,6 @@ export default class ControllerBase {
         for (const [t, e, f] of this._listeners) t.off(e, f, this);
         this._listeners = [];
         this.ui.destroy();
+        this.world.destroy();
     }
 }
