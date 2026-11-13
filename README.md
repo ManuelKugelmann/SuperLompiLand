@@ -9,9 +9,13 @@
 
 ![Biomes, nests, reef world with lighting, abyss](docs/devlog/12-lagoon.jpg)
 
-**First playable: endless seabed, generated art, shove/flap/stick/tap controls** — [`3f4f178`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/3f4f178) · 2026-11-13 19:14
+**Boxfish-shaped Lompi, fin animation, puff as air brake** — [`6d0f7c5`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/6d0f7c5) · 2026-11-13 19:41
 
-![First playable: endless seabed, generated art, shove/flap/stick/tap controls](docs/devlog/01-first-level.jpg)
+![Boxfish-shaped Lompi, fin animation, puff as air brake](docs/devlog/05-boxfish-lompi.jpg)
+
+**Waves at the surface, jumping out of the water** — [`47d2cff`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/47d2cff) · 2026-11-13 19:37
+
+![Waves at the surface, jumping out of the water](docs/devlog/04-waves-and-jumping.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
