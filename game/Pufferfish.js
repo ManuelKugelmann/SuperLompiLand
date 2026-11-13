@@ -14,7 +14,7 @@ export const FISH = {
     buoyancy: 0.0005,     // upward force per unit mass while inflated
     airGravity: 0.0011,    // extra downward force per unit mass above the water
     airDrag: 0.0015,        // almost no drag in the air
-    airControl: 0.06,      // fraction of swim thrust available in the air
+    airControl: 0,         // fraction of swim thrust available in the air (flying fish: > 0)
     shoveRadius: 340,
     shovePower: 16,
     states: {
@@ -45,7 +45,13 @@ export default class Pufferfish {
         this.facing = 1;        // 1 = right, -1 = left
 
         ensureFallbackTextures(scene);
-        this.sprite = scene.matter.add.sprite(x, y, FISH.states.normal.key).setDepth(5);
+        // `sprite` is the physics body (invisible, advanced in fixed 60 Hz steps).
+        // `view` is what you see: drawn every frame at a position interpolated
+        // between the last two physics steps, so motion is smooth at any refresh rate.
+        this.sprite = scene.matter.add.sprite(x, y, FISH.states.normal.key).setVisible(false);
+        this.view = scene.add.image(x, y, FISH.states.normal.key).setDepth(5);
+        this.prev = new Phaser.Math.Vector2(x, y);
+        this.cur = new Phaser.Math.Vector2(x, y);
         this.applyState('normal');
     }
 
@@ -60,8 +66,9 @@ export default class Pufferfish {
         const vel = sp.body ? { x: sp.body.velocity.x, y: sp.body.velocity.y } : { x: 0, y: 0 };
         this.state = name;
 
-        sp.setTexture(s.key);
-        sp.setDisplaySize(s.width, s.width * (sp.frame.height / sp.frame.width));
+        this.view.setTexture(s.key);
+        this.view.setDisplaySize(s.width, s.width * (this.view.frame.height / this.view.frame.width));
+        sp.setScale(1);
         sp.setBody({ type: 'circle', radius: s.radius });
         sp.setFixedRotation()
             .setMass(FISH.mass)
@@ -74,7 +81,7 @@ export default class Pufferfish {
     }
 
     thrust(dir) {
-        const k = this.inAir ? FISH.airControl : 1; // fins do little out of the water
+        const k = this.inAir ? FISH.airControl : 1; // no swimming in the air
         this.sprite.applyForce(dir.clone().scale(FISH.thrust * this.body.mass * k));
     }
 
@@ -151,8 +158,8 @@ export default class Pufferfish {
         if (this.inflated || this.invulnerable > 0) return false;
         this.invulnerable = 1200;
         this.scene.tweens.add({
-            targets: this.sprite, alpha: 0.35, duration: 110, yoyo: true, repeat: 4,
-            onComplete: () => this.sprite.setAlpha(1)
+            targets: this.view, alpha: 0.35, duration: 110, yoyo: true, repeat: 4,
+            onComplete: () => this.view.setAlpha(1)
         });
         return true;
     }
@@ -183,17 +190,34 @@ export default class Pufferfish {
         if (speed > FISH.maxSpeed) {
             this.sprite.setVelocity(vel.x * FISH.maxSpeed / speed, vel.y * FISH.maxSpeed / speed);
         }
+    }
+
+    /** Call right after each physics step: remembers the last two positions. */
+    afterStep() {
+        this.prev.copy(this.cur);
+        this.cur.set(this.sprite.x, this.sprite.y);
+    }
+
+    /**
+     * Draw the fish for this frame. `alpha` = how far we are between the last
+     * two physics steps (0..1), `frames` = elapsed time in 60 Hz steps.
+     */
+    render(alpha, frames) {
+        this.view.setPosition(
+            Phaser.Math.Linear(this.prev.x, this.cur.x, alpha),
+            Phaser.Math.Linear(this.prev.y, this.cur.y, alpha));
+
         // Orientation depends on speed: slow = level, just hovering up and down;
         // faster = the nose follows the movement vector. The art faces right;
         // heading left it is mirrored vertically so it never swims belly-up.
         const v = this.body.velocity;
-        const speed2 = Math.hypot(v.x, v.y);
+        const speed = Math.hypot(v.x, v.y);
         if (Math.abs(v.x) > 0.8) this.facing = v.x < 0 ? -1 : 1;
         const level = this.facing < 0 ? Math.PI : 0;
-        const follow = Phaser.Math.Clamp((speed2 - FISH.alignFrom) / (FISH.alignFull - FISH.alignFrom), 0, 1);
+        const follow = Phaser.Math.Clamp((speed - FISH.alignFrom) / (FISH.alignFull - FISH.alignFrom), 0, 1);
         const target = level + Phaser.Math.Angle.Wrap(Math.atan2(v.y, v.x) - level) * follow;
-        this.sprite.setFlipX(false).setFlipY(this.facing < 0);
-        this.sprite.rotation = Phaser.Math.Angle.RotateTo(this.sprite.rotation, target, FISH.turnRate);
+        this.view.setFlipY(this.facing < 0);
+        this.view.rotation = Phaser.Math.Angle.RotateTo(this.view.rotation, target, FISH.turnRate * frames);
     }
 }
 

@@ -190,6 +190,7 @@ export default class MainScene extends Phaser.Scene {
         }
         this.fish.update(STEP_MS, waveY(this.fish.sprite.x, this.time.now / 1000));
         this.matter.world.step(STEP_MS);
+        this.fish.afterStep();
     }
 
     update(time, delta) {
@@ -198,13 +199,16 @@ export default class MainScene extends Phaser.Scene {
 
         this.acc = Math.min(this.acc + delta, STEP_MS * 5);
         while (this.acc >= STEP_MS) { this.fixedStep(); this.acc -= STEP_MS; }
+        this.fish.render(this.acc / STEP_MS, delta / STEP_MS);
+        this.controller.draw?.();
+        const view = this.fish.view;
 
         // Camera follows in both axes, leading slightly in the travel direction.
         const v = sp.body.velocity;
         const k = 1 - Math.pow(WORLD.cameraEase, delta / STEP_MS);
         const prevX = this.camX, prevY = this.camY;
-        this.camX = Phaser.Math.Linear(this.camX, sp.x + v.x * WORLD.lookAhead - W / 2, k);
-        this.camY = Phaser.Math.Linear(this.camY, sp.y + v.y * WORLD.lookAhead - H / 2, k);
+        this.camX = Phaser.Math.Linear(this.camX, view.x + v.x * WORLD.lookAhead - W / 2, k);
+        this.camY = Phaser.Math.Linear(this.camY, view.y + v.y * WORLD.lookAhead - H / 2, k);
         this.camY = Math.max(this.camY, -760); // room for a jump, not the whole sky
         this.cameras.main.setScroll(this.camX, this.camY);
 
@@ -213,7 +217,7 @@ export default class MainScene extends Phaser.Scene {
         this.trailAt = (this.trailAt || 0) - delta;
         if (speed > 9 && this.trailAt <= 0) {
             this.trailAt = 55;
-            const b = this.add.circle(sp.x - v.x * 3 + Phaser.Math.Between(-20, 20), sp.y - v.y * 3 + Phaser.Math.Between(-20, 20),
+            const b = this.add.circle(view.x - v.x * 3 + Phaser.Math.Between(-20, 20), view.y - v.y * 3 + Phaser.Math.Between(-20, 20),
                 Phaser.Math.Between(6, 15), 0xffffff, 0.35).setStrokeStyle(2, 0xffffff, 0.7).setDepth(4);
             this.tweens.add({ targets: b, y: b.y - 70, alpha: 0, scale: 1.5, duration: 700, onComplete: () => b.destroy() });
         }

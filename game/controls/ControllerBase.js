@@ -37,14 +37,17 @@ export default class ControllerBase {
     hint(text) {
         const t = this.scene.add.text(this.scene.scale.width / 2, this.scene.scale.height - 60, text, {
             fontFamily: 'Arial', fontSize: '28px', color: '#ffffff'
-        }).setOrigin(0.5).setAlpha(0.75);
+        }).setOrigin(0.5).setAlpha(0.5);
         this.ui.add(t);
         this.scene.tweens.add({ targets: t, alpha: 0, delay: 5000, duration: 800 });
         return t;
     }
 
     enter() {}
+    /** Per physics step (fixed 60 Hz): apply forces. */
     update(/* dt */) {}
+    /** Per rendered frame: move overlay graphics (optional). */
+    draw() {}
 
     destroy() {
         for (const [t, e, f] of this._listeners) t.off(e, f, this);

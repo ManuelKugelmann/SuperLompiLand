@@ -17,7 +17,7 @@ export default class FlapController extends ControllerBase {
         this.center = new Phaser.Math.Vector2(W / 2, H / 2);
 
         const cross = this.scene.add.graphics();
-        cross.lineStyle(4, 0xffffff, 0.12);
+        cross.lineStyle(2, 0xffffff, 0.06);
         cross.lineBetween(W / 2, 140, W / 2, H - 40);
         cross.lineBetween(40, H / 2, W - 40, H / 2);
         this.ui.add(cross);
@@ -38,7 +38,7 @@ export default class FlapController extends ControllerBase {
         if (dir.length() > 1) dir.normalize();
         this.fish.launch(dir.scale(KICK));
 
-        const dot = this.scene.add.circle(pointer.x, pointer.y, 30, 0xffffff, 0.35);
+        const dot = this.scene.add.circle(pointer.x, pointer.y, 22, 0xffffff, 0.16);
         this.ui.add(dot);
         this.scene.tweens.add({ targets: dot, scale: 2.4, alpha: 0, duration: 300, onComplete: () => dot.destroy() });
     }

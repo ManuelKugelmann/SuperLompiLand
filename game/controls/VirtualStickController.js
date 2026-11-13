@@ -16,10 +16,10 @@ export default class VirtualStickController extends ControllerBase {
         this.pressAt = 0;
         this.pressPos = new Phaser.Math.Vector2();
 
-        this.ring = this.scene.add.circle(this.base.x, this.base.y, this.R, 0xffffff, 0.08)
-            .setStrokeStyle(6, 0xffffff, 0.35);
-        this.thumb = this.scene.add.circle(this.base.x, this.base.y, 62, 0xffc266, 0.85)
-            .setStrokeStyle(5, 0xffffff, 0.6);
+        this.ring = this.scene.add.circle(this.base.x, this.base.y, this.R, 0xffffff, 0.04)
+            .setStrokeStyle(3, 0xffffff, 0.16);
+        this.thumb = this.scene.add.circle(this.base.x, this.base.y, 54, 0xffffff, 0.16)
+            .setStrokeStyle(3, 0xffffff, 0.28);
         this.ui.add([this.ring, this.thumb]);
         this.hint('Ziehen = schwimmen · Doppeltipp = aufblasen');
 

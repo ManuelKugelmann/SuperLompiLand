@@ -28,19 +28,26 @@ export default class TapToMoveController extends ControllerBase {
     }
 
     update() {
-        this.band.clear();
         if (this.held && !this.held.isDown) this.held = null;
         if (!this.held) { this.fish.brake(); return; }
 
-        const target = this.worldPoint(this.held);
-        const to = target.clone().subtract(this.fish.pos);
+        const to = this.worldPoint(this.held).subtract(this.fish.pos);
         const dist = to.length();
-        const pull = Phaser.Math.Clamp(dist / BAND_FULL, 0, 1);
-        if (dist > this.fish.radius * 0.6) this.fish.thrust(to.normalize().scale(pull * 1.35));
-        else this.fish.brake();
+        if (dist > this.fish.radius * 0.6) {
+            this.fish.thrust(to.normalize().scale(Phaser.Math.Clamp(dist / BAND_FULL, 0, 1) * 1.35));
+        } else {
+            this.fish.brake();
+        }
+    }
 
-        this.band.lineStyle(4 + pull * 8, 0xffffff, 0.25 + pull * 0.45);
-        this.band.lineBetween(this.fish.sprite.x, this.fish.sprite.y, target.x, target.y);
-        this.band.fillStyle(0xffffff, 0.55).fillCircle(target.x, target.y, 16);
+    draw() {
+        this.band.clear();
+        if (!this.held) return;
+        const target = this.worldPoint(this.held);
+        const v = this.fish.view;
+        const pull = Phaser.Math.Clamp(Phaser.Math.Distance.Between(v.x, v.y, target.x, target.y) / BAND_FULL, 0, 1);
+        this.band.lineStyle(2 + pull * 3, 0xffffff, 0.1 + pull * 0.18);
+        this.band.lineBetween(v.x, v.y, target.x, target.y);
+        this.band.fillStyle(0xffffff, 0.25).fillCircle(target.x, target.y, 9);
     }
 }

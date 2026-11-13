@@ -23,10 +23,10 @@ export default class FlingController extends ControllerBase {
         this.pressAt = 0;
         this.pressPos = new Phaser.Math.Vector2();
 
-        this.paddleGfx = this.scene.add.circle(0, 0, PADDLE_R, 0xffffff, 0.22)
-            .setStrokeStyle(6, 0xffffff, 0.7).setVisible(false);
+        this.paddleGfx = this.scene.add.circle(0, 0, PADDLE_R, 0xffffff, 0.07)
+            .setStrokeStyle(3, 0xffffff, 0.3).setVisible(false);
         this.grabGfx = this.scene.add.circle(0, 0, 10, 0xffffff, 0)
-            .setStrokeStyle(6, 0xffe08a, 0.9).setVisible(false);
+            .setStrokeStyle(3, 0xffffff, 0.3).setVisible(false);
         this.world.add([this.paddleGfx, this.grabGfx]);
         this.hint('Fisch anfassen & werfen · oder mit dem Finger schubsen · Doppeltipp = aufblasen');
 
@@ -91,13 +91,22 @@ export default class FlingController extends ControllerBase {
 
         if (this.mode === 'grab') {
             this.fish.dragTo(p);
-            this.grabGfx.setPosition(this.fish.sprite.x, this.fish.sprite.y).setRadius(this.fish.radius + 14);
         } else if (this.paddle) {
             // Drive the paddle by velocity so the physics engine transfers momentum.
             const v = p.clone().subtract(new Phaser.Math.Vector2(this.paddle.position.x, this.paddle.position.y));
             if (v.length() > PADDLE_MAX_SPEED) v.setLength(PADDLE_MAX_SPEED);
             this.scene.matter.body.setVelocity(this.paddle, { x: v.x, y: v.y });
-            this.paddleGfx.setPosition(this.paddle.position.x, this.paddle.position.y);
+        }
+    }
+
+    draw() {
+        if (this.mode === 'grab') {
+            this.grabGfx.setPosition(this.fish.view.x, this.fish.view.y).setRadius(this.fish.radius + 12);
+        } else if (this.paddle && this.pointer) {
+            // Follow the finger directly so the paddle looks smooth; the physics
+            // body trails it by a step.
+            const p = this.worldPoint(this.pointer);
+            this.paddleGfx.setPosition(p.x, p.y);
         }
     }
 
