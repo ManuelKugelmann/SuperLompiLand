@@ -29,6 +29,10 @@ AAA-detailed world. Polish what exists before adding more.
   spills). No mines, atomic/biohazard items, faces, skulls or symbols.
 - **Never put project, personal or studio names into prompts sent to outside services.**
 - Every texture has a procedural fallback; the game runs with art files missing.
+- **Open source and free only:** libraries, tools, formats and runtimes must be open source
+  and free of charge (e.g. Phaser, Matter, delaunator/earcut, glTF, three.js). No paid or
+  proprietary tools or SDKs (no Spine, no Live2D). Check the licence before adding a
+  dependency.
 
 ## Code style: DRY and clean
 
