@@ -4,7 +4,7 @@ Screenshots from development, newest first. Each entry links to the commit it wa
 
 ## Nests rebuilt: a level sand basin with raked-sand relief and shells
 
-[`a51137f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/a51137f) · 2026-11-14 00:08
+[`da155c1`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/da155c1) · 2026-11-14 00:08
 
 ![Nests rebuilt: a level sand basin with raked-sand relief and shells](15-nests-rebuilt-a-level-sand-basin-with-raked-sand.jpg)
 
