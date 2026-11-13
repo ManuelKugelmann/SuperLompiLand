@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, createField, chunkGrids, gridRows } from './density.js';
+import { SHADE, shadeChunk } from './shade.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, mixColor, floorY, pickWeighted
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted
 } from './biomes.js';
 
 export const LEVEL = {
@@ -17,12 +18,8 @@ export const LEVEL = {
     margin: 1,            // extra chunks generated around the view
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     friendSheen: 0.16,    // strength of the rainbow shimmer on friends
-    visualDetail: 2,      // drawn outline grid is this many times finer than the collision grid
     wakeRadius: 300,      // how close the fish must swim to bend a plant
-    coinGap: 92,          // minimum distance between two coins
-    rockRes: 0.6,         // baked terrain resolution (1 = full; lower saves GPU memory)
-    backRes: 0.3,         // baked back-wall / shadow layer resolution (soft anyway)
-    rockTexScale: 1.6     // how large the rock texture appears
+    coinGap: 92           // minimum distance between two coins
 };
 const CH = LEVEL.cell * LEVEL.cells;
 
@@ -47,11 +44,6 @@ const HAZARDS = {
     mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6 },
     hazard_net: { size: 150, r: 84, place: 'water', anim: 'sway', bob: 34, speed: 0.7 }
 };
-// Rock shading: many thin bands from the rim into the core. Each is only a
-// little darker than the last, and the bake blurs them into a smooth gradient.
-const BANDS = 16;
-const BAND_DEPTH = 0.26;      // density range from rim to darkest core
-const DEEP_TINT = 0x1a3a62;
 
 /**
  * The ocean, generated on demand in every direction from one seed.
@@ -144,7 +136,7 @@ export default class LevelGenerator {
                     const key = `${cx},${cy}`;
                     if (this.pending.has(key) || this.ready.some(r => r.key === key)) continue;
                     this.pending.add(key);
-                    this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells * LEVEL.visualDetail });
+                    this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells });
                 }
             }
         }
@@ -190,106 +182,39 @@ export default class LevelGenerator {
         return 0;
     }
 
-    /** @param grids { fine, back } from the worker; computed here when omitted */
-    build(cx, cy, grids = null) {
-        const s = this.scene, C = LEVEL.cell, T = LEVEL.threshold, N = LEVEL.cells;
+    /** @param baked { coarse, rock, back } from the worker; computed here when omitted */
+    build(cx, cy, baked = null) {
+        const s = this.scene, T = LEVEL.threshold, N = LEVEL.cells;
         const ox = cx * CH, oy = cy * CH, mid = ox + CH / 2;
         const rng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}`]);
-        const chunk = { objects: [], bodies: [], key: `${cx},${cy}` };
+        const chunk = { objects: [], bodies: [], textures: [], key: `${cx},${cy}` };
         this.chunks.set(chunk.key, chunk);
         const keep = o => { chunk.objects.push(o); return o; };
         const has = key => s.textures.exists(key);
         const blend = biomeBlendAt(mid);
         const biome = blend.t < 0.5 ? blend.a : blend.b;
 
-        // Density at grid corners (shared with neighbours -> seamless). Everything
-        // that is DRAWN uses a grid twice as fine as the collision grid, so rock
-        // outlines look round instead of faceted while the physics stays cheap.
-        const F = LEVEL.visualDetail, FN = N * F;
-        const { fine: fineFlat, back: backFlat } = grids || chunkGrids(this.field, LEVEL.seed, ox, oy, CH, FN);
-        const fine = gridRows(fineFlat, FN + 1), back = gridRows(backFlat, FN + 1);
-        const coarse = grid => { const out = []; for (let j = 0; j <= N; j++) out.push(grid[j * F].filter((_, i) => i % F === 0)); return out; };
-        const val = coarse(fine), backCoarse = coarse(back);
-        const eachCell = (grid, t, fn) => marchGrid(grid, ox, oy, CH, t, fn);
-        const depthMix = Phaser.Math.Clamp((oy + CH / 2) / LEVEL.maxDepth, 0, 1) * 0.5;
-        // `u` in 0..1 runs from the rim to the core through the biome's five rock colours.
-        const bandColor = u => {
-            const f = Math.min(3.999, Math.max(0, u) * 4), k = Math.floor(f);
-            const shade = arr => mixColor(arr[k], arr[k + 1], f - k);
-            return mixColor(mixColor(shade(blend.a.rock), shade(blend.b.rock), blend.t), DEEP_TINT, depthMix);
+        // The terrain pictures are shaded per pixel (shade.js, normally in the
+        // worker) and shown as two plain images per chunk: nothing about the
+        // terrain is redrawn while playing.
+        const pics = baked || { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, ...shadeChunk(this.field, LEVEL.seed, ox, oy, CH) };
+        const show = (name, data, size, depth) => {
+            const key = `chunk:${chunk.key}:${name}`;
+            if (s.textures.exists(key)) s.textures.remove(key);
+            const tex = s.textures.createCanvas(key, size, size);
+            tex.context.putImageData(new ImageData(data, size, size), 0, 0);
+            tex.refresh();
+            chunk.textures.push(key);
+            keep(s.add.image(ox, oy, key).setOrigin(0).setScale(CH / size).setDepth(depth));
         };
+        show('back', pics.back, SHADE.backSize, -6);
+        show('rock', pics.rock, SHADE.rockSize, -2);
 
-        // Terrain is drawn once into two textures per chunk and the vector shapes
-        // are thrown away: re-tessellating hundreds of polygons every frame was by
-        // far the biggest cost of the whole game.
-        const temp = [];
-        const scratch = () => { const gr = s.make.graphics({ add: false }); temp.push(gr); return gr; };
-        const bake = (depth, k, layers) => {
-            const size = Math.ceil(CH * k);
-            const rt = keep(s.add.renderTexture(ox, oy, size, size).setOrigin(0).setScale(CH / size).setDepth(depth));
-            for (const [obj, erase] of layers) {
-                if (obj.type === 'Graphics') obj.setScale(k).setPosition(-ox * k, -oy * k);
-                if (erase) rt.erase(obj); else rt.draw(obj);
-            }
-            return rt;
-        };
-
-        // --- Back layer: cave back walls + ambient occlusion in the water ------
-        const wall = scratch();
-        wall.fillStyle(mixColor(bandColor(0.5), 0x0a2a44, 0.4), 0.42);
-        eachCell(backCoarse, T, shape => { if (shape.poly.length >= 3) wall.fillPoints(shape.poly, true); });
-        const ao = scratch();
-        for (let k = 1; k <= 8; k++) {                      // soft falloff, no visible steps
-            const dt = -0.008 * k, alpha = 0.035;
-            ao.fillStyle(0x04162a, alpha);
-            eachCell(val, T + dt, c => { if (c.poly.length >= 3) ao.fillPoints(c.poly, true); });
-        }
-        bake(-6, LEVEL.backRes, [[wall], [ao]]);
-
-        // --- Rock layer ---------------------------------------------------------
-        const textured = has('tex_rock');
+        // Collision strips and floor spots come from the coarse grid (corners
+        // shared with the neighbours -> seamless).
+        const val = gridRows(pics.coarse, N + 1);
         const floors = [];
-        const layers = [];
-        if (textured) {
-            // Rock texture over the whole chunk; everything that is water is erased below.
-            const k = LEVEL.rockRes;
-            const tile = s.make.tileSprite({ x: 0, y: 0, width: Math.ceil(CH * k), height: Math.ceil(CH * k), key: 'tex_rock', add: false }).setOrigin(0);
-            tile.setTileScale(k * LEVEL.rockTexScale).setTilePosition(ox / LEVEL.rockTexScale, oy / LEVEL.rockTexScale);
-            tile.setTint(mixColor(0xffffff, DEEP_TINT, depthMix));
-            temp.push(tile);
-            layers.push([tile]);
-        }
-        // Light comes from above: upward faces get a bright rim, undersides a dark one.
-        const rim = {
-            g: scratch(),
-            lit: mixColor(bandColor(0), 0xffffff, 0.4),
-            side: bandColor(0),
-            shade: mixColor(bandColor(0.75), 0x02101e, 0.45)
-        };
-        const bands = scratch();
-        for (let k = 0; k < BANDS; k++) {
-            const u = k / (BANDS - 1);
-            // Over the rock texture the bands are translucent, getting denser inward.
-            bands.fillStyle(bandColor(u), textured ? (k === 0 ? 0.42 : 0.2) : 1);
-            // Only the outermost band is the visible outline and needs the fine grid.
-            eachCell(k === 0 ? fine : val, T + Math.pow(u, 1.25) * BAND_DEPTH, c => {
-                if (c.poly.length >= 3) bands.fillPoints(c.poly, true);
-                if (k === 0) for (const [p, q] of c.edges) this.drawRim(p, q, rim);
-            });
-        }
-        // Collision strips and floor spots come from the coarse grid.
-        eachCell(val, T, c => { for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors); });
-        layers.push([bands]);
-        if (textured) {
-            const water = scratch();
-            water.fillStyle(0xffffff, 1);
-            const neg = fine.map(row => row.map(v => -v));
-            eachCell(neg, -T, c => { if (c.poly.length >= 3) water.fillPoints(c.poly, true); });
-            layers.push([water, true]);
-        }
-        layers.push([rim.g]);
-        bake(-2, LEVEL.rockRes, layers);
-        for (const obj of temp) obj.destroy();
+        marchGrid(val, ox, oy, CH, T, c => { for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors); });
 
         // --- Nest ------------------------------------------------------------
         for (const nest of this.nests) {
@@ -411,20 +336,6 @@ export default class LevelGenerator {
         chunk.bodies.push(this.scene.matter.add.rectangle(mx + nx * 26, my + ny * 26, len + 8, 52,
             { isStatic: true, angle: ang, friction: 0.05 }));
         if (ny > 0.8 && len > 45) floors.push({ x: mx, y: my, angle: b.x > a.x ? ang : ang + Math.PI });
-    }
-
-    /** One piece of the lit outline (fine grid): bright on top, dark underneath. */
-    drawRim(a, b, rim) {
-        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-        const ang = Math.atan2(b.y - a.y, b.x - a.x);
-        let ny = Math.cos(ang);
-        const nx = -Math.sin(ang);
-        if (this.density(mx + nx * 20, my + ny * 20) < this.density(mx - nx * 20, my - ny * 20)) ny = -ny;
-        // ny > 0: rock is below this edge = a floor facing the light.
-        const color = ny > 0.35 ? rim.lit : ny < -0.35 ? rim.shade : rim.side;
-        const w = ny > 0.35 ? 16 : 12;
-        rim.g.lineStyle(w, color, 0.95).lineBetween(a.x, a.y, b.x, b.y);
-        rim.g.fillStyle(color, 0.95).fillCircle(a.x, a.y, w / 2).fillCircle(b.x, b.y, w / 2);
     }
 
     addCoin(chunk, x, y, chunkKey, index) {
@@ -616,6 +527,7 @@ export default class LevelGenerator {
         const chunk = this.chunks.get(key);
         for (const b of chunk.bodies) this.scene.matter.world.remove(b);
         for (const o of chunk.objects) { this.scene.tweens.killTweensOf(o); o.destroy(); }
+        for (const key of chunk.textures) this.scene.textures.remove(key);
         this.chunks.delete(key);
         this.coins = this.coins.filter(c => c.img.active);
         this.hazards = this.hazards.filter(h => h.img.active);
