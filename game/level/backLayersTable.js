@@ -9,9 +9,11 @@
 //   depth    Phaser depth (behind the backdrop schools at -16 and light shafts at -12)
 //   strength 0 switches a layer off
 export const BACK_LAYERS = [
-    { id: 'haze', scroll: 0.08, fog: 0.74, height: 0.42, rise: 900, density: 0.45, blur: 7, depth: -21, strength: 1 },
-    { id: 'far', scroll: 0.25, fog: 0.5, height: 0.36, rise: 450, density: 0.75, blur: 4, depth: -19, strength: 1 },
-    { id: 'back', scroll: 0.45, fog: 0.3, height: 0.3, rise: 120, density: 1, blur: 2, depth: -17.5, strength: 1 }
+    // Off (strength 0) until painted, 2.5D layer art replaces the drawn primitive silhouettes,
+    // which read as flat solids with cut-offs (user feedback 2026-11-14).
+    { id: 'haze', scroll: 0.08, fog: 0.74, height: 0.42, rise: 900, density: 0.45, blur: 7, depth: -21, strength: 0 },
+    { id: 'far', scroll: 0.25, fog: 0.5, height: 0.36, rise: 450, density: 0.75, blur: 4, depth: -19, strength: 0 },
+    { id: 'back', scroll: 0.45, fog: 0.3, height: 0.3, rise: 120, density: 1, blur: 2, depth: -17.5, strength: 0 }
 ];
 
 // Silhouette kinds (big soft shapes only — the background has no micro detail, spec 10.10b).

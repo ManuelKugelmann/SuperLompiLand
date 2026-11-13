@@ -15,7 +15,8 @@ export const WATER_LIGHT = {
     shafts: 1.8,          // strength of the light shafts (0 = off)
     shaftCount: 7,        // broad shafts behind the play plane
     shaftNear: 3,         // thin shafts in front of the play plane (kept faint, never hide hazards)
-    caustics: 0.07,       // strength of the caustic shimmer (0 = off); open water shows only a hint
+    caustics: 0,          // caustic shimmer (0 = off): off until it can be projected on rock and sand only;
+                          // a screen-wide pattern read as a net over the water (user feedback 2026-11-14)
     causticScale: 2.6,    // world size of the caustic tile relative to its 256 px texture
     causticFade: 1500,    // caustics fade faster than the shafts: a shallow-water effect
     grade: 1,             // depth colour grade on the camera (0 = off)
@@ -88,7 +89,7 @@ export default class WaterLight {
             s.x = s.baseX + Math.sin(t * 0.21 + s.phase) * 60 - ((cam.scrollX * s.drift) % (W + 400));
             if (s.x < -260) s.x += W + 400; else if (s.x > W + 260) s.x -= W + 400;
             s.y = Math.max(-40, -cam.scrollY - 30);   // shafts start at the water surface
-            const flicker = 0.65 + 0.35 * Math.sin(t * 0.55 + s.phase) * Math.sin(t * 0.23 + s.phase * 1.7);
+            const flicker = 0.85 + 0.15 * Math.sin(t * 0.18 + s.phase);   // slow breathing, never a flicker
             s.setAlpha(WATER_LIGHT.shafts * s.base * flicker * light * (1 - above));
         }
 
@@ -104,8 +105,11 @@ export default class WaterLight {
         }
 
         if (this.grade) {
-            const q = Math.round(light * 40) / 40;   // only rebuild the matrix when the light changes visibly
-            if (q !== this.lastLight) {
+            // Ease the light so camera bobbing never pumps the colours, and update in tiny
+            // steps (no visible jumps between quantised levels).
+            this.smooth = this.smooth === undefined ? light : this.smooth + (light - this.smooth) * 0.03;
+            const q = this.smooth;
+            if (Math.abs(q - this.lastLight) > 0.002) {
                 this.lastLight = q;
                 const m = gradeMatrix(q, WATER_LIGHT.gradeSaturation * WATER_LIGHT.grade, WATER_LIGHT.gradeAbsorb * WATER_LIGHT.grade, WATER_LIGHT.gradeExposure * WATER_LIGHT.grade);
                 // Phaser's ColorMatrix keeps offsets in 0..255.
