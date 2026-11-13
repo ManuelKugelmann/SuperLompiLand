@@ -196,9 +196,12 @@ export default class Multiplayer {
         for (const g of this.ghosts.values()) if (g.pos) live++;
         if (live > 0) { this.hadFriends = true; this.quietSince = 0; this.retryGap = LOST_MS; return; }
         if (!this.hadFriends || document.hidden) return;
-        if (!this.quietSince) { this.quietSince = now; this.retryAt = now + LOST_MS; return; }
+        // Random spread: both sides usually lose each other at the same moment, and two
+        // watchdogs rejoining in lockstep would keep leaving just as the other arrives.
+        const jitter = () => 0.5 + Math.random();
+        if (!this.quietSince) { this.quietSince = now; this.retryAt = now + LOST_MS * jitter(); return; }
         if (now < this.retryAt) return;
-        this.retryAt = now + this.retryGap;
+        this.retryAt = now + this.retryGap * jitter();
         this.retryGap = Math.min(RETRY_MAX_MS, this.retryGap * 2);
         this.net.rejoin();
     }
