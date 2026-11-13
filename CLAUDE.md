@@ -4,7 +4,7 @@
 
 Colorful 2D underwater pufferfish game. Mobile-first installable PWA.
 Phaser 3 + Matter.js, Vite, plain JS (ESM). Design notes: `_ref/gamedesign/`
-(local only, gitignored) — read `gamedesign.md` and `lookdev1.jpg` before
+(local only, gitignored) — read `gamedesign.md` and the `lookdev*.png` images before
 touching look, controls or level design.
 
 ## Hard rules
@@ -61,8 +61,10 @@ npm run serve    # static server for dist/ on :4178 — tests the real PWA/SW
 
 ## Art
 
-- Look: glossy cute 3D cartoon characters (see `lookdev1.jpg`); calm, flowing
-  Alto's Odyssey atmosphere for backgrounds and pacing.
+- Look: follow the `lookdev*.png` images closely — these exact characters, their
+  dense glossy detail and saturated reef colours, plus the man-made hazards
+  (toxic barrel robot, net, claw, atomic buoy). Generic cartoon fish are wrong.
+  Art is derived from crops of the lookdev, not from text prompts alone.
 - Round-1 art is generated raster (Replicate) in `public/img/`. Every texture
   has a procedural fallback so the game runs with files missing.
 - Never put project, personal or studio names into prompts sent to outside

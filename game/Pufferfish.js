@@ -17,7 +17,7 @@ export const FISH = {
     hoverLift: 0.00012,    // cancels the sink while inflated (hover in place)     // upward force per unit mass while inflated
     airGravity: 0.0011,    // extra downward force per unit mass above the water
     airDrag: 0.0015,        // almost no drag in the air
-    airControl: 0,         // fraction of swim thrust available in the air (flying fish: > 0)
+    airTurn: 0.022,        // radians per step the flight path can be bent in the air (no speed gain)
     shoveRadius: 340,
     shovePower: 16,
     states: {
@@ -111,9 +111,24 @@ export default class Pufferfish {
     }
 
     thrust(dir) {
-        const k = this.inAir ? FISH.airControl : 1; // no swimming in the air
-        this.sprite.applyForce(dir.clone().scale(FISH.thrust * this.body.mass * k));
-        if (k > 0) this.effort = Math.min(1, this.effort + dir.length() * 0.25);
+        if (this.inAir) { this.airSteer(dir, 1); return; }
+        this.sprite.applyForce(dir.clone().scale(FISH.thrust * this.body.mass));
+        this.effort = Math.min(1, this.effort + dir.length() * 0.25);
+    }
+
+    /**
+     * Limited control in the air: input only bends the flight path toward `dir`,
+     * it never adds speed. `strength` scales how far it may turn this step.
+     */
+    airSteer(dir, strength) {
+        const v = this.body.velocity;
+        const speed = Math.hypot(v.x, v.y);
+        if (speed < 0.5 || dir.lengthSq() < 0.0001) return;
+        const heading = Math.atan2(v.y, v.x);
+        const want = Phaser.Math.Angle.Wrap(Math.atan2(dir.y, dir.x) - heading);
+        const max = FISH.airTurn * Math.min(1, dir.length()) * strength;
+        const a = heading + Phaser.Math.Clamp(want, -max, max);
+        this.sprite.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
     }
 
     seekTo(point) {
@@ -146,6 +161,7 @@ export default class Pufferfish {
     }
 
     launch(vec) {
+        if (this.inAir) { this.airSteer(vec, 6); return; } // a kick in the air only steers
         const v = new Phaser.Math.Vector2(this.body.velocity.x + vec.x, this.body.velocity.y + vec.y);
         if (v.length() > FISH.maxSpeed) v.setLength(FISH.maxSpeed);
         this.sprite.setVelocity(v.x, v.y);
