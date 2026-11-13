@@ -106,7 +106,7 @@ export default class StoryScene extends Phaser.Scene {
         const W = this.scale.width, H = this.scale.height;
         // Silhouettes of what the eruption shook loose drift west into the reef.
         ['mine', 'hazard_net', 'hazard_buoy', 'spikes', 'mine', 'hazard_net'].filter(k => this.textures.exists(k)).forEach((k, i) => {
-            const img = this.add.image(W * 0.78 - i * 30, 420 + i * 40, k).setScale(0.3).setTintFill(0x1c1820).setAlpha(0);
+            const img = this.add.image(W * 0.78 - i * 30, 420 + i * 40, k).setScale(0.3).setTint(0x1c1820).setTintMode(Phaser.TintModes.FILL).setAlpha(0);
             this.tweens.add({
                 targets: img, alpha: 0.95, x: W * (0.74 - i * 0.09), y: Phaser.Math.Between(H * 0.5, H * 0.86),
                 angle: Phaser.Math.Between(-40, 40), duration: 1500, delay: i * 130, ease: 'Sine.easeOut'

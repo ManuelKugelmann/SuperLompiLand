@@ -16,11 +16,14 @@
     },
     "dependencies": {
         "@gks/sdk": "git+https://github.com/ManuelKugelmann/gks_sdk.git#main",
-        "phaser": "^3.80.0",
+        "phaser": "^4.2.1",
         "trystero": "^0.27.0"
     },
     "devDependencies": {
         "vite": "^5.0.0",
         "vite-plugin-pwa": "^1.2.0"
+    },
+    "overrides": {
+        "phaser": "^4.2.1"
     }
 }
