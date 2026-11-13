@@ -31,6 +31,8 @@ const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.
 const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 /** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
 const OPEN_SLACK = 0.04;
+/** Fin-tip contrails: from this speed (px per step), at these tips (× body radius, nose = +x). */
+const CONTRAIL = { speed: 11, tips: [[-0.35, -0.55], [-0.35, 0.55]] };
 /** How high coins hop on each beat (px). */
 const COIN_BOB_PX = 12;
 
@@ -711,6 +713,16 @@ export default class MainScene extends Phaser.Scene {
         if (speed > 9 && this.trailAt <= 0 && !this.fish.inAir) {
             this.trailAt = 55;
             this.particles.spawn('bubble', view.x - v.x * 3, view.y - v.y * 3, 1, { radius: 20, spread: 20 });
+        }
+
+        // Contrails: at high speed the fin tips draw thin bubble streaks (vortex trails).
+        if (speed > CONTRAIL.speed && !this.fish.inAir) {
+            const r = this.fish.radius, f = this.fish.facing, a = view.rotation;
+            const ca = Math.cos(a), sa = Math.sin(a);
+            for (const [ox, oy] of CONTRAIL.tips) {
+                const lx = ox * r * f, ly = oy * r;
+                this.particles.spawn('contrail', view.x + lx * ca - ly * sa, view.y + lx * sa + ly * ca, 1, { spread: 4 });
+            }
         }
 
         // Sand is kicked up when swimming fast just above the ground.

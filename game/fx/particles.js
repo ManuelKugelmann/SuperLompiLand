@@ -25,6 +25,8 @@ export const PRESETS = {
     steam:  { life: [0.8, 1.4], size: [6, 14], grow: 0.6, drag: 1.4, rise: 240, coldRise: 1, cool: 0, alpha: 0.6, color: 0xffffff, colorEnd: 0xcfe9f2, surface: 'pop', blend: 'add' },
     lava:   { life: [1.2, 2.2], size: [4, 10], grow: 0.7, drag: 0.6, rise: -180, coldRise: 1.4, cool: 0.9, alpha: 1, color: 0xffb347, colorEnd: 0x3a1a10, surface: 'pass', blend: 'add' },
     ash:    { life: [6, 10], size: [8, 18], grow: 1.6, drag: 1.8, rise: -12, coldRise: 1, cool: 0, alpha: 0.35, color: 0x8a8c90, colorEnd: 0x6a6c70, surface: 'pass', blend: 'normal' },
+    // Thin streaks of tiny bubbles left at the fin tips at high speed (vortex trails).
+    contrail: { life: [0.35, 0.6], size: [4, 7], grow: 0.8, drag: 4.0, rise: 20, coldRise: 1, cool: 0, alpha: 0.5, color: 0xffffff, colorEnd: 0xd8f4ff, surface: 'pop', blend: 'add' },
     smoke:  { life: [4, 7], size: [20, 40], grow: 3.2, drag: 0.7, rise: 60, coldRise: 0.7, cool: 0.2, alpha: 0.4, color: 0x9a9ea4, colorEnd: 0xd5d8dc, surface: 'pass', blend: 'normal' }
 };
 export const PRESET_IDS = Object.keys(PRESETS);
