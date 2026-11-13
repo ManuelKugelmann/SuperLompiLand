@@ -3,7 +3,8 @@ import Phaser from 'phaser';
 /** Tunables — physics feel is adjusted here (velocities are px per physics step). */
 export const FISH = {
     thrust: 0.0013,        // terminal swim speed ~ thrust * 278 / drag        // swim force per unit mass
-    maxSpeed: 34,
+    maxSpeed: 26,
+    carrySpeed: 16,        // top speed while being carried by a finger
     brake: 0.9,
     alignFrom: 3,          // below this speed the fish stays level
     alignFull: 8,          // from this speed it fully points along its movement
@@ -141,8 +142,8 @@ export default class Pufferfish {
 
     dragTo(point) {
         if (this.inAir) return; // cannot be carried through the air
-        const v = point.clone().subtract(this.pos).scale(0.3);
-        if (v.length() > FISH.maxSpeed) v.setLength(FISH.maxSpeed);
+        const v = point.clone().subtract(this.pos).scale(0.22);
+        if (v.length() > FISH.carrySpeed) v.setLength(FISH.carrySpeed);
         this.sprite.setVelocity(v.x, v.y);
     }
 

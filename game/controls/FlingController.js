@@ -3,8 +3,9 @@ import ControllerBase from './ControllerBase.js';
 import { CAT } from '../Pufferfish.js';
 
 const PADDLE_R = 62;
-const PADDLE_MAX_SPEED = 40;
-const THROW_GAIN = 1.0; // 1 = fish leaves exactly at finger speed
+const PADDLE_MAX_SPEED = 20;   // px per step the paddle can move (caps how hard a shove can be)
+const THROW_GAIN = 0.55;       // share of the finger speed the fish keeps when thrown
+const THROW_MAX = 17;          // px per step, top speed of a throw
 
 /**
  * Air-hockey controls. Two ways to move the fish, no modes to pick:
@@ -47,7 +48,7 @@ export default class FlingController extends ControllerBase {
         } else {
             this.mode = 'paddle';
             this.paddle = this.scene.matter.add.circle(p.x, p.y, PADDLE_R, {
-                ignoreGravity: true, frictionAir: 0, restitution: 0.9, mass: 60,
+                ignoreGravity: true, frictionAir: 0, restitution: 0.25, mass: 14,
                 collisionFilter: { category: CAT.PADDLE, mask: CAT.FISH }
             });
             this.paddleGfx.setPosition(p.x, p.y).setVisible(true);
@@ -69,7 +70,9 @@ export default class FlingController extends ControllerBase {
         if (s.length < 2) return new Phaser.Math.Vector2(0, 0);
         const a = s[0], b = s[s.length - 1];
         const dt = Math.max(b.t - a.t, 16);
-        return new Phaser.Math.Vector2(b.x - a.x, b.y - a.y).scale(THROW_GAIN * (1000 / 60) / dt);
+        const v = new Phaser.Math.Vector2(b.x - a.x, b.y - a.y).scale(THROW_GAIN * (1000 / 60) / dt);
+        if (v.length() > THROW_MAX) v.setLength(THROW_MAX);
+        return v;
     }
 
     release() {
