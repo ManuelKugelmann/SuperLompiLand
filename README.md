@@ -5,20 +5,67 @@
 <!-- devlog:start -->
 ## Dev log
 
-**Kelp forest with the new per-pixel terrain light: smooth rock, sand on top, shade in the caves** — [`4f0b6bd`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/4f0b6bd) · 2026-11-13 21:59
+**Lompi in 3D: four techniques compared with the same light and pose** — [`9c70f65`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9c70f65) · 2026-11-13 23:04
 
-![Kelp forest with the new per-pixel terrain light: smooth rock, sand on top, shade in the caves](docs/devlog/13-kelp-forest-with-the-new-per-pixel-terrain-light.jpg)
-
-**Biomes, nests, reef world with lighting, abyss** — [`2ef5125`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/2ef5125) · 2026-11-13 20:15
-
-![Biomes, nests, reef world with lighting, abyss](docs/devlog/12-lagoon.jpg)
-
-**Boxfish-shaped Lompi, fin animation, puff as air brake** — [`6d0f7c5`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/6d0f7c5) · 2026-11-13 19:41
-
-![Boxfish-shaped Lompi, fin animation, puff as air brake](docs/devlog/05-boxfish-lompi.jpg)
+![Lompi in 3D: four techniques compared with the same light and pose](docs/devlog/14-lompi-in-3d-four-techniques-compared-with-the-sa.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
+
+## Animation experiments
+
+How should a character get real volume instead of being a bent flat picture? Candidates
+for Lompi, drawn by the same small renderer with the same light and pose, at close-up
+size (top) and at game size (bottom). Columns: current sprite · silhouette inflation ·
+TRELLIS v1 · Rodin Gen-2. Later rounds are added below; nothing here is removed.
+
+**Round 1 — first look, meshes as generated.** The generated 3D bodies turn as bodies;
+the Rodin one keeps the picture's face and colours best and is the current favourite.
+Inflating the silhouette does not work for a round body. In exact profile every 3D body
+loses the face (the art is a three-quarter view), so characters will swim turned about
+30° toward the camera.
+
+Front quarter:
+
+![Front quarter: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-front-quarter.jpg)
+
+Exact profile, where the face is lost:
+
+![Profile: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-profile.jpg)
+
+Puff (a simple ball morph for now):
+
+![Puff: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-puff.jpg)
+
+The same four in motion (close-up row; triangles as generated: 2 · 3,860 · 11,856 · full
+Rodin mesh). The flat sprite can only mirror, the bodies turn:
+
+Turntable, 60° to either side of the profile:
+
+![Turntable: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-turntable.webp)
+
+Swim cycle, turned 30° toward the camera:
+
+![Swim cycle: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-swim.webp)
+
+Turn-around:
+
+![Turn-around: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-turn.webp)
+
+Puff:
+
+![Puff in motion: current sprite, silhouette inflation, TRELLIS v1, Rodin Gen-2](docs/devlog/anim-01-puff.webp)
+
+**Round 2 — a procedural body in a controlled view.** No full 3D after all: a character
+is only ever shown from the angle it was painted from, so its rest pose is the painting
+itself. A procedural body — 8 rings of 8 points along the spine, 132 triangles, fitted to
+the picture's body — carries the art; the picture's alpha cuts the exact outline, the
+triangles only give volume, light and bending. The side fin is a card on its own hinge.
+The loop shows swimming, banking 25° to either side, the mirror turn-around and the puff.
+The motion is still the viewer's simple test motion, not the final swim drivers, and the
+jagged edge when banking away is a known defect of this round.
+
+![Procedural Lompi, 132 triangles: swim, bank, turn-around, puff](docs/devlog/anim-02-procedural.webp)
 
 A colorful 2D pufferfish game — underwater, Super Mario Land-ish — built as an
 installable PWA with **switchable control schemes** for experimentation.

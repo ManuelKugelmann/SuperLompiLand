@@ -18,12 +18,8 @@ const REACH = 0.7;    // from this far out a thin part is fully soft
 
 const smooth = (a, b, v) => { const t = v <= a ? 0 : v >= b ? 1 : (v - a) / (b - a); return t * t * (3 - 2 * t); };
 
-/**
- * @param alpha  opacity per cell, 0..255, row by row
- * @returns { soft: Float32Array (0 = rigid body, 1 = fully soft), cx, cy (body centre, 0..1) }
- */
-export function softnessMap(alpha, w, h) {
-    // Distance to the nearest transparent cell (two-pass chamfer); the border counts as transparent.
+/** Distance of every cell to the nearest transparent one, in cells (two-pass chamfer); the border counts as transparent. */
+export function distanceMap(alpha, w, h) {
     const INF = 1e9, d = new Float32Array(w * h);
     for (let i = 0; i < w * h; i++) d[i] = alpha[i] > 40 ? INF : 0;
     const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : d[y * w + x]);
@@ -39,6 +35,15 @@ export function softnessMap(alpha, w, h) {
             d[y * w + x] = Math.min(d[y * w + x], at(x + 1, y) + 1, at(x, y + 1) + 1, at(x + 1, y + 1) + 1.414, at(x - 1, y + 1) + 1.414);
         }
     }
+    return d;
+}
+
+/**
+ * @param alpha  opacity per cell, 0..255, row by row
+ * @returns { soft: Float32Array (0 = rigid body, 1 = fully soft), cx, cy (body centre, 0..1) }
+ */
+export function softnessMap(alpha, w, h) {
+    const INF = 1e9, d = distanceMap(alpha, w, h);
     // Local thickness: the biggest disc inside the shape that covers this cell.
     // (The rim of a fat body is thick; a thin fin is thin all over.)
     const thick = new Float32Array(w * h);
