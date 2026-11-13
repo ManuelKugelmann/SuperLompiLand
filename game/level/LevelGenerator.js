@@ -74,6 +74,7 @@ export default class LevelGenerator {
         // Density grids are computed in a Web Worker when available; the chunk is
         // then drawn on the main thread, one per frame.
         this.pending = new Set();   // chunk keys requested from the worker
+        this.early = new Map();     // chunk key -> collision bodies laid down while the worker is busy
         this.ready = [];            // grids that came back, waiting to be drawn
         try {
             this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
@@ -134,6 +135,7 @@ export default class LevelGenerator {
             } else {
                 for (const [cx, cy] of missing) {             // ask the worker for the maths
                     const key = `${cx},${cy}`;
+                    if (!this.early.has(key)) this.solidNow(cx, cy, key);      // solid at once, whatever the worker's state
                     if (this.pending.has(key) || this.ready.some(r => r.key === key)) continue;
                     this.pending.add(key);
                     this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells });
@@ -144,7 +146,7 @@ export default class LevelGenerator {
         while (this.ready.length) {
             const r = this.ready.shift();
             const [cx, cy] = r.key.split(',').map(Number);
-            if (!wanted(cx, cy) || this.chunks.has(r.key)) continue;
+            if (!wanted(cx, cy) || this.chunks.has(r.key)) { this.dropEarly(r.key); continue; }
             timed(cx, cy, r);
             break;
         }
@@ -152,6 +154,23 @@ export default class LevelGenerator {
             const [cx, cy] = key.split(',').map(Number);
             if (cx < x0 - 1 || cx > x1 + 1 || cy < y0 - 1 || cy > y1 + 1) this.drop(key);
         }
+    }
+
+    /**
+     * Rock is solid from the moment a chunk is asked for: its collision strips are
+     * laid down at once (cheap: the coarse grid only), while the pictures are still
+     * being shaded in the worker. They are replaced when the chunk is built.
+     */
+    solidNow(cx, cy, key) {
+        const early = { bodies: [] };
+        const grid = gridRows(chunkGrids(this.field, LEVEL.seed, cx * CH, cy * CH, CH, LEVEL.cells).fine, LEVEL.cells + 1);
+        marchGrid(grid, cx * CH, cy * CH, CH, LEVEL.threshold, c => { for (const [p, q] of c.edges) this.addEdge(early, p, q, []); });
+        this.early.set(key, early.bodies);
+    }
+
+    dropEarly(key) {
+        for (const b of this.early.get(key) || []) this.scene.matter.world.remove(b);
+        this.early.delete(key);
     }
 
     /** Per frame: bend / pulse every creature and plant. `t` in seconds. */
@@ -189,6 +208,7 @@ export default class LevelGenerator {
         const rng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}`]);
         const chunk = { objects: [], bodies: [], textures: [], key: `${cx},${cy}` };
         this.chunks.set(chunk.key, chunk);
+        this.dropEarly(chunk.key);
         const keep = o => { chunk.objects.push(o); return o; };
         const has = key => s.textures.exists(key);
         const blend = biomeBlendAt(mid);
