@@ -12,7 +12,7 @@ const WAKE_REJOIN_MS = 5000; // hidden at least this long -> rejoin on return
 const EMOTE_GAP_MS = 700;    // one emote per this long, per player
 const BUBBLE_MS = 5000;      // a downed friend's revive bubble lasts this long (then they respawn solo)
 const BUBBLE_R = 110;        // revive bubble radius (px)
-const LOST_MS = 6000;        // friends all quiet this long -> reconnect (public relays can drop us)
+const LOST_MS = 3500;        // friends all quiet this long -> reconnect (public relays can drop us)
 const RETRY_MAX_MS = 60000;  // back off up to this between reconnect attempts
 
 /**
