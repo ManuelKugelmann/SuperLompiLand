@@ -7,45 +7,63 @@ import { createSwarm } from './boids.js';
 // camera (spec 5.0b): they are spawned just out of view in the current biome and
 // dropped when far away. Fish are drawn procedurally (no art files needed).
 
-/** Species: look, size (px), how many, how fast, where they live (biome ids). */
+/** Species: look, size (px), how many, how fast, flock overrides (boids.js SWARM), where they live (biome ids). */
 export const SPECIES = {
-    anthias:    { count: 110, size: 26, body: 0xff8a5c, belly: 0xffc6ad, accent: 0xb36cff, speed: 85, biomes: ['reef', 'beach'] },
-    tang:       { count: 14, size: 40, body: 0xffd23f, belly: 0xfff0a0, accent: 0xffffff, speed: 55, neighbourR: 120, separationR: 46, biomes: ['reef', 'kelp', 'mangrove'] },
-    fry:        { count: 70, size: 14, body: 0xbfe3f0, belly: 0xffffff, accent: 0x9bd0e6, speed: 70, separationR: 16, neighbourR: 50, biomes: ['mangrove', 'beach'] },
-    silverside: { count: 150, size: 20, body: 0x8fb0c4, belly: 0xeaf4fa, accent: 0x5f86a0, speed: 105, biomes: ['blue', 'kelp', 'harbour', 'wreck'] },
+    anthias:    { count: 110, size: 26, body: 0xff8a5c, belly: 0xffc6ad, accent: 0xb36cff, speed: 85, flock: { separationR: 38, neighbourR: 95, weights: { cohesion: 0.35 } }, biomes: ['reef', 'beach'] },
+    tang:       { count: 14, size: 40, body: 0xffd23f, belly: 0xfff0a0, accent: 0xffffff, speed: 55, tall: true, flock: { neighbourR: 140, separationR: 60, weights: { cohesion: 0.4 } }, biomes: ['reef', 'kelp', 'mangrove'] },
+    fry:        { count: 70, size: 14, body: 0xbfe3f0, belly: 0xffffff, accent: 0x9bd0e6, speed: 70, stripe: true, flock: { separationR: 16, neighbourR: 50 }, biomes: ['mangrove', 'beach'] },
+    silverside: { count: 150, size: 20, body: 0x8fb0c4, belly: 0xeaf4fa, accent: 0xdff2ff, speed: 105, stripe: true, biomes: ['blue', 'kelp', 'harbour', 'wreck'] },
     lantern:    { count: 60, size: 18, body: 0x1d2b4a, belly: 0x2c4166, accent: 0x7fe9ff, speed: 75, glow: true, biomes: ['trench'] }
 };
 /** How many swarms around the camera, spawn and drop distances (px). */
 export const SWARMS = { perView: 2, spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6 };
 
+/** Texture size of one frame (px) for a species. */
+const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (sp.tall ? 1.25 : 0.8)) });
+/** Frames: TAIL tail beats (left, mid, right) and FLASH, the bright flank of a turning fish. */
+const TAIL = [-1, 0, 1], FLASH = TAIL.length;
+
 function fishTexture(scene, id, sp) {
     const key = `swarm_${id}`;
     if (scene.textures.exists(key)) return key;
-    const w = Math.ceil(sp.size * 1.6), h = Math.ceil(sp.size * 0.8);
-    const tex = scene.textures.createCanvas(key, w * 2, h);
+    const { w, h } = frameSize(sp);
+    const tex = scene.textures.createCanvas(key, w * (TAIL.length + 1), h);
     const c = tex.getContext();
-    // Frame 0 = normal, frame 1 = the silver flash of a turning flank.
-    [0, 1].forEach(f => {
-        const ox = f * w, cx = ox + w * 0.55, cy = h / 2, rx = w * 0.36, ry = h * 0.36;
-        const col = n => `#${(f ? lighten(n) : n).toString(16).padStart(6, '0')}`;
-        c.fillStyle = col(sp.body);
-        c.beginPath(); c.moveTo(ox + w * 0.18, cy); c.lineTo(ox + 2, cy - ry * 0.9); c.lineTo(ox + 2, cy + ry * 0.9); c.closePath(); c.fill();   // tail
+    [...TAIL, 0].forEach((beat, f) => {
+        const flash = f === FLASH, ox = f * w, cx = ox + w * 0.56, cy = h / 2;
+        const rx = w * (sp.tall ? 0.3 : 0.36), ry = h * (sp.tall ? 0.4 : 0.34);
+        const hex = n => `#${(flash ? lighten(n) : n).toString(16).padStart(6, '0')}`;
+        // Tail and fins first, a shade darker, so the body overlaps them.
+        c.fillStyle = hex(shade(sp.body, 0.75));
+        const tx = cx - rx * 0.92, tail = ry * (sp.tall ? 0.75 : 0.9), sway = beat * ry * 0.35;
+        c.beginPath(); c.moveTo(tx + rx * 0.15, cy); c.lineTo(ox + 1, cy - tail + sway); c.quadraticCurveTo(ox + w * 0.08, cy + sway, ox + 1, cy + tail + sway); c.closePath(); c.fill();
+        c.beginPath(); c.moveTo(cx - rx * 0.6, cy - ry * 0.7); c.quadraticCurveTo(cx - rx * 0.1, cy - ry * (sp.tall ? 1.35 : 1.15), cx + rx * 0.35, cy - ry * 0.85); c.closePath(); c.fill();   // dorsal
+        if (sp.tall) { c.beginPath(); c.moveTo(cx - rx * 0.6, cy + ry * 0.7); c.quadraticCurveTo(cx - rx * 0.1, cy + ry * 1.3, cx + rx * 0.25, cy + ry * 0.85); c.closePath(); c.fill(); }   // anal fin
+        // Body: lit from above, darker back, pale belly (reads round, not a flat sticker).
+        const g = c.createLinearGradient(0, cy - ry, 0, cy + ry);
+        g.addColorStop(0, hex(shade(sp.body, 0.7))); g.addColorStop(0.45, hex(sp.body)); g.addColorStop(1, hex(sp.belly));
+        c.fillStyle = g;
         c.beginPath(); c.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); c.fill();
-        c.fillStyle = col(sp.belly);
-        c.beginPath(); c.ellipse(cx + rx * 0.1, cy + ry * 0.35, rx * 0.8, ry * 0.45, 0, 0, Math.PI * 2); c.fill();
-        c.fillStyle = col(sp.accent);
+        c.fillStyle = hex(sp.accent);
         if (sp.glow) { for (let k = 0; k < 4; k++) { c.beginPath(); c.arc(cx - rx * 0.6 + k * rx * 0.4, cy + ry * 0.55, Math.max(1, h * 0.06), 0, Math.PI * 2); c.fill(); } }
-        else c.fillRect(cx - rx * 0.2, cy - ry * 0.9, Math.max(1, rx * 0.12), ry * 1.5);   // a body bar
-        c.fillStyle = '#ffffff'; c.beginPath(); c.arc(cx + rx * 0.62, cy - ry * 0.15, Math.max(1.2, h * 0.11), 0, Math.PI * 2); c.fill();
-        c.fillStyle = '#10243a'; c.beginPath(); c.arc(cx + rx * 0.66, cy - ry * 0.15, Math.max(0.8, h * 0.06), 0, Math.PI * 2); c.fill();
+        else if (sp.stripe) { c.globalAlpha = 0.85; c.fillRect(cx - rx * 0.8, cy - ry * 0.12, rx * 1.6, Math.max(1, ry * 0.22)); c.globalAlpha = 1; }   // a silver side line
+        else if (!sp.tall) { c.globalAlpha = 0.7; c.fillRect(cx - rx * 0.15, cy - ry * 0.9, Math.max(1, rx * 0.12), ry * 1.6); c.globalAlpha = 1; }   // a body bar
+        // Tang: the white spine at the tail root.
+        if (sp.tall) { c.fillStyle = '#ffffff'; c.fillRect(cx - rx * 0.95, cy - 1, Math.max(2, rx * 0.18), 2); }
+        c.fillStyle = 'rgba(255,255,255,0.35)';
+        c.beginPath(); c.ellipse(cx + rx * 0.1, cy - ry * 0.5, rx * 0.55, ry * 0.18, 0, 0, Math.PI * 2); c.fill();   // sheen
+        c.fillStyle = '#ffffff'; c.beginPath(); c.arc(cx + rx * 0.62, cy - ry * 0.18, Math.max(1.2, h * 0.09), 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#10243a'; c.beginPath(); c.arc(cx + rx * 0.66, cy - ry * 0.18, Math.max(0.8, h * 0.055), 0, Math.PI * 2); c.fill();
         tex.add(f, 0, ox, 0, w, h);
     });
     tex.refresh();
     return key;
 }
-function lighten(c) {
-    const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255, k = 0.6;
-    return (Math.round(r + (235 - r) * k) << 16) | (Math.round(g + (240 - g) * k) << 8) | Math.round(b + (245 - b) * k);
+function lighten(c) { return mix(c, 0xebf0f5, 0.6); }
+function shade(c, k) { return mix(c, 0x0a1a30, 1 - k); }
+function mix(a, b, k) {
+    const ch = (s) => Math.round(((a >> s) & 255) + (((b >> s) & 255) - ((a >> s) & 255)) * k);
+    return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
 export default class SwarmLayer {
@@ -59,14 +77,15 @@ export default class SwarmLayer {
 
     spawn(id, x, y) {
         const sp = SPECIES[id];
-        const sim = createSwarm({ count: sp.count, x, y, speed: sp.speed, maxSpeed: sp.speed * 3,
-            ...(sp.neighbourR ? { neighbourR: sp.neighbourR } : {}), ...(sp.separationR ? { separationR: sp.separationR } : {}) });
+        const sim = createSwarm({ count: sp.count, x, y, speed: sp.speed, maxSpeed: sp.speed * 3, ...sp.flock });
         const key = fishTexture(this.scene, id, sp);
         const blitter = this.scene.add.blitter(0, 0, key).setDepth(SWARMS.depth);
         if (sp.glow) blitter.setBlendMode(Phaser.BlendModes.ADD);
         const bobs = blitter.createMultiple(sp.count, 0, true);
-        const w = Math.ceil(sp.size * 1.6), h = Math.ceil(sp.size * 0.8);
-        this.swarms.push({ id, sim, blitter, bobs, w, h });
+        const { w, h } = frameSize(sp);
+        // Per fish: a tail-beat phase and a slow sway, so a shoal never reads as a grid.
+        const phase = Float32Array.from({ length: sp.count }, () => Math.random() * Math.PI * 2);
+        this.swarms.push({ id, sim, blitter, bobs, w, h, phase });
     }
 
     /** Keep a few swarms of the current biome around the view; drop far ones. */
@@ -76,8 +95,11 @@ export default class SwarmLayer {
             if (Math.hypot(c.x - cx, c.y - cy) > SWARMS.dropAt) { s.blitter.destroy(); this.swarms.splice(i, 1); }
         }
         const biome = this.env.biomeAt(cx);
-        const kinds = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(biome));
-        if (!kinds.length || this.swarms.length >= SWARMS.perView) return;
+        const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(biome));
+        if (!native.length || this.swarms.length >= SWARMS.perView) return;
+        // Prefer a species not already around: variety over repeats.
+        const fresh = native.filter(id => !this.swarms.some(s => s.id === id));
+        const kinds = fresh.length ? fresh : native;
         for (let tries = 0; tries < 10; tries++) {
             const a = Math.random() * Math.PI * 2, d = SWARMS.spawnMin + Math.random() * (SWARMS.spawnMax - SWARMS.spawnMin);
             const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * 0.6;
@@ -93,15 +115,18 @@ export default class SwarmLayer {
         this.checkAt -= dt * 1000;
         if (this.checkAt <= 0) { this.checkAt = SWARMS.checkMs; this.manage(cx, cy); }
         const env = { isOpen: this.env.isOpen, flowAt: this.env.flowAt, player };
+        this.time = (this.time || 0) + dt;
         for (const s of this.swarms) {
             s.sim.step(Math.min(dt, 0.05), env);
-            const { x, y, vx, panic, turn } = s.sim;
+            const { x, y, vx, vy, panic, turn } = s.sim;
             for (let i = 0; i < s.bobs.length; i++) {
-                const b = s.bobs[i];
+                const b = s.bobs[i], ph = s.phase[i];
+                // Tail beats faster the faster the fish swims.
+                const beat = Math.sin(ph + this.time * (6 + Math.hypot(vx[i], vy[i]) * 0.06));
                 b.x = x[i] - s.w / 2;
-                b.y = y[i] - s.h / 2;
+                b.y = y[i] - s.h / 2 + Math.sin(ph * 1.7 + this.time * 1.3) * s.h * 0.12;
                 b.flipX = vx[i] < 0;
-                b.setFrame(turn[i] > 0.6 || panic[i] > 0.5 ? 1 : 0);   // silver flash when wheeling or startled
+                b.setFrame(turn[i] > 0.6 || panic[i] > 0.5 ? FLASH : beat < -0.33 ? 0 : beat > 0.33 ? 2 : 1);   // flash when wheeling or startled
             }
         }
     }
