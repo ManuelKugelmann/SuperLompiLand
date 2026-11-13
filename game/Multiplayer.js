@@ -27,7 +27,8 @@ export default class Multiplayer {
         this.seq = 0;
         this.lang = scene.registry.get('currentLanguage') || 'de';
         // Session name + player count, pinned to the screen.
-        this.badge = scene.add.text(scene.scale.width - 24, 20, '', {
+        // Below the HUD's journey strip (top right), clear of its buttons.
+        this.badge = scene.add.text(scene.scale.width - 40, 158, '', {
             fontFamily: 'Arial', fontSize: '34px', color: '#ffffff', fontStyle: 'bold',
             stroke: '#0a3f6e', strokeThickness: 7
         }).setOrigin(1, 0).setScrollFactor(0).setDepth(60).setAlpha(0.9);

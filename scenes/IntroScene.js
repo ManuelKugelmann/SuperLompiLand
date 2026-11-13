@@ -156,6 +156,7 @@ export default class IntroScene extends Phaser.Scene {
 
     /** "Together" button + room-code panel: make a room, or type a friend's code. */
     buildTogether(lang) {
+        this.modal = false; // fresh title screen (the scene object is reused)
         const W = this.scale.width, H = this.scale.height, de = lang === 'de';
         const label = { fontFamily: 'Arial', fontStyle: 'bold' };
         const btn = this.add.text(W - 150, H * 0.905, de ? 'Zusammen' : 'Together', {
@@ -215,18 +216,26 @@ export default class IntroScene extends Phaser.Scene {
                 () => { if (word.length < MAX_SECRET) setWord(word + k.toLowerCase()); }, 46);
         });
 
+        // Typing listens to the browser directly: Phaser's keyboard queue can hand
+        // the same key over more than once when frames are slow (seen on the
+        // deployed build), which turned "walgg" into "walllgg".
         const close = () => {
             ui.forEach(o => o.destroy());
-            this.input.keyboard?.off('keydown', onKey);
+            window.removeEventListener('keydown', onKey);
+            this.events.off(Phaser.Scenes.Events.SHUTDOWN, close);
             this.modal = false;
         };
         const onKey = e => {
+            if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
             if (e.key === 'Backspace') setWord(word.slice(0, -1));
             else if (e.key === 'Escape') close();
             else if (e.key === 'Enter') { if (word.length >= MIN_SECRET) go.emit('pointerdown'); }
             else if (e.key.length === 1) setWord(word + e.key);
+            else return;
+            e.preventDefault();
         };
-        this.input.keyboard?.on('keydown', onKey);
+        window.addEventListener('keydown', onKey);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, close);
 
         const row = y0 + 3 * kh + 10;
         pill(W / 2 - 520, row, '⌫', '#ffd0d0', () => setWord(word.slice(0, -1)), 46);
@@ -234,7 +243,9 @@ export default class IntroScene extends Phaser.Scene {
         const go = pill(W / 2 + 280, row, de ? 'Los!' : 'Go!', '#7ee08a', () => {
             if (word.length < MIN_SECRET) return;
             try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
-            close();
+            // Stay modal until the scene is gone, so a queued Enter/Space can't
+            // also fire start() and restart the game solo.
+            window.removeEventListener('keydown', onKey);
             this.registry.set('room', word);
             this.scene.start(SCENE_KEYS.MAIN);
         });
