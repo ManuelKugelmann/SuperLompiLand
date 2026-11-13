@@ -9,13 +9,9 @@
 
 ![Biomes, nests, reef world with lighting, abyss](docs/devlog/12-lagoon.jpg)
 
-**Playable characters with a title carousel, health bar, tilt controls** — [`84b4750`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/84b4750) · 2026-11-13 20:00
+**First playable: endless seabed, generated art, shove/flap/stick/tap controls** — [`3f4f178`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/3f4f178) · 2026-11-13 19:14
 
-![Playable characters with a title carousel, health bar, tilt controls](docs/devlog/09-character-carousel.jpg)
-
-**Fin and tail animation, clean turn-around** — [`9ff697e`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9ff697e) · 2026-11-13 19:46
-
-![Fin and tail animation, clean turn-around](docs/devlog/07-fin-animation.jpg)
+![First playable: endless seabed, generated art, shove/flap/stick/tap controls](docs/devlog/01-first-level.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->

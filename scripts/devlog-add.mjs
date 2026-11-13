@@ -13,6 +13,7 @@ const LOG_DIR = resolve(ROOT, 'docs/devlog');
 const LOG = resolve(LOG_DIR, 'README.md');
 const README = resolve(ROOT, 'README.md');
 const SHOWN = 3; // screenshots shown in the main README
+const MIN_GAP_MIN = 60; // minimum spacing between two entries
 
 // No near-duplicates: one entry per commit, and each entry should show a
 // different scene or feature from the ones before it (pick the shot accordingly).
@@ -31,8 +32,15 @@ const date = git('log -1 --format=%ad --date=format:"%Y-%m-%d %H:%M"');
 const repo = git('remote get-url origin').replace(/\.git$/, '');
 
 if (!rebuild) {
-if (readFileSync(LOG, 'utf8').includes(`/commit/${sha})`)) {
+const existing = readFileSync(LOG, 'utf8');
+if (existing.includes(`/commit/${sha})`)) {
     console.error(`dev log: commit ${sha} already has an entry — nothing added`);
+    process.exit(0);
+}
+// Entries are spaced at least an hour apart (by commit time).
+const newest = /\) · (\d{4}-\d{2}-\d{2} \d{2}:\d{2})/.exec(existing);
+if (newest && new Date(date.replace(' ', 'T')) - new Date(newest[1].replace(' ', 'T')) < MIN_GAP_MIN * 60000) {
+    console.error(`dev log: newest entry is less than ${MIN_GAP_MIN} min older than ${sha} — nothing added`);
     process.exit(0);
 }
 const next = Math.max(0, ...readdirSync(LOG_DIR).map(f => parseInt(f, 10)).filter(Number.isFinite)) + 1;
