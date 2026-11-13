@@ -17,7 +17,9 @@ export const LEVEL = {
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
-    friendSheen: 0.16,    // strength of the rainbow shimmer on friends
+    friendSheen: 0.4,     // strength of the rainbow sheen on friends
+    sheenSpeed: 0.1,      // how fast its colours travel (turns of the colour wheel per second)
+    sheenSpread: 1.3,     // how much of the colour wheel lies across one friend
     wakeRadius: 300,      // how close the fish must swim to bend a plant
     coinGap: 92           // minimum distance between two coins
 };
@@ -44,6 +46,9 @@ const HAZARDS = {
     mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6 },
     hazard_net: { size: 150, r: 84, place: 'water', anim: 'sway', bob: 34, speed: 0.7 }
 };
+
+// One turn of the colour wheel, saturated and bright, looked up instead of converted every frame.
+const RAINBOW = Array.from({ length: 96 }, (_, i) => Phaser.Display.Color.HSVToRGB(i / 96, 0.75, 1).color);
 
 /**
  * The ocean, generated on demand in every direction from one seed.
@@ -189,8 +194,13 @@ export default class LevelGenerator {
             if (!l.active || !l.follow.active) continue;
             l.setPosition(l.follow.x, l.follow.y);
             if (l.hue !== undefined) {
-                const c = Phaser.Display.Color.HSVToRGB((l.hue + t * 0.12) % 1, 0.55, 1);
-                l.setFillStyle(c.color, LEVEL.friendSheen * (0.7 + 0.3 * Math.sin(t * 2 + l.hue * 20)));
+                // Rainbow sheen: colours run across the body and shimmer a little.
+                l.face(l.follow.facing());
+                l.setAlpha(LEVEL.friendSheen * (0.75 + 0.25 * Math.sin(t * 2 + l.hue * 20)));
+                const at = k => RAINBOW[Math.floor(((l.hue + t * LEVEL.sheenSpeed + k * LEVEL.sheenSpread) % 1) * RAINBOW.length)];
+                if (l.colors) { for (let i = 0, n = l.colors.length; i < n; i++) l.colors[i] = at((i >> 1) / (n / 2)); }
+                else if (Phaser.TintModes) l.setTint(at(0), at(0.5), at(0.5), at(1));        // the fill mode set at creation stays
+                else l.setTintFill(at(0), at(0.5), at(0.5), at(1));
             }
         }
     }
@@ -409,10 +419,15 @@ export default class LevelGenerator {
         }
         // Friends shimmer faintly in changing colours; hazards stay matte, so the
         // two can be told apart at a glance.
-        const sheen = s.add.ellipse(x, y, f.size * 0.8, f.size * 0.55, 0xffffff, LEVEL.friendSheen)
-            .setDepth(f.ground ? 1.1 : 4.1).setBlendMode(Phaser.BlendModes.ADD);
+        // The sheen is the friend's own picture once more, added on top in travelling
+        // rainbow colours: it lies exactly on the body and bends with it.
+        const sheen = makeCritter(s, key, x, y, f.size, f.anim, { ...f, rotation: angle })
+            .setDepth(f.ground ? 1.05 : 4.05).setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
+        // Pure colour inside the picture's outline (a tint would only multiply with the body colour).
+        if (Phaser.TintModes) sheen.setTintMode?.(Phaser.TintModes.FILL); else sheen.tintFill = true;
         sheen.follow = img;
         sheen.hue = rng.frac();
+        this.animated.push(sheen);
         chunk.objects.push(sheen);
         this.lights.push(sheen);
         if (!f.ground) s.tweens.add({ targets: img, y: y - f.bob, duration: rng.between(1400, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
