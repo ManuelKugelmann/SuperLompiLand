@@ -60,7 +60,10 @@ harbour down into the deep trench, to reach the grand nest.
   public relays that connect the players directly). Friends off screen show as an
   arrow at the edge. Try it alone with the
   [split screen](https://manuelkugelmann.github.io/SuperLompiLand/split.html): two
-  players in one window over the real connection.
+  players in one window over the real connection. Players connect peer-to-peer by
+  default; [`worker/relay`](worker/relay/README.md) is an optional own relay
+  (Cloudflare Worker) for networks where that fails — deploy it and set
+  `RELAY_URL` in `net/config.js`.
 
 ## Controls — switchable live (top of the screen)
 

@@ -12,22 +12,10 @@
 //  - Only fish state goes over the wire — no chat, no free text.
 import { joinRoom } from 'trystero';
 import { normalizeSecret } from './secret.js';
+import { APP_ID, deriveKeys } from './keys.js';
 
-const APP_ID = 'reef-swim-pals-v1';
 export const MAX_PLAYERS = 4; // spec: max 4 fish per room
 export { normalizeSecret, makeSecret, rollWords, MIN_JOIN, MIN_SECRET, MAX_SECRET } from './secret.js';
-
-const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-
-/** secret -> { room, password }, derived on this device. */
-async function derive(secret) {
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits(
-        { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(APP_ID), iterations: 120000 }, key, 512);
-    const b = new Uint8Array(bits);
-    return { room: hex(b.slice(0, 24)), password: hex(b.slice(24, 64)) };
-}
 
 export default class Net {
     /** status: 'connecting' | 'ready' | 'full' | 'error' */
@@ -50,7 +38,7 @@ export default class Net {
         const gen = ++this.gen;
         this.status = 'connecting';
         try {
-            this.keys ||= await derive(this.secret);
+            this.keys ||= await deriveKeys(this.secret);
             if (gen !== this.gen) return;
             // ?anon in the URL = throwaway identity, so two tabs of one browser
             // profile count as two players (local testing).

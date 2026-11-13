@@ -1,4 +1,4 @@
-import Net from '../net/Net.js';
+import { openNet } from '../net/config.js';
 import RemoteFish from './RemoteFish.js';
 import { EMOTES, EMOTE_ICON, isEmote, colorsFor, RateLimit } from '../net/social.js';
 import { HUD_KEY } from '../scenes/HudScene.js';
@@ -24,7 +24,7 @@ export default class Multiplayer {
 
     constructor(scene, secret) {
         this.scene = scene;
-        this.net = new Net(secret);
+        this.net = openNet(secret);
         this.label = this.net.secret.toUpperCase();
         this.ghosts = new Map(); // userId -> RemoteFish
         this.sendAt = 0;
