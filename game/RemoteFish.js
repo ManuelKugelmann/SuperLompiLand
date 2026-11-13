@@ -36,6 +36,19 @@ export default class RemoteFish {
             g.destroy();
         }
         this.arrow = scene.add.image(0, 0, 'mp_arrow').setScrollFactor(0).setDepth(59).setAlpha(0.95).setVisible(false);
+        // Colour ring (spec: no names; each fish shows its character plus a colour ring).
+        this.ring = scene.add.circle(0, 0, 60).setDepth(4.7).setVisible(false);
+        this.iconRing = scene.add.circle(0, 0, ICON_W * 0.62).setScrollFactor(0).setDepth(58.9).setVisible(false);
+        this.radius = 60;
+        this.setColor(0xffffff);
+    }
+
+    setColor(color) {
+        if (color === this.color) return;
+        this.color = color;
+        this.ring.setStrokeStyle(7, color, 0.85);
+        this.iconRing.setFillStyle(0x0a3f6e, 0.45).setStrokeStyle(5, color, 1);
+        this.arrow.setTint(color);
     }
 
     /** Snapshot: { n, t, x, y, vx, vy, s: 'normal'|'inflated', f: 1|-1, c: characterId }. `now` = local clock, ms. */
@@ -54,19 +67,30 @@ export default class RemoteFish {
         this.img.setScale(this.scale);
         this.icon.setTexture(key);
         this.icon.setScale(ICON_W / this.icon.width);
+        this.radius = (st.radius || 60) * 1.25;
+        this.ring.setRadius(this.radius);
     }
+
+    /** Where to show an emote over this fish (world position), or null if it is not drawn. */
+    get head() { return this.img.visible ? { x: this.img.x, y: this.img.y - this.radius - 30 } : null; }
 
     render(now) {
         const p = this.char && this.snaps.sample(now);
         const img = this.img;
         if (!p) return;
-        if (p.stale) { img.setVisible(false).setAlpha(0); this.icon.setVisible(false); this.arrow.setVisible(false); return; }
+        if (p.stale) {
+            img.setVisible(false).setAlpha(0);
+            for (const o of [this.icon, this.arrow, this.ring, this.iconRing]) o.setVisible(false);
+            return;
+        }
         const m = edgeMarker(this.scene.cameras.main.worldView, p);
         this.icon.setVisible(!!m);
         this.arrow.setVisible(!!m);
+        this.iconRing.setVisible(!!m);
         if (m) {
             const bob = Math.sin(now / 260) * 4;
             this.icon.setPosition(m.x, m.y + bob);
+            this.iconRing.setPosition(m.x, m.y + bob);
             this.arrow.setPosition(m.x + Math.cos(m.angle) * 58, m.y + Math.sin(m.angle) * 58).setRotation(m.angle);
         }
         const facing = p.f < 0 ? -1 : 1;
@@ -78,7 +102,8 @@ export default class RemoteFish {
         img.setScale(this.scale, this.scale * facing);
         img.rotation = Phaser.Math.Angle.RotateTo(img.rotation, target, 0.12);
         img.setVisible(true).setAlpha(Math.min(0.8, img.alpha + 0.05));
+        this.ring.setPosition(p.x, p.y).setVisible(true).setAlpha(img.alpha);
     }
 
-    destroy() { this.img.destroy(); this.icon.destroy(); this.arrow.destroy(); }
+    destroy() { for (const o of [this.img, this.icon, this.arrow, this.ring, this.iconRing]) o.destroy(); }
 }

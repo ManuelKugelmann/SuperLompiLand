@@ -1,8 +1,12 @@
 import Net from '../net/Net.js';
 import RemoteFish from './RemoteFish.js';
+import { EMOTES, EMOTE_ICON, isEmote, colorsFor, RateLimit } from '../net/social.js';
+import { HUD_KEY } from '../scenes/HudScene.js';
+import { pillButton } from './ui/kit.js';
 
 const SEND_MS = 1000 / 20;   // state broadcast rate
 const WAKE_REJOIN_MS = 5000; // hidden at least this long -> rejoin on return
+const EMOTE_GAP_MS = 700;    // one emote per this long, per player
 
 /**
  * Glue between a MainScene and the network: broadcasts the local fish and
@@ -33,6 +37,12 @@ export default class Multiplayer {
             stroke: '#0a3f6e', strokeThickness: 7
         }).setOrigin(1, 0).setScrollFactor(0).setDepth(60).setAlpha(0.9);
         this.shown = '';
+        // Our own colour ring, shown once someone else is here.
+        this.myRing = scene.add.circle(0, 0, 70).setDepth(4.7).setVisible(false);
+        this.myColor = null;
+        this.colorKey = '';
+        this.limit = new RateLimit(EMOTE_GAP_MS);
+        this.emoteBar = null;
 
         this.net.onState((id, snap) => {
             let g = this.ghosts.get(id);
@@ -42,6 +52,11 @@ export default class Multiplayer {
         this.net.onLeave(id => {
             this.ghosts.get(id)?.destroy();
             this.ghosts.delete(id);
+        });
+        this.net.onEmote((id, e) => {
+            const g = this.ghosts.get(id);
+            if (!g || !isEmote(e) || !this.limit.allow(id, performance.now())) return;
+            this.showEmote(e, g);
         });
 
         // Come back cleanly after the network drops or the device sleeps.
@@ -59,6 +74,7 @@ export default class Multiplayer {
     get players() { return this.ghosts.size + 1; }
 
     tick(fish) {
+        this.fish = fish;
         const now = performance.now();
         if (now >= this.sendAt) {
             this.sendAt = now + SEND_MS;
@@ -80,7 +96,57 @@ export default class Multiplayer {
             });
         }
         for (const g of this.ghosts.values()) g.render(now);
+        this.updateColors();
+        const together = this.ghosts.size > 0 && this.myColor !== null;
+        this.myRing.setVisible(together);
+        if (together) this.myRing.setPosition(fish.view.x, fish.view.y).setRadius(fish.radius * 1.25);
+        this.ensureEmoteBar();
         this.updateBadge();
+    }
+
+    /** Same colours on every screen: sorted player ids -> palette. */
+    updateColors() {
+        const self = this.net.selfId;
+        if (!self) return;
+        const ids = [self, ...this.ghosts.keys()];
+        const key = ids.slice().sort().join('|');
+        if (key === this.colorKey) return;
+        this.colorKey = key;
+        const colors = colorsFor(ids);
+        this.myColor = colors.get(self);
+        this.myRing.setStrokeStyle(7, this.myColor, 0.85);
+        for (const [id, g] of this.ghosts) g.setColor(colors.get(id));
+    }
+
+    /** Emote buttons live in the HUD scene, so a tap on them never steers the fish. */
+    ensureEmoteBar() {
+        const hudOn = this.scene.scene.isActive(HUD_KEY);
+        if (this.emoteBar && !hudOn) this.emoteBar = null; // HUD restarted: its objects are gone
+        if (this.emoteBar || !hudOn) return;
+        const hud = this.scene.scene.get(HUD_KEY);
+        const W = hud.scale.width, H = hud.scale.height;
+        this.emoteBar = EMOTES.map((e, i) =>
+            pillButton(hud, W - 66, H * 0.4 + i * 100, 96, 86, EMOTE_ICON[e], () => this.emote(e), { size: 44 }));
+    }
+
+    emote(e) {
+        if (!this.fish || !this.limit.allow('me', performance.now())) return;
+        this.net.sendEmote(e);
+        this.showEmote(e, null);
+    }
+
+    /** Pop the emote over the fish — or over its edge marker when that friend is off screen. */
+    showEmote(e, ghost) {
+        const s = this.scene;
+        let x, y, fixed = false;
+        if (!ghost) { x = this.fish.view.x; y = this.fish.view.y - this.fish.radius * 1.3 - 30; }
+        else if (ghost.icon.visible) { x = ghost.icon.x; y = ghost.icon.y - 70; fixed = true; }
+        else { const h = ghost.head; if (!h) return; x = h.x; y = h.y; }
+        const t = s.add.text(x, y, EMOTE_ICON[e], { fontFamily: 'Arial', fontSize: '76px' })
+            .setOrigin(0.5).setDepth(61).setScale(0.4);
+        if (fixed) t.setScrollFactor(0);
+        s.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' });
+        s.tweens.add({ targets: t, y: y - 110, alpha: 0, delay: 650, duration: 900, onComplete: () => t.destroy() });
     }
 
     updateBadge() {
@@ -99,7 +165,10 @@ export default class Multiplayer {
         document.removeEventListener('visibilitychange', this.onVisible);
         for (const g of this.ghosts.values()) g.destroy();
         this.ghosts.clear();
+        this.emoteBar?.forEach(b => b.destroy());
+        this.emoteBar = null;
         this.badge.destroy();
+        this.myRing.destroy();
         this.net.leave();
     }
 }
