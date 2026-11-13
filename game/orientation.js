@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { rotatedPageToGame } from './orientationMath.js';
+import { rotatedPageToGame, widthFor } from './orientationMath.js';
 
 /**
  * Always-landscape display.
@@ -28,8 +28,6 @@ function install(game) {
     const scale = game.scale;
     const canvas = game.canvas;
     const app = canvas.parentElement || document.getElementById('app');
-    const GW = scale.width;   // logical game width (1920)
-    const GH = scale.height;  // logical game height (1080)
 
     let rotated = false;
 
@@ -67,7 +65,7 @@ function install(game) {
     manager.transformPointer = function (pointer, pageX, pageY, wasMove) {
         origTransform(pointer, pageX, pageY, wasMove);
         if (!rotated) return;
-        const p = rotatedPageToGame(pageX, pageY, canvas.getBoundingClientRect(), GW, GH);
+        const p = rotatedPageToGame(pageX, pageY, canvas.getBoundingClientRect(), scale.width, scale.height);
         pointer.x = p.x;
         pointer.y = p.y;
         pointer.position.set(p.x, p.y);
@@ -100,4 +98,23 @@ function install(game) {
     window.addEventListener('resize', layout);
     window.addEventListener('orientationchange', layout);
     if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
+}
+
+/**
+ * Fill the screen: give the game the width that matches the screen's shape (the
+ * height stays fixed). Called when a scene starts, so a scene lays itself out
+ * once for the size it will keep; returns true when the size changed.
+ */
+export function fitToWindow(game) {
+    const rotated = !!game.registry.get('landscapeRotated');
+    const w = widthFor(rotated ? window.innerHeight : window.innerWidth, rotated ? window.innerWidth : window.innerHeight);
+    if (w === game.scale.width) return false;
+    game.scale.setGameSize(w, game.scale.height);
+    return true;
+}
+
+/** Would fitToWindow change the size right now? (for scenes that can simply start again) */
+export function fitsWindow(game) {
+    const rotated = !!game.registry.get('landscapeRotated');
+    return widthFor(rotated ? window.innerHeight : window.innerWidth, rotated ? window.innerWidth : window.innerHeight) === game.scale.width;
 }

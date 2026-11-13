@@ -23,6 +23,7 @@ import { createBook } from '../game/reefbook.js';
 import { BOOK_KEY } from './ReefBookScene.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
+import { fitToWindow } from '../game/orientation.js';
 
 const STEP_MS = 1000 / 60;
 
@@ -64,6 +65,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     create() {
+        fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         const W = this.scale.width, H = this.scale.height;
         this.lang = this.registry.get('currentLanguage') || 'de';
 

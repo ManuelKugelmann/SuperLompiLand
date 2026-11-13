@@ -13,6 +13,7 @@ import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
 import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
+import { fitToWindow, fitsWindow } from '../game/orientation.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -68,8 +69,12 @@ export default class IntroScene extends Phaser.Scene {
     }
 
     create() {
+        fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         const W = this.scale.width, H = this.scale.height;
         const lang = this.registry.get('currentLanguage') || 'de';
+        const refit = () => { if (!this.modal && !fitsWindow(this.game)) this.scene.restart(); };
+        this.scale.on('resize', refit);
+        this.events.once('shutdown', () => this.scale.off('resize', refit));
 
         if (!this.scene.get(SCENE_KEYS.MAIN)) {
             this.scene.add(SCENE_KEYS.MAIN, MainScene, false);

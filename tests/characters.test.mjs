@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHARACTERS, getCharacter } from '../game/characters.js';
 import { SPECIALS as SPECIAL_TABLE } from '../game/specials.js';
-import { rotatedPageToGame } from '../game/orientationMath.js';
+import { rotatedPageToGame, widthFor, PICTURE } from '../game/orientationMath.js';
 
 const SPECIALS = Object.keys(SPECIAL_TABLE);
 
@@ -44,4 +44,15 @@ test('rotated canvas: page points map to the right game corners', () => {
     near(rotatedPageToGame(540, 0, rect, 1920, 1080), 0, 0);         // page top-right = game top-left
     near(rotatedPageToGame(0, 0, rect, 1920, 1080), 0, 1080);        // page top-left = game bottom-left
     near(rotatedPageToGame(0, 960, rect, 1920, 1080), 1920, 1080);   // page bottom-left = game bottom-right
+});
+
+test('the picture fills the screen: its width follows the screen shape within limits', () => {
+    assert.equal(widthFor(1920, 1080), 1920);
+    assert.equal(widthFor(2340, 1080), 2340);                 // a tall phone held sideways
+    assert.equal(widthFor(1280, 800), 1728);                  // 16:10
+    assert.equal(widthFor(1024, 768), 1440);                  // 4:3 tablet
+    assert.equal(widthFor(800, 800), PICTURE.minWidth);       // squarer than that: bars above and below
+    assert.equal(widthFor(4000, 1000), PICTURE.maxWidth);     // extremely wide: bars left and right
+    assert.equal(widthFor(0, 0), 1920);
+    assert.equal(widthFor(1366, 768) % 2, 0);
 });
