@@ -14,6 +14,7 @@ import MidLayers from '../game/level/MidLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
+import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak } from '../game/music/melody.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
@@ -40,6 +41,7 @@ const WORLD = {
     friendBonus: 5,
     schoolRadius: 420,    // friends (other players) this close swim as a school ...
     schoolBoost: 0.1,     // ... each of up to two makes you this much faster
+    streamBubbles: 45,    // bubbles per second that mark each stream in view
     roomReach: 320,       // a pose that needs more room may move the player this far to find it
     downedMs: 5000,       // playing together: how long friends have to revive you before the nest respawn
     reviveHealth: 2
@@ -82,6 +84,8 @@ export default class MainScene extends Phaser.Scene {
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
         this.level = new LevelGenerator(this, this.world);
         this.density = (x, y) => this.level.density(x, y);
+        this.flow = createFlow(LEVEL.seed);     // currents and swell: one field for player and particles
+        this.flowAt = { x: 0, y: 0 };
         this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -391,7 +395,11 @@ export default class MainScene extends Phaser.Scene {
         const cache = new Map();
         let cacheAt = 0;
         return {
-            flowAt: (x, y, out) => { out.x = 0; out.y = this.level.liftAt(x, y) ? -170 : 0; },
+            // Particles want px per second; the field speaks px per physics step.
+            flowAt: (x, y, out) => {
+                this.flow.at(x, y, this.time.now / 1000, out);
+                out.x *= 60; out.y = out.y * 60 + (this.level.liftAt(x, y) ? -170 : 0);
+            },
             isSolid: (x, y) => {
                 const now = this.time.now;
                 if (now - cacheAt > 2000) { cache.clear(); cacheAt = now; }   // chunks come and go
@@ -553,8 +561,15 @@ export default class MainScene extends Phaser.Scene {
         const fsp = this.fish.sprite;
         const lifted = this.level.liftAt(fsp.x, fsp.y);
         if (lifted) fsp.applyForce({ x: 0, y: -WORLD.ventLift * fsp.body.mass });
-        // Whatever carries the fish upward inside a bubble column is the water's doing.
-        this.fish.flow.set(0, lifted ? Math.min(0, fsp.body.velocity.y) : 0);
+        // Currents: the water takes the player up to its own speed and never brakes it,
+        // so a stream entered fast is left faster (flow.js).
+        const water = this.flow.at(fsp.x, fsp.y, this.time.now / 1000, this.flowAt);
+        if (!this.fish.inAir && (water.x || water.y)) {
+            const push = carry(water.x, water.y, fsp.body.velocity.x, fsp.body.velocity.y, FLOW, this.flowPush || (this.flowPush = { x: 0, y: 0 }));
+            fsp.setVelocity(fsp.body.velocity.x + push.x, fsp.body.velocity.y + push.y);
+        }
+        // Whatever carries the fish is the water's doing, not its own swimming (it must not turn to face it).
+        this.fish.flow.set(water.x, water.y + (lifted ? Math.min(0, fsp.body.velocity.y) : 0));
         this.surface.recenter(fsp.x);
         this.surface.step();
         this.fish.update(STEP_MS, this.surface.heightAt(fsp.x, this.time.now / 1000));
@@ -591,6 +606,19 @@ export default class MainScene extends Phaser.Scene {
         this.cameras.main.setScroll(this.camX, this.camY);
 
         this.leakOil(delta);
+        // Streams show themselves: bubbles are born along the lanes in view and ride them.
+        this.streamBubbles = (this.streamBubbles || 0) + delta * WORLD.streamBubbles / 1000;
+        if (this.streamBubbles >= 1) {
+            const wv = this.cameras.main.worldView;
+            for (const st of this.flow.streamsIn(wv.x - 200, wv.right + 200)) {
+                for (let n = Math.floor(this.streamBubbles); n > 0; n--) {
+                    const x = Phaser.Math.Between(Math.max(st.x0, wv.x - 200), Math.min(st.x1, wv.right + 200));
+                    const y = streamY(st, x) + Phaser.Math.Between(-FLOW.streamWidth, FLOW.streamWidth) * 0.8;
+                    if (y > 40 && this.level.isOpen(x, y)) this.particles.spawn('bubble', x, y, 1, { radius: 9, spread: 6 });
+                }
+            }
+            this.streamBubbles %= 1;
+        }
         this.particles.update(delta / 1000);
         this.bobCoins();
 
