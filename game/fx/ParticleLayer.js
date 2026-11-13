@@ -99,6 +99,9 @@ export default class ParticleLayer {
         }
         // Soft clouds: redraw only while there is something to show.
         const rt = this.softRT;
+        // The game's width follows the screen shape (orientation.js): keep the texture matching.
+        const want = Math.ceil(this.scene.scale.width * SOFT.scale);
+        if (rt.width !== want) rt.resize(want, Math.ceil(this.scene.scale.height * SOFT.scale));
         if (L.soft.used || rt.wasUsed) {
             const cam = this.scene.cameras.main;
             rt.camera.setScroll(cam.scrollX, cam.scrollY);
