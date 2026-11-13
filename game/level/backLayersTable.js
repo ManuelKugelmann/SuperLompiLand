@@ -24,8 +24,10 @@ export const BACK_LAYERS = [
 //   rise     ground above the seabed (px)       items   decor per 1024-px chunk
 //   size     decor size (share of chunk height) depth   Phaser depth (shafts are at -12)
 export const MID_LAYERS = [
-    { id: 'mid', scroll: 0.6, vscroll: 0.7, fog: 0.58, height: 0.42, rise: 260, items: 9, size: 0.42, depth: -15, strength: 1 },
-    { id: 'backplay', scroll: 0.82, vscroll: 0.88, fog: 0.36, height: 0.4, rise: 60, items: 7, size: 0.55, depth: -10, strength: 1 }
+    // Off (strength 0): the stacked bands showed creases, cut-offs and seams and felt like a
+    // layer cake (user, 2026-11-14). Being replaced by many individual depths (spec 10.10b).
+    { id: 'mid', scroll: 0.6, vscroll: 0.7, fog: 0.58, height: 0.42, rise: 260, items: 9, size: 0.42, depth: -15, strength: 0 },
+    { id: 'backplay', scroll: 0.82, vscroll: 0.88, fog: 0.36, height: 0.4, rise: 60, items: 7, size: 0.55, depth: -10, strength: 0 }
 ];
 
 // Silhouette kinds (big soft shapes only — the background has no micro detail, spec 10.10b).

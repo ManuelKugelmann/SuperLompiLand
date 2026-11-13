@@ -23,7 +23,8 @@ export const WATER_LIGHT = {
     gradeSaturation: 0.2, // extra saturation in full sunlight
     gradeAbsorb: 0.32,    // how much red is lost at full depth
     gradeExposure: 0.22,  // brightness lift in full sunlight (style guide: shallow water is bright)
-    fadeTo: 2600          // depth (px below the surface) where the sunlight has faded away
+    fadeTo: 2600,         // depth (px below the surface) where the sunlight has faded away
+    dither: 0.035         // strength of the fine noise that breaks up colour banding in smooth water (0 = off)
 };
 
 const TEX = 256;
@@ -66,6 +67,18 @@ export default class WaterLight {
                 ts.speed = { x: sx, y: sy };
                 this.caustics.push(ts);
             }
+        }
+
+        // Dither: a fine static noise over the scene, a few grey levels either way, so the
+        // smooth water gradients never show 8-bit colour bands (spec 10.11b: no lines).
+        this.dither = null;
+        if (WATER_LIGHT.dither > 0) {
+            if (!scene.textures.exists('wl_dither')) {
+                const c = scene.textures.createCanvas('wl_dither', 128, 128), dctx = c.getContext(), img = dctx.createImageData(128, 128);
+                for (let i = 0; i < 128 * 128; i++) { const v = Math.random() * 255; img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255; }
+                dctx.putImageData(img, 0, 0); c.refresh();
+            }
+            this.dither = scene.add.tileSprite(0, 0, W, H, 'wl_dither').setOrigin(0).setScrollFactor(0).setDepth(39.5).setAlpha(WATER_LIGHT.dither);
         }
 
         // Colour grade on the main camera (WebGL post effect; skipped if unavailable).
@@ -123,6 +136,7 @@ export default class WaterLight {
 
     destroy() {
         for (const o of [...this.shafts, ...this.caustics]) o.destroy();
+        this.dither?.destroy();
         if (this.grade) this.scene.cameras.main.postFX?.remove(this.grade);
     }
 }
