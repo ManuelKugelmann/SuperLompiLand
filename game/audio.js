@@ -75,6 +75,58 @@ function noise({ at = 0, dur = 0.3, vol = 0.3, from = 1200, to = 300, q = 0.8 })
     src.stop(t + dur + 0.02);
 }
 
+// Vowel formants (F1, F2) in Hz for a small, bright creature voice.
+const VOWEL = { a: [900, 1500], e: [600, 2300], i: [380, 2900], o: [560, 1050], u: [380, 950], ae: [800, 1900] };
+
+/**
+ * A tiny sung syllable — what makes a friend sound like a happy little creature rather
+ * than a beep: a buzzy source plus a breath of noise through three band-pass formants
+ * that glide from one vowel to another, with an exclamation pitch scoop and vibrato.
+ */
+function voice({ at = 0, dur = 0.3, f0 = 520, f1 = f0 * 1.5, from = 'e', to = 'a', vol = 0.2, vib = 6 }) {
+    const t = ctx.currentTime + at;
+    const src = ctx.createOscillator();
+    src.type = 'sawtooth';
+    src.frequency.setValueAtTime(f0 * 0.82, t);
+    src.frequency.exponentialRampToValueAtTime(f0, t + 0.04);
+    src.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.75);
+    const lfo = ctx.createOscillator(), lfoGain = ctx.createGain();
+    lfo.frequency.value = vib;
+    lfoGain.gain.value = f0 * 0.02;
+    lfo.connect(lfoGain).connect(src.frequency);
+    const breathSrc = ctx.createBufferSource(), breath = ctx.createGain();
+    breathSrc.buffer = noiseBuf;
+    breathSrc.loop = true;
+    breath.gain.value = 0.35;
+    breathSrc.connect(breath);
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(vol, t + 0.03);
+    out.gain.setValueAtTime(vol, t + dur * 0.65);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    [[0, 7, 1], [1, 11, 0.8], [2, 14, 0.35]].forEach(([k, q, gain]) => {
+        const bp = ctx.createBiquadFilter(), g = ctx.createGain();
+        bp.type = 'bandpass';
+        bp.Q.value = q;
+        bp.frequency.setValueAtTime(k < 2 ? VOWEL[from][k] : 3300, t);
+        bp.frequency.linearRampToValueAtTime(k < 2 ? VOWEL[to][k] : 3460, t + dur * 0.6);
+        g.gain.value = gain * 2.2;
+        src.connect(bp);
+        breath.connect(bp);
+        bp.connect(g).connect(out);
+    });
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 6000;
+    out.connect(lp).connect(master);
+    for (const node of [src, lfo, breathSrc]) { node.start(t); node.stop(t + dur + 0.05); }
+}
+
+/** A celesta-like sparkle: a sine with two inharmonic partials and a ringing decay. */
+function bell({ f, at = 0, dur = 0.6, vol = 0.06 }) {
+    [[1, 1], [2.76, 0.35], [5.4, 0.12]].forEach(([m, a]) => tone({ f: f * m, at, dur: dur / Math.sqrt(m), vol: vol * a }));
+}
+
 let coinStreak = 0, lastCoin = 0, lastVoice = -1;
 
 const SOUNDS = {
@@ -113,19 +165,24 @@ const SOUNDS = {
         noise({ at: 0.06, dur: 0.5, vol: v * 0.45, from: 1200, to: 400, q: 0.7 });
     },
     hit() { tone({ f: 190, to: 70, type: 'square', dur: 0.22, vol: 0.22 }); noise({ dur: 0.12, vol: 0.2, from: 400, to: 150 }); },
-    /** Meeting a friend: one of several happy little voices, never the same twice in a row. */
+    /**
+     * Meeting a friend: one of several happy little creature voices (giggles, "woo-hoo",
+     * "yippee", "yay") with a soft sparkle, never the same twice in a row. Levels are
+     * matched to about -30 LUFS each, under the coin notes. Checked by ear with earshot:
+     * the giggles and the woo-hoo read as a cheering creature, not as a beep.
+     */
     friend() {
         const voices = [
-            // "yay!" — a quick dip and a long happy rise
-            () => { tone({ f: 620, to: 520, type: 'triangle', dur: 0.07, vol: 0.2 }); tone({ f: 540, to: 1250, type: 'triangle', at: 0.07, dur: 0.3, vol: 0.24 }); },
-            // "woo-hoo" — up, then higher
-            () => { tone({ f: 520, to: 780, type: 'sine', dur: 0.16, vol: 0.24 }); tone({ f: 700, to: 1180, type: 'sine', at: 0.2, dur: 0.26, vol: 0.24 }); },
-            // giggle — a run of quick bright blips
-            () => { [880, 1046.5, 932, 1174.66, 1046.5, 1318.51].forEach((f, i) => tone({ f, to: f * 1.12, type: 'triangle', at: i * 0.065, dur: 0.06, vol: 0.18 })); },
-            // "hello!" chirp — three notes of a major chord
-            () => { [659.25, 783.99, 1046.5].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.09, dur: 0.2, vol: 0.2 })); },
-            // happy squeak — fast wobble upward
-            () => { for (let i = 0; i < 4; i++) tone({ f: 700 + i * 130, to: 900 + i * 130, type: 'sine', at: i * 0.07, dur: 0.07, vol: 0.2 }); }
+            // giggle
+            () => { [620, 700, 660, 760, 720, 840].forEach((f, i) => voice({ at: i * 0.08, dur: 0.075, f0: f, f1: f * 1.08, from: 'e', to: 'i', vol: 0.2, vib: 0 })); bell({ f: 1760, at: 0.48 }); },
+            // a higher, quicker giggle
+            () => { [780, 700, 820, 740, 880, 800, 940].forEach((f, i) => voice({ at: i * 0.07, dur: 0.065, f0: f, f1: f * 1.06, from: 'i', to: 'e', vol: 0.2, vib: 0 })); bell({ f: 2093, at: 0.5 }); },
+            // "woo-hoo"
+            () => { voice({ dur: 0.24, f0: 420, f1: 560, from: 'u', to: 'o', vol: 0.09 }); voice({ at: 0.26, dur: 0.34, f0: 560, f1: 880, from: 'o', to: 'u', vol: 0.09 }); bell({ f: 1568, at: 0.55, vol: 0.03 }); },
+            // "yippee"
+            () => { voice({ dur: 0.18, f0: 520, f1: 600, from: 'i', to: 'i', vol: 0.14 }); voice({ at: 0.2, dur: 0.38, f0: 640, f1: 980, from: 'e', to: 'i', vol: 0.14 }); bell({ f: 1760, at: 0.6, vol: 0.04 }); },
+            // "yay!" with a little chime
+            () => { voice({ dur: 0.36, f0: 470, f1: 760, from: 'i', to: 'ae', vol: 0.09 }); [1318.5, 1568, 2093].forEach((f, i) => bell({ f, at: 0.3 + i * 0.06, vol: 0.03 })); }
         ];
         let pick;
         do { pick = Math.floor(Math.random() * voices.length); } while (pick === lastVoice && voices.length > 1);
