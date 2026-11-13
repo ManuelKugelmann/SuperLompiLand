@@ -10,9 +10,7 @@ import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.j
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
-import { makeRoomCode, cleanRoomCode, CODE_LENGTH } from '../net/Net.js';
-
-const CODE_KEYS = 'BCDFGHJKLMNPQRSTVWXZ2346789'.split('');
+import { makeSecret, normalizeSecret, MIN_SECRET, MAX_SECRET } from '../net/Net.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -173,39 +171,48 @@ export default class IntroScene extends Phaser.Scene {
         const label = { fontFamily: 'Arial', fontStyle: 'bold' };
         const ui = [];
         const add = o => { ui.push(o); return o.setDepth(100); };
-        let code = '';
+        let word = '';
+        try { word = normalizeSecret(window.localStorage.getItem('sll_family') || ''); } catch { /* storage blocked */ }
 
         // Dim backdrop that also swallows taps meant for the title behind it.
-        add(this.add.rectangle(W / 2, H / 2, W, H, 0x04213a, 0.88).setInteractive());
-        add(this.add.text(W / 2, H * 0.1, de ? 'Zusammen schwimmen' : 'Swim together', {
-            ...label, fontSize: '70px', color: '#ffffff', stroke: '#0a5c7a', strokeThickness: 10
+        add(this.add.rectangle(W / 2, H / 2, W, H, 0x04213a, 0.9).setInteractive());
+        add(this.add.text(W / 2, H * 0.09, de ? 'Zusammen schwimmen' : 'Swim together', {
+            ...label, fontSize: '68px', color: '#ffffff', stroke: '#0a5c7a', strokeThickness: 10
         }).setOrigin(0.5));
-        add(this.add.text(W / 2, H * 0.18, de ? 'Gleicher Code = gleiches Meer' : 'Same code = same sea', {
-            ...label, fontSize: '34px', color: '#eafcff'
+        add(this.add.text(W / 2, H * 0.165, de
+            ? 'Wählt ein geheimes Familien-Wort. Nur wer es kennt, kommt ins Meer.'
+            : 'Pick a secret family word. Only people who know it can join.', {
+            ...label, fontSize: '30px', color: '#eafcff'
         }).setOrigin(0.5));
 
-        const codeText = add(this.add.text(W / 2, H * 0.3, '', {
-            ...label, fontSize: '120px', color: '#ffc266', stroke: '#06343a', strokeThickness: 12
+        const wordText = add(this.add.text(W / 2, H * 0.275, '', {
+            ...label, fontSize: '84px', color: '#ffc266', stroke: '#06343a', strokeThickness: 10
+        }).setOrigin(0.5));
+        const hint = add(this.add.text(W / 2, H * 0.36, '', {
+            ...label, fontSize: '28px', color: '#9fd9ea'
         }).setOrigin(0.5));
         const refresh = () => {
-            codeText.setText(code.padEnd(CODE_LENGTH, '_').split('').join(' '));
-            go.setAlpha(code.length === CODE_LENGTH ? 1 : 0.35);
+            wordText.setText(word.toUpperCase() || '…');
+            const ok = word.length >= MIN_SECRET;
+            go.setAlpha(ok ? 1 : 0.35);
+            hint.setText(ok ? '' : (de ? `Mindestens ${MIN_SECRET} Zeichen` : `At least ${MIN_SECRET} characters`));
         };
-        const setCode = c => { code = cleanRoomCode(c); refresh(); };
+        const setWord = w => { word = normalizeSecret(w); refresh(); };
 
         const pill = (x, y, text, color, fn, size = 40) => {
             const t = add(this.add.text(x, y, text, {
-                ...label, fontSize: `${size}px`, color: '#06343a', backgroundColor: color, padding: { x: 24, y: 12 }
+                ...label, fontSize: `${size}px`, color: '#06343a', backgroundColor: color, padding: { x: 20, y: 10 }
             }).setOrigin(0.5).setInteractive({ useHandCursor: true }));
             t.on('pointerdown', fn);
             return t;
         };
 
-        // Keypad: 27 keys in 3 rows of 9, plus erase.
-        const cols = 9, kw = 112, kh = 96, x0 = W / 2 - (cols - 1) * kw / 2, y0 = H * 0.47;
-        CODE_KEYS.forEach((k, i) => {
+        // Keypad: A-Z and 0-9 in three rows of 12.
+        const keys = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('');
+        const cols = 12, kw = 124, kh = 94, x0 = W / 2 - (cols - 1) * kw / 2, y0 = H * 0.46;
+        keys.forEach((k, i) => {
             pill(x0 + (i % cols) * kw, y0 + Math.floor(i / cols) * kh, k, '#b8ecf7',
-                () => { if (code.length < CODE_LENGTH) setCode(code + k); }, 46);
+                () => { if (word.length < MAX_SECRET) setWord(word + k.toLowerCase()); }, 46);
         });
 
         const close = () => {
@@ -214,20 +221,21 @@ export default class IntroScene extends Phaser.Scene {
             this.modal = false;
         };
         const onKey = e => {
-            if (e.key === 'Backspace') setCode(code.slice(0, -1));
+            if (e.key === 'Backspace') setWord(word.slice(0, -1));
             else if (e.key === 'Escape') close();
-            else if (e.key === 'Enter') { if (code.length === CODE_LENGTH) go.emit('pointerdown'); }
-            else if (e.key.length === 1) setCode(code + e.key);
+            else if (e.key === 'Enter') { if (word.length >= MIN_SECRET) go.emit('pointerdown'); }
+            else if (e.key.length === 1) setWord(word + e.key);
         };
         this.input.keyboard?.on('keydown', onKey);
 
-        const row = H * 0.47 + 3 * kh + 10;
-        pill(W / 2 - 330, row, '⌫', '#ffd0d0', () => setCode(code.slice(0, -1)), 46);
-        pill(W / 2, row, de ? 'Neuer Raum' : 'New room', '#ffe9a8', () => setCode(makeRoomCode()));
-        const go = pill(W / 2 + 330, row, de ? 'Los!' : 'Go!', '#7ee08a', () => {
-            if (code.length !== CODE_LENGTH) return;
+        const row = y0 + 3 * kh + 10;
+        pill(W / 2 - 520, row, '⌫', '#ffd0d0', () => setWord(word.slice(0, -1)), 46);
+        pill(W / 2 - 200, row, de ? 'Zufalls-Wort' : 'Random word', '#ffe9a8', () => setWord(makeSecret()));
+        const go = pill(W / 2 + 280, row, de ? 'Los!' : 'Go!', '#7ee08a', () => {
+            if (word.length < MIN_SECRET) return;
+            try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
             close();
-            this.registry.set('room', code);
+            this.registry.set('room', word);
             this.scene.start(SCENE_KEYS.MAIN);
         });
         pill(W - 70, 60, '✕', '#ffd0d0', close);

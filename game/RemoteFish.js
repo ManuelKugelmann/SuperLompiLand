@@ -1,14 +1,22 @@
 import Phaser from 'phaser';
 import { getCharacter } from './characters.js';
 
-const DELAY_MS = 120;   // render this far in the past so there are always two snapshots to blend
-const KEEP = 12;        // snapshots kept per fish
-const STALE_MS = 6000;  // no update for this long = fish fades out
+const KEEP = 24;         // snapshots kept per fish
+const STALE_MS = 6000;   // no update for this long = fish fades out
+const MIN_DELAY = 90;    // render-delay bounds (ms): the cushion against network jitter
+const MAX_DELAY = 320;
+const SNAP_DIST = 700;   // a jump this far (respawn, nest) is a teleport, not a swim
+const OFFSET_WINDOW = 80;
 
 /**
  * Another player's fish: view only, no Matter body, never collides. Draws a
- * slightly see-through copy of that player's character at a position blended
- * between the snapshots received over the network.
+ * slightly see-through copy of that player's character.
+ *
+ * Smoothness: every snapshot carries the sender's clock (`t`). The offset
+ * between the two clocks is estimated as the fastest recent delivery, so
+ * bursty arrival (a stalled data channel releasing several packets at once)
+ * does not turn into stutter. The fish is drawn a little in the past, with a
+ * cushion that grows and shrinks with measured jitter.
  */
 export default class RemoteFish {
     constructor(scene) {
@@ -18,11 +26,29 @@ export default class RemoteFish {
         this.char = null;
         this.stateName = 'normal';
         this.seen = 0;
+        this.lastSeq = -1;
+        this.offsets = [];
+        this.delay = 140;
+        this.jitter = 0;
     }
 
-    /** Snapshot: { x, y, vx, vy, s: 'normal'|'inflated', f: 1|-1, c: characterId } */
+    /** Snapshot: { n, t, x, y, vx, vy, s: 'normal'|'inflated', f: 1|-1, c: characterId }. `now` = local clock, ms. */
     push(snap, now) {
-        this.buf.push({ ...snap, t: now });
+        if (typeof snap?.t !== 'number' || typeof snap.x !== 'number' || typeof snap.y !== 'number') return;
+        if (snap.n <= this.lastSeq && this.lastSeq - snap.n < 1000) return; // late / duplicate
+        this.lastSeq = snap.n;
+
+        this.offsets.push(now - snap.t);
+        if (this.offsets.length > OFFSET_WINDOW) this.offsets.shift();
+        const offset = Math.min(...this.offsets);
+        const lt = snap.t + offset;
+        // How late this packet was compared with the fastest ones, smoothed.
+        this.jitter += ((now - lt) - this.jitter) * 0.08;
+        this.delay = Phaser.Math.Clamp(60 + this.jitter * 3, MIN_DELAY, MAX_DELAY);
+
+        const last = this.buf[this.buf.length - 1];
+        if (last && Math.hypot(snap.x - last.x, snap.y - last.y) > SNAP_DIST) this.buf.length = 0;
+        this.buf.push({ ...snap, lt });
         if (this.buf.length > KEEP) this.buf.shift();
         this.seen = now;
         if (snap.c !== this.char?.id || snap.s !== this.stateName) this.setLook(snap.c, snap.s);
@@ -42,20 +68,22 @@ export default class RemoteFish {
         const b = this.buf;
         if (!b.length || !this.char) return;
         const img = this.img;
-        const age = now - this.seen;
-        if (age > STALE_MS) { img.setVisible(false); return; }
-        const t = now - DELAY_MS;
+        if (now - this.seen > STALE_MS) { img.setVisible(false).setAlpha(0); return; }
+
+        // Local time that maps onto "sender time minus the cushion".
+        const offset = Math.min(...this.offsets);
+        const t = now - offset - this.delay;
         let a = b[0], c = b[b.length - 1];
         for (let i = b.length - 1; i > 0; i--) {
-            if (b[i - 1].t <= t) { a = b[i - 1]; c = b[i]; break; }
+            if (b[i - 1].lt <= t) { a = b[i - 1]; c = b[i]; break; }
         }
         let x, y, vx, vy;
-        if (t >= c.t) {
+        if (t >= c.lt) {
             // Past the newest snapshot: coast on its velocity (60 Hz steps), briefly.
-            const dt = Math.min(t - c.t, 250) / (1000 / 60);
+            const dt = Math.min(t - c.lt, 250) / (1000 / 60);
             x = c.x + c.vx * dt; y = c.y + c.vy * dt; vx = c.vx; vy = c.vy;
         } else {
-            const k = a === c ? 1 : Phaser.Math.Clamp((t - a.t) / (c.t - a.t), 0, 1);
+            const k = a === c ? 1 : Phaser.Math.Clamp((t - a.lt) / (c.lt - a.lt), 0, 1);
             x = Phaser.Math.Linear(a.x, c.x, k); y = Phaser.Math.Linear(a.y, c.y, k);
             vx = Phaser.Math.Linear(a.vx, c.vx, k); vy = Phaser.Math.Linear(a.vy, c.vy, k);
         }
