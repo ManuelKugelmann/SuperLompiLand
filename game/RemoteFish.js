@@ -43,6 +43,8 @@ export default class RemoteFish {
         this.ring = scene.add.circle(0, 0, 60).setDepth(4.7).setVisible(false);
         this.iconRing = scene.add.circle(0, 0, ICON_W * 0.62).setScrollFactor(0).setDepth(58.9).setVisible(false);
         this.radius = 60;
+        this.down = false;      // 0 hearts: the edge marker pulses red with a heart so friends come to help
+        this.help = scene.add.text(0, 0, '💗', { fontFamily: 'Arial', fontSize: '44px' }).setOrigin(0.5).setScrollFactor(0).setDepth(59.1).setVisible(false);
         this.setColor(0xffffff);
     }
 
@@ -86,7 +88,7 @@ export default class RemoteFish {
             this.rig.setVisible(false);
             this.alpha = 0;
             this.pos = null;
-            for (const o of [this.icon, this.arrow, this.ring, this.iconRing]) o.setVisible(false);
+            for (const o of [this.icon, this.arrow, this.ring, this.iconRing, this.help]) o.setVisible(false);
             return;
         }
         this.pos = { x: p.x, y: p.y };
@@ -94,10 +96,18 @@ export default class RemoteFish {
         this.icon.setVisible(!!m);
         this.arrow.setVisible(!!m);
         this.iconRing.setVisible(!!m);
+        this.help.setVisible(!!m && this.down);
         if (m) {
             const bob = Math.sin(now / 260) * 4;
             this.icon.setPosition(m.x, m.y + bob);
             this.iconRing.setPosition(m.x, m.y + bob);
+            if (this.down) {
+                const pulse = 0.5 + 0.5 * Math.sin(now / 140);
+                this.iconRing.setStrokeStyle(6 + pulse * 4, 0xff3b6b, 1).setScale(1 + pulse * 0.15);
+                this.help.setPosition(m.x, m.y - 64 + bob).setScale(0.9 + pulse * 0.25);
+            } else if (this.iconRing.scale !== 1) {
+                this.iconRing.setScale(1).setStrokeStyle(5, this.color, 1);
+            }
             this.arrow.setPosition(m.x + Math.cos(m.angle) * 58, m.y + Math.sin(m.angle) * 58).setRotation(m.angle);
         }
         const frames = Phaser.Math.Clamp((now - this.last) / (1000 / 60), 0, 3);
@@ -110,6 +120,6 @@ export default class RemoteFish {
 
     destroy() {
         this.rig?.destroy();
-        for (const o of [this.icon, this.arrow, this.ring, this.iconRing]) o.destroy();
+        for (const o of [this.icon, this.arrow, this.ring, this.iconRing, this.help]) o.destroy();
     }
 }

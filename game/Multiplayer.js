@@ -227,6 +227,8 @@ export default class Multiplayer {
         const label = s.add.text(x, y - BUBBLE_R - 34, '💗', { fontFamily: 'Arial', fontSize: '56px' }).setOrigin(0.5).setDepth(5.3);
         s.tweens.add({ targets: ring, scale: 1.08, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         this.bubbles.set(id, { x, y, until: performance.now() + BUBBLE_MS, ring, label });
+        const g = this.ghosts.get(id);
+        if (g) g.down = true;
     }
 
     dropBubble(id) {
@@ -235,6 +237,8 @@ export default class Multiplayer {
         this.scene.tweens.killTweensOf(b.ring);
         b.ring.destroy(); b.label.destroy();
         this.bubbles.delete(id);
+        const g = this.ghosts.get(id);
+        if (g) g.down = false;
     }
 
     updateBubbles(now) {
