@@ -112,8 +112,7 @@ async function build(c) {
 }
 
 /** What the model does at time t (seconds): the four poses in a loop, or the one asked for. */
-function poseAt(t) {
-    const fixed = query.get('pose');
+function poseAt(t, fixed = query.get('pose')) {
     const index = fixed ? Math.max(0, POSES.indexOf(fixed)) : Math.floor(t / POSE_SECONDS) % POSES.length;
     const u = (t % POSE_SECONDS) / POSE_SECONDS, name = POSES[index];
     const ease = v => v * v * (3 - 2 * v);
@@ -155,12 +154,13 @@ bar.appendChild(shot);
 const start = performance.now();
 function now() { return query.has('t') ? Number(query.get('t')) : (performance.now() - start) / 1000; }
 
-function frame() {
+/** Draw one frame; `at` = { pose, t } draws that exact moment (capture scripts), else the running clock. */
+function frame(at = null) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const W = Math.round(canvas.clientWidth * dpr), H = Math.round(canvas.clientHeight * dpr);
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     gl.enable(gl.SCISSOR_TEST);
-    const pose = poseAt(now()), n = Math.max(1, candidates.length), cw = Math.floor(W / n);
+    const pose = at ? poseAt(at.t, at.pose) : poseAt(now()), n = Math.max(1, candidates.length), cw = Math.floor(W / n);
     const heroH = Math.floor(H * 0.68), gameH = H - heroH;
     candidates.forEach((c, i) => {
         // Hero zoom on top, on bright shallow water; gameplay size below, a little deeper.
@@ -178,7 +178,7 @@ function frame() {
         c.el.style.width = `${cw / dpr}px`;
     });
     gl.disable(gl.SCISSOR_TEST);
-    window.__viewer = { pose: pose.name, candidates: candidates.map(c => ({ id: c.id, triangles: c.triangles })) };
-    requestAnimationFrame(frame);
+    window.__viewer = { pose: pose.name, seconds: POSE_SECONDS, draw: (name, t) => frame({ pose: name, t }), candidates: candidates.map(c => ({ id: c.id, label: c.label, triangles: c.triangles })) };
+    if (!at) requestAnimationFrame(() => frame());
 }
 frame();
