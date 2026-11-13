@@ -5,6 +5,10 @@ import { SnapshotBuffer } from '../net/snapshots.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 
 const ICON_W = 78; // off-screen marker size (px)
+const ARROW_SCALE = 1.5;      // the arrow pointing at an off-screen friend
+const ARROW_REACH = 74;       // its distance from the friend's picture ...
+const ARROW_NUDGE = 12;       // ... plus this much, pulsing toward the friend
+const PX_PER_METER = 100;     // same scale as the depth gauge
 
 /**
  * Another player: view only, no Matter body, never collides. Draws a slightly
@@ -38,7 +42,11 @@ export default class RemoteFish {
             g.generateTexture('mp_arrow', 52, 40);
             g.destroy();
         }
-        this.arrow = scene.add.image(0, 0, 'mp_arrow').setScrollFactor(0).setDepth(59).setAlpha(0.95).setVisible(false);
+        this.arrow = scene.add.image(0, 0, 'mp_arrow').setScrollFactor(0).setDepth(59).setAlpha(0.95).setScale(ARROW_SCALE).setVisible(false);
+        // How far away the friend is, so you can tell whether you are getting closer.
+        this.far = scene.add.text(0, 0, '', {
+            fontFamily: 'Arial', fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: '#0a3f6e', strokeThickness: 7
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(59).setVisible(false);
         // Colour ring (spec: no names; each fish shows its character plus a colour ring).
         this.ring = scene.add.circle(0, 0, 60).setDepth(4.7).setVisible(false);
         this.iconRing = scene.add.circle(0, 0, ICON_W * 0.62).setScrollFactor(0).setDepth(58.9).setVisible(false);
@@ -54,6 +62,7 @@ export default class RemoteFish {
         this.ring.setStrokeStyle(7, color, 0.85);
         this.iconRing.setFillStyle(0x0a3f6e, 0.45).setStrokeStyle(5, color, 1);
         this.arrow.setTint(color);
+        this.mapDot?.setFillStyle(color, 1);
     }
 
     /** Snapshot: { n, t, x, y, vx, vy, s: 'normal'|'inflated', f: 1|-1, c: characterId }. `now` = local clock, ms. */
@@ -88,13 +97,14 @@ export default class RemoteFish {
             this.rig.setVisible(false);
             this.alpha = 0;
             this.pos = null;
-            for (const o of [this.icon, this.arrow, this.ring, this.iconRing, this.help]) o.setVisible(false);
+            for (const o of [this.icon, this.arrow, this.far, this.ring, this.iconRing, this.help]) o.setVisible(false);
             return;
         }
         this.pos = { x: p.x, y: p.y };
         const m = edgeMarker(this.scene.cameras.main.worldView, p);
         this.icon.setVisible(!!m);
         this.arrow.setVisible(!!m);
+        this.far.setVisible(!!m && !this.down);   // a downed friend shows the heart there instead
         this.iconRing.setVisible(!!m);
         this.help.setVisible(!!m && this.down);
         if (m) {
@@ -108,7 +118,12 @@ export default class RemoteFish {
             } else if (this.iconRing.scale !== 1) {
                 this.iconRing.setScale(1).setStrokeStyle(5, this.color, 1);
             }
-            this.arrow.setPosition(m.x + Math.cos(m.angle) * 58, m.y + Math.sin(m.angle) * 58).setRotation(m.angle);
+            // The arrow nudges toward the friend, so the direction reads at a glance.
+            const reach = ARROW_REACH + (0.5 + 0.5 * Math.sin(now / 180)) * ARROW_NUDGE;
+            this.arrow.setPosition(m.x + Math.cos(m.angle) * reach, m.y + Math.sin(m.angle) * reach).setRotation(m.angle);
+            // The distance sits on the side away from the arrow.
+            this.far.setText(`${Math.max(1, Math.round(m.distance / PX_PER_METER))} m`)
+                .setPosition(m.x - Math.cos(m.angle) * 12, m.y + bob + (Math.sin(m.angle) > 0.5 ? -62 : 62));
         }
         const frames = Phaser.Math.Clamp((now - this.last) / (1000 / 60), 0, 3);
         this.last = now;
@@ -120,6 +135,6 @@ export default class RemoteFish {
 
     destroy() {
         this.rig?.destroy();
-        for (const o of [this.icon, this.arrow, this.ring, this.iconRing, this.help]) o.destroy();
+        for (const o of [this.icon, this.arrow, this.far, this.ring, this.iconRing, this.help, this.mapDot]) o?.destroy();
     }
 }

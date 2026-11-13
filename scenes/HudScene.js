@@ -134,6 +134,14 @@ export default class HudScene extends Phaser.Scene {
         this.coinText.setText(String(m.mp ? m.teamCoins() : m.coins));
         this.depthText.setText(`${this.depthLabel} ${m.depthMeters()} m`);
         this.mapYou.x = this.toMap(m.fish.sprite.x);
+        // Playing together: every friend is a dot in their colour on the journey strip.
+        for (const g of m.mp?.ghosts.values() ?? []) {
+            if (!g.mapDot) {
+                g.mapDot = this.add.circle(0, this.mapY + 20, 8, g.color ?? 0xffffff, 1).setStrokeStyle(3, 0xffffff).setDepth(this.mapYou.depth);
+            }
+            g.mapDot.setVisible(!!g.pos);
+            if (g.pos) g.mapDot.x = this.toMap(g.pos.x);
+        }
         this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
