@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Split Test</title>
+<style>
+    html, body { margin: 0; height: 100%; background: #04213a; color: #eafcff; font: 600 14px Arial, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    header { padding: 6px 12px; display: flex; gap: 12px; align-items: center; }
+    header button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; background: #ffe9a8; color: #06343a; cursor: pointer; }
+    iframe { flex: 1; width: 100%; border: 0; border-top: 3px solid #0a5c7a; }
+</style>
+</head>
+<body>
+<header>
+    <span>Zwei Spieler, eine echte Verbindung &middot; Raum: <b id="room"></b></span>
+    <button id="again">Neuer Raum</button>
+    <span style="opacity:.7">Klick in eine Hälfte, dann Pfeiltasten.</span>
+</header>
+<iframe id="a" title="Spieler 1" allow="autoplay"></iframe>
+<iframe id="b" title="Spieler 2" allow="autoplay"></iframe>
+<script>
+    // Dev / test page: two copies of the game in one window, each with its own
+    // throwaway identity (?anon), joined to the same random room over the real
+    // relays. The room name goes after '#', so it never reaches a server.
+    const words = ['koralle', 'schildi', 'mond', 'welle', 'stern', 'muschel', 'perle', 'sonne', 'robbe', 'qualle', 'krabbe', 'insel'];
+    const pick = () => words[Math.floor(Math.random() * words.length)];
+    function start() {
+        const room = pick() + pick() + pick() + Math.floor(Math.random() * 1000);
+        document.getElementById('room').textContent = room;
+        document.getElementById('a').src = './index.html?anon#room=' + room + '&char=lompi';
+        document.getElementById('b').src = './index.html?anon#room=' + room + '&char=shark';
+    }
+    document.getElementById('again').onclick = start;
+    start();
+</script>
+</body>
+</html>

@@ -10,7 +10,7 @@ import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.j
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
-import { makeSecret, normalizeSecret, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
+import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -85,6 +85,7 @@ export default class IntroScene extends Phaser.Scene {
         this.buildCarousel(lang);
         flushFeedbackQueue();
         this.buildTogether(lang);
+        this.autoJoin();
 
         this.add.text(W - 24, H - 20, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
@@ -165,6 +166,21 @@ export default class IntroScene extends Phaser.Scene {
         btn.on('pointerdown', () => this.openTogether(de));
     }
 
+    /**
+     * Test hook for split.html: `?anon#room=<name>` joins that room straight away.
+     * The name sits after `#`, which browsers never send to a server.
+     */
+    autoJoin() {
+        if (!/[?&]anon\b/.test(window.location.search)) return;
+        const m = /[#&]room=([^&]+)/.exec(window.location.hash);
+        const word = m && normalizeSecret(decodeURIComponent(m[1]));
+        if (!word || word.length < MIN_JOIN) return;
+        const ch = /[#&]char=([a-z]+)/.exec(window.location.hash)?.[1];
+        if (ch && CHARACTERS.some(c => c.id === ch)) this.registry.set('character', ch);
+        this.registry.set('room', word);
+        this.time.delayedCall(300, () => this.scene.start(SCENE_KEYS.MAIN));
+    }
+
     openTogether(de) {
         if (this.modal) return;
         this.modal = true;
@@ -172,7 +188,7 @@ export default class IntroScene extends Phaser.Scene {
         const label = { fontFamily: 'Arial', fontStyle: 'bold' };
         const ui = [];
         const add = o => { ui.push(o); return o.setDepth(100); };
-        let word = '';
+        let word = '', shown = null; // `shown`: the rolled words with spaces, until the player types
         try { word = normalizeSecret(window.localStorage.getItem('sll_family') || ''); } catch { /* storage blocked */ }
 
         // Dim backdrop that also swallows taps meant for the title behind it.
@@ -193,12 +209,14 @@ export default class IntroScene extends Phaser.Scene {
             ...label, fontSize: '28px', color: '#9fd9ea'
         }).setOrigin(0.5));
         const refresh = () => {
-            wordText.setText(word.toUpperCase() || '…');
-            const ok = word.length >= MIN_SECRET;
-            go.setAlpha(ok ? 1 : 0.35);
-            hint.setText(ok ? '' : (de ? `Mindestens ${MIN_SECRET} Zeichen` : `At least ${MIN_SECRET} characters`));
+            wordText.setText((shown || word).toUpperCase() || '…');
+            go.setAlpha(word.length >= MIN_JOIN ? 1 : 0.35);
+            // Soft hint only (spec): short names still work, they are just easy to guess.
+            hint.setText(word.length >= MIN_SECRET || word.length === 0 ? ''
+                : (de ? 'Zu leicht zu erraten – lieber würfeln?' : 'Too easy to guess – roll the dice?'));
         };
-        const setWord = w => { word = normalizeSecret(w); refresh(); };
+        const setWord = w => { word = normalizeSecret(w); shown = null; refresh(); };
+        const roll = () => { const w = rollWords(de ? 'de' : 'en'); word = normalizeSecret(w.join('')); shown = w.join(' '); refresh(); };
 
         const pill = (x, y, text, color, fn, size = 40) => {
             const t = add(this.add.text(x, y, text, {
@@ -229,7 +247,7 @@ export default class IntroScene extends Phaser.Scene {
             if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
             if (e.key === 'Backspace') setWord(word.slice(0, -1));
             else if (e.key === 'Escape') close();
-            else if (e.key === 'Enter') { if (word.length >= MIN_SECRET) go.emit('pointerdown'); }
+            else if (e.key === 'Enter') { if (word.length >= MIN_JOIN) go.emit('pointerdown'); }
             else if (e.key.length === 1) setWord(word + e.key);
             else return;
             e.preventDefault();
@@ -239,9 +257,9 @@ export default class IntroScene extends Phaser.Scene {
 
         const row = y0 + 3 * kh + 10;
         pill(W / 2 - 520, row, '⌫', '#ffd0d0', () => setWord(word.slice(0, -1)), 46);
-        pill(W / 2 - 200, row, de ? 'Zufalls-Wort' : 'Random word', '#ffe9a8', () => setWord(makeSecret()));
+        pill(W / 2 - 200, row, de ? '🎲 Würfeln' : '🎲 Roll', '#ffe9a8', roll);
         const go = pill(W / 2 + 280, row, de ? 'Los!' : 'Go!', '#7ee08a', () => {
-            if (word.length < MIN_SECRET) return;
+            if (word.length < MIN_JOIN) return;
             try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
             // Stay modal until the scene is gone, so a queued Enter/Space can't
             // also fire start() and restart the game solo.

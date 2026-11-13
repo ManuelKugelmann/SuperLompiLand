@@ -20,8 +20,22 @@ export default class RemoteFish {
         this.scale = 1;
         // Off-screen marker: a small picture of the friend at the screen edge plus an arrow.
         this.icon = scene.add.image(0, 0, 'puffer_normal').setScrollFactor(0).setDepth(59).setAlpha(0.95).setVisible(false);
-        this.arrow = scene.add.triangle(0, 0, 0, -16, 30, 0, 0, 16, 0xffffff, 0.95)
-            .setScrollFactor(0).setDepth(59).setStrokeStyle(4, 0x0a3f6e).setVisible(false);
+        // Dart pointing right at rotation 0, drawn once into a texture. It must be long
+        // and notched: a near-equilateral triangle looks the same turned by 120°, so
+        // its direction could not be read.
+        if (!scene.textures.exists('mp_arrow')) {
+            const g = scene.make.graphics({ add: false });
+            const dart = (pad, color) => {
+                g.fillStyle(color, 1).fillPoints([
+                    { x: pad, y: pad }, { x: 52 - pad * 1.6, y: 20 }, { x: pad, y: 40 - pad }, { x: 14 + pad * 0.6, y: 20 }
+                ], true);
+            };
+            dart(0, 0x0a3f6e);
+            dart(5, 0xffffff);
+            g.generateTexture('mp_arrow', 52, 40);
+            g.destroy();
+        }
+        this.arrow = scene.add.image(0, 0, 'mp_arrow').setScrollFactor(0).setDepth(59).setAlpha(0.95).setVisible(false);
     }
 
     /** Snapshot: { n, t, x, y, vx, vy, s: 'normal'|'inflated', f: 1|-1, c: characterId }. `now` = local clock, ms. */

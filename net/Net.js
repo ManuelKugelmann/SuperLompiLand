@@ -14,8 +14,8 @@ import { joinRoom } from 'trystero';
 import { normalizeSecret } from './secret.js';
 
 const APP_ID = 'reef-swim-pals-v1';
-export const MAX_PLAYERS = 6;
-export { normalizeSecret, makeSecret, MIN_SECRET, MAX_SECRET } from './secret.js';
+export const MAX_PLAYERS = 4; // spec: max 4 fish per room
+export { normalizeSecret, makeSecret, rollWords, MIN_JOIN, MIN_SECRET, MAX_SECRET } from './secret.js';
 
 const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 

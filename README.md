@@ -1,6 +1,6 @@
 # Super Lompi Land
 
-**▶ Play:** [Release](https://manuelkugelmann.github.io/SuperLompiLand/) · [Dev (latest push)](https://manuelkugelmann.github.io/SuperLompiLand/dev/) · [Dev log with screenshots](docs/devlog/README.md)
+**▶ Play:** [Release](https://manuelkugelmann.github.io/SuperLompiLand/) · [Dev (latest push)](https://manuelkugelmann.github.io/SuperLompiLand/dev/) · [Multiplayer preview](https://manuelkugelmann.github.io/SuperLompiLand/multiplayer/) · [Two-player split screen](https://manuelkugelmann.github.io/SuperLompiLand/split.html) · [Dev log with screenshots](docs/devlog/README.md)
 
 <!-- devlog:start -->
 ## Dev log
@@ -53,6 +53,14 @@ harbour down into the deep trench, to reach the grand nest.
   with its own special (puff, dash, leap, shield, pulse).
 - **Relaxed or adventure:** switch in the menu. Relaxed means nothing can hurt.
 - The strip at the top right shows the whole journey and where you are.
+- **Swim together:** tap *Zusammen* on the title screen and type a secret room
+  name (or roll three words with the dice). Everyone who types the same name swims
+  in the same sea — up to 4 fish, co-op, everyone keeps their own coins. There is no
+  room list; the name never leaves the device (only a derived key reaches the
+  public relays that connect the players directly). Friends off screen show as an
+  arrow at the edge. Try it alone with the
+  [split screen](https://manuelkugelmann.github.io/SuperLompiLand/split.html): two
+  players in one window over the real connection.
 
 ## Controls — switchable live (top of the screen)
 
