@@ -10,11 +10,15 @@
 import MeshRenderer from './meshRenderer.js';
 import { parseGlb, normalize } from './glb.js';
 import { inflate, vertexNormals, shrinkMask } from '../rig/inflate.js';
+import { loftBody, fitProfile } from '../rig/loft.js';
+import { softnessMap } from '../rig/soft.js';
 
 /**
  * Candidates per creature. Kinds:
  *   card     the picture on a flat quad, unlit — what the game shows today
  *   inflate  silhouette inflation of the picture (rig/inflate.js), `cells` across
+ *   loft     a procedural body lofted over rings (rig/loft.js), fitted to the picture's body; fins and
+ *            tail stay on a flat card in the middle plane
  *   glb      a 3D model file; `turn` = [yaw, pitch] in degrees to bring its nose to +x
  * Model files from experiments live under _ref/ (not in the repo); missing ones are skipped.
  */
@@ -22,6 +26,7 @@ const CREATURES = {
     lompi: [
         { id: 'sprite', label: 'Current sprite', note: 'flat picture', kind: 'card', image: 'img/puffer_normal.png' },
         { id: 'inflate', label: 'Silhouette inflation', note: 'scripted, from the picture', kind: 'inflate', image: 'img/puffer_normal.png', cells: 44 },
+        { id: 'loft', label: 'Procedural (fitted)', note: 'lofted rings + fin card', kind: 'loft', image: 'img/puffer_normal.png', stations: 28, sides: 20, width: 0.86, box: 2.3 },
         { id: 'trellis1', label: 'Image-to-3D (TRELLIS)', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis1.glb', turn: [90, 0] },
         { id: 'trellis2', label: 'Image-to-3D (TRELLIS.2)', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis2.glb', turn: [90, 0] },
         { id: 'rodin', label: 'Image-to-3D (Rodin)', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/rodin.glb', turn: [90, 0] }
@@ -96,6 +101,26 @@ async function build(c) {
         for (let i = 0; i < indices.length; i += 3) { indices[i] = mesh.indices[i]; indices[i + 1] = mesh.indices[i + 2]; indices[i + 2] = mesh.indices[i + 1]; }
         const prim = { positions, indices, uvs: mesh.uvs, normals: vertexNormals(positions, indices) };
         return { ...c, meshes: [renderer.upload(prim, img)], triangles: mesh.triangles, lit: 1 };
+    }
+    if (c.kind === 'loft') {
+        const img = await loadImage(c.image), aspect = img.height / img.width;
+        // The body is the thick part of the picture; thin parts (fins, tail) are left to the card.
+        const small = shrinkMask(alphaOf(img), img.width, img.height, 96);
+        const soft = softnessMap(small.alpha, small.w, small.h).soft;
+        const bodyMask = small.alpha.map((a, i) => (a > 40 && soft[i] < 0.5 ? 1 : 0));
+        const fit = fitProfile(bodyMask, small.w, small.h, { width: c.width, box: c.box });
+        const profile = t => {
+            const p = fit.profile(t);
+            return { x: p.x / small.w - 0.5, y: (small.h / 2 - p.y) / small.w, h: p.h / small.w, w: p.w / small.w, n: p.n };
+        };
+        const body = loftBody({ stations: c.stations, sides: c.sides, profile, uv: (x, y) => [x + 0.5, 0.5 - y / aspect] });
+        body.normals = vertexNormals(body.positions, body.indices);
+        const card = {
+            positions: Float32Array.from([-0.5, aspect / 2, 0, 0.5, aspect / 2, 0, 0.5, -aspect / 2, 0, -0.5, -aspect / 2, 0]),
+            normals: Float32Array.from([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+            uvs: Float32Array.from([0, 0, 1, 0, 1, 1, 0, 1]), indices: Uint32Array.from([0, 2, 1, 0, 3, 2])
+        };
+        return { ...c, meshes: [renderer.upload(card, img), renderer.upload(body, img)], triangles: body.triangles + 2, lit: 1 };
     }
     const res = await fetch(c.url).catch(() => null);
     if (!res || !res.ok || (res.headers.get('content-type') || '').includes('text/html')) return null;
