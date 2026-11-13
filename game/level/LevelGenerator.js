@@ -388,8 +388,7 @@ export default class LevelGenerator {
         const img = s.textures.exists('coin')
             ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)
             : s.add.circle(x, y, 32, 0xffd23f).setStrokeStyle(5, 0xfff3b0);
-        img.setDepth(2);
-        s.tweens.add({ targets: img, y: y - 14, duration: 1100 + (Math.abs(x) % 400), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        img.setDepth(2);   // bobs on the music's beat: MainScene.bobCoins()
         chunk.objects.push(img);
         this.coins.push({ img, r: 40, x, y, chunkKey, index });
     }

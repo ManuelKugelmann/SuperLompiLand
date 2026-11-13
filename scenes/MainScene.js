@@ -14,7 +14,7 @@ import MidLayers from '../game/level/MidLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
-import { play, nowSeconds } from '../game/audio.js';
+import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak } from '../game/music/melody.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { HUD_KEY } from './HudScene.js';
@@ -25,6 +25,8 @@ const STEP_MS = 1000 / 60;
 /** World tunables. */
 /** Leaking oil drums (spec 7.1): how often they puff and how much. */
 const OIL = { pulseMs: 1400, perPulse: 5, margin: 600 };
+/** How high coins hop on each beat (px). */
+const COIN_BOB_PX = 12;
 
 const WORLD = {
     gravity: 0.12,         // gentle sink
@@ -452,6 +454,12 @@ export default class MainScene extends Phaser.Scene {
         });
     }
 
+    /** Coins hop on the music's beat, all together (spec ch.12, music-synced world). */
+    bobCoins() {
+        const lift = COIN_BOB_PX * musicClock.pulse(nowSeconds(), 4);
+        for (const c of this.level.coins) if (c.img.active) c.img.y = c.y - lift;
+    }
+
     /** Streak feedback: "x2", "x3"... when the counter steps up, a ring of light when a phrase completes. */
     streakFx(x, y, note) {
         if (note.stepped) {
@@ -584,6 +592,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.leakOil(delta);
         this.particles.update(delta / 1000);
+        this.bobCoins();
 
         // Bubble trail when moving fast.
         const speed = Math.hypot(v.x, v.y);

@@ -10,6 +10,8 @@
 //   still  no deformation (spike plates)
 // Plants use `sway` with `root: 'bottom'` (fixed at the base, free at the tip).
 
+import { musicClock, nowSeconds } from '../audio.js';
+
 const SEGMENTS = 10;
 
 /**
@@ -43,9 +45,11 @@ export function makeCritter(scene, key, x, y, width, anim = 'wobble', opts = {})
             }
             obj.setDirty();
         } else if (anim === 'pulse') {
-            const beat = Math.sin(p * 2.6);
-            sx = base * (1 + beat * 0.07);
-            sy = base * (1 - beat * 0.09);
+            // The bell contracts on the music's beat and relaxes until the next one
+            // (Nintendo style: every jelly in view pumps together, spec ch.12).
+            const beat = musicClock.pulse(nowSeconds(), 3.5) * 2 - 1;
+            sx = base * (1 - beat * 0.06);
+            sy = base * (1 + beat * 0.08);
             const amp = obj.frame.width * 0.06;
             const pts = obj.points, n = pts.length - 1;
             for (let i = 0; i <= n; i++) {
