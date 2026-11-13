@@ -1,0 +1,36 @@
+// Layer table for the parallax groups (spec 10.10 / 10.10b). Background group only for
+// now; the mid and foreground groups can add rows with the same fields.
+//   scroll   horizontal parallax (camera speed multiplier); vertical uses 0.6 x scroll
+//   fog      0..1 toward the biome's water colour (far = more)
+//   height   silhouette height as a share of the screen height
+//   rise     how far (world px) the layer's ground sits above the seabed (far ridges rise)
+//   density  how many shapes the layer's texture gets (1 = the kind's full count)
+//   blur     bake blur in texture px (far = softer)
+//   depth    Phaser depth (behind the backdrop schools at -16 and light shafts at -12)
+//   strength 0 switches a layer off
+export const BACK_LAYERS = [
+    { id: 'haze', scroll: 0.08, fog: 0.74, height: 0.42, rise: 900, density: 0.45, blur: 7, depth: -21, strength: 1 },
+    { id: 'far', scroll: 0.25, fog: 0.5, height: 0.36, rise: 450, density: 0.75, blur: 4, depth: -19, strength: 1 },
+    { id: 'back', scroll: 0.45, fog: 0.3, height: 0.3, rise: 120, density: 1, blur: 2, depth: -17.5, strength: 1 }
+];
+
+// Silhouette kinds (big soft shapes only — the background has no micro detail, spec 10.10b).
+//   ridge    ground line roughness/height
+//   shapes   which shapes stand on the ground, and how many per texture (at density 1)
+export const BACK_KINDS = {
+    dunes: { ridge: { rough: 0.35, base: 0.25, amp: 0.18 }, shapes: { dome: 4, grass: 10 } },
+    reef: { ridge: { rough: 0.5, base: 0.35, amp: 0.3 }, shapes: { dome: 9, fan: 6, branch: 6 } },
+    meadow: { ridge: { rough: 0.3, base: 0.25, amp: 0.15 }, shapes: { grass: 22, dome: 3 } },
+    kelp: { ridge: { rough: 0.45, base: 0.3, amp: 0.25 }, shapes: { kelp: 16, dome: 2 } },
+    seamount: { ridge: { rough: 0.6, base: 0.2, amp: 0.45 }, shapes: { dome: 2 } },
+    wreck: { ridge: { rough: 0.5, base: 0.3, amp: 0.25 }, shapes: { hull: 2, mast: 3, dome: 3 } },
+    harbour: { ridge: { rough: 0.25, base: 0.3, amp: 0.12 }, shapes: { piling: 10, quay: 1 } },
+    spires: { ridge: { rough: 0.65, base: 0.3, amp: 0.35 }, shapes: { spire: 8 } }
+};
+
+const BY_BIOME = { beach: 'dunes', reef: 'reef', mangrove: 'meadow', kelp: 'kelp', blue: 'seamount', wreck: 'wreck', harbour: 'harbour', trench: 'spires' };
+
+/** Which silhouette kind a biome's background uses. */
+export function kindFor(biomeId) {
+    return BY_BIOME[biomeId] || 'reef';
+}

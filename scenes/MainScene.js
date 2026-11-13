@@ -8,6 +8,7 @@ import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor } from '../game/l
 import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
+import BackLayers from '../game/level/BackLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
@@ -59,6 +60,7 @@ export default class MainScene extends Phaser.Scene {
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
+        this.backLayers = new BackLayers(this);   // far haze, far reef, back floor (parallax)
         this.waterLight = new WaterLight(this);   // light shafts, caustics, depth grade
         // What has been collected stays collected (per chunk bitfields, see worldState.js).
         // Playing together, the room has its own memory, separate from the solo journey.
@@ -512,6 +514,7 @@ export default class MainScene extends Phaser.Scene {
         this.level.update(this.camX, this.camY);
         this.level.animate(time / 1000, view, speed);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
+        this.backLayers.update(this.camX, this.camY);
         this.waterLight.update();
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
