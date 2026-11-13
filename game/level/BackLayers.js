@@ -108,7 +108,7 @@ export default class BackLayers {
 // --- baking --------------------------------------------------------------------
 
 /** A vertical fade (opaque at the top, gone at the bottom), shared by every layer's ground. */
-function makeFade(scene) {
+export function makeFade(scene) {
     if (scene.textures.exists('bl_fade')) return;
     const c = document.createElement('canvas');
     c.width = 4; c.height = 256;

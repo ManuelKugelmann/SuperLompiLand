@@ -69,3 +69,19 @@ export function mix(c1, c2, t) {
 export function layerTint(rock, water, fog, deep = 0x04122e, deepAmount = 0) {
     return mix(mix(rock, water, fog), deep, deepAmount);
 }
+
+/** Smooth 1D value noise (0..1), continuous for any x: one ground line across all chunks. */
+export function noise1(x, seed = 1, period = 260) {
+    const h = i => {
+        let t = Math.imul((i | 0) ^ Math.imul(seed, 0x9e3779b1), 0x85ebca6b);
+        t ^= t >>> 13; t = Math.imul(t, 0xc2b2ae35); t ^= t >>> 16;
+        return (t >>> 0) / 4294967296;
+    };
+    const u = x / period, i = Math.floor(u), f = u - i, s = f * f * (3 - 2 * f);
+    return h(i) + (h(i + 1) - h(i)) * s;
+}
+
+/** A few octaves of noise1 for a natural ground line (0..1). */
+export function groundLine(x, seed = 1) {
+    return 0.55 * noise1(x, seed, 520) + 0.3 * noise1(x, seed + 7, 190) + 0.15 * noise1(x, seed + 13, 70);
+}

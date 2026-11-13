@@ -16,6 +16,18 @@ export const BACK_LAYERS = [
     { id: 'back', scroll: 0.45, fog: 0.3, height: 0.3, rise: 120, density: 1, blur: 2, depth: -17.5, strength: 0 }
 ];
 
+// Midground (spec 10.10 "mid reef" and "back play"): the game's own painted art — rock and
+// sand textures for the ground, the coral, rock and kelp sprites on top — baked in
+// world-anchored chunks, scaled by distance and fogged toward the water.
+//   scroll   horizontal parallax; vertical uses vscroll
+//   fog      0..1 toward the water colour      height  chunk height as a share of the screen
+//   rise     ground above the seabed (px)       items   decor per 1024-px chunk
+//   size     decor size (share of chunk height) depth   Phaser depth (shafts are at -12)
+export const MID_LAYERS = [
+    { id: 'mid', scroll: 0.6, vscroll: 0.7, fog: 0.58, height: 0.42, rise: 260, items: 9, size: 0.42, depth: -15, strength: 1 },
+    { id: 'backplay', scroll: 0.82, vscroll: 0.88, fog: 0.36, height: 0.4, rise: 60, items: 7, size: 0.55, depth: -10, strength: 1 }
+];
+
 // Silhouette kinds (big soft shapes only — the background has no micro detail, spec 10.10b).
 //   ridge    ground line roughness/height
 //   shapes   which shapes stand on the ground, and how many per texture (at density 1)

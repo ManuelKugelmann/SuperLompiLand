@@ -43,3 +43,16 @@ test('layer table: far to near, fog falls and scroll rises; every biome has a sh
     }
     for (const b of BIOMES) assert.ok(BACK_KINDS[kindFor(b.id)], `${b.id} has a kind`);
 });
+
+import { noise1, groundLine } from '../game/level/backLayersMath.js';
+
+test('ground line is continuous across chunk borders and stays in range', () => {
+    let maxStep = 0;
+    for (let x = -5000; x < 5000; x += 1) {
+        const a = groundLine(x, 3), b = groundLine(x + 1, 3);
+        assert.ok(a >= 0 && a <= 1);
+        maxStep = Math.max(maxStep, Math.abs(b - a));
+    }
+    assert.ok(maxStep < 0.02, `no jumps (${maxStep.toFixed(4)})`);
+    assert.equal(noise1(1024, 5), noise1(1024, 5));
+});

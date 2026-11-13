@@ -10,6 +10,7 @@ import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
 import ParticleLayer from '../game/fx/ParticleLayer.js';
 import BackLayers from '../game/level/BackLayers.js';
+import MidLayers from '../game/level/MidLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
@@ -72,6 +73,7 @@ export default class MainScene extends Phaser.Scene {
         this.streak = createStreak();        // coins in a row play a melody (game/music/melody.js)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
         this.backLayers = new BackLayers(this);   // far haze, far reef, back floor (parallax)
+        this.midLayers = new MidLayers(this);     // mid reef and back-play layer from the painted art
         this.waterLight = new WaterLight(this);   // light shafts, caustics, depth grade
         // What has been collected stays collected (per chunk bitfields, see worldState.js).
         // Playing together, the room has its own memory, separate from the solo journey.
@@ -619,6 +621,7 @@ export default class MainScene extends Phaser.Scene {
         this.level.animate(time / 1000, view, speed);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.backLayers.update(this.camX, this.camY);
+        this.midLayers.update(this.camX, this.camY);
         this.waterLight.update();
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
