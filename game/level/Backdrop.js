@@ -6,6 +6,21 @@ import { biomeBlendAt, mixColor } from './biomes.js';
  * drifting light rays near the surface, ambient bubbles, and the sky + waterline
  * above y = 0.
  */
+/** Far fish schools are placed again once this far outside the picture (px). */
+const SCHOOL_MARGIN = { x: 700, y: 500 };
+/**
+ * Where far schools swim, matched to the back layers (backLayersTable.js) so a school
+ * moves like the layer it is drawn between: scroll = horizontal parallax, vscroll =
+ * vertical (the back layers use 0.6 x scroll, the mid layer its own), depth = draw
+ * order, size/alpha shrink and fade with distance.
+ */
+const SCHOOL_SLOTS = [
+    { scroll: 0.3, vscroll: 0.18, depth: -18.5, size: 0.6, alpha: 0.32 },    // between far reef and back floor
+    { scroll: 0.38, vscroll: 0.23, depth: -18, size: 0.7, alpha: 0.38 },
+    { scroll: 0.5, vscroll: 0.42, depth: -16.5, size: 0.85, alpha: 0.46 },   // between back floor and mid reef
+    { scroll: 0.56, vscroll: 0.58, depth: -16, size: 0.95, alpha: 0.52 }
+];
+
 export default class Backdrop {
     constructor(scene, maxDepth) {
         this.scene = scene;
@@ -36,16 +51,19 @@ export default class Backdrop {
         // drift past slower than the world (parallax) and never interact.
         this.schools = [];
         for (let k = 0; k < 4; k++) {
+            // wx/wy: the school's place in its own far layer (set on the first update);
+            // on screen it sits at (wx - camX * depthFactor, wy - camY * depthFactor).
+            const slot = SCHOOL_SLOTS[k % SCHOOL_SLOTS.length];
             const school = {
-                x: Phaser.Math.Between(0, 4000), y: Phaser.Math.Between(120, H - 160), dir: k % 2 ? 1 : -1,
-                speed: Phaser.Math.FloatBetween(0.5, 1.1), depthFactor: 0.25 + k * 0.08, fish: []
+                wx: null, wy: null, dir: k % 2 ? 1 : -1,
+                speed: Phaser.Math.FloatBetween(0.5, 1.1), slot, fish: []
             };
             const n = Phaser.Math.Between(7, 13);
             for (let i = 0; i < n; i++) {
-                const size = Phaser.Math.Between(16, 26) * (0.7 + k * 0.12);
-                // Soft, out-of-focus shapes: the farther school is blurrier and fainter.
-                const body = scene.add.image(0, 0, 'bd_fish').setDisplaySize(size * 1.5, size * 0.75).setTint(0x0d4763).setScrollFactor(0).setDepth(-16 + k * 0.1);
-                body.base = { sx: body.scaleX, sy: body.scaleY, alpha: 0.42 + k * 0.08 };
+                const size = Phaser.Math.Between(16, 26) * slot.size;
+                // Soft, out-of-focus shapes: the farther school is smaller and fainter.
+                const body = scene.add.image(0, 0, 'bd_fish').setDisplaySize(size * 1.5, size * 0.75).setTint(0x0d4763).setScrollFactor(0).setDepth(slot.depth);
+                body.base = { sx: body.scaleX, sy: body.scaleY, alpha: slot.alpha };
                 school.fish.push({ body, ox: Phaser.Math.Between(-150, 150), oy: Phaser.Math.Between(-70, 70), phase: Math.random() * 6.28 });
             }
             this.schools.push(school);
@@ -105,16 +123,27 @@ export default class Backdrop {
 
         const depthFade = Math.max(0.25, 1 - depth * 0.8);
         for (const sc of this.schools) {
-            sc.x += sc.dir * sc.speed;
-            // Far away = moves less than the world, by the same factor sideways and up/down,
-            // and wraps around smoothly well outside the picture on both axes.
-            const span = W + 900, tall = H + 700;
-            const sx = (((sc.x - camX * sc.depthFactor) % span) + span) % span - 450;
-            const sy = (((sc.y - camY * sc.depthFactor) % tall) + tall) % tall - 350;
+            // Far away = moves less than the world, by the same factor sideways and up/down.
+            // A school keeps its own depth in the water: no wrapping. When it drifts well
+            // out of the picture it is quietly placed again just outside the view.
+            const f0 = sc.slot.scroll, v0 = sc.slot.vscroll;
+            let sx = sc.wx === null ? NaN : sc.wx - camX * f0;
+            let sy = sc.wy === null ? NaN : sc.wy - camY * v0;
+            const out = !(sx > -SCHOOL_MARGIN.x && sx < W + SCHOOL_MARGIN.x && sy > -SCHOOL_MARGIN.y && sy < H + SCHOOL_MARGIN.y);
+            if (out) {
+                const first = sc.wx === null;
+                const side = first ? Phaser.Math.Between(0, W) : (dx >= 0 ? W + 250 : -250);   // ahead of where the camera goes
+                sx = side; sy = Phaser.Math.Between(120, H - 160);
+                sc.wx = sx + camX * f0; sc.wy = sy + camY * v0;
+            }
+            sc.wx += sc.dir * sc.speed;
+            sx = sc.wx - camX * f0;
+            sy = sc.wy - camY * v0;
+            const surfaceY = -camY * v0 + 60;   // the waterline as seen in this far layer
             for (const f of sc.fish) {
                 f.body.setPosition(sx + f.ox + Math.sin(t * 0.7 + f.phase) * 18, sy + f.oy + Math.sin(t * 1.1 + f.phase) * 10);
                 f.body.setScale(sc.dir * f.body.base.sx * (1 + Math.sin(t * 9 + f.phase) * 0.12), f.body.base.sy);   // tail beat
-                f.body.setVisible(camY + f.body.y > 60).setAlpha(f.body.base.alpha * depthFade);
+                f.body.setVisible(f.body.y > surfaceY).setAlpha(f.body.base.alpha * depthFade);
             }
         }
         for (const b of this.bubbles) {
