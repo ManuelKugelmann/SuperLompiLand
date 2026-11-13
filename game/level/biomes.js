@@ -1,5 +1,3 @@
-import Phaser from 'phaser';
-
 // The journey runs west -> east. West of the home reef is a shallow, safe
 // lagoon; every biome further east is deeper and a little more dangerous.
 // A Lompi nest (checkpoint) sits on the seabed at the start of each biome and
@@ -73,6 +71,8 @@ export const BIOMES = [
 export const WORLD_END = BIOMES[BIOMES.length - 1].from + BIOME_WIDTH;
 const BLEND = 700; // px over which neighbouring biomes fade into each other
 
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
 export function biomeIndexAt(x) {
     let i = 0;
     while (i < BIOMES.length - 1 && x >= BIOMES[i + 1].from) i++;
@@ -90,9 +90,9 @@ export function biomeBlendAt(x) {
 }
 
 export function mixColor(c1, c2, t) {
-    const a = Phaser.Display.Color.IntegerToColor(c1), b = Phaser.Display.Color.IntegerToColor(c2);
-    const c = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, Math.round(Phaser.Math.Clamp(t, 0, 1) * 100));
-    return Phaser.Display.Color.GetColor(c.r, c.g, c.b);
+    const k = clamp(t, 0, 1);
+    const ch = shift => Math.round(((c1 >> shift) & 255) + (((c2 >> shift) & 255) - ((c1 >> shift) & 255)) * k);
+    return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
 /** The abyss: a narrow chasm in the deep-sea biome that drops far below everything else. */
@@ -100,7 +100,7 @@ export const ABYSS = { x: 25300, halfWidth: 650, depth: 7500 };
 
 /** Seabed depth: shallow in the west, dropping steadily toward the east, plus the abyss. */
 export function floorY(x) {
-    const base = Phaser.Math.Clamp(1150 + (x - WORLD_WEST) * 0.14, 1000, 5600);
+    const base = clamp(1150 + (x - WORLD_WEST) * 0.14, 1000, 5600);
     const d = (x - ABYSS.x) / ABYSS.halfWidth;
     return base + ABYSS.depth * Math.exp(-d * d * 1.6);
 }

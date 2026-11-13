@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
+import { vnoise, eachCell as marchGrid } from './terrain.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, mixColor, floorY, pickWeighted
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, mixColor, floorY, pickWeighted
 } from './biomes.js';
 
 export const LEVEL = {
@@ -13,6 +14,8 @@ export const LEVEL = {
     spawn: { x: 0, y: 700 },
     margin: 1,            // extra chunks generated around the view
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
+    friendSheen: 0.16,    // strength of the rainbow shimmer on friends
+    visualDetail: 2,      // drawn outline grid is this many times finer than the collision grid
     coinGap: 92,          // minimum distance between two coins
     rockRes: 0.6,         // baked terrain resolution (1 = full; lower saves GPU memory)
     backRes: 0.3,         // baked back-wall / shadow layer resolution (soft anyway)
@@ -44,21 +47,6 @@ const HAZARDS = {
 };
 const BAND_DT = [0, 0.03, 0.075, 0.14, 0.22]; // density steps of the terrain colour bands
 const DEEP_TINT = 0x1a3a62;
-
-function hash(ix, iy, seed) {
-    let h = Math.imul(ix, 374761393) ^ Math.imul(iy, 668265263) ^ Math.imul(seed, 1442695041);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-function vnoise(x, y, seed) {
-    const ix = Math.floor(x), iy = Math.floor(y);
-    const fx = x - ix, fy = y - iy;
-    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
-    const a = hash(ix, iy, seed), b = hash(ix + 1, iy, seed);
-    const c = hash(ix, iy + 1, seed), d = hash(ix + 1, iy + 1, seed);
-    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
-}
 
 /**
  * The ocean, generated on demand in every direction from one seed.
@@ -145,8 +133,16 @@ export default class LevelGenerator {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         const x0 = Math.floor(camX / CH) - LEVEL.margin, x1 = Math.floor((camX + W) / CH) + LEVEL.margin;
         const y0 = Math.max(0, Math.floor(camY / CH) - LEVEL.margin), y1 = Math.floor((camY + H) / CH) + LEVEL.margin;
+        // Building a chunk takes a few dozen ms, so only one per frame (nearest to
+        // the view centre first) — except at the very start, when nothing exists yet.
+        const missing = [];
         for (let cy = y0; cy <= y1; cy++) {
-            for (let cx = x0; cx <= x1; cx++) if (!this.chunks.has(`${cx},${cy}`)) this.build(cx, cy);
+            for (let cx = x0; cx <= x1; cx++) if (!this.chunks.has(`${cx},${cy}`)) missing.push([cx, cy]);
+        }
+        if (missing.length) {
+            const mx = (camX + W / 2) / CH - 0.5, my = (camY + H / 2) / CH - 0.5;
+            missing.sort((p, q) => Math.hypot(p[0] - mx, p[1] - my) - Math.hypot(q[0] - mx, q[1] - my));
+            for (const [cx, cy] of (this.chunks.size === 0 ? missing : missing.slice(0, 1))) this.build(cx, cy);
         }
         for (const key of [...this.chunks.keys()]) {
             const [cx, cy] = key.split(',').map(Number);
@@ -157,7 +153,14 @@ export default class LevelGenerator {
     /** Per frame: bend / pulse every creature and plant. `t` in seconds. */
     animate(t) {
         for (const o of this.animated) if (o.active) o.animate(t);
-        for (const l of this.lights) if (l.active && l.follow.active) l.setPosition(l.follow.x, l.follow.y);
+        for (const l of this.lights) {
+            if (!l.active || !l.follow.active) continue;
+            l.setPosition(l.follow.x, l.follow.y);
+            if (l.hue !== undefined) {
+                const c = Phaser.Display.Color.HSVToRGB((l.hue + t * 0.12) % 1, 0.55, 1);
+                l.setFillStyle(c.color, LEVEL.friendSheen * (0.7 + 0.3 * Math.sin(t * 2 + l.hue * 20)));
+            }
+        }
     }
 
     /** Upward push at this point from bubble plants (0 if none). */
@@ -177,25 +180,24 @@ export default class LevelGenerator {
         const blend = biomeBlendAt(mid);
         const biome = blend.t < 0.5 ? blend.a : blend.b;
 
-        // Density at cell corners (shared with neighbours -> seamless).
-        const val = [], back = [];
-        for (let j = 0; j <= N; j++) {
-            val.push([]); back.push([]);
-            for (let i = 0; i <= N; i++) {
-                const x = ox + i * C, y = oy + j * C;
+        // Density at grid corners (shared with neighbours -> seamless). Everything
+        // that is DRAWN uses a grid twice as fine as the collision grid, so rock
+        // outlines look round instead of faceted while the physics stays cheap.
+        const F = LEVEL.visualDetail, FN = N * F, FC = C / F;
+        const fine = [], back = [];
+        for (let j = 0; j <= FN; j++) {
+            fine.push([]); back.push([]);
+            for (let i = 0; i <= FN; i++) {
+                const x = ox + i * FC, y = oy + j * FC;
                 const d = this.density(x, y);
-                val[j].push(d);
+                fine[j].push(d);
                 // Some caves get a rock wall behind them instead of open water.
                 back[j].push(vnoise(x / 1500, y / 1500, LEVEL.seed + 31) > 0.56 && y > 600 ? d + 0.05 : -1);
             }
         }
-        const eachCell = (grid, t, fn) => {
-            for (let j = 0; j < N; j++) {
-                for (let i = 0; i < N; i++) {
-                    fn(marchCell(ox + i * C, oy + j * C, C, [grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]], t));
-                }
-            }
-        };
+        const val = [];
+        for (let j = 0; j <= N; j++) val.push(fine[j * F].filter((_, i) => i % F === 0));
+        const eachCell = (grid, t, fn) => marchGrid(grid, ox, oy, CH, t, fn);
         const depthMix = Phaser.Math.Clamp((oy + CH / 2) / LEVEL.maxDepth, 0, 1) * 0.5;
         const bandColor = k => mixColor(mixColor(blend.a.rock[k], blend.b.rock[k], blend.t), DEEP_TINT, depthMix);
 
@@ -221,7 +223,7 @@ export default class LevelGenerator {
         const ao = scratch();
         for (const [dt, alpha] of [[-0.05, 0.06], [-0.03, 0.07], [-0.014, 0.09]]) {
             ao.fillStyle(0x04162a, alpha);
-            eachCell(val, T + dt, c => { if (c.poly.length >= 3) ao.fillPoints(c.poly, true); });
+            eachCell(fine, T + dt, c => { if (c.poly.length >= 3) ao.fillPoints(c.poly, true); });
         }
         bake(-6, LEVEL.backRes, [[wall], [ao]]);
 
@@ -248,16 +250,18 @@ export default class LevelGenerator {
         const bands = scratch();
         BAND_DT.forEach((dt, k) => {
             bands.fillStyle(bandColor(k), textured ? [0.42, 0.46, 0.62, 0.74, 0.84][k] : 1);
-            eachCell(val, T + dt, c => {
+            eachCell(fine, T + dt, c => {
                 if (c.poly.length >= 3) bands.fillPoints(c.poly, true);
-                if (k === 0) for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors, rim);
+                if (k === 0) for (const [p, q] of c.edges) this.drawRim(p, q, rim);
             });
         });
+        // Collision strips and floor spots come from the coarse grid.
+        eachCell(val, T, c => { for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors); });
         layers.push([bands]);
         if (textured) {
             const water = scratch();
             water.fillStyle(0xffffff, 1);
-            const neg = val.map(row => row.map(v => -v));
+            const neg = fine.map(row => row.map(v => -v));
             eachCell(neg, -T, c => { if (c.poly.length >= 3) water.fillPoints(c.poly, true); });
             layers.push([water, true]);
         }
@@ -349,7 +353,7 @@ export default class LevelGenerator {
     }
 
     /** One rock outline segment: collision strip + remember upward-facing ones. */
-    addEdge(chunk, a, b, floors, rim) {
+    addEdge(chunk, a, b, floors) {
         const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
         const ang = Math.atan2(b.y - a.y, b.x - a.x);
         let nx = -Math.sin(ang), ny = Math.cos(ang);
@@ -357,14 +361,21 @@ export default class LevelGenerator {
         const len = Math.hypot(b.x - a.x, b.y - a.y);
         chunk.bodies.push(this.scene.matter.add.rectangle(mx + nx * 26, my + ny * 26, len + 8, 52,
             { isStatic: true, angle: ang, friction: 0.05 }));
-        if (rim) {
-            // ny > 0: rock is below this edge = a floor facing the light.
-            const color = ny > 0.35 ? rim.lit : ny < -0.35 ? rim.shade : rim.side;
-            rim.g.lineStyle(ny > 0.35 ? 16 : 12, color, 0.95);
-            rim.g.lineBetween(a.x, a.y, b.x, b.y);
-            rim.g.fillStyle(color, 0.95).fillCircle(a.x, a.y, ny > 0.35 ? 8 : 6);
-        }
         if (ny > 0.8 && len > 45) floors.push({ x: mx, y: my, angle: b.x > a.x ? ang : ang + Math.PI });
+    }
+
+    /** One piece of the lit outline (fine grid): bright on top, dark underneath. */
+    drawRim(a, b, rim) {
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const ang = Math.atan2(b.y - a.y, b.x - a.x);
+        let ny = Math.cos(ang);
+        const nx = -Math.sin(ang);
+        if (this.density(mx + nx * 20, my + ny * 20) < this.density(mx - nx * 20, my - ny * 20)) ny = -ny;
+        // ny > 0: rock is below this edge = a floor facing the light.
+        const color = ny > 0.35 ? rim.lit : ny < -0.35 ? rim.shade : rim.side;
+        const w = ny > 0.35 ? 16 : 12;
+        rim.g.lineStyle(w, color, 0.95).lineBetween(a.x, a.y, b.x, b.y);
+        rim.g.fillStyle(color, 0.95).fillCircle(a.x, a.y, w / 2).fillCircle(b.x, b.y, w / 2);
     }
 
     addCoin(chunk, x, y) {
@@ -420,6 +431,14 @@ export default class LevelGenerator {
             chunk.objects.push(light);
             this.lights.push(light);
         }
+        // Friends shimmer faintly in changing colours; hazards stay matte, so the
+        // two can be told apart at a glance.
+        const sheen = s.add.ellipse(x, y, f.size * 0.8, f.size * 0.55, 0xffffff, LEVEL.friendSheen)
+            .setDepth(f.ground ? 1.1 : 4.1).setBlendMode(Phaser.BlendModes.ADD);
+        sheen.follow = img;
+        sheen.hue = rng.frac();
+        chunk.objects.push(sheen);
+        this.lights.push(sheen);
         if (!f.ground) s.tweens.add({ targets: img, y: y - f.bob, duration: rng.between(1400, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(img);
         this.friends.push({ img, r: f.size * 0.38, greeted: false });
@@ -526,32 +545,4 @@ export default class LevelGenerator {
         this.lights = this.lights.filter(o => o.active);
         this.vents = this.vents.filter(v => v.chunk !== key);
     }
-}
-
-export { biomeIndexAt };
-
-/**
- * Marching squares for one cell. `v` = densities at tl, tr, br, bl.
- * Returns the solid polygon and its outline segments (edges between two
- * interpolated crossing points).
- */
-function marchCell(x, y, size, v, t) {
-    const corners = [[x, y], [x + size, y], [x + size, y + size], [x, y + size]];
-    const poly = [], cut = [];
-    for (let i = 0; i < 4; i++) {
-        const j = (i + 1) % 4;
-        const a = corners[i], b = corners[j];
-        if (v[i] > t) { poly.push(new Phaser.Math.Vector2(a[0], a[1])); cut.push(false); }
-        if ((v[i] > t) !== (v[j] > t)) {
-            const k = (t - v[i]) / (v[j] - v[i]);
-            poly.push(new Phaser.Math.Vector2(a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k));
-            cut.push(true);
-        }
-    }
-    const edges = [];
-    for (let i = 0; i < poly.length; i++) {
-        const j = (i + 1) % poly.length;
-        if (cut[i] && cut[j] && poly.length > 2) edges.push([poly[i], poly[j]]);
-    }
-    return { poly, edges };
 }

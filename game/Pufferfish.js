@@ -23,19 +23,17 @@ export const FISH = {
     airDrag: 0.0015,        // almost no drag in the air
     airTurn: 0.022,        // radians per step the flight path can be bent in the air (no speed gain)
     shoveRadius: 340,
-    shovePower: 16,
-    states: {
-        normal: { key: 'puffer_normal', width: 170, radius: 56, air: 0.03, bounce: 0.35, wiggle: 30 },
-        inflated: { key: 'puffer_inflated', width: 255, radius: 98, air: 0.2, bounce: 0.75, wiggle: 9 }
-    }
+    shovePower: 16
 };
+
+/** Lompi's looks double as the fallback for any character whose art is missing. */
+const DEFAULT_STATES = CHARACTERS[0].states;
 
 export const CAT = { WORLD: 1, FISH: 2, PADDLE: 4 };
 
 /**
  * The player. Control schemes drive it ONLY through this API:
  *   thrust(dir)   steady swim force (dir length 0..1)
- *   seekTo(point) swim toward a world point, easing on arrival
  *   dragTo(point) follow a finger (grab) — release keeps the velocity = fling
  *   launch(vec)   one-shot velocity kick
  *   puff()        toggle the inflated state
@@ -48,7 +46,7 @@ export default class Pufferfish {
         // States = looks + collision size. Missing art falls back to Lompi's.
         this.states = {};
         for (const [name, st] of Object.entries(character.states)) {
-            this.states[name] = scene.textures.exists(st.key) ? st : { ...st, key: FISH.states.normal.key };
+            this.states[name] = scene.textures.exists(st.key) ? st : { ...st, key: DEFAULT_STATES.normal.key };
         }
         const m = (k, d = 1) => character[k] ?? d;
         this.move = {
@@ -149,14 +147,6 @@ export default class Pufferfish {
         const max = this.move.airTurn * Math.min(1, dir.length()) * strength;
         const a = heading + Phaser.Math.Clamp(want, -max, max);
         this.sprite.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
-    }
-
-    seekTo(point) {
-        const to = point.clone().subtract(this.pos);
-        const dist = to.length();
-        if (dist < 10) return dist;
-        this.thrust(to.normalize().scale(Phaser.Math.Clamp(dist / 280, 0.15, 1)));
-        return dist;
     }
 
     dragTo(point) {
@@ -375,7 +365,7 @@ export default class Pufferfish {
 
 /** Procedural stand-ins so the game runs even if the art files are missing. */
 function ensureFallbackTextures(scene) {
-    for (const [name, s] of Object.entries(FISH.states)) {
+    for (const [name, s] of Object.entries(DEFAULT_STATES)) {
         if (scene.textures.exists(s.key)) continue;
         const R = 100, pad = name === 'inflated' ? 30 : 6, c = R + pad;
         const g = scene.make.graphics({ add: false });

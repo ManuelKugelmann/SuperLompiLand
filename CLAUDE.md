@@ -35,7 +35,8 @@ adding half-done features.
 main.js            standalone entry (SDK host harness + forceLandscape)
 index.js           host entry (re-exports IntroScene + gameMeta)
 scenes/            Intro / Main / End, scene keys
-game/              Pufferfish, controls/, ui/, level generation, orientation
+game/              Pufferfish (any playable character), characters, controls/, ui/, level/, orientation
+tests/             unit tests for the pure modules
 systems/           progression (localStorage)
 public/            manifest, icons, img/ (generated art, loaded by URL)
 scripts/           gen-icons.mjs, serve.mjs
@@ -51,7 +52,18 @@ not find `git`.
 npm run dev      # dev server, port 8080, service worker OFF
 npm run build    # production build -> dist/ (regenerates icons first)
 npm run serve    # static server for dist/ on :4178 — tests the real PWA/SW
+npm test         # unit tests (node --test, no extra dependencies)
 ```
+
+## Code shape
+
+- Pure logic lives in Phaser-free modules and is unit-tested: `game/level/terrain.js`
+  (noise, marching squares), `game/level/biomes.js` (journey layout, spawn tables),
+  `game/characters.js`, `game/orientationMath.js`. New rules and tables go there,
+  with a test; Phaser classes only draw and wire things up.
+- One source of truth per thing: tunables at the top of the file that uses them,
+  creature and hazard tables in `LevelGenerator.js`, biomes in `biomes.js`.
+- Keep it simple: no frameworks, no abstractions for a single caller.
 
 ## Branches and deploy
 

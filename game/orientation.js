@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { rotatedPageToGame } from './orientationMath.js';
 
 /**
  * Always-landscape display.
@@ -66,15 +67,10 @@ function install(game) {
     manager.transformPointer = function (pointer, pageX, pageY, wasMove) {
         origTransform(pointer, pageX, pageY, wasMove);
         if (!rotated) return;
-        const rect = canvas.getBoundingClientRect(); // rotated → axis-aligned bbox
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const s = rect.height / GW; // displayed (pre-rotation) canvas width = rect.height
-        const gx = (pageY - cy) / s + GW / 2;
-        const gy = -(pageX - cx) / s + GH / 2;
-        pointer.x = gx;
-        pointer.y = gy;
-        pointer.position.set(gx, gy);
+        const p = rotatedPageToGame(pageX, pageY, canvas.getBoundingClientRect(), GW, GH);
+        pointer.x = p.x;
+        pointer.y = p.y;
+        pointer.position.set(p.x, p.y);
     };
 
     // (3) Size + rotate the container, then refresh Phaser.

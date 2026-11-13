@@ -56,6 +56,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Deploying $branch -> ${dest:-<root>}  ($url)"
 
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build -- --base="${{ steps.vars.outputs.base }}"
 
