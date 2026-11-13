@@ -77,7 +77,7 @@ export default class Backdrop {
             this.sea.fillStyle(0x9be9ef, 1).beginPath().moveTo(x0, 62);
             for (const p of pts) this.sea.lineTo(p.x, p.y);
             this.sea.lineTo(x1, 62).closePath().fillPath();
-            for (let k = 0; k < 6; k++) this.sea.fillStyle(0x9be9ef, 0.85 - k * 0.15).fillRect(x0, 62 + k * 26, x1 - x0, 26);
+            for (let k = 0; k < 40; k++) this.sea.fillStyle(0x9be9ef, 0.9 * (1 - k / 40) ** 1.6).fillRect(x0, 62 + k * 6, x1 - x0, 6);
             this.foam.lineStyle(7, 0xffffff, 0.85).beginPath().moveTo(pts[0].x, pts[0].y);
             for (const p of pts) this.foam.lineTo(p.x, p.y);
             this.foam.strokePath();
