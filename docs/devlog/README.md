@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Lompi in 3D: four techniques compared with the same light and pose
+
+[`9c70f65`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9c70f65) · 2026-11-13 23:04
+
+![Lompi in 3D: four techniques compared with the same light and pose](14-lompi-in-3d-four-techniques-compared-with-the-sa.jpg)
+
 ## Kelp forest with the new per-pixel terrain light: smooth rock, sand on top, shade in the caves
 
 [`4f0b6bd`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/4f0b6bd) · 2026-11-13 21:59
