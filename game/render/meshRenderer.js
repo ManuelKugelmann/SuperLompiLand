@@ -6,6 +6,8 @@
 // One shader for every candidate, so comparisons are fair:
 //   light   soft key light from above, teal fill from the water, warm bounce
 //           from below, up to two point lights, a rim, a depth tint
+//   eyes    a mesh with an `eye` state ({ x, y, lid, pupil, iris, skin }) is drawn as a
+//           procedural eye instead of a texture
 //   motion  in the vertex shader: swim (a wave running to the tail), puff
 //           (toward a ball), on top of the model rotation; a mesh can carry a
 //           `part` matrix (hinge) to move on its own bone first
@@ -64,8 +66,42 @@ precision highp float;
 in vec3 vNormal; in vec2 vUv; in vec3 vWorld;
 uniform sampler2D uTex; uniform vec4 uColor; uniform float uLit; uniform float uDepth;
 uniform vec3 uSun, uKey, uSky, uBounce, uDeep, uP0, uC0, uP1, uC1; uniform float uRim; uniform float uMirror;
+uniform float uEye, uLid, uPupil; uniform vec2 uLook; uniform vec3 uIris, uSkin;
 out vec4 o;
+
+// A procedural eye on a card: an eyeball with a shaded rim, a fibred iris with a
+// dark limbal ring, a pupil, two catchlights that stay with the light while the
+// eye turns, and an upper lid in the skin colour that casts a soft shadow.
+vec4 eye() {
+    vec2 p = vec2(vUv.x * 2.0 - 1.0, 1.0 - vUv.y * 2.0);
+    float r = length(p);
+    if (r > 1.0) discard;
+    vec3 ball = vec3(p, sqrt(max(0.0, 1.0 - r * r)));
+    vec3 col = mix(vec3(1.0, 0.99, 0.96), vec3(0.74, 0.8, 0.88), smoothstep(0.5, 1.0, r));
+    vec2 q = p - uLook * 0.27;
+    q.x /= mix(1.0, 0.8, abs(uLook.x));                        // the iris narrows as the eye turns sideways
+    q.y /= mix(1.0, 0.86, abs(uLook.y));
+    float ir = length(q) / 0.72;                               // a big iris: little white, a friendly look
+    if (ir < 1.0) {
+        float fibres = 0.5 + 0.5 * sin(atan(q.y, q.x) * 28.0 + ir * 5.0);
+        vec3 iris = uIris * (0.55 + 0.6 * ir) * (0.88 + 0.2 * fibres);
+        iris = mix(iris, uIris * 0.22, smoothstep(0.8, 1.0, ir));
+        col = mix(col, iris, smoothstep(1.0, 0.93, ir));
+        col = mix(vec3(0.02, 0.03, 0.06), col, smoothstep(0.92, 1.04, ir / (0.56 * uPupil)));
+    }
+    col *= 0.7 + 0.36 * max(dot(ball, uSun), 0.0);
+    float key = smoothstep(0.2, 0.12, length(p - vec2(-0.3, 0.38)));
+    float fill = smoothstep(0.09, 0.05, length(p - vec2(0.24, -0.3)));
+    col = mix(col, vec3(1.0), key * 0.95 + fill * 0.55);
+    float edge = 1.06 - uLid * 2.12 + p.x * p.x * 0.22;        // the lower edge of the lid, slightly arched
+    if (p.y > edge) col = uSkin * (0.8 + 0.2 * ball.z);
+    else col *= 1.0 - 0.32 * smoothstep(edge - 0.4, edge, p.y);
+    col = mix(col, uSkin * 0.42, smoothstep(0.9, 1.0, r));     // a soft dark rim where the eye meets the skin
+    return vec4(mix(col, uDeep, uDepth), 1.0);
+}
+
 void main() {
+    if (uEye > 0.5) { o = eye(); return; }
     vec4 a = texture(uTex, vUv) * uColor;
     if (a.a < 0.4) discard;
     vec3 n = normalize(vNormal);
@@ -183,6 +219,12 @@ export default class MeshRenderer {
             gl.uniform4fv(u.uColor, m.color);
             gl.uniformMatrix4fv(u.uPart, false, m.part);
             gl.uniform1f(u.uLift, m.lift);
+            gl.uniform1f(u.uEye, m.eye ? 1 : 0);
+            if (m.eye) {
+                gl.uniform2f(u.uLook, m.eye.x, m.eye.y);
+                gl.uniform1f(u.uLid, m.eye.lid); gl.uniform1f(u.uPupil, m.eye.pupil);
+                gl.uniform3fv(u.uIris, m.eye.iris); gl.uniform3fv(u.uSkin, m.eye.skin);
+            }
             gl.bindVertexArray(m.vao);
             gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0);
         }

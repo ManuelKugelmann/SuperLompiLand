@@ -81,6 +81,16 @@ jagged edge when banking away is a known defect of this round.
 
 ![Procedural Lompi, 132 triangles: swim, bank, turn-around, puff](docs/devlog/anim-02-procedural.webp)
 
+**Round 3, first piece — a procedural eye.** The near eye is no longer painted: it is
+drawn by a small shader (eyeball, fibred iris with a dark ring, pupil, two catchlights that
+stay with the light, an upper lid) and moved by a gaze model: it holds a fixation and jumps
+to a new one in quick saccades instead of gliding, drifts a little, blinks at irregular
+intervals, and its pupil widens with fright. The loop: following a circling point, looking
+at something close, a fright, sleepy. The far eye is still painted, and the lid is a flat
+skin colour for now.
+
+![Procedural eye on Lompi: follow, look close, fright, sleepy](docs/devlog/anim-03-eyes.webp)
+
 A colorful 2D pufferfish game — underwater, Super Mario Land-ish — built as an
 installable PWA with **switchable control schemes** for experimentation.
 
