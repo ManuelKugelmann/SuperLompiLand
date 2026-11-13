@@ -4,14 +4,17 @@
 //
 // softnessMap()  reads the picture's alpha and finds what is thin — fins,
 //   spines, tassels, tentacles, tail — as opposed to the thick body. Thin parts
-//   become soft, the body stays rigid. No hand-placed bones: it works for any
-//   character art.
+//   become soft, the body stays rigid, and so do short things on its rim
+//   (spikes). No hand-placed bones: it works for any character art.
 //
 // SoftHalo  a ring of short chains radiating from the body's centre. Each chain
 //   is simulated in world space (verlet): its points are pulled toward where
 //   the picture wants them, dragged by the water and kept at length. So when
 //   the character darts off, turns or sits in a current, the soft parts trail
 //   behind, swing through and settle — on top of the procedural swim motion.
+
+const SPIKE = 0.28;   // things shorter than this (in body radii) are part of the rigid body
+const REACH = 0.7;    // from this far out a thin part is fully soft
 
 const smooth = (a, b, v) => { const t = v <= a ? 0 : v >= b ? 1 : (v - a) / (b - a); return t * t * (3 - 2 * t); };
 
@@ -53,12 +56,30 @@ export function softnessMap(alpha, w, h) {
             }
         }
     }
+    // Distance from the thick body. Only what reaches well away from it is soft:
+    // short things on the rim — spikes, bumps, teeth — stay rigid with the body,
+    // and a fin is rigid at its root and loosens toward its tip.
+    const away = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) away[i] = thick[i] >= 0.62 * most ? 0 : INF;
+    const far = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? INF : away[y * w + x]);
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            away[y * w + x] = Math.min(away[y * w + x], far(x - 1, y) + 1, far(x, y - 1) + 1, far(x - 1, y - 1) + 1.414, far(x + 1, y - 1) + 1.414);
+        }
+    }
+    for (let y = h - 1; y >= 0; y--) {
+        for (let x = w - 1; x >= 0; x--) {
+            away[y * w + x] = Math.min(away[y * w + x], far(x + 1, y) + 1, far(x, y + 1) + 1, far(x + 1, y + 1) + 1.414, far(x - 1, y + 1) + 1.414);
+        }
+    }
     const soft = new Float32Array(w * h);
     let sx = 0, sy = 0, sw = 0;
     for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
             const t = thick[y * w + x];
-            soft[y * w + x] = most > 0 ? 1 - smooth(0.3 * most, 0.62 * most, t) : 1;
+            soft[y * w + x] = most > 0
+                ? (1 - smooth(0.3 * most, 0.62 * most, t)) * smooth(SPIKE * most, REACH * most, away[y * w + x])
+                : 1;
             const wgt = t * t * t;                 // the centre is where the body is thickest
             sx += (x + 0.5) * wgt; sy += (y + 0.5) * wgt; sw += wgt;
         }

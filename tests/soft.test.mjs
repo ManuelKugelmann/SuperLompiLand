@@ -9,7 +9,8 @@ for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
         const body = Math.hypot(x - 32, y - 16) < 12;
         const tail = x >= 4 && x < 24 && Math.abs(y - 16) < 2;
-        alpha[y * W + x] = body || tail ? 255 : 0;
+        const spike = x === 32 && y >= 1 && y < 5;            // a short spike on top of the body
+        alpha[y * W + x] = body || tail || spike ? 255 : 0;
     }
 }
 const map = softnessMap(alpha, W, H);
@@ -20,7 +21,14 @@ test('thin parts are soft, the thick body is rigid — including its rim', () =>
     assert.ok(soft(32, 16) < 0.05, `body centre: ${soft(32, 16)}`);
     assert.ok(soft(32, 6) < 0.05, `body rim (top): ${soft(32, 6)}`);
     assert.ok(soft(42, 16) < 0.05, `body rim (right): ${soft(42, 16)}`);
-    assert.ok(soft(1, 1) > 0.9, 'empty space moves with whatever is near');
+    assert.ok(soft(1, 16) > 0.9, 'empty space far out moves with whatever is near');
+});
+
+test('short spikes on the rim stay rigid; a fin is rigid at its root', () => {
+    assert.ok(soft(32, 2) < 0.05, `spike tip: ${soft(32, 2)}`);
+    assert.ok(soft(32, 3) < 0.05, `spike: ${soft(32, 3)}`);
+    assert.ok(soft(19, 16) < 0.2, `tail root: ${soft(19, 16)}`);
+    assert.ok(soft(12, 16) > soft(17, 16), 'looser toward the tip');
 });
 
 test('the centre is the middle of the thick body, not of the whole picture', () => {
