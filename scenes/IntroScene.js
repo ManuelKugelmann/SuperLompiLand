@@ -11,6 +11,7 @@ import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
 import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
+import { gateQuestion, gatePassed, rememberGate } from '../net/gate.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -163,7 +164,55 @@ export default class IntroScene extends Phaser.Scene {
         const btn = this.add.text(W - 150, H * 0.905, de ? 'Zusammen' : 'Together', {
             ...label, fontSize: '40px', color: '#ffffff', backgroundColor: '#1d8fb5', padding: { x: 30, y: 14 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        btn.on('pointerdown', () => this.openTogether(de));
+        // Offline: the button greys out and explains itself; solo play is unaffected (spec).
+        const offlineNote = this.add.text(W - 150, H * 0.905 - 62, de ? 'Kein Internet' : 'No internet', {
+            ...label, fontSize: '26px', color: '#ffd0d0', stroke: '#0a3f6e', strokeThickness: 5
+        }).setOrigin(0.5).setVisible(false);
+        const online = () => navigator.onLine !== false;
+        const paint = () => { btn.setAlpha(online() ? 1 : 0.45); offlineNote.setVisible(!online()); };
+        btn.on('pointerdown', () => { if (online()) this.openTogether(de); else paint(); });
+        window.addEventListener('online', paint);
+        window.addEventListener('offline', paint);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            window.removeEventListener('online', paint);
+            window.removeEventListener('offline', paint);
+        });
+        paint();
+    }
+
+    /** Parent gate before the first online join (spec): a grown-up taps the right product. */
+    parentGate(de, onPass, onCancel) {
+        const W = this.scale.width, H = this.scale.height;
+        const label = { fontFamily: 'Arial', fontStyle: 'bold' };
+        const q = gateQuestion();
+        const ui = [];
+        const add = o => { ui.push(o); return o.setDepth(110); };
+        const close = () => ui.forEach(o => o.destroy());
+        add(this.add.rectangle(W / 2, H / 2, W, H, 0x021624, 1).setInteractive());
+        add(this.add.text(W / 2, H * 0.2, de ? 'Frag kurz einen Erwachsenen' : 'Ask a grown-up', {
+            ...label, fontSize: '64px', color: '#ffffff', stroke: '#0a5c7a', strokeThickness: 10
+        }).setOrigin(0.5));
+        add(this.add.text(W / 2, H * 0.3, de ? 'Online spielen nur mit Erlaubnis. Wie viel ist' : 'Online play needs a grown-up. What is', {
+            ...label, fontSize: '32px', color: '#eafcff'
+        }).setOrigin(0.5));
+        add(this.add.text(W / 2, H * 0.42, `${q.a} × ${q.b} ?`, {
+            ...label, fontSize: '96px', color: '#ffc266', stroke: '#06343a', strokeThickness: 10
+        }).setOrigin(0.5));
+        const wrong = add(this.add.text(W / 2, H * 0.78, '', { ...label, fontSize: '30px', color: '#ffd0d0' }).setOrigin(0.5));
+        q.choices.forEach((c, i) => {
+            const t = add(this.add.text(W / 2 + (i - 1.5) * 260, H * 0.62, String(c), {
+                ...label, fontSize: '60px', color: '#06343a', backgroundColor: '#b8ecf7', padding: { x: 36, y: 16 }
+            }).setOrigin(0.5).setInteractive({ useHandCursor: true }));
+            t.on('pointerdown', () => {
+                if (c === q.answer) { rememberGate(window.localStorage); close(); onPass(); }
+                else { close(); onCancel(de ? 'Das war leider falsch.' : 'That was not right.'); }
+            });
+        });
+        const x = add(this.add.text(W - 70, 60, '✕', {
+            ...label, fontSize: '40px', color: '#06343a', backgroundColor: '#ffd0d0', padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true }));
+        x.on('pointerdown', () => { close(); onCancel(''); });
+        return wrong;
     }
 
     /**
@@ -258,14 +307,21 @@ export default class IntroScene extends Phaser.Scene {
         const row = y0 + 3 * kh + 10;
         pill(W / 2 - 520, row, '⌫', '#ffd0d0', () => setWord(word.slice(0, -1)), 46);
         pill(W / 2 - 200, row, de ? '🎲 Würfeln' : '🎲 Roll', '#ffe9a8', roll);
+        const join = () => {
+            try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
+            this.registry.set('room', word);
+            this.scene.start(SCENE_KEYS.MAIN);
+        };
         const go = pill(W / 2 + 280, row, de ? 'Los!' : 'Go!', '#7ee08a', () => {
             if (word.length < MIN_JOIN) return;
-            try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
             // Stay modal until the scene is gone, so a queued Enter/Space can't
             // also fire start() and restart the game solo.
             window.removeEventListener('keydown', onKey);
-            this.registry.set('room', word);
-            this.scene.start(SCENE_KEYS.MAIN);
+            if (gatePassed(window.localStorage)) { join(); return; }
+            this.parentGate(de, join, msg => {
+                window.addEventListener('keydown', onKey);
+                hint.setText(msg);
+            });
         });
         pill(W - 70, 60, '✕', '#ffd0d0', close);
         refresh();
