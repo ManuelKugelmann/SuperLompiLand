@@ -15,7 +15,8 @@ export default class EndScene extends Phaser.Scene {
         if (this.textures.exists('bg_far')) this.add.image(W / 2, H / 2, 'bg_far').setDisplaySize(W, H);
         else this.add.rectangle(W / 2, H / 2, W, H, 0x0a3f6e);
 
-        this.add.text(W / 2, H * 0.2, de ? 'Gut gemacht!' : 'Well done!', {
+        const won = !!data?.won;
+        this.add.text(W / 2, H * 0.2, won ? (de ? 'Geschafft! Das große Nest!' : 'You made it! The Grand Nest!') : (de ? 'Gut gemacht!' : 'Well done!'), {
             fontFamily: 'Arial', fontSize: '120px', color: '#ffffff', fontStyle: 'bold',
             stroke: '#0a5c7a', strokeThickness: 14
         }).setOrigin(0.5);

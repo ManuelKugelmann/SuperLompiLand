@@ -35,6 +35,8 @@ export default class MainScene extends Phaser.Scene {
 
         this.progression = new ProgressionManager();
         this.progression.init?.();
+        // Relaxed = just swim and explore: hazards are only scenery and cannot hurt.
+        this.relaxed = !!this.progression.get?.('relaxed', false);
 
         this.matter.world.setGravity(0, WORLD.gravity);
         this.matter.world.autoUpdate = false; // stepped manually in fixedStep()
@@ -205,6 +207,12 @@ export default class MainScene extends Phaser.Scene {
         });
     }
 
+    /** Menu: switch between relaxed (no damage) and adventure. Takes effect at once. */
+    setRelaxed(on) {
+        this.progression.set?.('relaxed', !!on);
+        this.scene.restart();
+    }
+
     /** Menu: forget the saved nest and coins and begin at the home reef again. */
     startOver() {
         this.progression.set?.('nest', 0);
@@ -267,6 +275,7 @@ export default class MainScene extends Phaser.Scene {
             if (Math.abs(p.x - nest.x) < 230 && p.y > nest.y - 260 && p.y < nest.y + 40) this.reachNest(nest);
         }
         for (const h of this.level.hazards) {
+            if (this.relaxed) break;
             if (!h.img.active || p.distance(h.img) > fr * LEVEL.hitSlack + h.r) continue;
             if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
                 this.health = Math.max(0, this.health - (this.character.armor ?? 1));

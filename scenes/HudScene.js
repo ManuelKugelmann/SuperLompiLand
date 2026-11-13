@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
+import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, BIOME_WIDTH } from '../game/level/biomes.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
@@ -51,6 +52,23 @@ export default class HudScene extends Phaser.Scene {
             fontFamily: 'Arial', fontSize: '20px', color: '#ffffff'
         }).setOrigin(1, 1).setAlpha(0.4);
 
+        // Journey strip: the whole trip west -> east at a glance. Biome colours,
+        // nests as dots, the grand nest as a star, the abyss as a notch, you as the arrow.
+        this.mapX = this.scale.width - 560; this.mapW = 520; this.mapY = 132;
+        const toMap = x => this.mapX + Phaser.Math.Clamp((x - WORLD_WEST) / (WORLD_END - WORLD_WEST), 0, 1) * this.mapW;
+        this.toMap = toMap;
+        const mg = this.add.graphics();
+        mg.fillStyle(0x06343a, 0.55).fillRoundedRect(this.mapX - 10, this.mapY - 16, this.mapW + 20, 32, 14);
+        BIOMES.forEach((b, i) => {
+            const x0 = toMap(b.from), x1 = toMap(BIOMES[i + 1] ? BIOMES[i + 1].from : b.from + BIOME_WIDTH);
+            mg.fillStyle(b.rock[1], 1).fillRect(x0, this.mapY - 7, Math.max(2, x1 - x0 - 2), 14);
+        });
+        mg.fillStyle(0x0a1436, 1).fillTriangle(toMap(ABYSS.x) - 7, this.mapY + 7, toMap(ABYSS.x) + 7, this.mapY + 7, toMap(ABYSS.x), this.mapY + 20);
+        this.nestDots = main.level.nests.map(n => n.grand
+            ? this.add.star(toMap(n.x), this.mapY, 5, 6, 13, 0xfff3b0).setStrokeStyle(2, 0x6b4a2b)
+            : this.add.circle(toMap(n.x), this.mapY, 6, 0xffffff, 0.5).setStrokeStyle(2, 0x06343a));
+        this.mapYou = this.add.triangle(0, this.mapY - 20, -9, -10, 9, -10, 0, 6, 0xffffff).setStrokeStyle(2, 0x06343a);
+
         // Banner line for announcements (biome names, nest reached, ...).
         const W = this.scale.width, H = this.scale.height;
         this.bannerTitle = this.add.text(W / 2, H * 0.26, '', {
@@ -63,6 +81,9 @@ export default class HudScene extends Phaser.Scene {
         new BurgerMenu(this, 60, 60, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
             { label: de ? 'NEU ANFANGEN' : 'START OVER', color: 0x6d4c41, callback: () => main.startOver() },
+            main.relaxed
+                ? { label: de ? 'MODUS: ENTSPANNT' : 'MODE: RELAXED', color: 0x00897b, callback: () => main.setRelaxed(false) }
+                : { label: de ? 'MODUS: ABENTEUER' : 'MODE: ADVENTURE', color: 0xc62828, callback: () => main.setRelaxed(true) },
             ...pwaMenuItems(this, main.lang),
             { label: de ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => main.scene.start('MainMenuScene') }
         ]);
@@ -83,6 +104,8 @@ export default class HudScene extends Phaser.Scene {
         if (!m?.fish) return;
         this.coinText.setText(String(m.coins));
         this.depthText.setText(`${this.depthLabel} ${m.depthMeters()} m`);
+        this.mapYou.x = this.toMap(m.fish.sprite.x);
+        this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });
         const hp = Phaser.Math.Clamp(m.health / m.maxHealth, 0, 1);
         this.hpFill.width = Phaser.Math.Linear(this.hpFill.width, this.hpW * hp, 0.2);
         this.hpFill.setFillStyle(hp > 0.5 ? 0x5fd35f : hp > 0.25 ? 0xffc23d : 0xff5a4f);
