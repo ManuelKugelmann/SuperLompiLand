@@ -10,7 +10,7 @@ import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.j
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
-import { makeSecret, normalizeSecret, MIN_SECRET, MAX_SECRET } from '../net/Net.js';
+import { makeSecret, normalizeSecret, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,

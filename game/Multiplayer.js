@@ -61,11 +61,20 @@ export default class Multiplayer {
         const now = performance.now();
         if (now >= this.sendAt) {
             this.sendAt = now + SEND_MS;
-            const v = fish.body.velocity;
+            const x = fish.sprite.x, y = fish.sprite.y;
+            // Velocity as actually moved (px per 60 Hz step), not the physics value: on a slow
+            // device that drops simulation steps the two differ, and receivers coast on this.
+            let vx = fish.body.velocity.x, vy = fish.body.velocity.y;
+            const last = this.last;
+            if (last && now - last.t > 5 && now - last.t < 500) {
+                const k = (1000 / 60) / (now - last.t);
+                vx = (x - last.x) * k; vy = (y - last.y) * k;
+            }
+            this.last = { x, y, t: now };
             this.net.send({
                 n: this.seq++, t: Math.round(now),
-                x: Math.round(fish.sprite.x), y: Math.round(fish.sprite.y),
-                vx: +v.x.toFixed(2), vy: +v.y.toFixed(2),
+                x: Math.round(x), y: Math.round(y),
+                vx: +vx.toFixed(2), vy: +vy.toFixed(2),
                 s: fish.state, f: fish.facing, c: fish.char.id
             });
         }

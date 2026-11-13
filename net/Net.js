@@ -11,26 +11,11 @@
 //  - The app id is generic: no project, personal or studio names.
 //  - Only fish state goes over the wire — no chat, no free text.
 import { joinRoom } from 'trystero';
+import { normalizeSecret } from './secret.js';
 
 const APP_ID = 'reef-swim-pals-v1';
 export const MAX_PLAYERS = 6;
-export const MIN_SECRET = 6;
-export const MAX_SECRET = 20;
-
-/** Lower-case letters and digits only, accents folded (ä -> a), so "Müller" == "muller". */
-export function normalizeSecret(input) {
-    return String(input || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, MAX_SECRET);
-}
-
-/** A pronounceable random secret (consonant + vowel pairs), easy to say aloud. */
-export function makeSecret() {
-    const C = 'bdfgklmnprstvz', V = 'aeiou';
-    let s = '';
-    for (let i = 0; i < 4; i++) {
-        s += C[Math.floor(Math.random() * C.length)] + V[Math.floor(Math.random() * V.length)];
-    }
-    return s;
-}
+export { normalizeSecret, makeSecret, MIN_SECRET, MAX_SECRET } from './secret.js';
 
 const hex = bytes => Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 
