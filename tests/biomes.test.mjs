@@ -22,6 +22,7 @@ test('friends are never listed as hazards', () => {
         assert.ok(!('urchin' in b.hazards) && !('enemy_angler' in b.hazards), `${b.id}: urchin/angler are friends`);
     }
     assert.equal(BIOMES[0].hazardRate, 0, 'the beach is safe');
+    for (const b of BIOMES) for (const key of Object.keys(b.hazards)) assert.ok(!/barrel|claw|robot/.test(key), `${b.id}: no machine characters (${key})`);
     assert.ok(ABYSS.x > BIOMES.at(-1).from && ABYSS.x < WORLD_END, 'the abyss lies in the last biome');
 });
 

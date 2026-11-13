@@ -41,7 +41,7 @@ npm run serve      # zero-dep static server for dist/ (tests the real PWA/SW)
 ## The game
 
 Lompi the pufferfish lives on a reef. A volcano erupts, and what it shakes loose —
-mines, nets, barrels, claws — drifts into the sea. Lompi sets out east across the
+mines, nets, buoys — drifts into the sea. Lompi sets out east across the
 ocean, from the shallow lagoon through reef, kelp forest, open blue, minefield and
 harbour down into the deep trench, to reach the grand nest.
 

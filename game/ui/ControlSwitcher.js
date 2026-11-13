@@ -1,48 +1,30 @@
 import { CONTROL_SCHEMES } from '../controls/index.js';
+import { pillButton } from './kit.js';
 
 /**
- * Top-center segmented control to switch schemes live, plus a physics-debug
- * toggle. Screen-fixed. Buttons are interactive, so control schemes ignore
- * pointer events that land on them.
+ * Top-center row of pills to switch control schemes live, plus a small
+ * physics-debug toggle. Lives in the HUD scene, so it never scrolls.
  */
 export default class ControlSwitcher {
     constructor(scene, activeId, onSelect, onToggleDebug) {
         const W = scene.scale.width;
-        const bw = 232, bh = 78, gap = 12, y = 62;
+        const bw = 226, bh = 76, gap = 14, y = 62;
         const total = CONTROL_SCHEMES.length * bw + (CONTROL_SCHEMES.length - 1) * gap;
         let x = (W - total) / 2 + bw / 2;
         this.buttons = {};
-
-        const button = (bx, w, label, onTap) => {
-            const bg = scene.add.rectangle(bx, y, w, bh, 0x06525c, 0.85)
-                .setStrokeStyle(4, 0xffffff, 0.5)
-                .setInteractive({ useHandCursor: true });
-            const txt = scene.add.text(bx, y, label, {
-                fontFamily: 'Arial', fontSize: '30px', color: '#ffffff', fontStyle: 'bold'
-            }).setOrigin(0.5);
-            bg.on('pointerdown', onTap);
-            return { bg, txt };
-        };
-
         for (const s of CONTROL_SCHEMES) {
-            this.buttons[s.id] = button(x, bw, s.label, () => onSelect(s.id));
+            this.buttons[s.id] = pillButton(scene, x, y, bw, bh, s.label, () => onSelect(s.id));
             x += bw + gap;
         }
-        this.debug = button(W - 110, 170, 'Debug', onToggleDebug);
-        this.debug.txt.setFontSize(24);
+        this.debug = pillButton(scene, W - 105, y, 150, 60, 'Debug', onToggleDebug, { size: 22 });
         this.setActive(activeId);
-        this.setDebug(false);
     }
 
     setActive(id) {
-        for (const [sid, b] of Object.entries(this.buttons)) {
-            const on = sid === id;
-            b.bg.setFillStyle(on ? 0xffc266 : 0x06525c, on ? 1 : 0.85);
-            b.txt.setColor(on ? '#06343a' : '#ffffff');
-        }
+        for (const [sid, b] of Object.entries(this.buttons)) b.setSelected(sid === id);
     }
 
     setDebug(on) {
-        this.debug.bg.setFillStyle(on ? 0x5a8f3a : 0x33373f, 0.85);
+        this.debug.setSelected(on);
     }
 }

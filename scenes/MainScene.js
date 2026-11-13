@@ -42,6 +42,7 @@ export default class MainScene extends Phaser.Scene {
         this.matter.world.setGravity(0, WORLD.gravity);
         this.matter.world.autoUpdate = false; // stepped manually in fixedStep()
         this.acc = 0;
+        this.perf = { physics: { sum: 0, n: 0, max: 0 }, world: { sum: 0, n: 0, max: 0 } }; // see ?debug=perf
         this.debugOn = false;
         this.maxDepth = 0;
 
@@ -315,8 +316,10 @@ export default class MainScene extends Phaser.Scene {
         const W = this.scale.width, H = this.scale.height;
         const sp = this.fish.sprite;
 
+        const t0 = performance.now();
         this.acc = Math.min(this.acc + delta, STEP_MS * 5);
         while (this.acc >= STEP_MS) { this.fixedStep(); this.acc -= STEP_MS; }
+        const t1 = performance.now();
         this.fish.render(this.acc / STEP_MS, delta / STEP_MS);
         this.controller.draw?.();
         const view = this.fish.view;
@@ -375,6 +378,10 @@ export default class MainScene extends Phaser.Scene {
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY);
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
+        const t2 = performance.now();
+        for (const [k, ms] of [['physics', t1 - t0], ['world', t2 - t1]]) {
+            const a = this.perf[k]; a.sum += ms; a.n++; if (ms > a.max) a.max = ms;
+        }
 
         // Announce a biome when the fish swims into it.
         const bi = biomeIndexAt(sp.x);

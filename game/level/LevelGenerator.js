@@ -39,11 +39,9 @@ const FRIENDS = {
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
 const HAZARDS = {
     spikes: { size: 210, r: 62, place: 'floor', lift: 30 },
-    hazard_barrel: { size: 190, r: 78, place: 'floor', lift: 80, anim: 'wobble' },
     mine: { size: 150, r: 64, place: 'water', anim: 'wobble', bob: 18 },
     hazard_buoy: { size: 130, r: 70, place: 'water', anim: 'wobble', bob: 26 },
-    hazard_net: { size: 230, r: 96, place: 'water', anim: 'sway' },
-    hazard_claw: { size: 230, r: 92, place: 'water', anim: 'sway', bob: 70 }
+    hazard_net: { size: 230, r: 96, place: 'water', anim: 'sway' }
 };
 const BAND_DT = [0, 0.03, 0.075, 0.14, 0.22]; // density steps of the terrain colour bands
 const DEEP_TINT = 0x1a3a62;

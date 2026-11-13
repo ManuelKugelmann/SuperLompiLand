@@ -8,8 +8,8 @@
 //   open     how much rock is removed (0 = cave-rich, 0.3 = wide open water)
 //   coral    chance that a floor spot gets coral          kelp    chance that it gets a kelp stalk
 //   Friends are the sea's own creatures (anglerfish and urchins included).
-//   Hazards are what the volcano's eruption and people left behind: mines,
-//   buoys, nets, claws, barrels, spikes.
+//   Hazards are what the volcano's eruption and people left behind, all of
+//   it inanimate: mines, warning buoys, nets, spike plates. No machines with faces.
 //   coins    coin trails per chunk                        friends / hazards: weighted spawn tables
 //   friendRate / hazardRate: chance per chunk
 export const BIOME_WIDTH = 5000;
@@ -65,14 +65,14 @@ export const BIOMES = [
         rock: [0xb7b9b0, 0x8d9088, 0x676b66, 0x4a4e4c, 0x353838], water: [0x6f8f3a, 0.26], open: 0.08,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
         friends: { friend_snail: 1, friend_nudibranch: 1 },
-        hazards: { hazard_net: 3, hazard_claw: 3, hazard_barrel: 3, spikes: 1, hazard_buoy: 1 }
+        hazards: { hazard_net: 4, hazard_buoy: 3, mine: 2, spikes: 2 }
     },
     {
         id: 'trench', name: { de: 'Tiefsee', en: 'Deep Trench' }, from: 27500,
         rock: [0x7f86c4, 0x5b5f9c, 0x434576, 0x303158, 0x21213f], water: [0x1a0f4a, 0.42], open: 0.04,
         coral: 0.2, kelp: 0.05, coins: 4, friendRate: 0.25, hazardRate: 0.5,
         friends: { friend_jellyfish: 2, friend_nudibranch: 1, enemy_angler: 4, urchin: 1 },
-        hazards: { mine: 2, hazard_barrel: 2, spikes: 1 }
+        hazards: { mine: 3, spikes: 1 }
     }
 ];
 

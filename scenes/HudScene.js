@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
+import { heartRow, textStyle } from '../game/ui/kit.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, BIOME_WIDTH } from '../game/level/biomes.js';
 import { feedbackMenuItems } from '../game/feedback.js';
@@ -35,20 +36,14 @@ export default class HudScene extends Phaser.Scene {
             id => { main.switchScheme(id); this.switcher.setActive(id); },
             () => this.switcher.setDebug(main.toggleDebug()));
 
-        const hudText = (x, y, size) => this.add.text(x, y, '', {
-            fontFamily: 'Arial', fontSize: size, color: '#ffffff', fontStyle: 'bold',
-            stroke: '#0a3f6e', strokeThickness: 8
-        });
+        const hudText = (x, y, size) => this.add.text(x, y, '', textStyle(parseInt(size, 10)));
         if (this.textures.exists('coin')) this.add.image(70, 190, 'coin').setDisplaySize(64, 64);
         this.coinText = hudText(116, 162, '50px');
         this.depthText = hudText(40, 232, '34px');
         this.depthLabel = de ? 'Tiefe' : 'Depth';
 
-        // Health bar.
-        this.hpW = 300;
-        this.add.rectangle(40, 300, this.hpW + 8, 34, 0x06343a, 0.7).setOrigin(0, 0.5).setStrokeStyle(3, 0xffffff, 0.6);
-        this.hpFill = this.add.rectangle(44, 300, this.hpW, 26, 0x5fd35f).setOrigin(0, 0.5);
-        this.add.text(44 + this.hpW + 18, 300, '♥', { fontFamily: 'Arial', fontSize: '34px', color: '#ff6b9a' }).setOrigin(0, 0.5);
+        // Health: a row of hearts (readable at a glance, half hearts for sturdy characters).
+        this.hearts = heartRow(this, 36, 300, main.maxHealth);
 
         this.add.text(this.scale.width - 16, this.scale.height - 12, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '20px', color: '#ffffff'
@@ -70,6 +65,14 @@ export default class HudScene extends Phaser.Scene {
             ? this.add.star(toMap(n.x), this.mapY, 5, 6, 13, 0xfff3b0).setStrokeStyle(2, 0x6b4a2b)
             : this.add.circle(toMap(n.x), this.mapY, 6, 0xffffff, 0.5).setStrokeStyle(2, 0x06343a));
         this.mapYou = this.add.triangle(0, this.mapY - 20, -9, -10, 9, -10, 0, 6, 0xffffff).setStrokeStyle(2, 0x06343a);
+
+        // ?debug=perf: frame time and where it goes, for checking on a real device.
+        if (new URLSearchParams(window.location.search).get('debug') === 'perf') {
+            this.perf = this.add.text(this.scale.width - 20, 200, '', {
+                fontFamily: 'monospace', fontSize: '24px', color: '#b6ffb0', backgroundColor: '#00000099', padding: { x: 10, y: 8 }, align: 'right'
+            }).setOrigin(1, 0);
+            this.perfAt = 0;
+        }
 
         // Banner line for announcements (biome names, nest reached, ...).
         const W = this.scale.width, H = this.scale.height;
@@ -96,6 +99,23 @@ export default class HudScene extends Phaser.Scene {
         ]);
     }
 
+    updatePerf(m) {
+        const now = performance.now();
+        if (now - this.perfAt < 500) return;
+        this.perfAt = now;
+        const loop = this.game.loop, p = m.perf;
+        const avg = a => (a.n ? (a.sum / a.n).toFixed(1) : '-');
+        this.perf.setText([
+            `fps ${Math.round(loop.actualFps)}   frame ${loop.delta.toFixed(1)} ms`,
+            `physics ${avg(p.physics)} ms  (max ${p.physics.max.toFixed(1)})`,
+            `world+fx ${avg(p.world)} ms  (max ${p.world.max.toFixed(1)})`,
+            `chunks ${m.level.chunks.size}  bodies ${m.matter.world.localWorld.bodies.length}`,
+            `objects ${m.children.list.length}  tweens ${m.tweens.getTweens().length}`,
+            `dpr ${window.devicePixelRatio}  ${this.game.renderer.type === 2 ? 'webgl' : 'canvas'}`
+        ].join('\n'));
+        for (const k of ['physics', 'world']) { p[k].sum = 0; p[k].n = 0; p[k].max = 0; }
+    }
+
     banner(title, subtitle = '') {
         const targets = [this.bannerTitle, this.bannerSub];
         this.tweens.killTweensOf(targets);
@@ -113,8 +133,7 @@ export default class HudScene extends Phaser.Scene {
         this.depthText.setText(`${this.depthLabel} ${m.depthMeters()} m`);
         this.mapYou.x = this.toMap(m.fish.sprite.x);
         this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });
-        const hp = Phaser.Math.Clamp(m.health / m.maxHealth, 0, 1);
-        this.hpFill.width = Phaser.Math.Linear(this.hpFill.width, this.hpW * hp, 0.2);
-        this.hpFill.setFillStyle(hp > 0.5 ? 0x5fd35f : hp > 0.25 ? 0xffc23d : 0xff5a4f);
+        if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
+        if (this.perf) this.updatePerf(m);
     }
 }
