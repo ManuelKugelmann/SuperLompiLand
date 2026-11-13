@@ -43,6 +43,18 @@ test('every nest sits on the seabed with open water above it', () => {
     }
 });
 
+test('a nest lies in a level sand basin with a raised rim, whatever the slope around it', () => {
+    for (const n of field.nests) {
+        for (const dx of [-150, -60, 0, 60, 150]) {
+            assert.ok(field.density(n.x + dx, n.y + 30) > FIELD.threshold, `sand under nest ${n.index} at ${dx}`);
+            assert.ok(field.density(n.x + dx, n.y - 40) < FIELD.threshold, `water over nest ${n.index} at ${dx}`);
+        }
+        // The middle is lower than the rim: at the same height the rim is sand, the middle is water.
+        const y = n.y - FIELD.nestRim * 0.5;
+        assert.ok(field.density(n.x, y) < field.density(n.x + FIELD.nestRadius, y), `rim of nest ${n.index}`);
+    }
+});
+
 test('chunk grids match direct sampling, and neighbouring chunks share their border', () => {
     const span = 960, n = 20;
     const a = chunkGrids(field, 1337, 0, 960, span, n), b = chunkGrids(field, 1337, 960, 960, span, n);

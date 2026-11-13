@@ -11,7 +11,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 2,           // bump when generation changes what index a coin or friend gets
+    version: 3,           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
@@ -427,28 +427,25 @@ export default class LevelGenerator {
     /** The pufferfish sand circle: concentric ridges, radial grooves, a ring of shells. */
     drawNest(chunk, nest) {
         const s = this.scene, R = nest.grand ? 300 : 210;
-        const g = s.add.graphics().setDepth(-1);
-        const cy = nest.y + 6;
-        [[1, 0xcfa565], [0.86, 0xf6e3ae], [0.7, 0xd9b877], [0.52, 0xf9ecc4], [0.32, 0xe2c488], [0.14, 0xfff6d8]].forEach(([k, col]) => {
-            g.fillStyle(col, 1).fillEllipse(nest.x, cy, R * 2 * k, R * 0.62 * k);
-        });
-        g.lineStyle(4, 0xb98f55, 0.55);
-        for (let i = 0; i < 22; i++) {
-            const a = (i / 22) * Math.PI * 2;
-            g.lineBetween(nest.x + Math.cos(a) * R * 0.2, cy + Math.sin(a) * R * 0.062,
-                nest.x + Math.cos(a) * R * 0.96, cy + Math.sin(a) * R * 0.3);
-        }
-        const shells = [0xff8fb1, 0xfff1a8, 0x9be9ef, 0xc9a0ff, 0xffb26b];
-        const count = nest.grand ? 18 : 10;
+        makeNestTextures(s);
+        // Raked sand: a shaded relief seen at the game's low camera angle, lying in the
+        // basin the terrain keeps level for it (density.js).
+        const disc = s.add.image(nest.x, nest.y - FIELD.nestRim * 0.4, 'nest_sand').setDisplaySize(R * 2.1, R * 0.66).setDepth(-1);
+        chunk.objects.push(disc);
+        // Shells on the ridge: small shaded things, the far ones behind the near ones.
+        const tints = [0xffb3c8, 0xfff1c0, 0xbdeff2, 0xd9c2ff, 0xffcf9e];
+        const count = nest.grand ? 16 : 9;
         for (let i = 0; i < count; i++) {
-            const a = (i / count) * Math.PI * 2;
-            g.fillStyle(shells[i % shells.length], 1).fillCircle(nest.x + Math.cos(a) * R * 0.9, cy + Math.sin(a) * R * 0.28, nest.grand ? 15 : 11);
+            const a = (i / count) * Math.PI * 2 + 0.3, far = Math.sin(a) < 0;
+            const size = (nest.grand ? 50 : 40) * (far ? 0.8 : 1) * (0.85 + ((i * 37) % 10) / 30);
+            const shell = s.add.image(nest.x + Math.cos(a) * R * 0.9, nest.y - FIELD.nestRim * 0.4 + Math.sin(a) * R * 0.27 - size * 0.25, 'nest_shell')
+                .setDisplaySize(size, size * 0.8).setTint(tints[i % tints.length]).setRotation(((i * 53) % 7 - 3) * 0.12).setDepth(far ? -0.9 : -0.8);
+            chunk.objects.push(shell);
         }
-        chunk.objects.push(g);
-        // A soft beacon so the nest can be found from a distance.
-        const beam = s.add.triangle(nest.x, nest.y - 420, -R * 0.5, 840, R * 0.5, 840, 0, 0, 0xfff3b0, 0.1).setDepth(-5)
-            .setBlendMode(Phaser.BlendModes.ADD);
-        s.tweens.add({ targets: beam, alpha: 0.04, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        // A soft column of light so the nest can be found from a distance.
+        const beam = s.add.image(nest.x, nest.y - 880, s.textures.exists('bd_ray') ? 'bd_ray' : 'nest_shell').setOrigin(0.5, 0)
+            .setDisplaySize(R * 1.5, 900).setFlipY(true).setTint(0xfff3b0).setAlpha(0.42).setDepth(-5).setBlendMode(Phaser.BlendModes.ADD);
+        s.tweens.add({ targets: beam, alpha: 0.14, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(beam);
     }
 
@@ -570,4 +567,50 @@ export default class LevelGenerator {
         this.lights = this.lights.filter(o => o.active);
         this.vents = this.vents.filter(v => v.chunk !== key);
     }
+}
+
+/** Nest pictures, made once: a disc of raked sand as a shaded relief, and a little shell. */
+function makeNestTextures(scene) {
+    if (scene.textures.exists('nest_sand')) return;
+    const W = 512, H = 160, tex = scene.textures.createCanvas('nest_sand', W, H), ctx = tex.getContext();
+    const img = ctx.createImageData(W, H);
+    // Height of the sand at a point of the disc (nx, ny in -1..1): ridges radiating from
+    // the middle, crossed by rings, a raised rim, a smooth fine middle.
+    const height = (nx, ny) => {
+        const r = Math.hypot(nx, ny), a = Math.atan2(ny, nx);
+        const out = r < 0.2 ? 0 : Math.min(1, (r - 0.2) / 0.15);
+        const rays = Math.cos(a * 24 + Math.sin(r * 7) * 0.8) * 0.5 * out * Math.min(1, (1 - r) / 0.12 + 0.35);
+        const rings = Math.cos(r * 30) * 0.28 * out;
+        const rim = Math.exp(-((r - 0.9) ** 2) / 0.004) * 0.9;
+        const middle = (1 - out) * Math.cos(r * 60) * 0.12;
+        return rays + rings + rim + middle;
+    };
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const nx = (x + 0.5) / W * 2 - 1, ny = (y + 0.5) / H * 2 - 1, r = Math.hypot(nx, ny);
+            const i = (y * W + x) * 4;
+            if (r >= 1) continue;
+            // Light from above and a little from the left: slopes facing up-left are bright.
+            const e = 0.02;
+            const slope = (height(nx, ny + e) - height(nx, ny - e)) * 0.9 + (height(nx + e, ny) - height(nx - e, ny)) * 0.35;
+            const light = Math.max(0.55, Math.min(1.25, 0.92 + slope * 0.55 - Math.max(0, ny) * 0.1));
+            // Fine pale sand in the middle, warmer toward the rim.
+            const t = Math.min(1, r / 0.9);
+            img.data[i] = (250 - 28 * t) * light;
+            img.data[i + 1] = (236 - 44 * t) * light;
+            img.data[i + 2] = (196 - 70 * t) * light;
+            img.data[i + 3] = 255 * Math.min(1, (1 - r) / 0.1);
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+    tex.refresh();
+
+    const shell = scene.textures.createCanvas('nest_shell', 64, 52), sc = shell.getContext();
+    const body = sc.createRadialGradient(26, 20, 2, 32, 30, 30);
+    body.addColorStop(0, '#ffffff'); body.addColorStop(0.55, '#e9e4dc'); body.addColorStop(1, '#a89f95');
+    sc.fillStyle = body;
+    sc.beginPath(); sc.moveTo(32, 50); sc.bezierCurveTo(-4, 44, 2, 2, 32, 4); sc.bezierCurveTo(62, 2, 68, 44, 32, 50); sc.fill();
+    sc.strokeStyle = 'rgba(120, 100, 90, 0.35)'; sc.lineWidth = 1.5;
+    for (let k = -3; k <= 3; k++) { sc.beginPath(); sc.moveTo(32, 49); sc.quadraticCurveTo(32 + k * 9, 26, 32 + k * 7.5, 8 + Math.abs(k) * 3); sc.stroke(); }
+    shell.refresh();
 }

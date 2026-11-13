@@ -7,13 +7,17 @@ import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY } from './bi
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
     spawn: { x: 0, y: 700 },      // start pool, kept free of rock
-    maxDepth: 5600                // deepest regular seabed (the abyss goes further)
+    maxDepth: 5600,               // deepest regular seabed (the abyss goes further)
+    nestRadius: 230,              // half width of the sand basin a nest lies in
+    nestRim: 16                   // how far its rim stands above the middle
 };
 
 /**
  * Build the world's density field for a seed.
  * Returns { density(x, y, withNests = true), nests }.
  */
+const smooth01 = v => { const t = v <= 0 ? 0 : v >= 1 ? 1 : v; return t * t * (3 - 2 * t); };
+
 export function createField(seed) {
     let nests = null;
 
@@ -32,10 +36,24 @@ export function createField(seed) {
         const ds = Math.hypot(x - FIELD.spawn.x, y - FIELD.spawn.y);
         if (ds < 900) n -= (1 - ds / 900) * 0.6;                         // clear start pool
         if (withNests && nests) {
-            for (const nest of nests) {                                  // open water above every nest
-                if (Math.abs(x - nest.x) > 520 || y > nest.y - 30) continue;
-                const d = Math.hypot(x - nest.x, y - (nest.y - 260));
-                if (d < 480) n -= (1 - d / 480) * 0.7;
+            for (const nest of nests) {
+                const dx = Math.abs(x - nest.x);
+                if (dx > 520) continue;
+                if (y <= nest.y - 30) {                                  // open water above every nest
+                    const d = Math.hypot(x - nest.x, y - (nest.y - 260));
+                    if (d < 480) n -= (1 - d / 480) * 0.7;
+                }
+                // The nest lies in a shallow sand basin with a raised rim, levelled into
+                // the seabed, so it sits right on any slope instead of floating or sinking.
+                const R = FIELD.nestRadius, reach = R + 170;
+                if (dx < reach && Math.abs(y - nest.y) < 260) {
+                    const u = dx / R;
+                    const rim = u < 1 ? u * u : Math.max(0, 1 - (dx - R) / 170);       // 0 in the middle, 1 on the rim, back to 0 outside
+                    const ground = nest.y - FIELD.nestRim * rim;
+                    const side = dx <= R ? 1 : smooth01(1 - (dx - R) / 170);
+                    const w = side * smooth01(1 - Math.abs(y - nest.y) / 260);
+                    n += (FIELD.threshold + (y - ground) / 320 - n) * w;
+                }
             }
         }
         return n;
