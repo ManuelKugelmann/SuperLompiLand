@@ -306,7 +306,10 @@ export default class MainScene extends Phaser.Scene {
         }
         // Bubble plants carry the fish upward.
         const fsp = this.fish.sprite;
-        if (this.level.liftAt(fsp.x, fsp.y)) fsp.applyForce({ x: 0, y: -WORLD.ventLift * fsp.body.mass });
+        const lifted = this.level.liftAt(fsp.x, fsp.y);
+        if (lifted) fsp.applyForce({ x: 0, y: -WORLD.ventLift * fsp.body.mass });
+        // Whatever carries the fish upward inside a bubble column is the water's doing.
+        this.fish.flow.set(0, lifted ? Math.min(0, fsp.body.velocity.y) : 0);
         this.fish.update(STEP_MS, waveY(this.fish.sprite.x, this.time.now / 1000));
         this.matter.world.step(STEP_MS);
         this.fish.afterStep();

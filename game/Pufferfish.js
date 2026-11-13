@@ -61,6 +61,11 @@ export default class Pufferfish {
         this.cooldown = 0;
         this.invulnerable = 0;
         this.inAir = false;
+        // Velocity of the water around the fish (currents, bubble columns), set by
+        // the scene. Being carried by the water must never turn the fish around:
+        // it points where it SWIMS, i.e. along its velocity relative to the water.
+        this.flow = new Phaser.Math.Vector2(0, 0);
+        this.pushed = 0;        // ms left during which a knock-back must not turn the fish
         this.steered = false;   // set by the scene while keyboard input is active
         this.facing = 1;        // 1 = right, -1 = left
 
@@ -254,6 +259,7 @@ export default class Pufferfish {
         if (away.lengthSq() < 1) away.set(0, -1);
         away.setLength(this.inflated ? 15 : 11);
         this.sprite.setVelocity(away.x, away.y);
+        this.pushed = 450;
         if (this.inflated || this.invulnerable > 0) return false;
         this.invulnerable = 1200;
         this.scene.tweens.add({
@@ -282,6 +288,7 @@ export default class Pufferfish {
         else if (this.move.sink < 1) this.sprite.applyForce({ x: 0, y: -FISH.sinkForce * (1 - this.move.sink) * this.body.mass });
         if (this.shield > 0) this.shield -= dt;
         if (this.guard > 0) this.guard -= dt;
+        if (this.pushed > 0) this.pushed -= dt;
 
         if (this.inflated) {
             if (!this.inAir) this.sprite.applyForce({ x: 0, y: -FISH.hoverLift * this.body.mass });
@@ -313,7 +320,8 @@ export default class Pufferfish {
         // Orientation depends on speed: slow = level, just hovering up and down;
         // faster = the nose follows the movement vector. The art faces right;
         // heading left it is mirrored vertically so it never swims belly-up.
-        const v = this.body.velocity;
+        const bv = this.body.velocity;
+        const v = this.pushed > 0 ? { x: 0, y: 0 } : { x: bv.x - this.flow.x, y: bv.y - this.flow.y };
         const speed = Math.hypot(v.x, v.y);
         const facing = Math.abs(v.x) > 0.8 ? (v.x < 0 ? -1 : 1) : this.facing;
         if (facing !== this.facing) {
@@ -332,7 +340,7 @@ export default class Pufferfish {
         // end of the art), driven by how hard the fish is swimming and how fast
         // it moves. Idle = a slow, small flutter.
         this.effort = Math.max(0, this.effort - 0.035 * frames);
-        const drive = Phaser.Math.Clamp(Math.max(this.effort, speed / 14), 0.12, 1);
+        const drive = Phaser.Math.Clamp(Math.max(this.effort, speed / 14), 0.12, 1); // being carried is not swimming
         this.swimPhase += (0.1 + drive * 0.42) * frames;
         const amp = this.states[this.state].wiggle * (0.25 + drive * 0.75);
         const pts = this.view.points, n = pts.length - 1;
