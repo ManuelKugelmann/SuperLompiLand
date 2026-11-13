@@ -40,13 +40,13 @@ export const CHARACTERS = [
         states: one('player_flyingfish', 230, 50, 26)
     },
     {
-        id: 'firefish', name: 'Feuerfisch', blurb: { de: 'Wendig · Stachelschild', en: 'Nimble · spine shield' },
-        special: 'shield', thrust: 0.95, drag: 1.25, turn: 1.6, soft: 1,
+        id: 'firefish', name: 'Feuerfisch', blurb: { de: 'Wendig · Flossenfächer', en: 'Nimble · fin fan' },
+        special: 'fan', thrust: 0.95, drag: 1.25, turn: 1.6, soft: 1,
         states: one('player_firefish', 210, 60, 18)
     },
     {
-        id: 'turtle', name: 'Schildi', blurb: { de: 'Langsam, hält viel aus · Panzer', en: 'Slow but tough · shell' },
-        special: 'shield', thrust: 0.7, maxSpeed: 0.75, drag: 1.1, turn: 0.7, armor: 0.5, anim: 'paddle', soft: 0.35,
+        id: 'turtle', name: 'Schildi', blurb: { de: 'Langsam, hält viel aus · rollt als Panzer', en: 'Slow but tough · rolls as a shell' },
+        special: 'shell', thrust: 0.7, maxSpeed: 0.75, drag: 1.1, turn: 0.7, armor: 0.5, anim: 'paddle', soft: 0.35,
         states: one('friend_turtle', 250, 70, 14)
     },
     {
@@ -55,8 +55,8 @@ export const CHARACTERS = [
         states: one('friend_jellyfish', 150, 58, 6)
     },
     {
-        id: 'seahorse', name: 'Hüpfi', blurb: { de: 'Sehr genau, bleibt sofort stehen · Hüpfer', en: 'Very precise, stops at once · hop' },
-        special: 'dash', thrust: 0.85, maxSpeed: 0.8, drag: 2.2, sink: 0.3, upright: true, anim: 'sway', soft: 0.5,
+        id: 'seahorse', name: 'Hüpfi', blurb: { de: 'Sehr genau · hält sich mit dem Schwanz fest', en: 'Very precise · holds on with its tail' },
+        special: 'anchor', thrust: 0.85, maxSpeed: 0.8, drag: 2.2, sink: 0.3, upright: true, anim: 'sway', soft: 0.5,
         states: one('friend_seahorse', 120, 52, 6)
     }
 ];

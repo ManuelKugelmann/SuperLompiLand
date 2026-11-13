@@ -158,6 +158,14 @@ const SOUNDS = {
     },
     deflate() { noise({ dur: 0.35, vol: 0.2, from: 1600, to: 300, q: 0.7 }); },
     special() { tone({ f: 330, to: 990, type: 'sawtooth', dur: 0.2, vol: 0.14 }); noise({ dur: 0.2, vol: 0.18, from: 900, to: 2600 }); },
+    // One voice per special move, so each character sounds like itself.
+    sprint() { noise({ dur: 0.16, vol: 0.2, from: 500, to: 2400, q: 0.9 }); tone({ f: 180, to: 420, type: 'triangle', dur: 0.14, vol: 0.12 }); },
+    leap() { noise({ dur: 0.3, vol: 0.2, from: 700, to: 3200, q: 0.6 }); tone({ f: 520, to: 1040, type: 'sine', dur: 0.26, vol: 0.12 }); },
+    fan() { [0, 0.04, 0.08, 0.12].forEach((at, i) => tone({ f: 620 + i * 140, type: 'triangle', at, dur: 0.12, vol: 0.1 })); noise({ dur: 0.35, vol: 0.12, from: 3000, to: 900, q: 0.5 }); },
+    shell() { tone({ f: 150, to: 90, type: 'square', dur: 0.16, vol: 0.2 }); tone({ f: 300, to: 180, type: 'triangle', at: 0.03, dur: 0.14, vol: 0.14 }); },
+    pulse() { tone({ f: 240, to: 720, type: 'sine', dur: 0.32, vol: 0.18 }); tone({ f: 480, to: 1440, type: 'sine', at: 0.05, dur: 0.3, vol: 0.07 }); },
+    grab() { tone({ f: 700, to: 500, type: 'triangle', dur: 0.08, vol: 0.16 }); tone({ f: 500, to: 520, type: 'sine', at: 0.07, dur: 0.1, vol: 0.12 }); },
+    hop() { tone({ f: 400, to: 800, type: 'sine', dur: 0.12, vol: 0.16 }); },
     splash(strength = 1) {
         // Soft and airy; a hard dive is only a little louder than a gentle one.
         const v = Math.min(0.14, 0.04 + strength * 0.006);

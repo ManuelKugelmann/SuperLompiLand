@@ -46,7 +46,7 @@ export const CAT = { WORLD: 1, PLAYER: 2 };
  * ONLY through this API:
  *   thrust(dir)   steady swim force (dir length 0..1)
  *   launch(vec)   one-shot velocity kick
- *   special()     the character's special move
+ *   special()     the character's special move (data in specials.js)
  */
 export default class Player {
     /** @param character one entry of CHARACTERS (movement profile, art, special) */
@@ -65,6 +65,9 @@ export default class Player {
         this.poseCooldown = 0;  // cooldown that starts when the pose ends
         this.cooldown = 0;
         this.skips = 0;         // wave tops skipped off in the current flight
+        this.mode = null;       // a special's temporary behaviour: { left, drag, sink, flow, bounce, tuck }
+        this.hold = null;       // { x, y } rock the character holds on to (anchor special)
+        this.findHold = null;   // set by the scene: reach -> { x, y } to hold on to, or null
         this.chain = { count: 0, left: 0 };   // uses of a chained special so far, ms left to continue
         this.shield = 0;        // ms hazards cannot hurt
         this.guard = 0;         // ms fully protected (not even pushed)
@@ -115,15 +118,29 @@ export default class Player {
         sp.setBody({ type: 'circle', radius: s.radius, x: at.x, y: at.y });
         sp.setFixedRotation()
             .setMass(PLAYER.mass)
-            .setFrictionAir(this.inAir ? PLAYER.airDrag : s.air * this.move.drag * PLAYER.waterDrag)
-            .setBounce(Math.min(0.9, s.bounce * PLAYER.bounce))
+            .setFrictionAir(this.waterDrag())
+            .setBounce(this.mode?.bounce ?? Math.min(0.9, s.bounce * PLAYER.bounce))
             .setFriction(0.02)
             .setCollisionCategory(CAT.PLAYER)
             .setCollidesWith([CAT.WORLD]);
         sp.setVelocity(vel.x, vel.y);
     }
 
+    /** Resistance of the medium the body is in right now (a special's mode can change it). */
+    waterDrag() {
+        if (this.inAir) return PLAYER.airDrag;
+        return Math.min(0.5, this.states[this.state].air * this.move.drag * PLAYER.waterDrag * (this.mode?.drag ?? 1));
+    }
+
+    /** A special changes how the body behaves for a while (see `mode` in specials.js); null ends it. */
+    setMode(mode) {
+        this.mode = mode ? { ...mode, left: mode.ms } : null;
+        this.sprite.setFrictionAir(this.waterDrag())
+            .setBounce(this.mode?.bounce ?? Math.min(0.9, this.states[this.state].bounce * PLAYER.bounce));
+    }
+
     thrust(dir) {
+        if (this.hold) return;                 // holding on to a rock: no swimming until it lets go
         if (this.inAir) { this.airSteer(dir, 1); return; }
         this.sprite.applyForce(dir.clone().scale(this.move.thrust * this.boost * this.body.mass));
         this.effort = Math.min(1, this.effort + dir.length() * 0.25);
@@ -173,7 +190,12 @@ export default class Player {
         const sp = SPECIALS[this.char.special];
         if (!canUse(sp, this)) return;
         const v = this.body.velocity;
-        const fx = sp.start({ vx: v.x, vy: v.y, facing: this.facing, inAir: this.inAir });
+        // A special that holds on to rock asks the scene for a spot within its reach.
+        const spot = sp.reach && !this.hold ? this.findHold?.(sp.reach) : null;
+        const fx = sp.start({ vx: v.x, vy: v.y, facing: this.facing, inAir: this.inAir, holding: !!this.hold, canHold: !!spot });
+        if (fx.hold) this.hold = spot;
+        if (fx.release) this.hold = null;
+        if (fx.mode) this.setMode(fx.mode);
         // A chained special (the sprint) counts its uses and rests after the last one.
         const step = chainStep(sp, this.chain);
         this.chain.count = step.count; this.chain.left = step.left;
@@ -194,9 +216,29 @@ export default class Player {
         if (fx.squash) this.squash = fx.squash;
         if (fx.shove) this.shove();
         play(fx.sound ?? 'special');
-        if (fx.ring === 0) return;
-        const ring = this.scene.add.circle(this.sprite.x, this.sprite.y, this.radius, fx.color ?? 0xffffff, 0.4).setDepth(4);
-        this.scene.tweens.add({ targets: ring, scale: fx.ring ?? 2.6, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
+        this.scene.events.emit('fish-special', { x: this.sprite.x, y: this.sprite.y, kind: this.char.special });
+        this.burst(fx.burst ?? 'ring', fx);
+    }
+
+    /** What a special looks like the moment it starts: every one has its own picture. */
+    burst(kind, fx) {
+        const s = this.scene, x = this.sprite.x, y = this.sprite.y, color = fx.color ?? 0xffffff;
+        if (kind === 'ring') {
+            const ring = s.add.circle(x, y, this.radius, color, 0.4).setDepth(4);
+            s.tweens.add({ targets: ring, scale: fx.ring ?? 2.6, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
+        } else if (kind === 'spines') {
+            // A ring of spines stands up all around and fades.
+            for (let i = 0; i < 14; i++) {
+                const a = (i / 14) * Math.PI * 2, r = this.radius * 0.9;
+                const spine = s.add.triangle(x + Math.cos(a) * r, y + Math.sin(a) * r, 0, -5, 0, 5, 46, 0, color, 0.9).setRotation(a).setDepth(4.2);
+                s.tweens.add({ targets: spine, x: x + Math.cos(a) * (r + 70), y: y + Math.sin(a) * (r + 70), alpha: 0, scaleX: 1.5, duration: 520, ease: 'Quad.easeOut', onComplete: () => spine.destroy() });
+            }
+        } else if (kind === 'ripple' && s.textures.exists('bd_glow')) {
+            // Light, not bubbles: a soft glow swells out and fades.
+            const glow = s.add.image(x, y, 'bd_glow').setTint(color).setBlendMode(Phaser.BlendModes.ADD).setDepth(4.2).setAlpha(0.85)
+                .setDisplaySize(this.radius * 1.6, this.radius * 1.6);
+            s.tweens.add({ targets: glow, scale: glow.scale * 4, alpha: 0, duration: 620, ease: 'Sine.easeOut', onComplete: () => glow.destroy() });
+        }
     }
 
     /** Leave a special's pose (back to the normal look and size). */
@@ -242,6 +284,16 @@ export default class Player {
     /** @param {number} dt ms  @param {number} waterY world y of the water surface at the fish */
     update(dt, waterY = -Infinity) {
         if (this.cooldown > 0) this.cooldown -= dt;
+        if (this.mode) {
+            this.mode.left -= dt;
+            if (this.mode.sink && !this.inAir) this.sprite.applyForce({ x: 0, y: PLAYER.sinkForce * this.mode.sink * this.body.mass });
+            if (this.mode.tuck) this.squash = -this.mode.tuck;
+            if (this.mode.left <= 0) this.setMode(null);
+        }
+        if (this.hold) {
+            // Holding on: pulled firmly to the spot, whatever the water does.
+            this.sprite.setVelocity((this.hold.x - this.sprite.x) * 0.25, (this.hold.y - this.sprite.y) * 0.25);
+        }
         if (this.chain.left > 0) this.chain.left -= dt;
         if (this.invulnerable > 0) this.invulnerable -= dt;
 
@@ -252,7 +304,8 @@ export default class Player {
         if (inAir !== this.inAir) {
             this.inAir = inAir;
             if (!inAir) this.skips = 0;
-            this.sprite.setFrictionAir(inAir ? PLAYER.airDrag : this.states[this.state].air * this.move.drag * PLAYER.waterDrag);
+            this.sprite.setFrictionAir(this.waterDrag());
+            if (inAir) this.hold = null;
             this.scene.events.emit('fish-splash', {
                 x: this.sprite.x, y: waterY, speed: Math.hypot(this.body.velocity.x, this.body.velocity.y), entering: !inAir
             });

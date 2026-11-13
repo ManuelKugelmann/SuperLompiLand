@@ -120,6 +120,19 @@ export default class MainScene extends Phaser.Scene {
             return p && Math.hypot(p.x - sp.x, p.y - sp.y) <= WORLD.roomReach ? p : null;
         };
         this.stillness = new Stillness();
+        // The nearest rock surface within reach, for a character that holds on with its tail.
+        this.fish.findHold = reach => {
+            const sp = this.fish.sprite, r = this.fish.radius;
+            let best = null;
+            for (let i = 0; i < 16; i++) {
+                const a = (i / 16) * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a);
+                for (let d = r; d <= reach && (!best || d < best.d); d += 16) {
+                    if (this.density(sp.x + dx * d, sp.y + dy * d) > LEVEL.threshold) { best = { d, dx, dy }; break; }
+                }
+            }
+            // Sit just off the rock, tail toward it.
+            return best ? { x: sp.x + best.dx * (best.d - r * 0.9), y: sp.y + best.dy * (best.d - r * 0.9) } : null;
+        };
 
         // Lighting layers (screen-fixed): ambient multiply + a soft vignette.
         this.ambient = this.add.rectangle(0, 0, W, H, 0xffffff).setOrigin(0).setScrollFactor(0).setDepth(40)
@@ -699,9 +712,10 @@ export default class MainScene extends Phaser.Scene {
         // Currents: the water takes the player up to its own speed and never brakes it,
         // so a stream entered fast is left faster (flow.js).
         const water = this.flow.at(fsp.x, fsp.y, this.time.now / 1000, this.flowAt);
-        if (!this.fish.inAir && (water.x || water.y)) {
+        if (!this.fish.inAir && !this.fish.hold && (water.x || water.y)) {
             const push = carry(water.x, water.y, fsp.body.velocity.x, fsp.body.velocity.y, FLOW, this.flowPush || (this.flowPush = { x: 0, y: 0 }));
-            fsp.setVelocity(fsp.body.velocity.x + push.x, fsp.body.velocity.y + push.y);
+            const sail = this.fish.mode?.flow ?? 1;      // a spread fan catches the current
+            fsp.setVelocity(fsp.body.velocity.x + push.x * sail, fsp.body.velocity.y + push.y * sail);
         }
         // Whatever carries the fish is the water's doing, not its own swimming (it must not turn to face it).
         this.fish.flow.set(water.x, water.y + (lifted ? Math.min(0, fsp.body.velocity.y) : 0));

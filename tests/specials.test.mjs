@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SPECIALS, canUse, chainStep } from '../game/specials.js';
-import { MOTION, motionOf, glideLift, skim } from '../game/characters.js';
-import { CHARACTERS } from '../game/characters.js';
+import { CHARACTERS, MOTION, motionOf, glideLift, skim } from '../game/characters.js';
 
-const still = { vx: 0, vy: 0, facing: 1, inAir: false };
+const still = { vx: 0, vy: 0, facing: 1, inAir: false, holding: false, canHold: false };
 
 test('every character resolves to a registered special, and its pose exists', () => {
     for (const c of CHARACTERS) {
@@ -15,48 +14,106 @@ test('every character resolves to a registered special, and its pose exists', ()
     }
 });
 
+test('no two characters share a special, and no special is left without a character', () => {
+    const used = CHARACTERS.map(c => c.special);
+    assert.equal(new Set(used).size, used.length, used.join(', '));
+    assert.deepEqual(Object.keys(SPECIALS).sort(), [...used].sort());
+});
+
 test('every special has the full interface and returns a finite velocity', () => {
     for (const [name, sp] of Object.entries(SPECIALS)) {
         assert.ok(sp.cooldown >= 0 && typeof sp.air === 'boolean' && typeof sp.start === 'function', name);
-        for (const ctx of [still, { vx: -6, vy: 3, facing: -1, inAir: false }, { vx: 4, vy: -9, facing: 1, inAir: true }]) {
+        for (const ctx of [still, { ...still, vx: -6, vy: 3, facing: -1 }, { ...still, vx: 4, vy: -9, inAir: true }, { ...still, holding: true }, { ...still, canHold: true }]) {
             const fx = sp.start(ctx);
             assert.ok(Number.isFinite(fx.vx) && Number.isFinite(fx.vy), `${name}: velocity`);
         }
-        if (sp.start(still).pose) assert.ok(sp.start(still).poseMs > 0 && sp.endCooldown >= 0, `${name}: pose timing`);
+        const fx = sp.start(still);
+        if (fx.pose) assert.ok(fx.poseMs > 0 && sp.endCooldown >= 0, `${name}: pose timing`);
+        if (fx.mode) assert.ok(fx.mode.ms > 0 && fx.mode.ms < sp.cooldown, `${name}: the mode ends before the special is ready again`);
     }
 });
 
+test('each special has its own look and its own sound; only the puff uses the plain ring', () => {
+    const sounds = new Set(), looks = {};
+    for (const [name, sp] of Object.entries(SPECIALS)) {
+        const fx = sp.start(still);
+        assert.ok(fx.sound && !sounds.has(fx.sound), `${name}: sound ${fx.sound}`);
+        sounds.add(fx.sound);
+        looks[name] = fx.burst ?? 'ring';
+    }
+    assert.deepEqual(Object.entries(looks).filter(([, l]) => l === 'ring').map(([n]) => n), ['puff']);
+    assert.equal(looks.fan, 'spines');
+    assert.equal(looks.pulse, 'ripple');
+});
+
 test('cooldown blocks a special; only some may start in the air', () => {
-    assert.equal(canUse(SPECIALS.dash, { cooldown: 0, inAir: false }), true);
-    assert.equal(canUse(SPECIALS.dash, { cooldown: 120, inAir: false }), false);
-    assert.equal(canUse(SPECIALS.dash, { cooldown: 0, inAir: true }), false);
+    assert.equal(canUse(SPECIALS.sprint, { cooldown: 0, inAir: false }), true);
+    assert.equal(canUse(SPECIALS.sprint, { cooldown: 120, inAir: false }), false);
+    assert.equal(canUse(SPECIALS.sprint, { cooldown: 0, inAir: true }), false);
     assert.equal(canUse(SPECIALS.leap, { cooldown: 0, inAir: true }), false);
     assert.equal(canUse(SPECIALS.puff, { cooldown: 0, inAir: true }), true);
-    assert.equal(canUse(SPECIALS.shield, { cooldown: 0, inAir: true }), true);
+    assert.equal(canUse(SPECIALS.fan, { cooldown: 0, inAir: true }), true);
     assert.equal(canUse(undefined, { cooldown: 0, inAir: false }), false);
 });
 
 test('the puff is an air brake in the water and leaves a flight alone', () => {
-    const wet = SPECIALS.puff.start({ vx: 20, vy: -10, facing: 1, inAir: false });
+    const wet = SPECIALS.puff.start({ ...still, vx: 20, vy: -10 });
     assert.ok(Math.hypot(wet.vx, wet.vy) < 3);
-    const dry = SPECIALS.puff.start({ vx: 20, vy: -10, facing: 1, inAir: true });
+    const dry = SPECIALS.puff.start({ ...still, vx: 20, vy: -10, inAir: true });
     assert.deepEqual([dry.vx, dry.vy], [20, -10]);
     assert.ok(wet.guard > 0 && wet.pose === 'inflated');
 });
 
-test('dash goes where the character is heading, or where it faces when resting', () => {
-    const left = SPECIALS.dash.start({ vx: 0, vy: 0, facing: -1, inAir: false });
-    assert.ok(left.vx < -10 && left.vy === 0);
-    const down = SPECIALS.dash.start({ vx: 0, vy: 5, facing: 1, inAir: false });
-    assert.ok(down.vy > 15 && Math.abs(down.vx) < 1e-9);
+test('the sprint chains: up to five bursts in a row, then a rest', () => {
+    const sp = SPECIALS.sprint;
+    let chain = { count: 0, left: 0 };
+    for (let tap = 1; tap <= 4; tap++) {
+        const step = chainStep(sp, chain);
+        assert.equal(step.count, tap);
+        assert.equal(step.cooldown, sp.cooldown, 'a short pause between bursts');
+        assert.equal(step.left, sp.chain.window);
+        chain = step;
+    }
+    assert.deepEqual(chainStep(sp, chain), { count: 0, left: 0, cooldown: sp.chain.rest }, 'the fifth burst ends the chain with a rest');
+    const two = chainStep(sp, chainStep(sp, { count: 0, left: 0 }));
+    assert.equal(chainStep(sp, { count: two.count, left: 0 }).count, 1, 'letting the window pass starts again at one');
+    assert.deepEqual(chainStep(SPECIALS.fan, { count: 3, left: 500 }), { count: 0, left: 0, cooldown: SPECIALS.fan.cooldown });
+});
+
+test('every sprint burst adds speed along the nose', () => {
+    const fx = SPECIALS.sprint.start({ ...still, vx: 6 });
+    assert.ok(fx.vx > 12 && fx.vy === 0);
+    assert.ok(SPECIALS.sprint.start({ ...still, facing: -1 }).vx < -7);
 });
 
 test('leap and pulse always go up; the leap is flat: more forward than up', () => {
     for (const name of ['leap', 'pulse']) {
-        assert.ok(SPECIALS[name].start({ vx: 3, vy: 8, facing: 1, inAir: false }).vy < -6, name);
+        assert.ok(SPECIALS[name].start({ ...still, vx: 3, vy: 8 }).vy < -6, name);
     }
-    const leap = SPECIALS.leap.start({ vx: 0, vy: 0, facing: 1, inAir: false });
+    const leap = SPECIALS.leap.start(still);
     assert.ok(leap.vx > -leap.vy, `forward ${leap.vx}, up ${-leap.vy}`);
+});
+
+test('the fan is a parachute: it slows down, protects, pushes others away and catches the current', () => {
+    const fx = SPECIALS.fan.start({ ...still, vx: 14, vy: 4 });
+    assert.ok(Math.hypot(fx.vx, fx.vy) < Math.hypot(14, 4) * 0.6);
+    assert.ok(fx.shield > 0 && fx.shove && fx.mode.drag > 2 && fx.mode.flow > 1);
+});
+
+test('the shell is a heavy bouncy stone: it keeps its speed, sinks, bounces and protects', () => {
+    const fx = SPECIALS.shell.start({ ...still, vx: 9, vy: -2 });
+    assert.deepEqual([fx.vx, fx.vy], [9, -2]);
+    assert.ok(fx.shield >= fx.mode.ms && fx.mode.sink > 1 && fx.mode.drag < 1 && fx.mode.bounce > 0.8 && fx.mode.tuck > 0);
+});
+
+test('the anchor holds on when rock is in reach, lets go with a hop, and is a hop when there is nothing to hold', () => {
+    const grab = SPECIALS.anchor.start({ ...still, vx: 7, vy: 2, canHold: true });
+    assert.ok(grab.hold && grab.vx === 0 && grab.vy === 0);
+    const letGo = SPECIALS.anchor.start({ ...still, facing: -1, holding: true, canHold: true });
+    assert.ok(letGo.release && letGo.vx < 0 && letGo.vy < 0 && !letGo.hold);
+    const free = SPECIALS.anchor.start({ ...still, vx: 2 });
+    assert.ok(!free.hold && !free.release && free.vx > 2);
+    assert.ok(SPECIALS.anchor.reach > 100);
 });
 
 test('wings carry a fast glider and do nothing for anyone else', () => {
@@ -78,38 +135,6 @@ test('a glider skips off wave tops: only on the way down, close to the water, fa
     assert.equal(skim(flyer, { ...down, vx: 2 }), null, 'not when slow');
     assert.equal(skim(flyer, { ...down, skips: flyer.glide.skips }), null, 'not for ever');
     assert.equal(skim(CHARACTERS[0], down), null, 'Lompi has no wings');
-});
-
-test('the sprint chains: up to five bursts in a row, then a rest', () => {
-    const sp = SPECIALS.sprint;
-    let chain = { count: 0, left: 0 };
-    for (let tap = 1; tap <= 4; tap++) {
-        const step = chainStep(sp, chain);
-        assert.equal(step.count, tap);
-        assert.equal(step.cooldown, sp.cooldown, 'a short pause between bursts');
-        assert.equal(step.left, sp.chain.window);
-        chain = step;
-    }
-    const fifth = chainStep(sp, chain);
-    assert.deepEqual(fifth, { count: 0, left: 0, cooldown: sp.chain.rest }, 'the fifth burst ends the chain with a rest');
-});
-
-test('letting the window pass starts the chain again at one', () => {
-    const sp = SPECIALS.sprint;
-    const two = chainStep(sp, chainStep(sp, { count: 0, left: 0 }));
-    assert.equal(two.count, 2);
-    assert.equal(chainStep(sp, { count: two.count, left: 0 }).count, 1);
-});
-
-test('specials without a chain just use their cooldown', () => {
-    assert.deepEqual(chainStep(SPECIALS.shield, { count: 3, left: 500 }), { count: 0, left: 0, cooldown: SPECIALS.shield.cooldown });
-});
-
-test('every sprint burst adds speed along the nose and draws no ring', () => {
-    const fx = SPECIALS.sprint.start({ vx: 6, vy: 0, facing: 1, inAir: false });
-    assert.ok(fx.vx > 12 && fx.vy === 0 && fx.ring === 0);
-    const back = SPECIALS.sprint.start({ vx: 0, vy: 0, facing: -1, inAir: false });
-    assert.ok(back.vx < -7);
 });
 
 test('motion numbers per character match the physics rules', () => {
