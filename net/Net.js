@@ -70,6 +70,17 @@ export default class Net {
             const anon = typeof location !== 'undefined' && /[?&]anon\b/.test(location.search);
             const cfg = { appId: APP_ID, password: this.keys.password, maxUsers: MAX_PLAYERS };
             if (anon) cfg.identity = 'none';
+            // Optional TURN relay for networks where direct peer-to-peer is
+            // blocked (symmetric NAT, some mobile carriers). Set at build time:
+            //   VITE_TURN_URLS=turn:host:3478,turns:host:443 VITE_TURN_USER=... VITE_TURN_PASS=...
+            // Without it the game still uses STUN and works on most home networks.
+            const turnUrls = import.meta.env?.VITE_TURN_URLS;
+            if (turnUrls) {
+                cfg.turnConfig = [{
+                    urls: turnUrls.split(',').map(u => u.trim()).filter(Boolean),
+                    username: import.meta.env.VITE_TURN_USER, credential: import.meta.env.VITE_TURN_PASS
+                }];
+            }
             const room = joinRoom(cfg, this.keys.room);
             this.room = room;
             this.state = room.makeAction('fish');

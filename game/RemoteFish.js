@@ -70,9 +70,8 @@ export default class RemoteFish {
         const img = this.img;
         if (now - this.seen > STALE_MS) { img.setVisible(false).setAlpha(0); return; }
 
-        // Local time that maps onto "sender time minus the cushion".
-        const offset = Math.min(...this.offsets);
-        const t = now - offset - this.delay;
+        // Snapshot times (`lt`) are already on our clock; draw a cushion in the past.
+        const t = now - this.delay;
         let a = b[0], c = b[b.length - 1];
         for (let i = b.length - 1; i > 0; i--) {
             if (b[i - 1].lt <= t) { a = b[i - 1]; c = b[i]; break; }
