@@ -1,0 +1,24 @@
+{
+    "name": "super-lompi-land",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "SuperLompiLand — a GKS standalone test-case game. 2D pufferfish platformer with switchable control schemes.",
+    "scripts": {
+        "icons": "node scripts/gen-icons.mjs",
+        "predev": "node scripts/gen-icons.mjs",
+        "dev": "vite",
+        "prebuild": "node scripts/gen-icons.mjs",
+        "build": "vite build",
+        "preview": "vite preview",
+        "serve": "node scripts/serve.mjs"
+    },
+    "dependencies": {
+        "@gks/sdk": "git+https://github.com/ManuelKugelmann/gks_sdk.git#main",
+        "phaser": "^3.80.0"
+    },
+    "devDependencies": {
+        "vite": "^5.0.0",
+        "vite-plugin-pwa": "^1.2.0"
+    }
+}

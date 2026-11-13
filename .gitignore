@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dev-dist/
+# Generated binary assets (produced by `npm run icons` / prebuild)
+public/pwa-192x192.png
+public/pwa-512x512.png
+assets/card_preview.png
+# Local reference clones / contribution staging (never published)
+_ref/
+*.log
+.DS_Store
