@@ -22,7 +22,7 @@ test('every character is complete and has a known special', () => {
 
 test('movement multipliers stay in a sane range', () => {
     for (const c of CHARACTERS) {
-        for (const key of ['thrust', 'maxSpeed', 'drag', 'turn', 'sink', 'armor', 'airGravity', 'airTurn']) {
+        for (const key of ['thrust', 'maxSpeed', 'drag', 'turn', 'sink', 'armor', 'airGravity', 'airTurn', 'soft']) {
             if (c[key] === undefined) continue;
             assert.ok(c[key] > 0 && c[key] <= 3, `${c.id}.${key} = ${c[key]}`);
         }

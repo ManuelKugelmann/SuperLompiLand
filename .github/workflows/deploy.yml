@@ -11,8 +11,12 @@ on:
     branches: ['**']
   workflow_dispatch:
 
+# One queue per branch: with a single shared queue GitHub drops all but the newest
+# waiting run, so pushing main and dev together lost main's deploy. Two branches
+# may now publish at the same time; the publish step is retried once if the other
+# one got to gh-pages first.
 concurrency:
-  group: gh-pages-writer
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -63,6 +67,20 @@ jobs:
         run: npm run build -- --base="${{ steps.vars.outputs.base }}"
 
       - name: Publish subfolder to gh-pages
+        id: publish
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: ${{ steps.vars.outputs.dest }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'deploy ${{ github.ref_name }} -> ${{ steps.vars.outputs.dest || ''<root>'' }} (${{ github.sha }})'
+
+      - name: Publish again if another branch pushed first
+        if: steps.publish.outcome == 'failure'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
