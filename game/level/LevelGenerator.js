@@ -45,7 +45,8 @@ const HAZARDS = {
     // leaking oil drum, mine = lost anchor on its chain, hazard_net = ghost net.
     spikes: { size: 240, r: 62, place: 'floor', lift: 26 },
     hazard_buoy: { size: 170, r: 74, place: 'floor', lift: 104 },
-    mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6 },
+    // The lost anchor hangs on its chain from a hull at the surface: the chain runs all the way up.
+    mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6, chain: true },
     // A ghost net never just hangs in the water: where the seabed is within `tether` px below,
     // it is caught on a line to a stone and tugs at it; near the surface it hangs from a float;
     // otherwise it drifts `drift` px to and fro.
@@ -404,6 +405,15 @@ export default class LevelGenerator {
                 targets: img, x: x - h.patrol / 2, duration: rng.between(3800, 5200), yoyo: true, repeat: -1,
                 ease: 'Sine.easeInOut', onYoyo: () => img.face(-1), onRepeat: () => img.face(1)
             });
+        } else if (h.chain) {
+            // Nothing hangs from nowhere: the chain continues up out of the picture to the dark
+            // hull of a boat lying at the surface.
+            makeLineTexture(s);
+            const top = y - h.size * 0.46;
+            if (top > 40) {
+                chunk.objects.push(s.add.tileSprite(x, 16, 16, top - 16, 'hz_chain').setOrigin(0.5, 0).setDepth(2.9));
+                chunk.objects.push(s.add.image(x, 6, 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
+            }
         } else if (h.tether || h.drift) {
             const ground = h.tether ? this.groundBelow(x, y, h.tether) : null;
             if (ground) {
@@ -687,4 +697,24 @@ function makeLineTexture(scene) {
     ctx.fillStyle = across;
     ctx.fillRect(0, 0, 8, 32);
     tex.refresh();
+
+    // Chain: oval links, seen alternately from the front and from the side, tiling downward.
+    const chain = scene.textures.createCanvas('hz_chain', 16, 44), cc = chain.getContext();
+    cc.lineWidth = 3.2; cc.strokeStyle = '#5d5f5c';
+    cc.beginPath(); cc.ellipse(8, 11, 5.2, 9.5, 0, 0, Math.PI * 2); cc.stroke();
+    cc.strokeStyle = '#3f423f'; cc.lineWidth = 3.6;
+    cc.beginPath(); cc.moveTo(8, 21); cc.lineTo(8, 45); cc.moveTo(8, -1); cc.lineTo(8, 1); cc.stroke();
+    cc.strokeStyle = 'rgba(190, 200, 190, 0.35)'; cc.lineWidth = 1;
+    cc.beginPath(); cc.moveTo(4.6, 6); cc.lineTo(4.6, 16); cc.stroke();
+    chain.refresh();
+
+    // The underside of a boat at the surface: a dark, soft-edged hull seen from below.
+    const hull = scene.textures.createCanvas('hz_hull', 560, 150), hc = hull.getContext();
+    hc.filter = 'blur(5px)';
+    const shade = hc.createLinearGradient(0, 10, 0, 140);
+    shade.addColorStop(0, '#16242c'); shade.addColorStop(1, '#2c444e');
+    hc.fillStyle = shade;
+    hc.beginPath(); hc.moveTo(14, 26); hc.quadraticCurveTo(280, 4, 546, 26);
+    hc.quadraticCurveTo(470, 132, 280, 138); hc.quadraticCurveTo(90, 132, 14, 26); hc.fill();
+    hull.refresh();
 }
