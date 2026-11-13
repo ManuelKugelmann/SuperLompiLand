@@ -18,6 +18,7 @@ import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak } from '../game/music/melody.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
+import { createGuide } from '../game/guide.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 
@@ -26,6 +27,8 @@ const STEP_MS = 1000 / 60;
 /** World tunables. */
 /** Leaking oil drums (spec 7.1): how often they puff and how much. */
 const OIL = { pulseMs: 1400, perPulse: 5, margin: 600 };
+/** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
+const OPEN_SLACK = 0.04;
 /** How high coins hop on each beat (px). */
 const COIN_BOB_PX = 12;
 
@@ -87,6 +90,7 @@ export default class MainScene extends Phaser.Scene {
         this.flow = createFlow(LEVEL.seed);     // currents and swell: one field for player and particles
         this.flowAt = { x: 0, y: 0 };
         this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
+        this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
@@ -431,7 +435,7 @@ export default class MainScene extends Phaser.Scene {
         this.controller.ui?.setVisible(false);
         this.autoDir = new Phaser.Math.Vector2();
         this.autopilot = createAutopilot({
-            isOpen: (x, y) => this.level.isOpen(x, y, 0.12),
+            isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK),
             poi: (x, y) => {
                 let best = null, bd = 1800;
                 for (const f of this.level.friends) {
@@ -460,6 +464,45 @@ export default class MainScene extends Phaser.Scene {
             this.input.on('pointerdown', leave);
             this.input.keyboard?.on('keydown', leave);
         });
+    }
+
+    /**
+     * The guide fish (spec 1.4): after a stall it swims ahead to open water east and
+     * waits; following it moves it on, progress sends it off. Drawn once, procedurally.
+     */
+    updateGuide(dt) {
+        const p = this.fish.sprite;
+        const { state, target } = this.guide.update(dt, p.x, p.y);
+        let g = this.guideFish;
+        if (state === 'away') { if (g) g.setVisible(false); return; }
+        if (!g) {
+            if (!this.textures.exists('guide_fish')) {
+                const d = this.make.graphics({ add: false });
+                d.fillStyle(0xffd23f, 1).fillEllipse(34, 22, 52, 34);          // body
+                d.fillStyle(0xffb000, 1).fillTriangle(6, 22, -10, 8, -10, 36);   // tail
+                d.fillStyle(0xfff3b0, 0.9).fillEllipse(36, 14, 30, 10);         // shine
+                d.fillStyle(0xffffff, 1).fillCircle(48, 18, 7);
+                d.fillStyle(0x10324a, 1).fillCircle(50, 18, 4);
+                d.generateTexture('guide_fish', 64, 44);
+                d.destroy();
+            }
+            g = this.guideFish = this.add.image(p.x, p.y, 'guide_fish').setDepth(4.6).setOrigin(0.4, 0.5);
+            g.vx = 0; g.vy = 0;
+        }
+        if (!g.visible) {                              // arrives from just ahead, off to the side
+            g.setPosition(p.x + 260, p.y - 160).setAlpha(0).setVisible(true);
+        }
+        const to = state === 'leave' ? { x: g.x + 900, y: g.y - 200 } : target;
+        const dx = to.x - g.x, dy = to.y - g.y, dist = Math.hypot(dx, dy);
+        const speed = state === 'leave' ? 520 : Math.min(360, dist * 1.5);
+        g.vx += ((dist ? dx / dist : 0) * speed - g.vx) * Math.min(1, dt * 3);
+        g.vy += ((dist ? dy / dist : 0) * speed - g.vy) * Math.min(1, dt * 3);
+        g.x += g.vx * dt;
+        g.y += g.vy * dt + Math.sin(this.time.now / 260) * 0.4;
+        if (Math.abs(g.vx) > 8) g.setFlipX(g.vx < 0);
+        g.rotation = Phaser.Math.Clamp(Math.atan2(g.vy, Math.abs(g.vx) + 1) * 0.5, -0.4, 0.4) * (g.vx < 0 ? -1 : 1);
+        g.setAlpha(state === 'leave' ? Math.max(0, g.alpha - dt * 0.8) : Math.min(1, g.alpha + dt * 1.5));
+        if (state === 'leave' && g.alpha <= 0) { g.setVisible(false); this.guide.gone(); }
     }
 
     /** Coins hop on the music's beat, all together (spec ch.12, music-synced world). */
@@ -621,6 +664,7 @@ export default class MainScene extends Phaser.Scene {
         }
         this.particles.update(delta / 1000);
         this.bobCoins();
+        if (!this.ambientMode) this.updateGuide(delta / 1000);
 
         // Bubble trail when moving fast.
         const speed = Math.hypot(v.x, v.y);
