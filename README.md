@@ -200,3 +200,14 @@ worker/        feedback relay (Cloudflare Worker)
 tests/         unit tests
 scripts/       icon generator, static server, dev log helper
 ```
+
+## Credits
+
+A game by **Familie Kugelmann**.
+
+- Stone and metal surfaces (`public/img/mat/`): [ambientCG](https://ambientcg.com) — CC0
+  (Ground054, Rock029, Rock057, Rock055, Rock035, Metal021), reduced to 512-px tiles.
+- [Phaser](https://phaser.io), [Matter.js](https://brm.io/matter-js/), [Vite](https://vitejs.dev),
+  [Trystero](https://github.com/dmotz/trystero) — MIT.
+
+The same list is in the game menu (Danke / Credits), see `game/credits.js`.

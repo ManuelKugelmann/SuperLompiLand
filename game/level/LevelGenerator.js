@@ -3,6 +3,7 @@ import { makeCritter } from './critters.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
+import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import {
     BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted
 } from './biomes.js';
@@ -88,10 +89,12 @@ export default class LevelGenerator {
         this.early = new Map();     // chunk key -> collision bodies laid down while the worker is busy
         this.tethers = [];          // lines that hold drifting things: stretched between them and their anchor every frame
         this.ready = [];            // grids that came back, waiting to be drawn
+        const mats = this.loadMaterials();
         try {
             this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
             this.worker.onmessage = e => { this.pending.delete(e.data.key); this.ready.push(e.data); };
             this.worker.onerror = () => { this.worker = null; this.pending.clear(); };   // fall back to the main thread
+            if (mats) this.worker.postMessage({ materials: mats });
         } catch { this.worker = null; }
         const lang = scene.registry.get('currentLanguage') || 'de';
         const ground = x => { let y = floorY(x) + 260; while (y > 400 && this.density(x, y) > LEVEL.threshold) y -= 12; return y + 12; };
@@ -100,6 +103,22 @@ export default class LevelGenerator {
             { x: trench.from + 620, text: lang === 'de' ? 'Marianengraben' : 'Mariana Trench', arrow: '→' },
             { x: ABYSS.x - ABYSS.halfWidth * 1.9, text: lang === 'de' ? 'Marianengraben' : 'Mariana Trench', arrow: '↘' }
         ].map(sg => ({ ...sg, y: ground(sg.x) }));
+    }
+
+    /**
+     * Rock material tiles from the loaded stone images (materials.js); they stay
+     * module state, so this runs once per game. Missing images: procedural grain.
+     */
+    loadMaterials() {
+        if (materialTiles()) return materialTiles();
+        const tex = this.scene.textures, N = MAT.size;
+        if (!MATERIALS.every(m => tex.exists(`mat_${m}`) && tex.exists(`mat_${m}_h`))) return null;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = N;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const pixels = key => { ctx.clearRect(0, 0, N, N); ctx.drawImage(tex.get(key).getSourceImage(), 0, 0, N, N); return ctx.getImageData(0, 0, N, N).data; };
+        setMaterials(MATERIALS.map(m => prepareTile(pixels(`mat_${m}`), pixels(`mat_${m}_h`))));
+        return materialTiles();
     }
 
     /** Rock density at a world point (> LEVEL.threshold = solid). See density.js. */

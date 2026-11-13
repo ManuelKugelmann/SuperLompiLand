@@ -10,6 +10,7 @@
 import { hash, vnoise } from './terrain.js';
 import { biomeBlendAt } from './biomes.js';
 import { FIELD } from './density.js';
+import { MAT, BIOME_INDEX, materialTiles } from './materials.js';
 
 export const SHADE = {
     rockSize: 640,        // rock picture, px per chunk side
@@ -82,7 +83,7 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
     const T = FIELD.threshold;
 
     // Density, its slope and the cave-wall mask on the sample grid.
-    const D = new Float32Array(W * W), mask = new Float32Array(W * W);
+    const D = new Float32Array(W * W), mask = new Float32Array(W * W), mask2 = new Float32Array(W * W);
     for (let j = 0; j < W; j++) {
         const y = oy + (j - 1) * ws;
         for (let i = 0; i < W; i++) {
@@ -111,6 +112,38 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             }
         }
     }
+
+    // Real stone per column: each side of the biome blend brings its two materials;
+    // a large soft mask decides where the second one shows.
+    const mats = materialTiles();
+    const colA = new Int8Array(S * 4), colT = new Float32Array(S);
+    if (mats) {
+        for (let px = 0; px < S; px++) {
+            const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * span / S);
+            const ma = BIOME_INDEX[a.id] || BIOME_INDEX.reef, mb = BIOME_INDEX[b.id] || BIOME_INDEX.reef;
+            colA.set([ma[0], ma[1], mb[0], mb[1]], px * 4);
+            colT[px] = t;
+        }
+        for (let j = 0; j < W; j++) {
+            for (let i = 0; i < W; i++) {
+                const n = vnoise((ox + (i - 1) * ws) / MAT.maskScale, (oy + (j - 1) * ws) / MAT.maskScale, seed + 77);
+                mask2[j * W + i] = smooth(1 - MAT.share - 0.08, 1 - MAT.share + 0.08, n);
+            }
+        }
+    }
+    const MS = MAT.size, MM = MS - 1, matColour = MAT.colour / 128, matRelief = MAT.relief * 8 / 255, macro = MAT.macro * 2 / 255;
+    let mr = 1, mg = 1, mb = 1, mdx = 0, mdy = 0;
+    // Adds material `m` at weight `w` for tile pixel (x, y) into mr/mg/mb/mdx/mdy.
+    const sample = (m, w, x, y) => {
+        const t = mats[m], row = (y & MM) * MS, up = ((y - 1) & MM) * MS, dn = ((y + 1) & MM) * MS;
+        const o = (row + (x & MM)) * 4;
+        mr += w * (t[o] * matColour - 1); mg += w * (t[o + 1] * matColour - 1); mb += w * (t[o + 2] * matColour - 1);
+        mdx += w * (t[(row + ((x + 1) & MM)) * 4 + 3] - t[(row + ((x - 1) & MM)) * 4 + 3]);
+        mdy += w * (t[(dn + (x & MM)) * 4 + 3] - t[(up + (x & MM)) * 4 + 3]);
+        const big = t[((((y / 6) | 0) + 97 & MM) * MS + ((((x / 6) | 0) + 211) & MM)) * 4 + 3];
+        const k = w * macro * (big - 128);
+        mr += k; mg += k; mb += k;
+    };
 
     const g = grainTile(), gh = g.h, gdx = g.dx, gdy = g.dy;
     const tx0 = Math.round(ox / span) * S, ty0 = Math.round(oy / span) * S;   // grain stays put across chunks
@@ -150,7 +183,19 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             const outY = -gy / gl;
             const edge = inside >= bevel ? 0 : 1 - inside / bevel;
             const tilt = edge * Math.sqrt(edge) * relief;
-            let nx = -gx / gl * tilt - gdx[gi] * bump, ny = outY * tilt - gdy[gi] * bump;
+            let nx, ny, tr, tg, tb;
+            if (mats) {
+                const m2 = mask2[i00] * w00 + mask2[i10] * w10 + mask2[i01] * w01 + mask2[i11] * w11;
+                const t = colT[px], c = px * 4, X = tx0 + px, Y = ty0 + py;
+                mr = 1; mg = 1; mb = 1; mdx = 0; mdy = 0;
+                if (t < 0.999) { sample(colA[c], (1 - t) * (1 - m2), X, Y); sample(colA[c + 1], (1 - t) * m2, Y + 151, X + 333); }
+                if (t > 0.001) { sample(colA[c + 2], t * (1 - m2), X, Y); sample(colA[c + 3], t * m2, Y + 151, X + 333); }
+                nx = -gx / gl * tilt - mdx * matRelief; ny = outY * tilt - mdy * matRelief;
+                tr = mr; tg = mg; tb = mb;
+            } else {
+                nx = -gx / gl * tilt - gdx[gi] * bump; ny = outY * tilt - gdy[gi] * bump;
+                tr = tg = tb = grainLo + grainK * gh[gi];
+            }
             const nl = 1 / Math.sqrt(nx * nx + ny * ny + 1);
             nx *= nl; ny *= nl;
             const dot = nx * lx + ny * ly + nl * lz;
@@ -162,14 +207,13 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             const depthIn = Math.sqrt(r * Math.sqrt(r)) * core;        // r^0.75: quick at the rim, slow in the core
             const k = depthIn | 0, kt = depthIn - k, p = px * 15 + k * 3;
             const sandy = inside >= sandReach || outY > -0.3 ? 0 : smooth(0.3, 0.8, -outY) * (1 - inside / sandReach) * 0.8;
-            const tone = grainLo + grainK * gh[gi];
             const o = (py * S + px) * 4;
             let cr = pal[p] + (pal[p + 3] - pal[p]) * kt, cg = pal[p + 1] + (pal[p + 4] - pal[p + 1]) * kt, cb = pal[p + 2] + (pal[p + 5] - pal[p + 2]) * kt;
             cr += (sandR - cr) * sandy; cg += (sandG - cg) * sandy; cb += (sandB - cb) * sandy;
             cr += (deepR - cr) * tintK; cg += (deepG - cg) * tintK; cb += (deepB - cb) * tintK;
-            rock[o] = cr * tone * (bncR + skyR * up + keyR * lambert);
-            rock[o + 1] = cg * tone * (bncG + skyG * up + keyG * lambert);
-            rock[o + 2] = cb * tone * (bncB + skyB * up + keyB * lambert);
+            rock[o] = cr * tr * (bncR + skyR * up + keyR * lambert);
+            rock[o + 1] = cg * tg * (bncG + skyG * up + keyG * lambert);
+            rock[o + 2] = cb * tb * (bncB + skyB * up + keyB * lambert);
             rock[o + 3] = alpha >= 1 ? 255 : alpha * 255;
         }
     }

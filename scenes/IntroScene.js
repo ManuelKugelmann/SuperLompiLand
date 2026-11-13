@@ -12,6 +12,8 @@ import Rig from '../game/Rig.js';
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
+import { MATERIALS } from '../game/level/materials.js';
+import { openCredits } from '../game/credits.js';
 import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
 import { fitToWindow, fitsWindow } from '../game/orientation.js';
 
@@ -65,6 +67,11 @@ export default class IntroScene extends Phaser.Scene {
         for (const [key, file] of Object.entries(IMAGES)) {
             if (!this.textures.exists(key)) this.load.image(key, `img/${file}`);
         }
+        // Rock materials for the terrain shader (game/level/materials.js).
+        for (const m of MATERIALS) {
+            if (!this.textures.exists(`mat_${m}`)) this.load.image(`mat_${m}`, `img/mat/${m}.jpg`);
+            if (!this.textures.exists(`mat_${m}_h`)) this.load.image(`mat_${m}_h`, `img/mat/${m}_h.jpg`);
+        }
         if (!this.cache.json.exists('fins')) this.load.json('fins', 'img/fins.json');
     }
 
@@ -108,6 +115,7 @@ export default class IntroScene extends Phaser.Scene {
             ...feedbackMenuItems(lang, () => ({ screen: 'title' })),
             soundMenuItem(lang, () => this.scene.restart()),
             ...pwaMenuItems(this, lang),
+            { label: lang === 'de' ? 'DANKE' : 'CREDITS', color: 0x00796b, callback: () => openCredits(lang) },
             { label: lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
         ]);
 
