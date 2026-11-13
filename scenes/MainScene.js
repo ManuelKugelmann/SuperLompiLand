@@ -26,7 +26,9 @@ const STEP_MS = 1000 / 60;
 
 /** World tunables. */
 /** Leaking oil drums (spec 7.1): how often they puff and how much. */
-const OIL = { pulseMs: 1400, perPulse: 5, margin: 600 };
+const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5 };
+/** Plumes at the trench's vents: how often, how many smoke and steam particles. */
+const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 /** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
 const OPEN_SLACK = 0.04;
 /** How high coins hop on each beat (px). */
@@ -572,14 +574,49 @@ export default class MainScene extends Phaser.Scene {
         for (const h of this.level.hazards) {
             if (this.relaxed) break;
             if (!h.img.active || p.distance(h.img) > fr * LEVEL.hitSlack + h.r) continue;
-            if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
-                play('hit');
-                this.hitStop = WORLD.hitStopMs;
-                this.fish.squash = -0.3;
-                this.health = Math.max(0, this.health - (this.character.armor ?? 1));
-                this.cameras.main.shake(180, 0.008);
-                if (this.health <= 0 && !this.respawning) { this.goDown(); return; }
-            }
+            if (this.hurt(h.img.x, h.img.y)) return;
+        }
+    }
+
+    /** Something hurt the fish from (x, y). Returns true when it went down. */
+    hurt(x, y) {
+        if (!this.fish.hit(new Phaser.Math.Vector2(x, y))) return false;
+        play('hit');
+        this.hitStop = WORLD.hitStopMs;
+        this.fish.squash = -0.3;
+        this.health = Math.max(0, this.health - (this.character.armor ?? 1));
+        this.cameras.main.shake(180, 0.008);
+        if (this.health <= 0 && !this.respawning) { this.goDown(); return true; }
+        return false;
+    }
+
+    /**
+     * Swimming in thick oil (spec 7.1): a short touch only darkens the fish; staying
+     * in a dense patch for OIL.graceS costs a heart, then a pause before it can again.
+     */
+    oilExposure(dt) {
+        if (this.relaxed || this.respawning) return;
+        const p = this.fish.sprite;
+        const dense = this.particles.densityAt('oil', p.x, p.y, this.fish.radius + 30) >= OIL.denseCount;
+        const t = this.oilTime || 0;
+        this.oilTime = dense ? t + dt : (t > 0 ? Math.max(0, t - dt * 2) : Math.min(0, t + dt));
+        if (this.oilTime > OIL.graceS) {
+            this.oilTime = -OIL.pauseS;
+            this.hurt(p.x, p.y - 40);
+        }
+    }
+
+    /** Deep vents (the trench's bubble plants) breathe dark mineral plumes and steam (spec 6.1b). */
+    ventPlumes(delta) {
+        this.ventAt = (this.ventAt || 0) - delta;
+        if (this.ventAt > 0) return;
+        this.ventAt = VENT_PLUME.everyMs;
+        const cam = this.cameras.main, m = VENT_PLUME.margin;
+        for (const v of this.level.vents) {
+            if (v.x < cam.scrollX - m || v.x > cam.scrollX + cam.width + m || v.y < cam.scrollY - m || v.y > cam.scrollY + cam.height + m) continue;
+            if (BIOMES[biomeIndexAt(v.x)].id !== 'trench') continue;
+            this.particles.spawn('smoker', v.x, v.y - 40, VENT_PLUME.smoke, { radius: 16, spread: 15, vy: -90 });
+            this.particles.spawn('steam', v.x, v.y - 30, VENT_PLUME.steam, { radius: 10, spread: 25, vy: -120 });
         }
     }
 
@@ -649,6 +686,7 @@ export default class MainScene extends Phaser.Scene {
         this.cameras.main.setScroll(this.camX, this.camY);
 
         this.leakOil(delta);
+        this.ventPlumes(delta);
         // Streams show themselves: bubbles are born along the lanes in view and ride them.
         this.streamBubbles = (this.streamBubbles || 0) + delta * WORLD.streamBubbles / 1000;
         if (this.streamBubbles >= 1) {
@@ -663,6 +701,7 @@ export default class MainScene extends Phaser.Scene {
             this.streamBubbles %= 1;
         }
         this.particles.update(delta / 1000);
+        this.oilExposure(delta / 1000);
         this.bobCoins();
         if (!this.ambientMode) this.updateGuide(delta / 1000);
 
