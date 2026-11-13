@@ -51,7 +51,10 @@ npm run serve    # static server for dist/ on :4178 — tests the real PWA/SW
 - `main` -> release: https://manuelkugelmann.github.io/SuperLompiLand/
 - `dev` -> latest dev build: https://manuelkugelmann.github.io/SuperLompiLand/dev/
 - any other branch -> `/<slug>/` preview, removed when the branch is deleted
-- Work lands on `dev`; `main` only moves when a release is asked for.
+- For now, work is committed and pushed directly to `main`; `dev` is
+  fast-forwarded to the same commit so both links show the latest build.
+  After the first "release", development moves to sub-branches (each gets its
+  own `/<slug>/` preview) and `main` only takes finished work.
 - Vite `base` is injected per branch by the deploy workflow — keep every asset
   URL relative (no leading `/`).
 
