@@ -13,6 +13,7 @@ import { inflate, vertexNormals, shrinkMask } from '../rig/inflate.js';
 import { loftBody, fitProfile } from '../rig/loft.js';
 import { softnessMap } from '../rig/soft.js';
 import { Gaze } from '../rig/eyes.js';
+import { SWIM, Swimmer } from '../rig/swim.js';
 
 /**
  * Candidates per creature. Kinds:
@@ -163,10 +164,17 @@ async function build(c) {
             fin.lift = 0.06;
             meshes.push(fin);
             const pivot = [px(c.fin.pivotX), py(c.fin.pivotY), z];
+            // Motion comes from the swim driver (rig/swim.js): a boxfish rows with its pectorals,
+            // ripples its other fins, and steers with the tail. It returns what the body should do.
+            const swimmer = new Swimmer(SWIM[c.swim || 'ostraciiform']);
+            let seen = null;
             animate = pose => {
-                const beat = Math.sin(pose.phase * 1.15);
+                const dt = seen === null || pose.time < seen ? 1 / 60 : Math.min(0.1, pose.time - seen);
+                seen = pose.time;
+                swimmer.update(dt, pose.drive);
                 // The fin trails backward from its hinge; a positive spread lifts its tip away from the flank.
-                fin.part = hinge(...pivot, beat * (0.12 + pose.swim * 0.25), 0.3 + beat * 0.22 * (0.4 + pose.swim));
+                fin.part = hinge(...pivot, swimmer.pectoral, 0.18 + swimmer.spread * 0.7);
+                return { swim: swimmer.power, phase: swimmer.phase, sway: swimmer.sway + swimmer.tail * 0.12 };
             };
         }
         if (c.eyes) {
@@ -191,7 +199,7 @@ async function build(c) {
             const finMove = animate;
             let last = null;
             animate = pose => {
-                finMove?.(pose);
+                const body = finMove?.(pose);
                 const dt = last === null || pose.time < last ? 1 / 60 : Math.min(0.1, pose.time - last);
                 last = pose.time;
                 for (const e of eyes) {
@@ -200,6 +208,7 @@ async function build(c) {
                     const g = e.gaze.update(dt, { x: tx, y: ty }, { scared: pose.scared, lid: pose.sleepy });
                     Object.assign(e.mesh.eye, { x: g.x, y: g.y, lid: g.lid, pupil: g.pupil });
                 }
+                return body;
             };
         }
         return { ...c, meshes, animate, triangles: body.triangles + 2 * (meshes.length - 1), lit: 1 };
@@ -224,7 +233,8 @@ function poseAt(t, fixed = query.get('pose')) {
     const u = (t % POSE_SECONDS) / POSE_SECONDS, name = POSES[index];
     const ease = v => v * v * (3 - 2 * v);
     // `look` is the point the eyes follow (model space); by default somewhere ahead of the nose.
-    const pose = { name, u, time: t, yaw: FACE_YAW, pitch: 0, swim: 0.15, phase: t * 7, puff: 0, look: { x: 1.2, y: 0.1 }, scared: 0, sleepy: 0 };
+    const pose = { name, u, time: t, yaw: FACE_YAW, pitch: 0, swim: 0.15, phase: t * 7, puff: 0, look: { x: 1.2, y: 0.1 }, scared: 0, sleepy: 0,
+        drive: { speed: 0, push: 0, turn: 0, brake: 0 } };          // input for the swim driver
     if (name === 'eyes') {
         // A point circles the face, then sits close in front of the nose (the eyes converge),
         // then a fright, then sleepy.
@@ -234,8 +244,18 @@ function poseAt(t, fixed = query.get('pose')) {
         else if (u < 0.85) { pose.look = { x: 1.4, y: 0.4 }; pose.scared = 1; }
         else pose.sleepy = 0.45;
     }
-    if (name === 'turntable') pose.yaw = Math.sin(u * Math.PI * 2) * Math.PI / 3;                 // ±60° around true profile
-    else if (name === 'swim') { pose.swim = 1; pose.yaw += Math.sin(t * 7) * 0.1; }
+    if (name === 'turntable') {
+        pose.yaw = Math.sin(u * Math.PI * 2) * Math.PI / 3;              // ±60° around true profile
+        pose.drive = { speed: 1, push: 0.3, turn: Math.cos(u * Math.PI * 2), brake: 0 };
+    }
+    else if (name === 'swim') {
+        pose.swim = 1; pose.yaw += Math.sin(t * 7) * 0.1;
+        // Slow, medium, a sprint, then letting go: a glide and a brake.
+        pose.drive = u < 0.25 ? { speed: 0.8, push: 0.3, turn: 0, brake: 0 }
+            : u < 0.5 ? { speed: 2, push: 0.6, turn: 0, brake: 0 }
+                : u < 0.75 ? { speed: 4.5, push: 1, turn: 0, brake: 0 }
+                    : { speed: 1.5, push: 0, turn: 0, brake: u > 0.9 ? 1 : 0 };
+    }
     else if (name === 'eyes') pose.yaw = FACE_YAW;
     else if (name === 'turn') {
         // From facing right to facing left and back: the far side also ends turned toward the camera.
@@ -251,7 +271,7 @@ const candidates = (await Promise.all(wanted.map(c => build(c).catch(e => { cons
 
 // Labels are painted on a canvas of their own over the picture, so saved frames carry them too.
 const labels = document.getElementById('labels'), pen = labels.getContext('2d');
-const POSE_TEXT = { turntable: 'Banking / turntable', swim: 'Swim', turn: 'Turn-around', puff: 'Puff', eyes: 'Eyes: follow, converge, fright, sleepy' };
+const POSE_TEXT = { turntable: 'Banking / turntable', swim: 'Swim: slow, medium, sprint, glide, brake', turn: 'Turn-around', puff: 'Puff', eyes: 'Eyes: follow, converge, fright, sleepy' };
 
 function paintLabels(pose, W, H, cw, dpr) {
     if (labels.width !== W || labels.height !== H) { labels.width = W; labels.height = H; }
@@ -327,8 +347,9 @@ function frame(at = null) {
                 }
                 if (flat) yaw = 0;                                                         // today's sprite: no banking at all
             }
-            c.animate?.(pose);
-            renderer.draw(c.meshes, { ...pose, yaw, mirror, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
+            const body = c.animate?.(pose);       // a candidate with drivers says how its body moves
+            if (body) yaw += body.sway;
+            renderer.draw(c.meshes, { ...pose, ...(body ? { swim: body.swim, phase: body.phase } : null), yaw, mirror, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
         }
     });
     paintLabels(pose, W, H, cw, dpr);

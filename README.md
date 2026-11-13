@@ -91,6 +91,16 @@ skin colour for now.
 
 ![Procedural eye on Lompi: follow, look close, fright, sleepy](docs/devlog/anim-03-eyes.webp)
 
+**Round 3, second piece — motion from a swim driver.** No keyframes: the motion is
+computed from speed, push and steering. Beat frequency follows the Strouhal relation
+(faster and smaller swimmers beat faster); a boxfish like Lompi keeps its body rigid, rows
+with the pectoral fin, uses the tail as a rudder and only beats it in a sprint; when the
+push stops it glides and the fin trims out, and braking flares it. The loop: slow, medium,
+sprint, glide and brake, then banking with steering. Tail, dorsal and anal fins are not
+separate cards yet, and breathing and the mouth exist as a tested model without a picture.
+
+![Lompi driven by the swim model: slow, medium, sprint, glide, brake, banking](docs/devlog/anim-03-swim.webp)
+
 A colorful 2D pufferfish game — underwater, Super Mario Land-ish — built as an
 installable PWA with **switchable control schemes** for experimentation.
 
