@@ -4,6 +4,7 @@ import cardImg from '../assets/card_preview.png';
 import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
 import HudScene, { HUD_KEY } from './HudScene.js';
+import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import { SCENE_KEYS } from './keys.js';
@@ -66,6 +67,7 @@ export default class IntroScene extends Phaser.Scene {
             this.scene.add(SCENE_KEYS.MAIN, MainScene, false);
             this.scene.add(SCENE_KEYS.END, EndScene, false);
             this.scene.add(HUD_KEY, HudScene, false);
+            this.scene.add(STORY_KEY, StoryScene, false);
         }
 
         if (this.textures.exists('bg_far')) {
@@ -84,6 +86,7 @@ export default class IntroScene extends Phaser.Scene {
         }).setOrigin(1, 1).setAlpha(0.45);
 
         new BurgerMenu(this, 60, 60, [
+            { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => this.scene.start(STORY_KEY) },
             ...pwaMenuItems(this, lang),
             { label: lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
         ]);
@@ -155,7 +158,8 @@ export default class IntroScene extends Phaser.Scene {
     }
 
     start() {
-        this.scene.start(SCENE_KEYS.MAIN);
+        // First time: tell the story of the eruption before the journey begins.
+        this.scene.start(storySeen() ? SCENE_KEYS.MAIN : STORY_KEY);
     }
 
     update(time, delta) {

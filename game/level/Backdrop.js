@@ -27,6 +27,11 @@ export default class Backdrop {
         this.sea = scene.add.graphics().setDepth(-28);   // water body drawn over the sky, wavy top edge
         this.foam = scene.add.graphics().setDepth(6);    // bright crest line, in front of the fish
 
+        // The volcano's glow on the eastern horizon: always shows which way the journey goes.
+        this.eastGlow = scene.add.ellipse(W + 120, H * 0.5, 520, H * 1.5, 0xff3b1f, 0.12)
+            .setScrollFactor(0).setDepth(-11).setBlendMode(Phaser.BlendModes.ADD);
+        scene.tweens.add({ targets: this.eastGlow, alpha: 0.2, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
         this.rays = [];
         for (let i = 0; i < 6; i++) {
             const x = (W / 6) * i + Phaser.Math.Between(-60, 60);
