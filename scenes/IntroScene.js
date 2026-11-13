@@ -172,8 +172,14 @@ export default class IntroScene extends Phaser.Scene {
             off = ((off % n) + n) % n;
             if (off > n / 2) off -= n;
             const near = Math.max(0, 1 - Math.abs(off));
-            img.setPosition(W / 2 + off * this.carousel.SPACING, this.carousel.cy + (near > 0.5 ? bob : 0));
-            img.setScale(img.fit * (0.5 + near * 0.6));
+            // Never a frozen sprite: every card breathes, bobs and rocks a little,
+            // each with its own rhythm; the chosen one moves the most.
+            const ph = i * 1.7, live = 0.45 + near * 0.55;
+            const breathe = 1 + Math.sin(time / 520 + ph) * 0.035 * live;
+            img.setPosition(W / 2 + off * this.carousel.SPACING + Math.sin(time / 1300 + ph) * 10 * live,
+                this.carousel.cy + Math.sin(time / 600 + ph) * 14 * live + (near > 0.5 ? bob * 0.5 : 0));
+            img.setScale(img.fit * (0.5 + near * 0.6) * breathe, img.fit * (0.5 + near * 0.6) / breathe);
+            img.setRotation(Math.sin(time / 900 + ph) * 0.06 * live);
             img.setAlpha(Math.abs(off) > 2.2 ? 0 : 0.45 + near * 0.55);
             img.setDepth(near > 0.5 ? 2 : 1);
         });

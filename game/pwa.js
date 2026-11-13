@@ -18,6 +18,9 @@ const IS_DEV = BUILD === 'dev';
 const RELOAD_GUARD = 'slld-reloaded-for';
 
 let deferredPrompt = null;
+/** 'unknown' | 'current' | 'available' | 'offline' — result of the last version check. */
+let updateState = 'unknown';
+export function getUpdateState() { return updateState; }
 const listeners = new Set();
 const notify = () => listeners.forEach(fn => fn());
 
@@ -75,10 +78,11 @@ export async function checkForUpdate(force = true) {
     const reg = await navigator.serviceWorker?.getRegistration().catch(() => null);
     if (reg) {
         await reg.update().catch(() => null);
-        if (reg.installing || reg.waiting) return 'updating'; // reload follows on controllerchange
+        if (reg.installing || reg.waiting) { updateState = 'available'; return 'updating'; } // reload follows on controllerchange
     }
     const live = await liveBuild();
-    if (live === null) return 'offline';
+    if (live === null) { updateState = 'offline'; return 'offline'; }
+    updateState = live !== BUILD ? 'available' : 'current';
     if (live !== BUILD && force) return (await hardRefresh(live)) ? 'updating' : 'current';
     return 'current';
 }
@@ -153,6 +157,9 @@ export function pwaMenuItems(scene, lang) {
     const de = lang === 'de';
     return [
         { label: de ? 'APP INSTALLIEREN' : 'INSTALL APP', color: 0x1565c0, callback: () => install(scene, lang) },
-        { label: 'UPDATE', color: 0x455a64, callback: () => manualUpdate(scene, lang) }
+        // Lit up only when a newer build is live; otherwise greyed and it just says so.
+        updateState === 'available'
+            ? { label: de ? '● UPDATE LADEN' : '● GET UPDATE', color: 0x2e7d32, callback: () => manualUpdate(scene, lang) }
+            : { label: updateState === 'offline' ? 'OFFLINE' : (de ? 'AKTUELL ✓' : 'UP TO DATE ✓'), color: 0x30363a, callback: () => manualUpdate(scene, lang) }
     ];
 }

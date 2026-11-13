@@ -13,6 +13,7 @@ export const LEVEL = {
     spawn: { x: 0, y: 700 },
     margin: 1,            // extra chunks generated around the view
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
+    coinGap: 92,          // minimum distance between two coins
     rockRes: 0.6,         // baked terrain resolution (1 = full; lower saves GPU memory)
     backRes: 0.3,         // baked back-wall / shadow layer resolution (soft anyway)
     rockTexScale: 1.6     // how large the rock texture appears
@@ -368,13 +369,17 @@ export default class LevelGenerator {
 
     addCoin(chunk, x, y) {
         const s = this.scene;
+        // Never stack coins: keep a clear gap to every coin already placed.
+        for (const c of this.coins) {
+            if (c.img.active && Math.abs(c.x - x) < LEVEL.coinGap && Math.abs(c.y - y) < LEVEL.coinGap) return;
+        }
         const img = s.textures.exists('coin')
             ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)
             : s.add.circle(x, y, 32, 0xffd23f).setStrokeStyle(5, 0xfff3b0);
         img.setDepth(2);
         s.tweens.add({ targets: img, y: y - 14, duration: 1100 + (Math.abs(x) % 400), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(img);
-        this.coins.push({ img, r: 40 });
+        this.coins.push({ img, r: 40, x, y });
     }
 
     addHazard(chunk, key, x, y, rng, angle = 0) {
