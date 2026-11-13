@@ -25,8 +25,8 @@ export const CHARACTERS = [
         }
     },
     {
-        id: 'shark', name: 'Sharky', blurb: { de: 'Schnell, träge in der Kurve · Sprint', en: 'Fast, wide turns · dash' },
-        special: 'dash', thrust: 1.15, maxSpeed: 1.25, drag: 0.85, turn: 0.55, soft: 0.3,
+        id: 'shark', name: 'Sharky', blurb: { de: 'Schnell, träge in der Kurve · Sprint, bis zu 5-mal tippen', en: 'Fast, wide turns · sprint, tap up to 5 times' },
+        special: 'sprint', thrust: 1.15, maxSpeed: 1.25, drag: 0.85, turn: 0.55, soft: 0.3,
         states: one('player_shark', 250, 62, 34)
     },
     {
@@ -68,4 +68,22 @@ export function loadSelectedId() {
 
 export function saveSelectedId(id) {
     try { window.localStorage.setItem(STORE_KEY, id); } catch { /* storage blocked */ }
+}
+
+// How a character's body moves through water and air, per 60 Hz physics step — the
+// same numbers the physics uses, for anything that has to predict a body without
+// running it (other players over the network). `base` = the PLAYER tunables from
+// Player.js — pass them in where Phaser is around, so tuning there carries over; the
+// defaults here are the shipped values.
+//   keepWater / keepAir       share of the velocity kept each step
+//   gravityWater / gravityAir downward acceleration, px per step squared
+const WORLD_GRAVITY = 0.12 * 0.001 * (1000 / 60) ** 2;     // the scene's gravity as Matter applies it
+export function motionOf(character, state = 'normal', base = { waterDrag: 0.6, airDrag: 0.0015, airGravity: 0.0011 }) {
+    const st = character.states[state] || character.states.normal;
+    return {
+        keepWater: 1 - st.air * (character.drag ?? 1) * base.waterDrag,
+        keepAir: 1 - base.airDrag,
+        gravityWater: WORLD_GRAVITY * (character.sink ?? 1),
+        gravityAir: WORLD_GRAVITY + base.airGravity * (character.airGravity ?? 1) * (1000 / 60) ** 2
+    };
 }

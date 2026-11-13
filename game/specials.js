@@ -12,7 +12,9 @@
 //       shield       ms hazards cannot hurt
 //       invulnerable ms without damage (still pushed)
 //       shove        push loose things away
-//       squash, sound, color, ring   feedback
+//       squash, sound, color, ring   feedback (ring 0 = no ring)
+//   chain        { max, window, rest }: the special may be used up to `max` times in a row,
+//                each within `window` ms of the last; after the last one it rests for `rest` ms
 //
 // Pure data and maths, no Phaser (tests/specials.test.mjs). The numbers are
 // first proposals for everything but the puff, to be tuned by play.
@@ -36,6 +38,11 @@ export const SPECIALS = {
         cooldown: 900, air: false,
         start: c => { const a = ahead(c); return { vx: c.vx + a.x * 15, vy: c.vy + a.y * 15, invulnerable: 350 }; }
     },
+    // Sprint: every tap is another burst along the nose, up to five in a row, then a rest.
+    sprint: {
+        cooldown: 110, air: false, chain: { max: 5, window: 900, rest: 1700 },
+        start: c => { const a = ahead(c); return { vx: c.vx + a.x * 7.5, vy: c.vy + a.y * 7.5, invulnerable: 300, squash: 0.22, ring: 0 }; }
+    },
     // Up and forward, made for breaking the surface.
     leap: {
         cooldown: 1100, air: false,
@@ -52,6 +59,18 @@ export const SPECIALS = {
         start: ({ vx, vy }) => ({ vx, vy, shield: 2600, color: 0xffe08a })
     }
 };
+
+/**
+ * One use of a chained special. `chain` = { count, left } (uses so far, ms left to continue).
+ * Returns the new chain state and the cooldown that applies now.
+ */
+export function chainStep(special, chain) {
+    const rule = special.chain;
+    if (!rule) return { count: 0, left: 0, cooldown: special.cooldown };
+    const count = (chain.left > 0 ? chain.count : 0) + 1;
+    if (count >= rule.max) return { count: 0, left: 0, cooldown: rule.rest };
+    return { count, left: rule.window, cooldown: special.cooldown };
+}
 
 /** May this special start now? */
 export function canUse(special, { cooldown, inAir }) {

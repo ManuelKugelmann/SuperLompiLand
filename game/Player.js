@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { CHARACTERS } from './characters.js';
-import { SPECIALS, canUse } from './specials.js';
+import { SPECIALS, canUse, chainStep } from './specials.js';
 import Rig from './Rig.js';
 import { play } from './audio.js';
 
@@ -65,6 +65,7 @@ export default class Player {
         this.poseLeft = 0;      // ms left in a special's pose
         this.poseCooldown = 0;  // cooldown that starts when the pose ends
         this.cooldown = 0;
+        this.chain = { count: 0, left: 0 };   // uses of a chained special so far, ms left to continue
         this.shield = 0;        // ms hazards cannot hurt
         this.guard = 0;         // ms fully protected (not even pushed)
         this.invulnerable = 0;  // ms without damage
@@ -173,7 +174,10 @@ export default class Player {
         if (!canUse(sp, this)) return;
         const v = this.body.velocity;
         const fx = sp.start({ vx: v.x, vy: v.y, facing: this.facing, inAir: this.inAir });
-        this.cooldown = sp.cooldown;
+        // A chained special (the sprint) counts its uses and rests after the last one.
+        const step = chainStep(sp, this.chain);
+        this.chain.count = step.count; this.chain.left = step.left;
+        this.cooldown = step.cooldown;
         if (fx.pose && this.states[fx.pose]) {
             // A bigger pose needs room: move into open water first, or do not start it.
             const room = this.makeRoom ? this.makeRoom(this.states[fx.pose].radius) : this.pos;
@@ -190,6 +194,7 @@ export default class Player {
         if (fx.squash) this.squash = fx.squash;
         if (fx.shove) this.shove();
         play(fx.sound ?? 'special');
+        if (fx.ring === 0) return;
         const ring = this.scene.add.circle(this.sprite.x, this.sprite.y, this.radius, fx.color ?? 0xffffff, 0.4).setDepth(4);
         this.scene.tweens.add({ targets: ring, scale: fx.ring ?? 2.6, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
     }
@@ -237,6 +242,7 @@ export default class Player {
     /** @param {number} dt ms  @param {number} waterY world y of the water surface at the fish */
     update(dt, waterY = -Infinity) {
         if (this.cooldown > 0) this.cooldown -= dt;
+        if (this.chain.left > 0) this.chain.left -= dt;
         if (this.invulnerable > 0) this.invulnerable -= dt;
 
         // Water <-> air. In the air: no drag, real gravity, hardly any control.

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHARACTERS, getCharacter } from '../game/characters.js';
+import { SPECIALS as SPECIAL_TABLE } from '../game/specials.js';
 import { rotatedPageToGame } from '../game/orientationMath.js';
 
-const SPECIALS = ['puff', 'dash', 'leap', 'shield', 'pulse'];
+const SPECIALS = Object.keys(SPECIAL_TABLE);
 
 test('every character is complete and has a known special', () => {
     const ids = new Set();

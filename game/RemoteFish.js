@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { getCharacter } from './characters.js';
+import { getCharacter, motionOf } from './characters.js';
+import { PLAYER } from './Player.js';
 import Rig from './Rig.js';
 import { SnapshotBuffer } from '../net/snapshots.js';
 import { edgeMarker } from '../net/edgeMarker.js';
@@ -80,6 +81,8 @@ export default class RemoteFish {
         }
         this.stateName = char.states[stateName] ? stateName : 'normal';
         this.rig.setState(this.stateName);
+        // Prediction between snapshots uses this character's own water and air numbers.
+        this.snaps.setMotion?.(motionOf(char, this.stateName, PLAYER));
         const st = char.states[this.stateName];
         this.icon.setTexture(this.rig.view.texture.key);
         this.icon.setScale(ICON_W / this.icon.width);
