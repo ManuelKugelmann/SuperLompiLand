@@ -34,26 +34,47 @@ npm run build      # production build -> dist/
 npm run serve      # zero-dep static server for dist/ (tests the real PWA/SW)
 ```
 
-## Controls — switchable live (top-center switcher)
+## The game
 
-Swap any time in-game:
+Lompi the pufferfish lives on a reef. A volcano erupts, and what it shakes loose —
+mines, nets, barrels, claws — drifts into the sea. Lompi sets out east across the
+ocean, from the shallow lagoon through reef, kelp forest, open blue, minefield and
+harbour down into the deep trench, to reach the grand nest.
 
-| Scheme | Move | Puff |
+- **Nests** on the seabed save your coins, refill your health and are where you
+  continue — also next time you play. Running out of health is never the end.
+- **Friends** (turtle, seahorse, snail, starfish, urchin, anglerfish, …) cheer you
+  up: a bonus and a heart. They shimmer; hazards do not.
+- **Seven characters** to choose on the title screen, each moving differently and
+  with its own special (puff, dash, leap, shield, pulse).
+- **Relaxed or adventure:** switch in the menu. Relaxed means nothing can hurt.
+- The strip at the top right shows the whole journey and where you are.
+
+## Controls — switchable live (top of the screen)
+
+| Scheme | Move | Special |
 |---|---|---|
-| **Schubsen** (air hockey) | grab the fish and throw it, or shove it with your finger as a paddle | double tap |
+| **Schubsen** (air hockey) | grab the fish and throw it, or shove it with your finger | double tap |
 | **Flattern** (flap) | every tap is a fin stroke: tap position = direction, tap rate = speed | long press |
+| **Neigen** (tilt) | tilt the phone to steer, tap for speed | long press |
 | **Stick** | floating virtual stick, drag to swim | double tap |
 | **Tippen** (rubber band) | touch and hold: the fish is pulled to your finger; let go and it brakes | double tap |
 
-Keyboard always works too: arrows / WASD swim, Space puffs.
+Keyboard always works too: arrows / WASD swim, Space is the special.
+Out of the water there is no swimming — only your momentum, and a little steering.
 
-The pufferfish has two states — normal (small, agile) and inflated (big, buoyant,
-shrugs off hazards). The world is an open 2D ocean generated from a seed: swim in
-any direction, dive deeper, meet friends, avoid urchins, mines and anglerfish.
+Sound can be switched off in the menu (☰). The app updates itself when a new build
+is live; install it from the same menu.
 
-Add a scheme in `game/controls/` and register it in `game/controls/index.js` — it
-appears in the switcher automatically. A physics-debug toggle is top-right.
-The app updates itself when a new build is live; install / update are also in the menu (☰).
+## Development
+
+```bash
+npm test           # unit tests for the pure logic (terrain, biomes, characters, …)
+```
+
+Add a control scheme in `game/controls/` and register it in `game/controls/index.js`;
+add a playable character in `game/characters.js`; biomes and their spawn tables live
+in `game/level/biomes.js`.
 
 ## Deploy — GitHub Pages (dev/release routing)
 
@@ -72,9 +93,11 @@ Netlify / Vercel / Cloudflare Pages (drag-drop or git).
 ## Layout
 
 ```
-scenes/        Intro / Main / End
-game/          Pufferfish, control schemes, level generator, UI, orientation, PWA
-public/img/    generated art
+scenes/        title (character carousel), story intro, game, HUD, end
+game/          player fish, characters, control schemes, audio, PWA, feedback
+game/level/    world generator, biomes, terrain math, creatures, backdrop
 systems/       progression (localStorage)
-scripts/       icon generator, static server
+worker/        feedback relay (Cloudflare Worker)
+tests/         unit tests
+scripts/       icon generator, static server, dev log helper
 ```

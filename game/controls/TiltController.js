@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
+import { play } from '../audio.js';
 
 const KICK = 9;            // speed added per tap
 const FULL_TILT = 22;      // degrees of tilt for full deflection
@@ -141,6 +142,7 @@ export default class TiltController extends ControllerBase {
         // No tilt: stroke straight ahead.
         const d = this.dir.lengthSq() > 0 ? this.dir.clone() : new Phaser.Math.Vector2(this.fish.facing, 0);
         this.fish.launch(d.setLength(KICK));
+        play('flap');
     }
 
     refreshStatus() {

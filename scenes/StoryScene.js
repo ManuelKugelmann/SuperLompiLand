@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { play } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const STORY_KEY = `${SCENE_KEYS.MAIN}_Story`;
@@ -64,7 +65,7 @@ export default class StoryScene extends Phaser.Scene {
 
         // --- Beats ---------------------------------------------------------
         const at = (ms, fn) => this.time.delayedCall(ms, () => { if (!this.done) fn(); });
-        at(1500, () => this.cameras.main.shake(1400, 0.006));                    // 2 rumble
+        at(1500, () => { this.cameras.main.shake(1400, 0.006); play('rumble'); });                    // 2 rumble
         at(1900, () => this.friends.forEach(f => this.tweens.add({ targets: f, angle: -10, duration: 300, yoyo: true })));
         at(3000, () => this.erupt());                                             // 3 eruption
         at(4500, () => this.fallout());                                           // 4 dark things, friends scatter
@@ -79,6 +80,7 @@ export default class StoryScene extends Phaser.Scene {
     erupt() {
         const W = this.scale.width;
         this.cameras.main.shake(900, 0.014);
+        play('boom');
         this.tweens.add({ targets: this.flash, alpha: 0.5, duration: 140, yoyo: true });
         this.tweens.add({ targets: this.sunset, alpha: 0.55, duration: 900 });
         this.tweens.add({ targets: this.glow, alpha: 0.3, duration: 700 });
@@ -124,6 +126,7 @@ export default class StoryScene extends Phaser.Scene {
         this.time.delayedCall(650, () => {
             if (this.done) return;
             if (this.textures.exists('puffer_inflated')) this.lompi.setTexture('puffer_inflated').setScale(0.5);
+            play('puff');
             this.tweens.add({ targets: this.lompi, scale: this.lompi.scale * 1.25, duration: 220, yoyo: true, ease: 'Back.easeOut' });
             const ring = this.add.circle(this.lompi.x, this.lompi.y, 120, 0xfff3b0, 0.45);
             this.tweens.add({ targets: ring, scale: 3, alpha: 0, duration: 520, onComplete: () => ring.destroy() });

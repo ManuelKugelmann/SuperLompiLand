@@ -7,6 +7,7 @@ import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { waveY } from '../game/level/surface.js';
+import { play } from '../game/audio.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 
@@ -108,6 +109,7 @@ export default class MainScene extends Phaser.Scene {
 
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed }) => {
+            play('splash', speed);
             const n = Phaser.Math.Clamp(Math.round(speed * 0.9), 5, 22);
             for (let i = 0; i < n; i++) {
                 const d = this.add.circle(x + Phaser.Math.Between(-40, 40), y, Phaser.Math.Between(4, 11), 0xffffff, 0.85).setDepth(6);
@@ -166,6 +168,7 @@ export default class MainScene extends Phaser.Scene {
         if (!first && this.coins === this.banked && this.health >= this.maxHealth) return;
         this.banked = this.coins;
         this.health = this.maxHealth;
+        play(nest.grand ? 'win' : 'nest');
         this.progression.set?.('nest', this.nestIndex);
         this.progression.set?.('banked', this.banked);
         if (nest.grand) {
@@ -190,6 +193,7 @@ export default class MainScene extends Phaser.Scene {
     respawn() {
         const de = this.lang === 'de';
         const p = this.startPoint();
+        play('respawn');
         this.cameras.main.fadeOut(260, 10, 40, 70);
         this.time.delayedCall(280, () => {
             this.fish.deflate();
@@ -257,12 +261,14 @@ export default class MainScene extends Phaser.Scene {
             this.tweens.killTweensOf(c.img);
             c.img.destroy();
             this.coins++;
+            play('coin');
             const pop = this.add.circle(x, y, 30, 0xfff3b0, 0.8).setDepth(3);
             this.tweens.add({ targets: pop, scale: 2.6, alpha: 0, duration: 260, onComplete: () => pop.destroy() });
         }
         for (const f of this.level.friends) {
             if (f.greeted || !f.img.active || p.distance(f.img) > fr + f.r) continue;
             f.greeted = true;
+            play('friend');
             this.coins += WORLD.friendBonus;
             this.health = Math.min(WORLD.maxHealth, this.health + 1); // friends cheer you up
             const heart = this.add.text(f.img.x, f.img.y - f.r, `♥ +${WORLD.friendBonus}`, {
@@ -278,6 +284,7 @@ export default class MainScene extends Phaser.Scene {
             if (this.relaxed) break;
             if (!h.img.active || p.distance(h.img) > fr * LEVEL.hitSlack + h.r) continue;
             if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
+                play('hit');
                 this.health = Math.max(0, this.health - (this.character.armor ?? 1));
                 this.cameras.main.shake(180, 0.008);
                 if (this.health <= 0 && !this.respawning) { this.respawning = true; this.respawn(); return; }

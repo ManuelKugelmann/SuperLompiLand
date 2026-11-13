@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { CHARACTERS } from './characters.js';
+import { play } from './audio.js';
 
 /** Tunables — physics feel is adjusted here (velocities are px per physics step). */
 export const FISH = {
@@ -184,6 +185,7 @@ export default class Pufferfish {
         if (this.inflated) { this.deflate(); return; }
         if (this.cooldown > 0) return;
         this.applyState('inflated');
+        play('puff');
         this.inflateLeft = FISH.inflateMs;
         // Air brake: puffing up stops the fish where it is (in the water).
         if (!this.inAir) this.sprite.setVelocity(this.body.velocity.x * 0.08, this.body.velocity.y * 0.08);
@@ -232,6 +234,7 @@ export default class Pufferfish {
         } else {
             return;
         }
+        play('special');
         const ring = this.scene.add.circle(this.sprite.x, this.sprite.y, this.radius, color, 0.4).setDepth(4);
         this.scene.tweens.add({ targets: ring, scale: 2.6, alpha: 0, duration: 380, onComplete: () => ring.destroy() });
     }
@@ -239,6 +242,7 @@ export default class Pufferfish {
     deflate() {
         if (!this.inflated) return;
         this.applyState('normal');
+        play('deflate');
         this.inflateLeft = 0;
         this.cooldown = FISH.cooldownMs;
     }

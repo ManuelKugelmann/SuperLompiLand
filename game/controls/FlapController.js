@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
+import { play } from '../audio.js';
 
 const KICK = 10.5; // velocity added per tap at full deflection
 const LONG_PRESS_MS = 380;
@@ -37,6 +38,7 @@ export default class FlapController extends ControllerBase {
         );
         if (dir.length() > 1) dir.normalize();
         this.fish.launch(dir.scale(KICK));
+        play('flap');
 
         const dot = this.scene.add.circle(pointer.x, pointer.y, 22, 0xffffff, 0.16);
         this.ui.add(dot);

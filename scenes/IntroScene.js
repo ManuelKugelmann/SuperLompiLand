@@ -8,6 +8,7 @@ import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
+import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const gameMeta = {
@@ -90,6 +91,7 @@ export default class IntroScene extends Phaser.Scene {
         new BurgerMenu(this, 60, 60, [
             { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => this.scene.start(STORY_KEY) },
             ...feedbackMenuItems(lang, () => ({ screen: 'title' })),
+            soundMenuItem(lang, () => this.scene.restart()),
             ...pwaMenuItems(this, lang),
             { label: lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
         ]);
@@ -156,6 +158,7 @@ export default class IntroScene extends Phaser.Scene {
         const c = CHARACTERS[this.index];
         saveSelectedId(c.id);
         this.registry.set('character', c.id);
+        if (this.nameText.text && this.nameText.text !== c.name) play('tap');
         this.nameText.setText(c.name);
         this.blurbText.setText(c.blurb[this.lang] || c.blurb.en);
     }
