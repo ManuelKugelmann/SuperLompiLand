@@ -29,6 +29,7 @@ export const CHARACTERS = [
     {
         id: 'shark', name: 'Sharky', blurb: { de: 'Schnell, träge in der Kurve · Sprint, bis zu 5-mal tippen', en: 'Fast, wide turns · sprint, tap up to 5 times' },
         special: 'sprint', thrust: 1.15, maxSpeed: 1.25, drag: 0.85, turn: 0.55, soft: 0.3,
+        fright: 2.2,   // a fish-eater: small fish keep this much more distance and never let him in (boids.js)
         states: one('player_shark', 250, 62, 34)
     },
     {

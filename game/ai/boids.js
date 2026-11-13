@@ -94,8 +94,10 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                 ppx = pl.x + pl.vx * P.playerPredictS; ppy = pl.y + pl.vy * P.playerPredictS;
                 pspeed = Math.hypot(pl.vx, pl.vy);
             }
-            const calm = pl && pspeed < P.calmSpeed;
-            const personal = calm ? P.playerR * 0.45 : P.playerR * (1 + Math.min(1.5, pspeed / P.dashSpeed));
+            // fright > 1: a predator (Sharky). Fish keep more room and never let it in.
+            const fright = pl?.fright || 1;
+            const calm = pl && pspeed < P.calmSpeed && fright <= 1;
+            const personal = (calm ? P.playerR * 0.45 : P.playerR * (1 + Math.min(1.5, pspeed / P.dashSpeed))) * fright;
 
             buildGrid();
             const decay = Math.exp(-P.panicDecay * dt);

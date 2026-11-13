@@ -783,7 +783,7 @@ export default class MainScene extends Phaser.Scene {
         }
         this.particles.update(delta / 1000);
         const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step
-        pl.x = view.x; pl.y = view.y; pl.vx = v.x * 60; pl.vy = v.y * 60;
+        pl.x = view.x; pl.y = view.y; pl.vx = v.x * 60; pl.vy = v.y * 60; pl.fright = this.character.fright || 1;
         this.swarms.update(delta / 1000, view.x, view.y, pl);
         this.oilExposure(delta / 1000);
         this.bobCoins();

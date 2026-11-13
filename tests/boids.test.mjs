@@ -55,6 +55,20 @@ test('a dash starts a panic that spreads beyond the dash radius', () => {
     assert.equal(still, 0, 'calms down again');
 });
 
+test('a predator (fright > 1) is given far more room than a calm friend', () => {
+    const closest = fright => {
+        const sw = createSwarm({ count: 80, random: seq(12) });
+        run(sw, 5);
+        const c = sw.centre(), p = { x: c.x, y: c.y, vx: 40, vy: 0, fright };
+        run(sw, 3, { player: p });
+        let min = Infinity;
+        for (let i = 0; i < sw.count; i++) min = Math.min(min, Math.hypot(sw.x[i] - p.x, sw.y[i] - p.y));
+        return min;
+    };
+    const friend = closest(1), shark = closest(2.2);
+    assert.ok(shark > friend * 2 && shark > 150, `friend ${friend.toFixed(0)} px, shark ${shark.toFixed(0)} px`);
+});
+
 test('startle panics the fish near the event only', () => {
     const sw = createSwarm({ count: 40, random: seq(6) });
     sw.startle(sw.x[0], sw.y[0], 1);
