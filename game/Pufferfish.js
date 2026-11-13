@@ -83,7 +83,10 @@ export default class Pufferfish {
             // the fin flaps separately; otherwise the single image is used as is.
             const pivot = scene.cache.json.get('fins')?.[s.key];
             const layered = !!pivot && scene.textures.exists(`${s.key}_body`) && scene.textures.exists(`${s.key}_fin`);
-            const rope = scene.add.rope(x, y, layered ? `${s.key}_body` : s.key, null, FISH.wiggleSegments, true)
+            // The strip mesh is cut across the body's length: vertical strips for
+            // fish (tail waves), horizontal ones for tall creatures (tentacles trail).
+            const tall = character.anim === 'pulse' || character.anim === 'sway';
+            const rope = scene.add.rope(x, y, layered ? `${s.key}_body` : s.key, null, FISH.wiggleSegments, !tall)
                 .setDepth(5).setVisible(false);
             rope.baseScale = s.width / rope.frame.width;
             if (layered) {
@@ -354,9 +357,40 @@ export default class Pufferfish {
         this.swimPhase += (0.1 + drive * 0.42) * frames;
         const amp = this.states[this.state].wiggle * (0.25 + drive * 0.75);
         const pts = this.view.points, n = pts.length - 1;
-        for (let i = 0; i <= n; i++) {
-            const tail = 1 - i / n;                       // 1 at the tail, 0 at the nose
-            pts[i].y = Math.sin(this.swimPhase - tail * 2.6) * amp * tail * tail;
+        const frame = this.view.frame, style = this.char.anim || 'swim';
+        if (style === 'pulse') {
+            // Jellyfish: the bell pumps (harder when swimming), the tentacles trail
+            // behind the movement and ripple.
+            const beat = Math.sin(this.swimPhase * 0.9);
+            const pump = 0.05 + drive * 0.09;
+            const sx0 = this.view.scaleX, sy0 = this.view.scaleY;
+            this.view.setScale(sx0 * (1 + beat * pump), sy0 * (1 - beat * pump * 1.3));
+            const trail = Phaser.Math.Clamp(-(bv.x - this.flow.x) * 0.012, -0.35, 0.35) * this.facing;
+            for (let i = 0; i <= n; i++) {
+                const f = i / n;                              // 0 = top of the bell, 1 = tentacle tips
+                pts[i].x = (Math.sin(this.swimPhase * 0.9 - f * 3.4) * 0.06 + trail * f) * frame.width * f * f * 2.2;
+            }
+        } else if (style === 'sway') {
+            // Seahorse: upright, the body curls gently from the head down; the tail swings behind.
+            const trail = Phaser.Math.Clamp(-(bv.x - this.flow.x) * 0.01, -0.3, 0.3) * this.facing;
+            for (let i = 0; i <= n; i++) {
+                const f = i / n;
+                pts[i].x = (Math.sin(this.swimPhase * 0.7 - f * 2.2) * 0.05 * (0.5 + drive) + trail * f) * frame.width * f;
+            }
+        } else if (style === 'paddle') {
+            // Turtle: a stiff shell that rocks with each flipper stroke and stretches forward a little.
+            const stroke = Math.sin(this.swimPhase * 0.55);
+            this.view.rotation += stroke * 0.07 * (0.3 + drive) * this.facing;
+            this.view.setScale(this.view.scaleX * (1 + stroke * 0.03 * drive), this.view.scaleY * (1 - stroke * 0.045 * (0.4 + drive)));
+            for (let i = 0; i <= n; i++) {                    // only the rear flippers / tail end flex
+                const tail = 1 - i / n;
+                pts[i].y = Math.sin(this.swimPhase * 0.55 - tail * 1.5) * amp * 0.5 * tail * tail * tail;
+            }
+        } else {
+            for (let i = 0; i <= n; i++) {
+                const tail = 1 - i / n;                       // 1 at the tail, 0 at the nose
+                pts[i].y = Math.sin(this.swimPhase - tail * 2.6) * amp * tail * tail;
+            }
         }
         this.view.setDirty();
         // Protective glow while a shield or the short puff invincibility is active.

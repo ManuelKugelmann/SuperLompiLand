@@ -66,7 +66,7 @@ function noise({ at = 0, dur = 0.3, vol = 0.3, from = 1200, to = 300, q = 0.8 })
     src.stop(t + dur + 0.02);
 }
 
-let coinStreak = 0, lastCoin = 0;
+let coinStreak = 0, lastCoin = 0, lastVoice = -1;
 
 const SOUNDS = {
     /** Coins collected in quick succession climb the scale. */
@@ -90,7 +90,25 @@ const SOUNDS = {
         noise({ at: 0.06, dur: 0.5, vol: v * 0.45, from: 1200, to: 400, q: 0.7 });
     },
     hit() { tone({ f: 190, to: 70, type: 'square', dur: 0.22, vol: 0.22 }); noise({ dur: 0.12, vol: 0.2, from: 400, to: 150 }); },
-    friend() { tone({ f: 659.25, type: 'triangle', dur: 0.14, vol: 0.2 }); tone({ f: 987.77, type: 'triangle', at: 0.11, dur: 0.24, vol: 0.2 }); },
+    /** Meeting a friend: one of several happy little voices, never the same twice in a row. */
+    friend() {
+        const voices = [
+            // "yay!" — a quick dip and a long happy rise
+            () => { tone({ f: 620, to: 520, type: 'triangle', dur: 0.07, vol: 0.2 }); tone({ f: 540, to: 1250, type: 'triangle', at: 0.07, dur: 0.3, vol: 0.24 }); },
+            // "woo-hoo" — up, then higher
+            () => { tone({ f: 520, to: 780, type: 'sine', dur: 0.16, vol: 0.24 }); tone({ f: 700, to: 1180, type: 'sine', at: 0.2, dur: 0.26, vol: 0.24 }); },
+            // giggle — a run of quick bright blips
+            () => { [880, 1046.5, 932, 1174.66, 1046.5, 1318.51].forEach((f, i) => tone({ f, to: f * 1.12, type: 'triangle', at: i * 0.065, dur: 0.06, vol: 0.18 })); },
+            // "hello!" chirp — three notes of a major chord
+            () => { [659.25, 783.99, 1046.5].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.09, dur: 0.2, vol: 0.2 })); },
+            // happy squeak — fast wobble upward
+            () => { for (let i = 0; i < 4; i++) tone({ f: 700 + i * 130, to: 900 + i * 130, type: 'sine', at: i * 0.07, dur: 0.07, vol: 0.2 }); }
+        ];
+        let pick;
+        do { pick = Math.floor(Math.random() * voices.length); } while (pick === lastVoice && voices.length > 1);
+        lastVoice = pick;
+        voices[pick]();
+    },
     nest() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.11, dur: 0.3, vol: 0.22 })); },
     win() { [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.13, dur: 0.5, vol: 0.22 })); },
     respawn() { tone({ f: 440, to: 220, type: 'sine', dur: 0.4, vol: 0.2 }); },

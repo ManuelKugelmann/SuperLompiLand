@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import ProgressionManager from '../systems/ProgressionManager.js';
+import WorldState from '../systems/worldState.js';
 import Pufferfish from '../game/Pufferfish.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
@@ -51,7 +52,9 @@ export default class MainScene extends Phaser.Scene {
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
-        this.level = new LevelGenerator(this);
+        // What has been collected stays collected (per chunk bitfields, see worldState.js).
+        this.world = new WorldState(window.localStorage, 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
+        this.level = new LevelGenerator(this, this.world);
 
         // Start at the last nest reached (kept across sessions), else the start pool.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
@@ -80,7 +83,7 @@ export default class MainScene extends Phaser.Scene {
         this.health = WORLD.maxHealth;
         this.maxHealth = WORLD.maxHealth;
 
-        const saved = this.progression.get?.('scheme', null);
+        const saved = this.progression.get?.('controls', null);
         this.activeScheme = CONTROL_SCHEMES.some(s => s.id === saved) ? saved : CONTROL_SCHEMES[0].id;
         this.controller = makeController(this.activeScheme, this, this.fish);
 
@@ -150,8 +153,18 @@ export default class MainScene extends Phaser.Scene {
         }
         this.keyDir = new Phaser.Math.Vector2();
 
+        // Save the world state now and then, and when the game goes to the background.
+        this.time.addEvent({ delay: 5000, loop: true, callback: () => this.world.save() });
+        const saveNow = () => this.world.save();
+        document.addEventListener('visibilitychange', saveNow);
+        window.addEventListener('pagehide', saveNow);
+
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            saveNow();
+            document.removeEventListener('visibilitychange', saveNow);
+            window.removeEventListener('pagehide', saveNow);
             this.scene.stop(HUD_KEY);
+            this.level.worker?.terminate();
             this.input.manager.globalTopOnly = this.prevTopOnly;
             this.controller?.destroy();
             kb?.removeAllListeners('keydown-SPACE');
@@ -189,6 +202,7 @@ export default class MainScene extends Phaser.Scene {
         if (first) this.nestIndex = nest.index;
         if (!first && this.coins === this.banked && this.health >= this.maxHealth) return;
         this.banked = this.coins;
+        this.world.save();
         this.health = this.maxHealth;
         play(nest.grand ? 'win' : 'nest');
         this.progression.set?.('nest', this.nestIndex);
@@ -243,6 +257,7 @@ export default class MainScene extends Phaser.Scene {
     startOver() {
         this.progression.set?.('nest', 0);
         this.progression.set?.('banked', 0);
+        this.world.reset();
         this.scene.restart();
     }
 
@@ -260,7 +275,7 @@ export default class MainScene extends Phaser.Scene {
         this.controller.destroy();
         this.activeScheme = id;
         this.controller = makeController(id, this, this.fish);
-        this.progression.set?.('scheme', id);
+        this.progression.set?.('controls', id);
     }
 
     toggleDebug() {
@@ -282,6 +297,7 @@ export default class MainScene extends Phaser.Scene {
             const { x, y } = c.img;
             this.tweens.killTweensOf(c.img);
             c.img.destroy();
+            this.world.set(c.chunkKey, 'coin', c.index);
             this.coins++;
             play('coin');
             for (let i = 0; i < 5; i++) {           // sparkle
@@ -296,9 +312,10 @@ export default class MainScene extends Phaser.Scene {
             if (f.greeted || !f.img.active || p.distance(f.img) > fr + f.r) continue;
             f.greeted = true;
             play('friend');
-            this.coins += WORLD.friendBonus;
-            this.health = Math.min(WORLD.maxHealth, this.health + 1); // friends cheer you up
-            const heart = this.add.text(f.img.x, f.img.y - f.r, `♥ +${WORLD.friendBonus}`, {
+            this.health = Math.min(this.maxHealth, this.health + 1); // friends cheer you up
+            const bonus = f.rewarded ? 0 : WORLD.friendBonus;      // coins only the first time ever
+            if (bonus) { f.rewarded = true; this.world.set(f.chunkKey, 'friend', f.index); this.coins += bonus; }
+            const heart = this.add.text(f.img.x, f.img.y - f.r, bonus ? `♥ +${bonus}` : '♥', {
                 fontFamily: 'Arial', fontSize: '54px', color: '#ff6b9a', fontStyle: 'bold',
                 stroke: '#ffffff', strokeThickness: 8
             }).setOrigin(0.5).setDepth(8);

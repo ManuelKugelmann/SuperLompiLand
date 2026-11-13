@@ -6,6 +6,8 @@
 //   maxSpeed  top speed                  turn      how quickly the nose follows the movement
 //   sink      gravity in water           airGravity / airTurn  flight behaviour above the surface
 //   upright   never tilts along the movement (jellyfish, seahorse)
+//   anim      how the body moves: swim (default, tail waves), pulse (jellyfish),
+//             sway (seahorse), paddle (turtle: stiff shell, flipper strokes)
 //   armor     share of hazard damage taken (1 = normal)
 //
 // The specials other than Lompi's puff are first proposals, to be tuned by play.
@@ -38,17 +40,17 @@ export const CHARACTERS = [
     },
     {
         id: 'turtle', name: 'Schildi', blurb: { de: 'Langsam, hält viel aus · Panzer', en: 'Slow but tough · shell' },
-        special: 'shield', thrust: 0.7, maxSpeed: 0.75, drag: 1.1, turn: 0.7, armor: 0.5,
+        special: 'shield', thrust: 0.7, maxSpeed: 0.75, drag: 1.1, turn: 0.7, armor: 0.5, anim: 'paddle',
         states: one('friend_turtle', 250, 70, 14)
     },
     {
         id: 'jellyfish', name: 'Quallina', blurb: { de: 'Schwebt, sinkt kaum · Stoß nach oben', en: 'Floats, barely sinks · upward pulse' },
-        special: 'pulse', thrust: 0.6, maxSpeed: 0.7, drag: 1.6, sink: 0.15, upright: true,
+        special: 'pulse', thrust: 0.6, maxSpeed: 0.7, drag: 1.6, sink: 0.15, upright: true, anim: 'pulse',
         states: one('friend_jellyfish', 150, 58, 6)
     },
     {
         id: 'seahorse', name: 'Hüpfi', blurb: { de: 'Sehr genau, bleibt sofort stehen · Hüpfer', en: 'Very precise, stops at once · hop' },
-        special: 'dash', thrust: 0.85, maxSpeed: 0.8, drag: 2.2, sink: 0.3, upright: true,
+        special: 'dash', thrust: 0.85, maxSpeed: 0.8, drag: 2.2, sink: 0.3, upright: true, anim: 'sway',
         states: one('friend_seahorse', 120, 52, 6)
     }
 ];

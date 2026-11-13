@@ -117,13 +117,26 @@ export function mixColor(c1, c2, t) {
 
 const FLOOR_SLOPE = (5600 - 1050) / (BIOMES[BIOMES.length - 1].from - WORLD_WEST);
 
+const BEACH_END = BIOMES[1].from;          // where the beach hands over to the home reef
+export const SHORE = WORLD_WEST + 1500;   // west of this the sand is above the water
+
+/** How much higher the waves run here: surf builds up over the shallow beach. */
+export function surfAt(x) {
+    return 1 + 1.4 * clamp((BEACH_END - x) / (BEACH_END - SHORE), 0, 1);
+}
+
 /** The abyss: a narrow chasm in the deep-sea biome that drops far below everything else. */
 export const ABYSS = { x: BIOMES[BIOMES.length - 1].from + 5200, halfWidth: 650, depth: 7500 };
 
 /** Seabed depth: shallow in the west, dropping steadily toward the east, plus the abyss. */
 export function floorY(x) {
     // Full depth is reached where the deep trench begins.
-    const base = clamp(1050 + (x - WORLD_WEST) * FLOOR_SLOPE, 1000, 5600);
+    let base = clamp(1050 + (x - WORLD_WEST) * FLOOR_SLOPE, 1000, 5600);
+    // The beach: the sand rises gently toward the west until it leaves the water.
+    if (x < BEACH_END) {
+        const t = clamp((x - SHORE) / (BEACH_END - SHORE), 0, 1);
+        base = -70 + (1050 + (BEACH_END - WORLD_WEST) * FLOOR_SLOPE + 70) * Math.pow(t, 1.15);
+    }
     const d = (x - ABYSS.x) / ABYSS.halfWidth;
     return base + ABYSS.depth * Math.exp(-d * d * 1.6);
 }

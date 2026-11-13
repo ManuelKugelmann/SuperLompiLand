@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted
 } from '../game/level/biomes.js';
 
 test('biomes are ordered west to east and every table is complete', () => {
@@ -60,6 +60,13 @@ test('the seabed never rises toward the east, and the abyss is by far the deepes
         prev = floorY(x);
     }
     assert.ok(floorY(ABYSS.x) > floorY(ABYSS.x - 5000) + ABYSS.depth * 0.9);
+});
+
+test('the beach rises out of the water in the west and the surf runs higher there', () => {
+    assert.ok(floorY(SHORE - 200) < 0, 'dry sand west of the shore line');
+    assert.ok(floorY(BIOMES[1].from) > 1000, 'deep again where the reef begins');
+    assert.equal(surfAt(BIOMES[1].from + 500), 1);
+    assert.ok(surfAt(SHORE) > 2);
 });
 
 test('pickWeighted respects weights, skips missing art and handles empty tables', () => {

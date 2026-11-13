@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
-import { vnoise, eachCell as marchGrid } from './terrain.js';
+import { eachCell as marchGrid } from './terrain.js';
+import { FIELD, createField, chunkGrids, gridRows } from './density.js';
 import {
     BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, mixColor, floorY, pickWeighted
 } from './biomes.js';
@@ -9,9 +10,10 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    threshold: 0.53,      // density above this is rock
-    maxDepth: 5600,       // deepest seabed (far east)
-    spawn: { x: 0, y: 700 },
+    version: 2,           // bump when generation changes what index a coin or friend gets
+    threshold: FIELD.threshold,
+    maxDepth: FIELD.maxDepth,
+    spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     friendSheen: 0.16,    // strength of the rainbow shimmer on friends
@@ -45,7 +47,10 @@ const HAZARDS = {
     mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6 },
     hazard_net: { size: 150, r: 84, place: 'water', anim: 'sway', bob: 34, speed: 0.7 }
 };
-const BAND_DT = [0, 0.03, 0.075, 0.14, 0.22]; // density steps of the terrain colour bands
+// Rock shading: many thin bands from the rim into the core. Each is only a
+// little darker than the last, and the bake blurs them into a smooth gradient.
+const BANDS = 16;
+const BAND_DEPTH = 0.26;      // density range from rim to darkest core
 const DEEP_TINT = 0x1a3a62;
 
 /**
@@ -58,8 +63,10 @@ const DEEP_TINT = 0x1a3a62;
  * start of every biome, the grand nest at the end.
  */
 export default class LevelGenerator {
-    constructor(scene) {
+    /** @param state WorldState: what has already been collected (optional) */
+    constructor(scene, state = null) {
         this.scene = scene;
+        this.state = state;
         this.chunks = new Map(); // "cx,cy" -> { objects[], bodies[] }
         this.coins = [];
         this.hazards = [];
@@ -70,7 +77,17 @@ export default class LevelGenerator {
         this.buildMs = { last: 0, max: 0, count: 0 };   // cost of building chunks, shown by ?debug=perf
         this.makeKelpTexture();
         this.makeRootTextures();
-        this.nests = this.findNests();
+        this.field = createField(LEVEL.seed);
+        this.nests = this.field.nests.map(n => ({ ...n, biome: BIOMES[Math.min(n.index + 1, BIOMES.length - 1)] }));
+        // Density grids are computed in a Web Worker when available; the chunk is
+        // then drawn on the main thread, one per frame.
+        this.pending = new Set();   // chunk keys requested from the worker
+        this.ready = [];            // grids that came back, waiting to be drawn
+        try {
+            this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
+            this.worker.onmessage = e => { this.pending.delete(e.data.key); this.ready.push(e.data); };
+            this.worker.onerror = () => { this.worker = null; this.pending.clear(); };   // fall back to the main thread
+        } catch { this.worker = null; }
         const lang = scene.registry.get('currentLanguage') || 'de';
         const ground = x => { let y = floorY(x) + 260; while (y > 400 && this.density(x, y) > LEVEL.threshold) y -= 12; return y + 12; };
         const trench = BIOMES[BIOMES.length - 1];
@@ -80,29 +97,9 @@ export default class LevelGenerator {
         ].map(sg => ({ ...sg, y: ground(sg.x) }));
     }
 
-    /** Rock density at a world point (> LEVEL.threshold = solid). */
+    /** Rock density at a world point (> LEVEL.threshold = solid). See density.js. */
     density(x, y, withNests = true) {
-        // Two broad octaves only: big soft blobs and winding passages, no jagged detail.
-        let n = 0.72 * vnoise(x / 1000, y / 1000, LEVEL.seed) + 0.28 * vnoise(x / 420, y / 420, LEVEL.seed + 7);
-        const { a, b, t } = biomeBlendAt(x);
-        n -= Phaser.Math.Linear(a.open, b.open, t);                      // lagoon / open sea have less rock
-        if (y < 520) n -= ((520 - y) / 520) * 0.6;                       // open water under the surface
-        const fy = floorY(x);
-        if (y > fy) n += (y - fy) / 380;                                 // seabed, deeper toward the east
-        // Keep the abyss shaft swimmable all the way down.
-        if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.3;
-        if (x < WORLD_WEST + 900) n += (WORLD_WEST + 900 - x) / 500;     // western shore
-        if (x > WORLD_END + 900) n += (x - WORLD_END - 900) / 500;       // wall behind the grand nest
-        const ds = Math.hypot(x - LEVEL.spawn.x, y - LEVEL.spawn.y);
-        if (ds < 900) n -= (1 - ds / 900) * 0.6;                         // clear start pool
-        if (withNests && this.nests) {
-            for (const nest of this.nests) {                             // open water above every nest
-                if (Math.abs(x - nest.x) > 520 || y > nest.y - 30) continue;
-                const d = Math.hypot(x - nest.x, y - (nest.y - 260));
-                if (d < 480) n -= (1 - d / 480) * 0.7;
-            }
-        }
-        return n;
+        return this.field.density(x, y, withNests);
     }
 
     /** Is there ground within `reach` px below this point? Returns its colour, else null. */
@@ -117,44 +114,47 @@ export default class LevelGenerator {
         return y > 60 && this.density(x, y) < LEVEL.threshold - slack;
     }
 
-    /** One nest per biome start (not the lagoon) plus the grand nest at the end. */
-    findNests() {
-        const xs = BIOMES.slice(1).map(b => b.from + 260);
-        xs[0] = LEVEL.spawn.x;                // home reef: right under the start pool
-        xs.push(WORLD_END - 300);
-        return xs.map((x, index) => {
-            // On the real seabed: start inside it and walk up to its surface.
-            let y = floorY(x) + 260;
-            while (y > 400 && this.density(x, y, false) > LEVEL.threshold) y -= 12;
-            y += 12;
-            return { x, y, index, grand: index === xs.length - 1, biome: BIOMES[Math.min(index + 1, BIOMES.length - 1)] };
-        });
-    }
-
     update(camX, camY) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         const x0 = Math.floor(camX / CH) - LEVEL.margin, x1 = Math.floor((camX + W) / CH) + LEVEL.margin;
         const y0 = Math.max(0, Math.floor(camY / CH) - LEVEL.margin), y1 = Math.floor((camY + H) / CH) + LEVEL.margin;
-        // Building a chunk takes a few dozen ms, so only one per frame (nearest to
-        // the view centre first) — except at the very start, when nothing exists yet.
+        const wanted = (cx, cy) => cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
         const missing = [];
         for (let cy = y0; cy <= y1; cy++) {
             for (let cx = x0; cx <= x1; cx++) if (!this.chunks.has(`${cx},${cy}`)) missing.push([cx, cy]);
         }
+        const timed = (cx, cy, grids) => {
+            const t0 = performance.now();
+            this.build(cx, cy, grids);
+            const ms = performance.now() - t0;
+            this.buildMs.last = ms; this.buildMs.count++;
+            if (ms > this.buildMs.max) this.buildMs.max = ms;
+        };
         if (missing.length) {
             const mx = (camX + W / 2) / CH - 0.5, my = (camY + H / 2) / CH - 0.5;
             missing.sort((p, q) => Math.hypot(p[0] - mx, p[1] - my) - Math.hypot(q[0] - mx, q[1] - my));
-            // At the very start, build what is on screen in one go (nothing to look
-            // at yet anyway); everything else, including the margin, one per frame.
             const onScreen = ([cx, cy]) => cx * CH < camX + W && (cx + 1) * CH > camX && cy * CH < camY + H && (cy + 1) * CH > camY;
-            const batch = this.chunks.size === 0 ? missing.filter(onScreen) : missing.slice(0, 1);
-            for (const [cx, cy] of (batch.length ? batch : missing.slice(0, 1))) {
-                const t0 = performance.now();
-                this.build(cx, cy);
-                const ms = performance.now() - t0;
-                this.buildMs.last = ms; this.buildMs.count++;
-                if (ms > this.buildMs.max) this.buildMs.max = ms;
+            if (this.chunks.size === 0) {
+                // Very first frame: what is on screen is built right away.
+                for (const [cx, cy] of missing.filter(onScreen)) timed(cx, cy);
+            } else if (!this.worker) {
+                timed(missing[0][0], missing[0][1]);          // no worker: one per frame on the main thread
+            } else {
+                for (const [cx, cy] of missing) {             // ask the worker for the maths
+                    const key = `${cx},${cy}`;
+                    if (this.pending.has(key) || this.ready.some(r => r.key === key)) continue;
+                    this.pending.add(key);
+                    this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells * LEVEL.visualDetail });
+                }
             }
+        }
+        // Draw at most one finished chunk per frame; results nobody needs any more are dropped.
+        while (this.ready.length) {
+            const r = this.ready.shift();
+            const [cx, cy] = r.key.split(',').map(Number);
+            if (!wanted(cx, cy) || this.chunks.has(r.key)) continue;
+            timed(cx, cy, r);
+            break;
         }
         for (const key of [...this.chunks.keys()]) {
             const [cx, cy] = key.split(',').map(Number);
@@ -190,12 +190,13 @@ export default class LevelGenerator {
         return 0;
     }
 
-    build(cx, cy) {
+    /** @param grids { fine, back } from the worker; computed here when omitted */
+    build(cx, cy, grids = null) {
         const s = this.scene, C = LEVEL.cell, T = LEVEL.threshold, N = LEVEL.cells;
         const ox = cx * CH, oy = cy * CH, mid = ox + CH / 2;
         const rng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}`]);
-        const chunk = { objects: [], bodies: [] };
-        this.chunks.set(`${cx},${cy}`, chunk);
+        const chunk = { objects: [], bodies: [], key: `${cx},${cy}` };
+        this.chunks.set(chunk.key, chunk);
         const keep = o => { chunk.objects.push(o); return o; };
         const has = key => s.textures.exists(key);
         const blend = biomeBlendAt(mid);
@@ -204,23 +205,19 @@ export default class LevelGenerator {
         // Density at grid corners (shared with neighbours -> seamless). Everything
         // that is DRAWN uses a grid twice as fine as the collision grid, so rock
         // outlines look round instead of faceted while the physics stays cheap.
-        const F = LEVEL.visualDetail, FN = N * F, FC = C / F;
-        const fine = [], back = [];
-        for (let j = 0; j <= FN; j++) {
-            fine.push([]); back.push([]);
-            for (let i = 0; i <= FN; i++) {
-                const x = ox + i * FC, y = oy + j * FC;
-                const d = this.density(x, y);
-                fine[j].push(d);
-                // Some caves get a rock wall behind them instead of open water.
-                back[j].push(vnoise(x / 1500, y / 1500, LEVEL.seed + 31) > 0.56 && y > 600 ? d + 0.05 : -1);
-            }
-        }
+        const F = LEVEL.visualDetail, FN = N * F;
+        const { fine: fineFlat, back: backFlat } = grids || chunkGrids(this.field, LEVEL.seed, ox, oy, CH, FN);
+        const fine = gridRows(fineFlat, FN + 1), back = gridRows(backFlat, FN + 1);
         const coarse = grid => { const out = []; for (let j = 0; j <= N; j++) out.push(grid[j * F].filter((_, i) => i % F === 0)); return out; };
         const val = coarse(fine), backCoarse = coarse(back);
         const eachCell = (grid, t, fn) => marchGrid(grid, ox, oy, CH, t, fn);
         const depthMix = Phaser.Math.Clamp((oy + CH / 2) / LEVEL.maxDepth, 0, 1) * 0.5;
-        const bandColor = k => mixColor(mixColor(blend.a.rock[k], blend.b.rock[k], blend.t), DEEP_TINT, depthMix);
+        // `u` in 0..1 runs from the rim to the core through the biome's five rock colours.
+        const bandColor = u => {
+            const f = Math.min(3.999, Math.max(0, u) * 4), k = Math.floor(f);
+            const shade = arr => mixColor(arr[k], arr[k + 1], f - k);
+            return mixColor(mixColor(shade(blend.a.rock), shade(blend.b.rock), blend.t), DEEP_TINT, depthMix);
+        };
 
         // Terrain is drawn once into two textures per chunk and the vector shapes
         // are thrown away: re-tessellating hundreds of polygons every frame was by
@@ -239,10 +236,11 @@ export default class LevelGenerator {
 
         // --- Back layer: cave back walls + ambient occlusion in the water ------
         const wall = scratch();
-        wall.fillStyle(mixColor(bandColor(2), 0x0a2a44, 0.4), 0.42);
+        wall.fillStyle(mixColor(bandColor(0.5), 0x0a2a44, 0.4), 0.42);
         eachCell(backCoarse, T, shape => { if (shape.poly.length >= 3) wall.fillPoints(shape.poly, true); });
         const ao = scratch();
-        for (const [dt, alpha] of [[-0.05, 0.06], [-0.03, 0.07], [-0.014, 0.09]]) {
+        for (let k = 1; k <= 8; k++) {                      // soft falloff, no visible steps
+            const dt = -0.008 * k, alpha = 0.035;
             ao.fillStyle(0x04162a, alpha);
             eachCell(val, T + dt, c => { if (c.poly.length >= 3) ao.fillPoints(c.poly, true); });
         }
@@ -266,17 +264,19 @@ export default class LevelGenerator {
             g: scratch(),
             lit: mixColor(bandColor(0), 0xffffff, 0.4),
             side: bandColor(0),
-            shade: mixColor(bandColor(3), 0x02101e, 0.45)
+            shade: mixColor(bandColor(0.75), 0x02101e, 0.45)
         };
         const bands = scratch();
-        BAND_DT.forEach((dt, k) => {
-            bands.fillStyle(bandColor(k), textured ? [0.42, 0.46, 0.62, 0.74, 0.84][k] : 1);
+        for (let k = 0; k < BANDS; k++) {
+            const u = k / (BANDS - 1);
+            // Over the rock texture the bands are translucent, getting denser inward.
+            bands.fillStyle(bandColor(u), textured ? (k === 0 ? 0.42 : 0.2) : 1);
             // Only the outermost band is the visible outline and needs the fine grid.
-            eachCell(k === 0 ? fine : val, T + dt, c => {
+            eachCell(k === 0 ? fine : val, T + Math.pow(u, 1.25) * BAND_DEPTH, c => {
                 if (c.poly.length >= 3) bands.fillPoints(c.poly, true);
                 if (k === 0) for (const [p, q] of c.edges) this.drawRim(p, q, rim);
             });
-        });
+        }
         // Collision strips and floor spots come from the coarse grid.
         eachCell(val, T, c => { for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors); });
         layers.push([bands]);
@@ -359,12 +359,22 @@ export default class LevelGenerator {
         }
 
         // --- Coin trails through open water ----------------------------------
+        // Every coin has a stable number within its chunk (order of generation,
+        // decided by the chunk's own seed only), so a collected coin stays gone.
+        const chunkKey = `${cx},${cy}`;
+        const placed = [];
+        let coinIndex = 0;
         for (let trails = rng.between(Math.max(0, biome.coins - 2), biome.coins); trails > 0; trails--) {
             let x = ox + rng.between(80, CH - 80), y = oy + rng.between(80, CH - 80);
             let heading = rng.realInRange(0, Math.PI * 2);
             const bend = rng.realInRange(-0.35, 0.35);
             for (let k = rng.between(4, 7); k > 0; k--) {
-                if (this.isOpen(x, y, 0.09)) this.addCoin(chunk, x, y);
+                if (this.isOpen(x, y, 0.09) && coinIndex < 64
+                    && !placed.some(q => Math.abs(q.x - x) < LEVEL.coinGap && Math.abs(q.y - y) < LEVEL.coinGap)) {
+                    placed.push({ x, y });
+                    const index = coinIndex++;
+                    if (!this.state?.has(chunkKey, 'coin', index)) this.addCoin(chunk, x, y, chunkKey, index);
+                }
                 heading += bend;
                 x += Math.cos(heading) * 100;
                 y += Math.sin(heading) * 100;
@@ -417,19 +427,15 @@ export default class LevelGenerator {
         rim.g.fillStyle(color, 0.95).fillCircle(a.x, a.y, w / 2).fillCircle(b.x, b.y, w / 2);
     }
 
-    addCoin(chunk, x, y) {
+    addCoin(chunk, x, y, chunkKey, index) {
         const s = this.scene;
-        // Never stack coins: keep a clear gap to every coin already placed.
-        for (const c of this.coins) {
-            if (c.img.active && Math.abs(c.x - x) < LEVEL.coinGap && Math.abs(c.y - y) < LEVEL.coinGap) return;
-        }
         const img = s.textures.exists('coin')
             ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)
             : s.add.circle(x, y, 32, 0xffd23f).setStrokeStyle(5, 0xfff3b0);
         img.setDepth(2);
         s.tweens.add({ targets: img, y: y - 14, duration: 1100 + (Math.abs(x) % 400), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(img);
-        this.coins.push({ img, r: 40, x, y });
+        this.coins.push({ img, r: 40, x, y, chunkKey, index });
     }
 
     addHazard(chunk, key, x, y, rng, angle = 0) {
@@ -480,7 +486,10 @@ export default class LevelGenerator {
         this.lights.push(sheen);
         if (!f.ground) s.tweens.add({ targets: img, y: y - f.bob, duration: rng.between(1400, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(img);
-        this.friends.push({ img, r: f.size * 0.38, greeted: false });
+        // Friends are numbered per chunk too. They greet you every time you come
+        // back; only the coin bonus is given once per friend, for good.
+        const index = chunk.friendCount = (chunk.friendCount ?? -1) + 1;
+        this.friends.push({ img, r: f.size * 0.38, chunkKey: chunk.key, index, greeted: false, rewarded: !!this.state?.has(chunk.key, 'friend', index) });
         return img;
     }
 

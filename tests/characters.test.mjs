@@ -12,6 +12,7 @@ test('every character is complete and has a known special', () => {
         ids.add(c.id);
         assert.ok(c.name && c.blurb.de && c.blurb.en, `${c.id}: name and blurb`);
         assert.ok(SPECIALS.includes(c.special), `${c.id}: special ${c.special}`);
+        assert.ok(['swim', 'pulse', 'sway', 'paddle', undefined].includes(c.anim), `${c.id}: anim ${c.anim}`);
         const n = c.states.normal;
         assert.ok(n && n.key && n.width > 0 && n.radius > 0 && n.air > 0, `${c.id}: normal state`);
         assert.ok(n.radius * 2 <= n.width, `${c.id}: collision circle fits inside the sprite`);

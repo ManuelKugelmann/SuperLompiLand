@@ -3,11 +3,13 @@
 // Two parts add up: a slow rolling swell (a pure function of x and time) and a
 // row of spring columns that react to things breaking the surface — a splash
 // pushes columns down or up, the disturbance spreads to the neighbours as
-// ripples and dies away. Pure logic, no Phaser (tests/surface.test.mjs).
+// ripples and dies away. Over the shallow beach the swell runs higher (surf).
+// Pure logic, no Phaser (tests/surface.test.mjs).
+import { surfAt } from './biomes.js';
 
 /** The swell alone: height (world y) at world x and time t (seconds). */
 export function waveY(x, t) {
-    return Math.sin(x / 190 + t * 1.5) * 15 + Math.sin(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10;
+    return (Math.sin(x / 190 + t * 1.5) * 15 + Math.sin(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10) * surfAt(x);
 }
 
 export const SURFACE = {
