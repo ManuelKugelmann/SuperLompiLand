@@ -62,6 +62,7 @@ export default class Player {
         this.steered = false;   // set by the scene while keyboard input is active
         this.effort = 0;
         this.boost = 1;         // speed multiplier set by the scene (swimming in a school)
+        this.makeRoom = null;   // set by the scene: radius -> { x, y, moved } with open water for that size, or null
 
         // `rig` is what you see. `sprite` is the physics body (invisible, advanced
         // in fixed 60 Hz steps); the rig is drawn every frame at a position
@@ -154,6 +155,15 @@ export default class Player {
         this.sprite.setVelocity(v.x, v.y);
     }
 
+    /** Put the body somewhere at once (respawn, pop out of rock); the velocity stays. */
+    place(x, y) {
+        const v = this.body.velocity, vx = v.x, vy = v.y;
+        this.sprite.setPosition(x, y).setVelocity(vx, vy);
+        this.prev.set(x, y);
+        this.cur.set(x, y);
+        this.rig.view.grid.halo.fresh = true;
+    }
+
     /** The character's special move (double tap / long press / Space). See specials.js. */
     special() {
         if (this.posed) { this.endPose(); return; }       // using it again ends a held pose early
@@ -163,6 +173,10 @@ export default class Player {
         const fx = sp.start({ vx: v.x, vy: v.y, facing: this.facing, inAir: this.inAir });
         this.cooldown = sp.cooldown;
         if (fx.pose && this.states[fx.pose]) {
+            // A bigger pose needs room: move into open water first, or do not start it.
+            const room = this.makeRoom ? this.makeRoom(this.states[fx.pose].radius) : this.pos;
+            if (!room) return;
+            if (room.moved) this.place(room.x, room.y);
             this.applyState(fx.pose);
             this.poseLeft = fx.poseMs;
             this.poseCooldown = sp.endCooldown ?? 0;

@@ -5,6 +5,7 @@ import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor } from '../game/level/biomes.js';
+import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
@@ -28,6 +29,7 @@ const WORLD = {
     friendBonus: 5,
     schoolRadius: 420,    // friends (other players) this close swim as a school ...
     schoolBoost: 0.1,     // ... each of up to two makes you this much faster
+    roomReach: 320,       // a pose that needs more room may move the player this far to find it
     downedMs: 5000,       // playing together: how long friends have to revive you before the nest respawn
     reviveHealth: 2
 };
@@ -60,17 +62,25 @@ export default class MainScene extends Phaser.Scene {
         // Playing together, the room has its own memory, separate from the solo journey.
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
         this.level = new LevelGenerator(this, this.world);
+        this.density = (x, y) => this.level.density(x, y);
 
         // Start at the last nest reached (kept across sessions), else the start pool.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
         this.banked = this.progression.get?.('banked', 0) || 0;
+        this.character = getCharacter(this.registry.get('character') || loadSelectedId());
         const start = this.startPoint();
         this.camX = start.x - W / 2;
         this.camY = start.y - H / 2;
         this.level.update(this.camX, this.camY);
 
-        this.character = getCharacter(this.registry.get('character') || loadSelectedId());
         this.fish = new Player(this, start.x, start.y, this.character);
+        // Never stuck (level/unstick.js): room is checked before a bigger pose, a body
+        // inside rock pops into open water, pushing in vain gets a lift.
+        this.fish.makeRoom = radius => {
+            const sp = this.fish.sprite, p = this.fish.inAir ? { x: sp.x, y: sp.y, moved: false } : popOut(this.density, sp.x, sp.y, radius);
+            return p && Math.hypot(p.x - sp.x, p.y - sp.y) <= WORLD.roomReach ? p : null;
+        };
+        this.stillness = new Stillness();
 
         // Lighting layers (screen-fixed): ambient multiply + a soft vignette.
         this.ambient = this.add.rectangle(0, 0, W, H, 0xffffff).setOrigin(0).setScrollFactor(0).setDepth(40)
@@ -194,14 +204,31 @@ export default class MainScene extends Phaser.Scene {
         const spot = spotFor(new URLSearchParams(window.location.search).get('at'));
         if (spot) {
             // Move into open water: try further and further above and below.
-            for (let d = 0; d < 1500; d += 60) {
-                for (const y of [spot.y - d, spot.y + d]) if (this.level.isOpen(spot.x, y)) return { x: spot.x, y };
-            }
-            return spot;
+            return this.safeSpot(spot.x, spot.y);
         }
-        if (this.nestIndex === 0) return { x: LEVEL.spawn.x, y: LEVEL.spawn.y };
+        if (this.nestIndex === 0) return this.safeSpot(LEVEL.spawn.x, LEVEL.spawn.y);
         const nest = this.level.nests[this.nestIndex];
-        return { x: nest.x, y: nest.y - 240 };
+        return this.safeSpot(nest.x, nest.y - 240);
+    }
+
+    /** The nearest place to (x, y) with open water for the character even at its biggest. */
+    safeSpot(x, y) {
+        const biggest = Math.max(...Object.values(this.character.states).map(s => s.radius));
+        return popOut(this.density, x, y, biggest) || { x, y };
+    }
+
+    /** Pop the player into open water with a little puff of bubbles (never stuck). */
+    popFree(radius) {
+        const sp = this.fish.sprite, p = popOut(this.density, sp.x, sp.y, radius);
+        if (!p || !p.moved) return;
+        this.fish.place(p.x, p.y);
+        sp.setVelocity(sp.body.velocity.x * 0.3, sp.body.velocity.y * 0.3);
+        this.fish.guard = Math.max(this.fish.guard, 600);
+        play('deflate');
+        for (let i = 0; i < 7; i++) {
+            const b = this.add.circle(p.x + Phaser.Math.Between(-40, 40), p.y + Phaser.Math.Between(-30, 30), Phaser.Math.Between(5, 12), 0xffffff, 0.5).setDepth(6);
+            this.tweens.add({ targets: b, y: b.y - Phaser.Math.Between(60, 130), alpha: 0, duration: Phaser.Math.Between(400, 800), onComplete: () => b.destroy() });
+        }
     }
 
     /** Big friendly line of text in the middle of the screen (shown by the HUD). */
@@ -271,9 +298,8 @@ export default class MainScene extends Phaser.Scene {
         this.cameras.main.fadeOut(260, 10, 40, 70);
         this.time.delayedCall(280, () => {
             this.fish.endPose();
-            this.fish.sprite.setPosition(p.x, p.y).setVelocity(0, 0);
-            this.fish.prev.set(p.x, p.y);
-            this.fish.cur.set(p.x, p.y);
+            this.fish.place(p.x, p.y);
+            this.fish.sprite.setVelocity(0, 0);
             this.fish.guard = 2500;
             this.health = this.maxHealth;
             this.coins = this.banked;
@@ -410,6 +436,11 @@ export default class MainScene extends Phaser.Scene {
         this.surface.step();
         this.fish.update(STEP_MS, this.surface.heightAt(fsp.x, this.time.now / 1000));
         this.matter.world.step(STEP_MS);
+        // Never stuck: a body whose centre is inside rock pops out at once; one that
+        // is wedged between rock and pushes without moving for a while is lifted to roomier water.
+        const body = fsp.body, r = this.fish.radius;
+        if (this.density(fsp.x, fsp.y) > LEVEL.threshold + UNSTICK.slack) this.popFree(r);
+        else if (this.stillness.step(STEP_MS, this.fish.effort > 0.3, Math.hypot(body.velocity.x, body.velocity.y), wedged(this.density, fsp.x, fsp.y, r * 1.15))) this.popFree(r * 1.8);
         this.fish.afterStep();
     }
 
