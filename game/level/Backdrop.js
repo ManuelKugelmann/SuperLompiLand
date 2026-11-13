@@ -1,37 +1,39 @@
 import Phaser from 'phaser';
 
 /**
- * Calm layered backdrop: depth gradient, drifting light rays and two tiling
- * silhouette layers (far ruins, near reef) that scroll slower than the level.
+ * Calm backdrop for the open world: a depth gradient that darkens as you dive,
+ * drifting light rays near the surface, ambient bubbles, and the sky + waterline
+ * above y = 0.
  */
 export default class Backdrop {
-    constructor(scene) {
+    constructor(scene, maxDepth) {
         this.scene = scene;
+        this.maxDepth = maxDepth;
         const W = scene.scale.width, H = scene.scale.height;
 
-        makeGradient(scene, 'bd_grad', H, [[0, 0x8fe3ea], [0.18, 0x39b9cf], [0.55, 0x1480a8], [1, 0x0a3f6e]]);
+        makeGradient(scene, 'bd_grad', H, [[0, 0x7fdce6], [0.25, 0x35b3cc], [0.6, 0x1480a8], [1, 0x0d5a8c]]);
         scene.add.image(0, 0, 'bd_grad').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(-30);
+        this.dark = scene.add.rectangle(0, 0, W, H, 0x04122e, 0).setOrigin(0).setScrollFactor(0).setDepth(-25);
 
-        makeSilhouette(scene, 'bd_far', 2048, 620, 0x2f93b4, 3, true);
-        makeSilhouette(scene, 'bd_near', 2048, 520, 0x17688e, 5, false);
-        this.far = scene.add.tileSprite(0, H - 560, W, 620, 'bd_far').setOrigin(0).setScrollFactor(0).setDepth(-20).setAlpha(0.55);
-        this.near = scene.add.tileSprite(0, H - 430, W, 520, 'bd_near').setOrigin(0).setScrollFactor(0).setDepth(-15).setAlpha(0.75);
+        // Sky and waterline live in the world (scroll vertically, follow x).
+        this.sky = scene.add.rectangle(0, -1200, W * 2, 1200, 0xd9f6f0).setOrigin(0.5, 0).setDepth(-28).setScrollFactor(0, 1);
+        this.sky.x = W / 2;
+        this.sun = scene.add.circle(W * 0.5, -260, 120, 0xffffff, 0.75).setDepth(-27).setScrollFactor(0, 1);
+        this.surface = scene.add.rectangle(W / 2, 0, W * 2, 14, 0xffffff, 0.75).setDepth(-9).setScrollFactor(0, 1);
 
         this.rays = [];
         for (let i = 0; i < 6; i++) {
             const x = (W / 6) * i + Phaser.Math.Between(-60, 60);
-            const ray = scene.add.triangle(x, 0, 0, 0, 190, 0, 380, H * 0.95, 0xffffff, 0.06)
+            const ray = scene.add.triangle(x, 0, 0, 0, 190, 0, 380, H * 0.95, 0xffffff, 0.07)
                 .setOrigin(0).setScrollFactor(0).setDepth(-12).setBlendMode(Phaser.BlendModes.ADD);
-            scene.tweens.add({
-                targets: ray, alpha: 0.02, x: x + Phaser.Math.Between(-80, 80),
-                duration: Phaser.Math.Between(3500, 6500), yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
-            });
+            ray.baseAlpha = Phaser.Math.FloatBetween(0.04, 0.09);
+            ray.phase = Math.random() * 6.28;
+            ray.baseX = x;
             this.rays.push(ray);
         }
 
-        // Ambient bubbles drifting up across the screen.
         this.bubbles = [];
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < 16; i++) {
             const b = scene.textures.exists('bubble')
                 ? scene.add.image(0, 0, 'bubble')
                 : scene.add.circle(0, 0, 20, 0xffffff, 0.3).setStrokeStyle(3, 0xffffff, 0.6);
@@ -44,21 +46,27 @@ export default class Backdrop {
     resetBubble(b, anywhere) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         const size = Phaser.Math.Between(14, 54);
-        b.setDisplaySize(size, size).setAlpha(Phaser.Math.FloatBetween(0.25, 0.6));
+        b.setDisplaySize(size, size).setAlpha(Phaser.Math.FloatBetween(0.2, 0.55));
         b.x = Phaser.Math.Between(0, W);
         b.y = anywhere ? Phaser.Math.Between(0, H) : H + 60;
         b.speed = 0.4 + size / 40;
         b.phase = Math.random() * 6.28;
     }
 
-    update(cameraX, dx) {
-        this.far.tilePositionX = cameraX * 0.12;
-        this.near.tilePositionX = cameraX * 0.3;
+    update(camX, camY, dx, dy) {
+        const W = this.scene.scale.width, H = this.scene.scale.height;
+        const depth = Phaser.Math.Clamp((camY + H / 2) / this.maxDepth, 0, 1);
+        this.dark.setAlpha(depth * 0.78);
+
         const t = this.scene.time.now / 1000;
+        for (const ray of this.rays) {
+            ray.x = ray.baseX + Math.sin(t * 0.25 + ray.phase) * 70 - (camX * 0.05) % 40;
+            ray.setAlpha(ray.baseAlpha * (0.6 + 0.4 * Math.sin(t * 0.6 + ray.phase)) * Math.max(0, 1 - depth * 2.2));
+        }
         for (const b of this.bubbles) {
-            b.y -= b.speed;
+            b.y -= b.speed + dy * 0.5;
             b.x += Math.sin(t * 1.4 + b.phase) * 0.5 - dx * 0.5;
-            if (b.y < -60 || b.x < -80) this.resetBubble(b, false);
+            if (b.y < -60 || b.y > H + 80 || b.x < -80 || b.x > W + 80) this.resetBubble(b, b.y > H + 80 || b.x < -80 || b.x > W + 80);
         }
     }
 }
@@ -71,37 +79,5 @@ function makeGradient(scene, key, h, stops) {
     for (const [t, c] of stops) grad.addColorStop(t, '#' + c.toString(16).padStart(6, '0'));
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 4, h);
-    tex.refresh();
-}
-
-/** Tileable hill/ruin silhouette (sine periods divide the width, so it wraps). */
-function makeSilhouette(scene, key, w, h, color, waves, ruins) {
-    if (scene.textures.exists(key)) return;
-    const tex = scene.textures.createCanvas(key, w, h);
-    const ctx = tex.getContext();
-    const css = '#' + color.toString(16).padStart(6, '0');
-    const k = (Math.PI * 2) / w;
-    const top = x => h * 0.5
-        - Math.sin(x * k * waves) * h * 0.14
-        - Math.sin(x * k * (waves * 2 + 1) + 1.7) * h * 0.08
-        - Math.sin(x * k * (waves * 5 + 2) + 0.6) * h * 0.03;
-    ctx.fillStyle = css;
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    for (let x = 0; x <= w; x += 8) ctx.lineTo(x, top(x));
-    ctx.lineTo(w, h);
-    ctx.closePath();
-    ctx.fill();
-    if (ruins) {
-        for (const [cx, cols] of [[380, 3], [1260, 4], [1750, 2]]) {
-            const baseY = top(cx) + 30;
-            for (let c = 0; c < cols; c++) {
-                const colH = 150 + ((c * 53) % 90);
-                ctx.fillRect(cx + c * 62, baseY - colH, 22, colH + 60);
-                ctx.fillRect(cx + c * 62 - 6, baseY - colH - 10, 34, 12);
-            }
-            ctx.fillRect(cx - 8, baseY - 232, Math.max(1, cols - 1) * 62 - 26, 18);
-        }
-    }
     tex.refresh();
 }

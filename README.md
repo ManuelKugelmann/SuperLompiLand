@@ -24,22 +24,22 @@ npm run serve      # zero-dep static server for dist/ (tests the real PWA/SW)
 
 Swap any time in-game:
 
-| Scheme | Move |
-|---|---|
-| **Schubsen** (air hockey) | grab the fish and throw it, or shove it with your finger as a paddle |
-| **Flattern** (flap) | every tap is a fin stroke: tap position = direction, tap rate = speed |
-| **Stick** | floating virtual stick, drag to swim |
-| **Tippen** | tap the water, fish swims there |
+| Scheme | Move | Puff |
+|---|---|---|
+| **Schubsen** (air hockey) | grab the fish and throw it, or shove it with your finger as a paddle | double tap |
+| **Flattern** (flap) | every tap is a fin stroke: tap position = direction, tap rate = speed | long press |
+| **Stick** | floating virtual stick, drag to swim | double tap |
+| **Tippen** (rubber band) | touch and hold: the fish is pulled to your finger; let go and it brakes | double tap |
 
-Puff (inflate): the PUFF button, a quick tap on the fish, or Space.
-Keyboard always works too: arrows / WASD swim.
+Keyboard always works too: arrows / WASD swim, Space puffs.
 
 The pufferfish has two states — normal (small, agile) and inflated (big, buoyant,
-shrugs off hazards). Levels are endless and procedurally generated from a seed.
+shrugs off hazards). The world is an open 2D ocean generated from a seed: swim in
+any direction, dive deeper, meet friends, avoid urchins, mines and anglerfish.
 
 Add a scheme in `game/controls/` and register it in `game/controls/index.js` — it
 appears in the switcher automatically. A physics-debug toggle is top-right.
-Install / update the app from the in-game menu (☰).
+The app updates itself when a new build is live; install / update are also in the menu (☰).
 
 ## Deploy — GitHub Pages (dev/release routing)
 

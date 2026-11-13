@@ -15,11 +15,11 @@ export default class ControlSwitcher {
 
         const button = (bx, w, label, onTap) => {
             const bg = scene.add.rectangle(bx, y, w, bh, 0x06525c, 0.85)
-                .setStrokeStyle(4, 0xffffff, 0.5).setScrollFactor(0).setDepth(60)
+                .setStrokeStyle(4, 0xffffff, 0.5)
                 .setInteractive({ useHandCursor: true });
             const txt = scene.add.text(bx, y, label, {
                 fontFamily: 'Arial', fontSize: '30px', color: '#ffffff', fontStyle: 'bold'
-            }).setOrigin(0.5).setScrollFactor(0).setDepth(61);
+            }).setOrigin(0.5);
             bg.on('pointerdown', onTap);
             return { bg, txt };
         };

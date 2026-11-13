@@ -1,22 +1,21 @@
 import Phaser from 'phaser';
-import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import ProgressionManager from '../systems/ProgressionManager.js';
 import Pufferfish from '../game/Pufferfish.js';
-import ControlSwitcher from '../game/ui/ControlSwitcher.js';
-import LevelGenerator from '../game/level/LevelGenerator.js';
+import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import Backdrop from '../game/level/Backdrop.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
-import { pwaMenuItems } from '../game/pwa.js';
+import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 
 const STEP_MS = 1000 / 60;
 
 /** World tunables. */
 const WORLD = {
-    gravity: 0.22,        // gentle sink
-    current: 0.00028,     // constant rightward drift (force per unit mass)
-    cameraLead: 0.34,     // fish sits at this fraction of the screen width
-    streamBoost: 0.0016,  // extra push inside a current stream
+    gravity: 0.2,         // gentle sink
+    cameraEase: 0.88,     // per-step camera lag (lower = snappier)
+    lookAhead: 9,         // camera leads the fish by velocity * this
+    doubleTapMs: 320,
+    doubleTapDist: 110,
     coinLossOnHit: 3,
     friendBonus: 5
 };
@@ -37,50 +36,46 @@ export default class MainScene extends Phaser.Scene {
         this.matter.world.autoUpdate = false; // stepped manually in fixedStep()
         this.acc = 0;
         this.debugOn = false;
-        this.camX = 0;
+        this.camX = LEVEL.spawn.x - W / 2;
+        this.camY = LEVEL.spawn.y - H / 2;
+        this.maxDepth = 0;
 
-        this.backdrop = new Backdrop(this);
+        this.backdrop = new Backdrop(this, LEVEL.maxDepth);
         this.level = new LevelGenerator(this);
-        this.level.update(0);
+        this.level.update(this.camX, this.camY);
 
-        this.fish = new Pufferfish(this, W * WORLD.cameraLead, H * 0.42);
+        this.fish = new Pufferfish(this, LEVEL.spawn.x, LEVEL.spawn.y);
 
         const saved = this.progression.get?.('scheme', null);
         this.activeScheme = CONTROL_SCHEMES.some(s => s.id === saved) ? saved : CONTROL_SCHEMES[0].id;
         this.controller = makeController(this.activeScheme, this, this.fish);
-        this.switcher = new ControlSwitcher(this, this.activeScheme,
-            id => this.switchScheme(id), () => this.toggleDebug());
 
-        // --- HUD ---------------------------------------------------------
         this.coins = 0;
         this.best = this.progression.get?.('best_coins', 0) || 0;
-        const hudText = (x, y, size) => this.add.text(x, y, '', {
-            fontFamily: 'Arial', fontSize: size, color: '#ffffff', fontStyle: 'bold',
-            stroke: '#0a3f6e', strokeThickness: 8
-        }).setScrollFactor(0).setDepth(60);
-        if (this.textures.exists('coin')) {
-            this.add.image(70, 190, 'coin').setDisplaySize(64, 64).setScrollFactor(0).setDepth(60);
-        }
-        this.coinText = hudText(116, 162, '50px');
-        this.distText = hudText(40, 232, '34px');
-        this.refreshHud();
 
-        // Puff button (works in every control scheme).
-        const pb = this.add.circle(W - 150, H - 150, 96, 0xffc266, 0.9)
-            .setStrokeStyle(8, 0xffffff, 0.8).setScrollFactor(0).setDepth(60)
-            .setInteractive({ useHandCursor: true });
-        this.add.text(W - 150, H - 150, 'PUFF', {
-            fontFamily: 'Arial', fontSize: '40px', color: '#06343a', fontStyle: 'bold'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(61);
-        pb.on('pointerdown', () => this.fish.puff());
+        // HUD (menu, scheme switcher, puff button, counters) runs as its own
+        // scene on top — see HudScene.
+        this.scene.launch(HUD_KEY, { main: this });
+        // Phaser lets the top scene swallow input for the scenes below, and it
+        // also swallows the first tap after a HUD button was touched. Turn that
+        // off: this scene always gets every tap and asks isOverHud() itself.
+        this.prevTopOnly = this.input.manager.globalTopOnly;
+        this.input.manager.globalTopOnly = false;
 
-        const menu = new BurgerMenu(this, 60, 60, [
-            { label: this.lang === 'de' ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => this.finish() },
-            ...pwaMenuItems(this, this.lang),
-            { label: this.lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
-        ]);
-        menu.setDepth(70).setScrollFactor(0, 0, true);
-        menu.overlay.setScrollFactor(0, 0, true);
+        // Double tap = puff, in every control scheme except flap (rapid taps
+        // are swimming there; it uses a long press instead).
+        this.lastTap = { t: -9999, x: 0, y: 0 };
+        this.input.on('pointerdown', pointer => {
+            if (this.isOverHud(pointer) || this.activeScheme === 'flap') return;
+            const now = this.time.now, last = this.lastTap;
+            const near = Phaser.Math.Distance.Between(pointer.x, pointer.y, last.x, last.y) < WORLD.doubleTapDist;
+            if (now - last.t < WORLD.doubleTapMs && near) {
+                this.fish.puff();
+                this.lastTap = { t: -9999, x: 0, y: 0 };
+            } else {
+                this.lastTap = { t: now, x: pointer.x, y: pointer.y };
+            }
+        });
 
         // Keyboard (always on, alongside the touch scheme): arrows / WASD swim, space puffs.
         const kb = this.input.keyboard;
@@ -91,23 +86,27 @@ export default class MainScene extends Phaser.Scene {
         this.keyDir = new Phaser.Math.Vector2();
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.scene.stop(HUD_KEY);
+            this.input.manager.globalTopOnly = this.prevTopOnly;
             this.controller?.destroy();
             kb?.removeAllListeners('keydown-SPACE');
         });
     }
 
+    /** True if the pointer is on a HUD element (button, open menu). */
+    isOverHud(pointer) {
+        const hud = this.scene.get(HUD_KEY);
+        if (!hud || !this.scene.isActive(HUD_KEY)) return false;
+        return hud.consumedDown === pointer.downTime || hud.input.hitTestPointer(pointer).length > 0;
+    }
+
     finish() {
         if (this.coins > this.best) this.progression.set?.('best_coins', this.coins);
-        this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.distance() });
+        this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth });
     }
 
-    distance() {
-        return Math.max(0, Math.round((this.fish.sprite.x - this.scale.width * WORLD.cameraLead) / 100));
-    }
-
-    refreshHud() {
-        this.coinText.setText(String(this.coins));
-        this.distText.setText(`${this.distance()} m`);
+    depthMeters() {
+        return Math.max(0, Math.round(this.fish.sprite.y / 100));
     }
 
     switchScheme(id) {
@@ -115,7 +114,6 @@ export default class MainScene extends Phaser.Scene {
         this.controller.destroy();
         this.activeScheme = id;
         this.controller = makeController(id, this, this.fish);
-        this.switcher.setActive(id);
         this.progression.set?.('scheme', id);
     }
 
@@ -128,7 +126,7 @@ export default class MainScene extends Phaser.Scene {
             world.debugGraphic.setVisible(this.debugOn);
             if (!this.debugOn) world.debugGraphic.clear();
         }
-        this.switcher.setDebug(this.debugOn);
+        return this.debugOn;
     }
 
     collect() {
@@ -151,7 +149,6 @@ export default class MainScene extends Phaser.Scene {
                 stroke: '#ffffff', strokeThickness: 8
             }).setOrigin(0.5).setDepth(8);
             this.tweens.add({ targets: heart, y: heart.y - 120, alpha: 0, duration: 1100, onComplete: () => heart.destroy() });
-            this.tweens.add({ targets: f.img, scale: f.img.scale * 1.18, duration: 160, yoyo: true });
         }
         for (const h of this.level.hazards) {
             if (!h.img.active || p.distance(h.img) > fr + h.r) continue;
@@ -164,9 +161,6 @@ export default class MainScene extends Phaser.Scene {
 
     /** One fixed 60 Hz simulation step: all forces + physics, display-rate independent. */
     fixedStep() {
-        const sp = this.fish.sprite;
-        const stream = this.level.inCurrent(sp.x, sp.y) ? WORLD.streamBoost : 0;
-        sp.applyForce({ x: (WORLD.current + stream) * sp.body.mass, y: 0 });
         this.controller.update(STEP_MS);
         if (this.keys) {
             const k = this.keys;
@@ -180,37 +174,34 @@ export default class MainScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        const W = this.scale.width;
+        const W = this.scale.width, H = this.scale.height;
         const sp = this.fish.sprite;
 
         this.acc = Math.min(this.acc + delta, STEP_MS * 5);
         while (this.acc >= STEP_MS) { this.fixedStep(); this.acc -= STEP_MS; }
 
-        // Camera only moves forward; the fish cannot leave the screen on the left.
-        const target = sp.x - W * WORLD.cameraLead;
-        const prev = this.camX;
-        if (target > this.camX) this.camX = Phaser.Math.Linear(this.camX, target, 1 - Math.pow(0.88, delta / STEP_MS));
-        this.cameras.main.scrollX = this.camX;
-        const leftEdge = this.camX + this.fish.radius;
-        if (sp.x < leftEdge) {
-            sp.setPosition(leftEdge, sp.y);
-            if (sp.body.velocity.x < 0) sp.setVelocityX(0);
-        }
+        // Camera follows in both axes, leading slightly in the travel direction.
+        const v = sp.body.velocity;
+        const k = 1 - Math.pow(WORLD.cameraEase, delta / STEP_MS);
+        const prevX = this.camX, prevY = this.camY;
+        this.camX = Phaser.Math.Linear(this.camX, sp.x + v.x * WORLD.lookAhead - W / 2, k);
+        this.camY = Phaser.Math.Linear(this.camY, sp.y + v.y * WORLD.lookAhead - H / 2, k);
+        this.camY = Math.max(this.camY, -220); // a strip of sky at the surface, no more
+        this.cameras.main.setScroll(this.camX, this.camY);
 
         // Bubble trail when moving fast.
-        const v = sp.body.velocity, speed = Math.hypot(v.x, v.y);
+        const speed = Math.hypot(v.x, v.y);
         this.trailAt = (this.trailAt || 0) - delta;
         if (speed > 9 && this.trailAt <= 0) {
             this.trailAt = 55;
-            const r = Phaser.Math.Between(6, 15);
             const b = this.add.circle(sp.x - v.x * 3 + Phaser.Math.Between(-20, 20), sp.y - v.y * 3 + Phaser.Math.Between(-20, 20),
-                r, 0xffffff, 0.35).setStrokeStyle(2, 0xffffff, 0.7).setDepth(4);
+                Phaser.Math.Between(6, 15), 0xffffff, 0.35).setStrokeStyle(2, 0xffffff, 0.7).setDepth(4);
             this.tweens.add({ targets: b, y: b.y - 70, alpha: 0, scale: 1.5, duration: 700, onComplete: () => b.destroy() });
         }
 
-        this.level.update(this.camX);
-        this.backdrop.update(this.camX, this.camX - prev);
+        this.level.update(this.camX, this.camY);
+        this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY);
         this.collect();
-        this.refreshHud();
+        this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
     }
 }

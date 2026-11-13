@@ -1,49 +1,46 @@
+import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
 
+const BAND_FULL = 520; // finger distance at which the pull is at full strength
+
 /**
- * Move-to-tapped-location. Tap (or hold and drag) the water and the fish swims
- * there. Tap ON the fish to puff.
+ * Rubber band. Touch and hold: the fish is pulled toward the finger as if tied
+ * to it by an elastic band — further away pulls harder. Let go and it brakes to
+ * a stop.
  */
 export default class TapToMoveController extends ControllerBase {
     enter() {
-        this.target = null;
         this.held = null;
-        this.marker = this.scene.add.circle(0, 0, 26, 0xffffff, 0)
-            .setStrokeStyle(5, 0xffffff, 0.7).setVisible(false);
-        this.world.add(this.marker);
-        this.hint('Tippen = hinschwimmen · Fisch antippen = aufblasen');
+        this.band = this.scene.add.graphics();
+        this.world.add(this.band);
+        this.hint('Halten = Gummiband zum Finger · Loslassen = bremsen · Doppeltipp = aufblasen');
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
-        this.listen(this.scene.input, 'pointermove', this.onMove);
         this.listen(this.scene.input, 'pointerup', this.onUp);
     }
 
-    onDown(pointer, currentlyOver) {
-        if (this.overHud(currentlyOver)) return;
-        const p = this.worldPoint(pointer);
-        if (p.distance(this.fish.pos) < this.fish.radius * 1.4) { this.fish.puff(); return; }
-        this.held = pointer;
-        this.setTarget(p);
-    }
-
-    onMove(pointer) {
-        if (this.held === pointer && pointer.isDown) this.setTarget(this.worldPoint(pointer));
+    onDown(pointer) {
+        if (!this.held && !this.overHud(pointer)) this.held = pointer;
     }
 
     onUp(pointer) {
         if (this.held === pointer) this.held = null;
     }
 
-    setTarget(p) {
-        this.target = p;
-        this.marker.setPosition(p.x, p.y).setVisible(true);
-    }
-
     update() {
-        if (!this.target) return;
-        if (this.fish.seekTo(this.target) < 14 && !this.held) {
-            this.target = null;
-            this.marker.setVisible(false);
-        }
+        this.band.clear();
+        if (this.held && !this.held.isDown) this.held = null;
+        if (!this.held) { this.fish.brake(); return; }
+
+        const target = this.worldPoint(this.held);
+        const to = target.clone().subtract(this.fish.pos);
+        const dist = to.length();
+        const pull = Phaser.Math.Clamp(dist / BAND_FULL, 0, 1);
+        if (dist > this.fish.radius * 0.6) this.fish.thrust(to.normalize().scale(pull * 1.35));
+        else this.fish.brake();
+
+        this.band.lineStyle(4 + pull * 8, 0xffffff, 0.25 + pull * 0.45);
+        this.band.lineBetween(this.fish.sprite.x, this.fish.sprite.y, target.x, target.y);
+        this.band.fillStyle(0xffffff, 0.55).fillCircle(target.x, target.y, 16);
     }
 }

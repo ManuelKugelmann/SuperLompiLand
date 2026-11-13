@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
 
 const KICK = 10.5; // velocity added per tap at full deflection
+const LONG_PRESS_MS = 380;
 
 /**
  * Tap-rhythm swimming. Every tap is one fin stroke:
@@ -20,17 +21,16 @@ export default class FlapController extends ControllerBase {
         cross.lineBetween(W / 2, 140, W / 2, H - 40);
         cross.lineBetween(40, H / 2, W - 40, H / 2);
         this.ui.add(cross);
-        this.hint('Schnell tippen = schnell schwimmen · Tipp-Ort = Richtung');
+        this.hint('Schnell tippen = schnell schwimmen · Tipp-Ort = Richtung · lange halten = aufblasen');
+        this.held = null;
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
     }
 
-    onDown(pointer, currentlyOver) {
-        if (this.overHud(currentlyOver)) return;
-        if (this.worldPoint(pointer).distance(this.fish.pos) < this.fish.radius * 1.3) {
-            this.fish.puff();
-            return;
-        }
+    onDown(pointer) {
+        if (this.overHud(pointer)) return;
+        this.held = pointer;
+        this.heldSince = this.scene.time.now;
         const dir = new Phaser.Math.Vector2(
             Phaser.Math.Clamp((pointer.x - this.center.x) / (this.center.x * 0.6), -1, 1),
             Phaser.Math.Clamp((pointer.y - this.center.y) / (this.center.y * 0.6), -1, 1)
@@ -41,5 +41,15 @@ export default class FlapController extends ControllerBase {
         const dot = this.scene.add.circle(pointer.x, pointer.y, 30, 0xffffff, 0.35);
         this.ui.add(dot);
         this.scene.tweens.add({ targets: dot, scale: 2.4, alpha: 0, duration: 300, onComplete: () => dot.destroy() });
+    }
+
+    update() {
+        // Long press = puff (rapid taps are swimming here, so no double tap).
+        if (!this.held) return;
+        if (!this.held.isDown) { this.held = null; return; }
+        if (this.scene.time.now - this.heldSince > LONG_PRESS_MS) {
+            this.fish.puff();
+            this.held = null;
+        }
     }
 }

@@ -21,15 +21,15 @@ export default class VirtualStickController extends ControllerBase {
         this.thumb = this.scene.add.circle(this.base.x, this.base.y, 62, 0xffc266, 0.85)
             .setStrokeStyle(5, 0xffffff, 0.6);
         this.ui.add([this.ring, this.thumb]);
-        this.hint('Ziehen = schwimmen · Tippen = aufblasen');
+        this.hint('Ziehen = schwimmen · Doppeltipp = aufblasen');
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
         this.listen(this.scene.input, 'pointermove', this.onMove);
         this.listen(this.scene.input, 'pointerup', this.onUp);
     }
 
-    onDown(pointer, currentlyOver) {
-        if (this.active || this.overHud(currentlyOver)) return;
+    onDown(pointer) {
+        if (this.active || this.overHud(pointer)) return;
         this.active = true;
         this.pointerId = pointer.id;
         this.pressAt = this.scene.time.now;
@@ -49,8 +49,6 @@ export default class VirtualStickController extends ControllerBase {
 
     onUp(pointer) {
         if (!this.active || pointer.id !== this.pointerId) return;
-        const moved = new Phaser.Math.Vector2(pointer.x, pointer.y).distance(this.pressPos);
-        if (moved < 18 && this.scene.time.now - this.pressAt < 260) this.fish.puff();
         this.active = false;
         this.pointerId = null;
         this.vec.set(0, 0);

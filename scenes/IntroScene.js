@@ -3,7 +3,8 @@ import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import cardImg from '../assets/card_preview.png';
 import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
-import { pwaMenuItems, BUILD } from '../game/pwa.js';
+import HudScene, { HUD_KEY } from './HudScene.js';
+import { pwaMenuItems, BUILD, install, isStandalone, canPromptInstall, onInstallChange } from '../game/pwa.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const gameMeta = {
@@ -55,6 +56,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.scene.get(SCENE_KEYS.MAIN)) {
             this.scene.add(SCENE_KEYS.MAIN, MainScene, false);
             this.scene.add(SCENE_KEYS.END, EndScene, false);
+            this.scene.add(HUD_KEY, HudScene, false);
         }
 
         if (this.textures.exists('bg_far')) {
@@ -80,6 +82,20 @@ export default class IntroScene extends Phaser.Scene {
         this.add.text(W - 24, H - 20, `build ${BUILD}`, {
             fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
         }).setOrigin(1, 1).setAlpha(0.45);
+
+        // Install button: shown unless the app already runs installed.
+        if (!isStandalone() && BUILD !== 'dev') {
+            const label = lang === 'de' ? '⬇  App installieren' : '⬇  Install app';
+            const btn = this.add.text(W - 40, 44, label, {
+                fontFamily: 'Arial', fontSize: '38px', color: '#ffffff', fontStyle: 'bold',
+                backgroundColor: '#1565c0', padding: { x: 26, y: 16 }
+            }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+            btn.on('pointerdown', () => install(this, lang));
+            const refresh = () => btn.setAlpha(canPromptInstall() ? 1 : 0.6);
+            refresh();
+            const off = onInstallChange(() => { if (isStandalone()) btn.destroy(); else refresh(); });
+            this.events.once(Phaser.Scenes.Events.SHUTDOWN, off);
+        }
 
         new BurgerMenu(this, 60, 60, [
             ...pwaMenuItems(this, lang),

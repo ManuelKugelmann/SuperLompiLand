@@ -23,9 +23,9 @@ export default class ControllerBase {
         return this;
     }
 
-    /** Pointer landed on an interactive HUD element — schemes ignore it. */
-    overHud(currentlyOver) {
-        return !!currentlyOver && currentlyOver.length > 0;
+    /** Pointer is on a HUD element (menu, buttons) — schemes ignore it. */
+    overHud(pointer) {
+        return !!this.scene.isOverHud?.(pointer);
     }
 
     /** Pointer position in world space (camera scroll applied). */

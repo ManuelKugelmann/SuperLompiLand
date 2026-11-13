@@ -28,14 +28,14 @@ export default class FlingController extends ControllerBase {
         this.grabGfx = this.scene.add.circle(0, 0, 10, 0xffffff, 0)
             .setStrokeStyle(6, 0xffe08a, 0.9).setVisible(false);
         this.world.add([this.paddleGfx, this.grabGfx]);
-        this.hint('Fisch anfassen & werfen · oder mit dem Finger schubsen');
+        this.hint('Fisch anfassen & werfen · oder mit dem Finger schubsen · Doppeltipp = aufblasen');
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
         this.listen(this.scene.input, 'pointerup', this.onUp);
     }
 
-    onDown(pointer, currentlyOver) {
-        if (this.pointer || this.overHud(currentlyOver)) return;
+    onDown(pointer) {
+        if (this.pointer || this.overHud(pointer)) return;
         this.pointer = pointer;
         this.pressAt = this.scene.time.now;
         this.pressPos.set(pointer.x, pointer.y);
@@ -58,8 +58,7 @@ export default class FlingController extends ControllerBase {
         if (pointer !== this.pointer) return;
         if (this.mode === 'grab') {
             const moved = this.pressPos.distance(new Phaser.Math.Vector2(pointer.x, pointer.y));
-            if (moved < 18 && this.scene.time.now - this.pressAt < 240) this.fish.puff();
-            else this.fish.throwAt(this.fingerVelocity());
+            if (moved > 18) this.fish.throwAt(this.fingerVelocity());
         }
         this.release();
     }

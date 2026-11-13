@@ -5,17 +5,31 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Standalone build/dev config. We take the shared preset (base './', single
 // Phaser instance, dev server) and ADD a PWA layer on top via an override, so
 // the game is installable standalone without modifying the shared preset.
-export default defineConfig(
+// One stamp per build: baked into the bundle AND written to version.json, which
+// the running app fetches uncached to notice that a newer build is live.
+const BUILD = new Date().toISOString().slice(0, 19).replace('T', ' ');
+const versionFile = {
+    name: 'version-json',
+    apply: 'build',
+    generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build: BUILD }) });
+    }
+};
+
+export default defineConfig(({ command }) =>
     gameViteConfig({
         define: {
-            // Shown in the menu so it is obvious which build is running.
-            __BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' '))
+            __BUILD__: JSON.stringify(command === 'build' ? BUILD : 'dev')
         },
         plugins: [
+            versionFile,
             VitePWA({
                 registerType: 'autoUpdate',
                 manifest: false, // we ship our own public/manifest.json (portal pattern)
                 workbox: {
+                    cleanupOutdatedCaches: true,
+                    // version.json must always come from the network.
+                    navigateFallbackDenylist: [/version\.json$/],
                     globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,webp,woff2}'],
                     maximumFileSizeToCacheInBytes: 10_000_000
                 },

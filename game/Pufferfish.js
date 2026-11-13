@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 export const FISH = {
     thrust: 0.0021,        // swim force per unit mass
     maxSpeed: 34,
+    brake: 0.9,            // velocity kept per step while braking
     mass: 6,
     inflateMs: 2600,
     cooldownMs: 500,
@@ -79,6 +80,12 @@ export default class Pufferfish {
         const v = point.clone().subtract(this.pos).scale(0.3);
         if (v.length() > FISH.maxSpeed) v.setLength(FISH.maxSpeed);
         this.sprite.setVelocity(v.x, v.y);
+    }
+
+    /** Actively slow down (call every step while braking). */
+    brake() {
+        const v = this.body.velocity;
+        this.sprite.setVelocity(v.x * FISH.brake, v.y * FISH.brake);
     }
 
     /** Replace the velocity outright (release of a grab = the throw). */
