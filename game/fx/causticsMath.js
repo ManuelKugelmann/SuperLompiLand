@@ -84,8 +84,9 @@ export const SURFACE_CAUSTICS = {
     cells: [24, 36],      // net cells per period for the two layers laid over each other (~170 and ~115 px; even numbers)
     drift: [0.55, 0.75],  // how fast each layer's cells move (radians per second)
     wrap: 70,             // px the net is pushed along a surface's relief per unit of brightness change: it bends over bumps
+    skin: [0.04, 0.09],   // texture-space reach of the top skin: light lands on the upper faces of a picture; deep inside it (opaque far above too) it fades
     relief: 0.012,        // texture-space step for reading the relief (wide enough that fine paint detail does not speckle)
-    lit: [0.08, 0.4],    // brightness of a surface from which it begins to catch the net, and from which it catches all of it
+    lit: [0.22, 0.55],   // brightness of a surface from which it begins to catch the net, and from which it catches all of it
     facing: 6,            // how quickly the net fades on a face that looks down (brightness rising downward)
     shaft: { bands: 2, slant: 0.35, floor: 0.45, speed: 0.06 },   // light shafts: bands per period, their slant (px sideways per px down), the share of light between them, their drift
     warmth: 0.5           // 0 = the net has the water's hue, 1 = it is white sunlight

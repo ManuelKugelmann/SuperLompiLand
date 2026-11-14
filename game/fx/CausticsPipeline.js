@@ -92,6 +92,9 @@ void main () {
         float light = min(1.0, a + 0.55 * b);
         float shaft = ${f(C.shaft.floor)} + ${f(1 - C.shaft.floor)} * smoothstep(-0.3, 0.7, sin((world.x + world.y * ${f(C.shaft.slant)}) * ${TAU} * ${f(C.shaft.bands)} / ${f(C.period)} + uTime * ${f(C.shaft.speed)}));
         float catching = smoothstep(${f(C.lit[0])}, ${f(C.lit[1])}, l0) * clamp(1.0 - relief.y * ${f(C.facing)}, 0.0, 1.0);
+        // Only the top skin of a surface: where the picture is opaque well above this texel too, the light is gone.
+        float cover = texture2D(uMainSampler, outTexCoord - vec2(0.0, ${f(C.skin[0])})).a * texture2D(uMainSampler, outTexCoord - vec2(0.0, ${f(C.skin[1])})).a;
+        catching *= 1.0 - 0.9 * cover;
         color.rgb += uTint * (light * shaft * depth * catching * uStrength * color.a);
     }
     gl_FragColor = color;
