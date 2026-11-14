@@ -291,6 +291,21 @@ export default class Player {
     }
 
     /** @param {number} dt ms  @param {number} waterY world y of the water surface at the fish */
+    /**
+     * One bad number must never take the game down: a body whose place or speed is not a number any
+     * more (a force that divided by zero somewhere) is put back where it last was, at rest. Called
+     * first thing every frame by the scene, before anything reads the fish's place.
+     */
+    heal() {
+        const body = this.body, at = body.position, v = body.velocity;
+        if (Number.isFinite(at.x) && Number.isFinite(at.y) && Number.isFinite(v.x) && Number.isFinite(v.y)) { (this.sound ??= { x: 0, y: 0 }).x = at.x; this.sound.y = at.y; return; }
+        if (!this.sound) return;
+        // The collision body is made anew at the last good place (its corner points are bad numbers too by now).
+        at.x = this.sound.x; at.y = this.sound.y; v.x = 0; v.y = 0;
+        this.applyState(this.state);
+        this.prev.set(this.sound.x, this.sound.y); this.cur.set(this.sound.x, this.sound.y);
+    }
+
     update(dt, waterY = -Infinity) {
         if (this.cooldown > 0) this.cooldown -= dt;
         if (this.mode) {

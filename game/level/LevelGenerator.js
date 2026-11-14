@@ -279,7 +279,8 @@ export default class LevelGenerator {
     setCaustics(on) {
         if (!this.caustics || on === this.causticsOn) return;
         this.causticsOn = on;
-        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.type === 'Image') { if (on) o.setPipeline(CAUSTICS); else o.resetPipeline(); }
+        // (A chunk's list also holds what was taken away since it was built, a collected coin for one: those have no scene any more.)
+        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.type === 'Image' && o.scene) { if (on) o.setPipeline(CAUSTICS); else o.resetPipeline(); }
     }
 
     /** A worker result that is used up (its chunk is built, or nobody needs it any more): its picture arrays go back to the worker to be written into again. */

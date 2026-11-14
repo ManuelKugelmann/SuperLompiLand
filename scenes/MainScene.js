@@ -1572,7 +1572,10 @@ export default class MainScene extends Phaser.Scene {
 
     update(time, delta) {
         const W = this.scale.width, H = this.scale.height;
+        // A bad number in the fish's body or in the camera is mended before anything reads it (Player.heal): it must never stop the game.
+        this.fish.heal();
         const sp = this.fish.sprite;
+        if (!Number.isFinite(this.camX) || !Number.isFinite(this.camY)) { this.camX = sp.x - W / 2; this.camY = sp.y - H / 2; }
 
         const t0 = performance.now();
         if (this.hitStop > 0) { this.hitStop -= delta; delta = 0; }   // freeze-frame on impact
