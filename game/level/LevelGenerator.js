@@ -812,7 +812,9 @@ export default class LevelGenerator {
                 }
                 const front = rng.frac() < 0.25, art = rng.between(1, 3), width = 0.9 + rng.frac() * 0.2;
                 if (!ground) continue;
-                const root = keep(s.add.image(x, -40, `root_${art}`).setOrigin(0.5, 0));
+                // root_2's painted crown is a barnacled beam cut off at the picture's edge (it read as a glass pane under the
+                // surface): its draw uses root_1 (the same random draws, so nothing else moves).
+                const root = keep(s.add.image(x, -40, `root_${art === 2 ? 1 : art}`).setOrigin(0.5, 0));
                 // As long as the way down (and a little into the ground); its width follows, within a slight stretch, so painted roots keep their proportions.
                 const scale = (ground.y + 40 + LEVEL.rootBury) / root.height;
                 root.setScale(scale * width, scale).setDepth(front ? 7.5 : -7).setAlpha(front ? LEVEL.frontAlpha : 0.8);
