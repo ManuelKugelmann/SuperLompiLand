@@ -26,11 +26,12 @@ const ROCK_REEF = [0xf3dba0, 0xd2ae6c, 0x9c7a54, 0x6a5748, 0x4b4350];
 
 export const BIOMES = [
     {
+        // Sandy beach: seagrass meadows and a few rocks; corals only here and there (sign-off S3).
         id: 'beach', name: { de: 'Sandstrand', en: 'Sandy Beach' },
         rock: [0xfff0c0, 0xf2d894, 0xd9b877, 0xb89868, 0x937a5c], water: [0x7ff0e0, 0.22], open: 0.2,
         backRock: 400,
-        coral: 0.35, kelp: 0.1, coins: 2, friendRate: 0.5, hazardRate: 0,
-        props: { boulder: 3, seagrass: 3, anemone: 1 }, propRate: 1.6,
+        coral: 0.12, kelp: 0.1, coins: 2, friendRate: 0.5, hazardRate: 0,
+        props: { boulder: 2, seagrass: 5, anemone: 1 }, propRate: 2.0,
         friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, urchin: 1 }, hazards: {}
     },
     {
