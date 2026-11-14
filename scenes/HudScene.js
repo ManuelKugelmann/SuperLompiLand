@@ -79,6 +79,12 @@ export default class HudScene extends Phaser.Scene {
         this.nestDots = main.level.nests.map(n => n.grand
             ? this.add.star(toMap(n.x), this.mapY, 5, 6, 13, 0xfff3b0).setStrokeStyle(2, 0x6b4a2b)
             : this.add.circle(toMap(n.x), this.mapY, 6, 0xffffff, 0.5).setStrokeStyle(2, 0x06343a));
+        // The friends waiting along the way: a ring where each one is, filled once it is freed.
+        this.friendDots = main.journey.list.filter(c => c.friend).map(c => {
+            const dot = this.add.circle(toMap(c.x), this.mapY + 24, 8, 0xff6b9a, 0).setStrokeStyle(3, 0xffffff);
+            dot.friendId = c.friend.id;
+            return dot;
+        });
         this.mapYou = this.add.triangle(0, this.mapY - 20, -9, -10, 9, -10, 0, 6, 0xffffff).setStrokeStyle(2, 0x06343a);
 
         // ?debug=perf: frame time and where it goes, for checking on a real device.
@@ -159,6 +165,7 @@ export default class HudScene extends Phaser.Scene {
             if (g.pos) g.mapDot.x = this.toMap(g.pos.x);
         }
         this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });
+        for (const d of this.friendDots) d.setFillStyle(0xff6b9a, m.journey.has(d.friendId) ? 1 : 0);
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
     }

@@ -24,6 +24,8 @@ import SpeedLines from '../game/fx/SpeedLines.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
+import { JOURNEY, createJourney } from '../game/journey.js';
+import StoryBeats from '../game/StoryBeats.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
 import { ROUTE } from '../game/level/density.js';
 import { BOOK_KEY, placeBadge } from './ReefBookScene.js';
@@ -123,6 +125,9 @@ export default class MainScene extends Phaser.Scene {
         });
         this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
+        // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
+        this.journey = createJourney(this.progression.get?.('journey', []) || []);
+        this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -223,7 +228,7 @@ export default class MainScene extends Phaser.Scene {
             if (this.relaxed || this.health <= GRUMPY_HIT) { this.fish.hit(new Phaser.Math.Vector2(x, y)); return; }
             this.hurt(x, y, GRUMPY_HIT);
         });
-        this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
+        this.events.on('fish-special', ({ x, y }) => { this.beats?.special(x, y); this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
@@ -342,6 +347,23 @@ export default class MainScene extends Phaser.Scene {
         if (this.scene.isActive(HUD_KEY)) this.scene.get(HUD_KEY).banner?.(title, subtitle);   // no HUD in ambient mode
     }
 
+    /** A friend is out of its net (StoryBeats): thanks, coins, a heart, and the journey remembers. */
+    freeFriend(ch, x, y) {
+        const de = this.lang === 'de', name = ch.friend.name;
+        this.progression.set?.('journey', this.journey.toJSON());
+        this.coins += JOURNEY.coins;
+        this.health = Math.min(this.maxHealth, this.health + 1);
+        play('friend'); play('nest');
+        this.announce(de ? `${name} ist frei!` : `${name} is free!`,
+            de ? `${this.journey.count} von ${this.journey.total} Freunden gefunden` : `${this.journey.count} of ${this.journey.total} friends found`);
+        for (let i = 0; i < 9; i++) {
+            const a = (i / 9) * Math.PI * 2;
+            const heart = this.add.text(x, y, '♥', { fontFamily: 'Arial', fontSize: '60px', color: '#ff6b9a', stroke: '#ffffff', strokeThickness: 8 }).setOrigin(0.5).setDepth(8);
+            this.tweens.add({ targets: heart, x: x + Math.cos(a) * 230, y: y + Math.sin(a) * 180 - 60, alpha: 0, duration: 1300, ease: 'Sine.easeOut', onComplete: () => heart.destroy() });
+        }
+        this.events.emit('journey-free', ch);
+    }
+
     /** Swam into a nest: coins are safe, this is the new restart point. */
     reachNest(nest) {
         const de = this.lang === 'de';
@@ -357,6 +379,7 @@ export default class MainScene extends Phaser.Scene {
         if (nest.grand) {
             this.progression.set?.('nest', 0);
             this.progression.set?.('banked', 0);
+            this.progression.set?.('journey', []);
             this.time.delayedCall(900, () => this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, won: true }));
             this.announce(de ? 'Das große Nest!' : 'The Grand Nest!', de ? 'Du hast es geschafft!' : 'You made it!');
         } else if (first) {
@@ -437,6 +460,7 @@ export default class MainScene extends Phaser.Scene {
     startOver() {
         this.progression.set?.('nest', 0);
         this.progression.set?.('banked', 0);
+        this.progression.set?.('journey', []);
         this.world.reset();
         this.scene.restart();
     }
@@ -1044,6 +1068,7 @@ export default class MainScene extends Phaser.Scene {
         this.farLayers.update(this.camX);
         this.rockLayers.update(this.camX, this.camY);
         this.waterLight.update();
+        this.beats?.update(sp, time / 1000, delta);
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
         const t2 = performance.now();
@@ -1054,7 +1079,7 @@ export default class MainScene extends Phaser.Scene {
         // Announce a biome when the fish swims into it.
         const bi = biomeIndexAt(sp.x);
         if (bi !== this.biomeIndex) {
-            if (this.biomeIndex !== -1 || time > 0) this.announce(BIOMES[bi].name[this.lang] || BIOMES[bi].name.en);
+            if (this.biomeIndex !== -1 || time > 0) this.announce(BIOMES[bi].name[this.lang] || BIOMES[bi].name.en, this.journey.goalAt(sp.x, this.lang));
             this.biomeIndex = bi;
         }
     }
