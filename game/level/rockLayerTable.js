@@ -20,12 +20,13 @@ const smooth01 = t => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 export const ROCK_LAYERS = [
     // s = parallax; seed = field seed offset; share = how much of the biome's closed share
     // this layer takes (near walls are rarer); swing = how far the enclosure pushes the field;
-    // scale = enclosure noise period (world px); fog = share of the water colour baked in;
+    // scale = enclosure noise period (world px); open = extra push toward water (near walls
+    // never fill the frame); fog = share of the water colour baked in;
     // dark = tint multiply on top; depth = draw order.
     // clearRoute: keep the calm main route free (the play field is open water there; a wall
     // drawn over it would read as solid, gamedesigner 2026-11-14).
     { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1700, fog: 0.45, dark: 0.92, depth: -9.5 },
-    { id: 'near', s: 0.82, seed: 202, share: 0.55, swing: 0.36, scale: 1300, fog: 0.3, dark: 0.95, depth: -7, clearRoute: true }
+    { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.3, dark: 0.95, depth: -7, clearRoute: true }
 ];
 
 /** Layer chunk size (layer px) and its shading: coarse (soft), no sand, low contrast, unlit rims. */
@@ -48,6 +49,9 @@ export const LAYER_SHADE = {
  * `lift` above the threshold within `band`, so it is a flat foot, not a ripple.
  */
 export const SUPPORT = { reach: 1800, gap: 60, spread: 120, wobble: 260, grid: 110, carryGrid: [280, 480], minCarry: 0.03, band: 0.06, lift: 0.1 };
+
+/** Near the surface: no layer rock above `below` virtual px, fading back in over `fade` px. */
+export const SURFACE_CLEAR = { below: 300, fade: 420, push: 1.2 };
 
 /** Around the calm route: no near rock within `half` px of its middle, fading back in over `fade` px. */
 export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 0.9 };
@@ -132,7 +136,7 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
         density(x, y) {
             const e = enclosure(x, layer);
             if (e <= -0.999) return -1;                         // open: nothing behind
-            const shift = layer.swing * e - 0.12;
+            const shift = layer.swing * e - 0.12 + (layer.open || 0);
             let d = soft.density(x, y) + shift;
             // The strongest rock in the stretch above (centre and both sides of the foot): once it
             // is clearly rock, this point is too — a flat foot, smooth in x and y.
@@ -142,6 +146,11 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
                 carry.columnMax(x + w - sup.spread, y0, y1) - 0.02, carry.columnMax(x + w + sup.spread, y0, y1) - 0.02);
             const lo = T + sup.minCarry;
             d = Math.max(d, T - 0.05 + (sup.lift + 0.05) * smooth01((v + shift - lo) / sup.band));
+            // Never up to the surface: a layer's rock would be cut straight at the water line.
+            if (y < SURFACE_CLEAR.below + SURFACE_CLEAR.fade) {
+                const t = Math.max(0, (y - SURFACE_CLEAR.below) / SURFACE_CLEAR.fade);
+                d -= SURFACE_CLEAR.push * (1 - t * t * (3 - 2 * t));
+            }
             if (route && layer.clearRoute) {
                 const off = Math.abs(y - route(x)), t = Math.min(1, Math.max(0, (off - clear.half) / clear.fade));
                 d -= clear.push * (1 - t * t * (3 - 2 * t));
@@ -161,11 +170,18 @@ export function layerChunkRect(layer, cx, cy, span = LAYER_CHUNK) {
  * of the way toward the water colour of its biome (mixed with the deep tint by depth), which
  * lifts the darkest values and lowers the contrast. The rock's alpha is kept: solid, not see-through.
  */
+const LIFT_TO = [0x2a, 0x9f, 0xc8], FOG_LIFT = 0.35;
+
 export function fogLayer(rgba, size, ox, oy, span, layer, deepTint = SHADE.deepTint, maxDepth = 5600) {
     const fog = layer.fog;
     for (let px = 0; px < size; px++) {
         const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * span / size);
-        const wc = [16, 8, 0].map(sh => ((a.water[0] >> sh) & 255) * (1 - t) + ((b.water[0] >> sh) & 255) * t);
+        // The water colour, lifted toward open-sea blue: even in the darkest biome the rock
+        // behind stays lighter than the play-plane rock, so it never reads as solid.
+        const wc = [16, 8, 0].map((sh, c) => {
+            const w = ((a.water[0] >> sh) & 255) * (1 - t) + ((b.water[0] >> sh) & 255) * t;
+            return w + (LIFT_TO[c] - w) * FOG_LIFT;
+        });
         for (let py = 0; py < size; py++) {
             const o = (py * size + px) * 4;
             if (rgba[o + 3] === 0) continue;

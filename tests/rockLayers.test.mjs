@@ -100,3 +100,10 @@ test('no stacks of chips: below rock the carried foot is one piece (no gaps on t
         assert.ok(chips < 12, `${L.id}: ${chips} short gaps under rock`);
     }
 });
+
+test('no layer rock at the water surface (it would be cut straight at the water line)', () => {
+    for (const L of ROCK_LAYERS) {
+        const f = layerField(createField(1337 + L.seed), L);
+        for (let x = -6000; x < 64000; x += 300) assert.ok(f.density(x, 60) < T, `${L.id} at ${x}`);
+    }
+});
