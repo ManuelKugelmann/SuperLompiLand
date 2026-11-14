@@ -11,6 +11,11 @@ import { SCENE_KEYS } from './keys.js';
 
 export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
 
+export const HUD = {
+    switcherFirstMs: 14000,   // the control-scheme row stays this long on the very first run
+    switcherMenuMs: 12000     // ... and this long when called from the menu
+};
+
 /**
  * Heads-up display, run as its own scene on top of the game.
  * Its camera never scrolls, so every button is reliably clickable while the
@@ -37,6 +42,15 @@ export default class HudScene extends Phaser.Scene {
         this.switcher = new ControlSwitcher(this, main.activeScheme,
             id => { main.switchScheme(id); this.switcher.setActive(id); },
             () => this.switcher.setDebug(main.toggleDebug()));
+        // The row is clutter over the best part of the picture: it shows on the very first run for
+        // a while, and whenever it is called from the menu; picking a scheme puts it away again.
+        const showSwitcher = ms => {
+            this.switcher.setVisible(true);
+            this.switcherTimer?.remove();
+            this.switcherTimer = this.time.delayedCall(ms, () => this.switcher.setVisible(false));
+        };
+        if (main.progression.get?.('controls_shown', false)) this.switcher.setVisible(false);
+        else { main.progression.set?.('controls_shown', true); showSwitcher(HUD.switcherFirstMs); }
 
         const hudText = (x, y, size) => this.add.text(x, y, '', textStyle(parseInt(size, 10)));
         if (this.textures.exists('coin')) this.add.image(70, 190, 'coin').setDisplaySize(64, 64);
@@ -109,6 +123,7 @@ export default class HudScene extends Phaser.Scene {
         new BurgerMenu(this, 60, 60, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
             { label: de ? 'RIFFBUCH' : 'REEF BOOK', color: 0x1d6f9a, callback: () => main.openBook() },
+            { label: de ? 'STEUERUNG' : 'CONTROLS', color: 0x1d6f9a, callback: () => showSwitcher(HUD.switcherMenuMs) },
             { label: de ? 'NEU ANFANGEN' : 'START OVER', color: 0x6d4c41, callback: () => main.startOver() },
             main.relaxed
                 ? { label: de ? 'MODUS: ENTSPANNT' : 'MODE: RELAXED', color: 0x00897b, callback: () => main.setRelaxed(false) }

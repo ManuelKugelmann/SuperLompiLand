@@ -51,6 +51,7 @@ export function pillButton(scene, x, y, w, h, label, onTap, { size = 30 } = {}) 
     return {
         setSelected(on) { selected = !!on; paint(false); },
         setLabel(text) { txt.setText(text); },
+        setVisible(on) { g.setVisible(on); txt.setVisible(on); hit.setVisible(on); if (on) hit.setInteractive({ useHandCursor: true }); else hit.disableInteractive(); },
         destroy() { g.destroy(); txt.destroy(); hit.destroy(); }
     };
 }
