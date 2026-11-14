@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## A world above the water: every area has its own coast on the horizon, and the volcano in the east comes closer as you travel
+
+[`a087bf8`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/a087bf8) · 2026-11-14 11:06
+
+![A world above the water: every area has its own coast on the horizon, and the volcano in the east comes closer as you travel](21-a-world-above-the-water-every-area-has-its-own-c.jpg)
+
 ## Bubble cannons along the currents: a shot counts as a move in the chain
 
 [`850be96`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/850be96) · 2026-11-14 05:10
