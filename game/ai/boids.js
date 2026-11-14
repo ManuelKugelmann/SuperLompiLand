@@ -4,6 +4,10 @@
 // and the player: the swarm parts around Lompi's predicted path, a fast dash sends a
 // panic wave through it, and a slow, calm Lompi is let inside. Every fish has
 // momentum (limited acceleration and turn), so the swarm flows instead of snapping.
+// Deciding and moving are apart (throttle.js: decisions at a low rate, staggered; only
+// motion every step): a fish looks at its neighbours, the players and the rock ahead
+// only every `thinkEvery` steps, the fish taking turns, and keeps the pull it chose
+// in between.
 // Units: px and px/s.
 
 export const SWARM = {
@@ -22,8 +26,8 @@ export const SWARM = {
     panicR: 260,          // px
     panicDecay: 0.6,      // per s
     panicSpread: 0.85,    // share passed on to neighbours (a wave, not a switch)
-    flowEvery: 4,         // each fish asks the water field every this many steps (it changes slowly; staggered)
-    avoidEvery: 2         // ... and probes for rock ahead every this many steps
+    thinkEvery: 2,        // each fish decides (neighbours, players, rock ahead) every this many steps, the fish taking turns; in between it keeps its pull
+    flowEvery: 4          // each fish asks the water field every this many steps (it changes slowly; staggered)
 };
 
 export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, ...opts } = {}) {
@@ -31,7 +35,8 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
     const n = count;
     const px = new Float32Array(n), py = new Float32Array(n), vx = new Float32Array(n), vy = new Float32Array(n);
     const panic = new Float32Array(n), turn = new Float32Array(n), quirk = new Float32Array(n);
-    const flx = new Float32Array(n), fly = new Float32Array(n), blocked = new Uint8Array(n), next = new Int32Array(n);
+    const flx = new Float32Array(n), fly = new Float32Array(n), next = new Int32Array(n);
+    const pullX = new Float32Array(n), pullY = new Float32Array(n);      // the pull each fish chose when it last decided
     let tick = 0;
     for (let i = 0; i < n; i++) {
         const a = random() * Math.PI * 2, r = Math.sqrt(random()) * 120;
@@ -106,62 +111,65 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
 
             buildGrid();
             tick++;
-            const decay = Math.exp(-P.panicDecay * dt);
+            const think = Math.max(1, P.thinkEvery | 0), decay = Math.exp(-P.panicDecay * dt * think);
             for (let i = 0; i < n; i++) {
-                let sx = 0, sy = 0, ax = 0, ay = 0, cx = 0, cy = 0, m = 0, pn = 0;
-                const gx = Math.floor(px[i] / cell), gy = Math.floor(py[i] / cell);
-                for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
-                    const head = grid.get(key(gx + ox, gy + oy));
-                    if (head === undefined) continue;
-                    for (let j = head; j !== -1; j = next[j]) {
-                        if (j === i) continue;
-                        const dx = px[j] - px[i], dy = py[j] - py[i], d2 = dx * dx + dy * dy;
-                        if (d2 > P.neighbourR * P.neighbourR) continue;
-                        m++;
-                        ax += vx[j]; ay += vy[j]; cx += dx; cy += dy;
-                        if (panic[j] > pn) pn = panic[j];
-                        if (d2 < P.separationR * P.separationR && d2 > 1e-6) { const d = Math.sqrt(d2); sx -= dx / d * (P.separationR - d); sy -= dy / d * (P.separationR - d); }
-                    }
-                }
-                // Panic spreads from neighbour to neighbour (a wave).
-                panic[i] = Math.max(panic[i] * decay, pn * P.panicSpread * decay);
-                let fx = sx * W.separation, fy = sy * W.separation;
-                if (m) {
-                    fx += (ax / m - vx[i]) * W.alignment * 1.5 + cx / m * W.cohesion * 0.8;
-                    fy += (ay / m - vy[i]) * W.alignment * 1.5 + cy / m * W.cohesion * 0.8;
-                }
-                // Follow the leader loosely, and stay near home.
-                fx += (leader.x - px[i]) * W.leader * 0.3; fy += (leader.y - py[i]) * W.leader * 0.3;
-                // The players: part around each predicted path; a dash nearby starts a panic.
-                let near = null, nearD = Infinity;
-                for (let q = 0; q < ps.length; q++) {
-                    const { pl, speed: pspeed, calm, ppx, ppy, personal } = ps[q];
-                    const pdx = px[i] - pl.x, pdy = py[i] - pl.y, pd = Math.sqrt(pdx * pdx + pdy * pdy);
-                    if (pd < nearD) { nearD = pd; near = pl; }
-                    const dx = px[i] - ppx, dy = py[i] - ppy, d = Math.sqrt(dx * dx + dy * dy);
-                    if (d < personal && d > 1e-3) {
-                        const k = (personal - d) / personal;
-                        // Part like a curtain: move off the player's path to the near side.
-                        let ex = dx / d, ey = dy / d;
-                        if (pspeed > 20) {
-                            const qx = -pl.vy / pspeed, qy = pl.vx / pspeed, side = dx * qx + dy * qy >= 0 ? 1 : -1;
-                            ex = qx * side + ex * 0.35; ey = qy * side + ey * 0.35;
+                let fx = pullX[i], fy = pullY[i];
+                if ((i + tick) % think === 0) {
+                    let sx = 0, sy = 0, ax = 0, ay = 0, cx = 0, cy = 0, m = 0, pn = 0;
+                    const gx = Math.floor(px[i] / cell), gy = Math.floor(py[i] / cell);
+                    for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+                        const head = grid.get(key(gx + ox, gy + oy));
+                        if (head === undefined) continue;
+                        for (let j = head; j !== -1; j = next[j]) {
+                            if (j === i) continue;
+                            const dx = px[j] - px[i], dy = py[j] - py[i], d2 = dx * dx + dy * dy;
+                            if (d2 > P.neighbourR * P.neighbourR) continue;
+                            m++;
+                            ax += vx[j]; ay += vy[j]; cx += dx; cy += dy;
+                            if (panic[j] > pn) pn = panic[j];
+                            if (d2 < P.separationR * P.separationR && d2 > 1e-6) { const d = Math.sqrt(d2); sx -= dx / d * (P.separationR - d); sy -= dy / d * (P.separationR - d); }
                         }
-                        fx += ex * k * W.player * 400; fy += ey * k * W.player * 400;
-                        if (!calm) panic[i] = Math.max(panic[i], k * 0.7);   // startled: a burst of speed
                     }
-                    if (pspeed > P.dashSpeed && pd < P.panicR) panic[i] = 1;
-                }
-                // Rock ahead: turn away from it before touching it.
-                const sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]) || 1;
-                if (env.isOpen && (i + tick) % P.avoidEvery === 0) blocked[i] = env.isOpen(px[i] + vx[i] / sp * P.lookAhead, py[i] + vy[i] / sp * P.lookAhead) ? 0 : 1;
-                if (blocked[i]) {
-                    fx += -vx[i] / sp * W.avoid * 40 + -vy[i] / sp * W.avoid * 25;
-                    fy += -vy[i] / sp * W.avoid * 40 + vx[i] / sp * W.avoid * 25;
-                }
-                if (panic[i] > 0.05 && near) {            // flee from the nearest player while panicking
-                    const dx = px[i] - near.x, dy = py[i] - near.y, d = Math.hypot(dx, dy) || 1;
-                    fx += dx / d * panic[i] * 120; fy += dy / d * panic[i] * 120;
+                    // Panic spreads from neighbour to neighbour (a wave).
+                    panic[i] = Math.max(panic[i] * decay, pn * P.panicSpread * decay);
+                    fx = sx * W.separation; fy = sy * W.separation;
+                    if (m) {
+                        fx += (ax / m - vx[i]) * W.alignment * 1.5 + cx / m * W.cohesion * 0.8;
+                        fy += (ay / m - vy[i]) * W.alignment * 1.5 + cy / m * W.cohesion * 0.8;
+                    }
+                    // Follow the leader loosely, and stay near home.
+                    fx += (leader.x - px[i]) * W.leader * 0.3; fy += (leader.y - py[i]) * W.leader * 0.3;
+                    // The players: part around each predicted path; a dash nearby starts a panic.
+                    let near = null, nearD = Infinity;
+                    for (let q = 0; q < ps.length; q++) {
+                        const { pl, speed: pspeed, calm, ppx, ppy, personal } = ps[q];
+                        const pdx = px[i] - pl.x, pdy = py[i] - pl.y, pd = Math.sqrt(pdx * pdx + pdy * pdy);
+                        if (pd < nearD) { nearD = pd; near = pl; }
+                        const dx = px[i] - ppx, dy = py[i] - ppy, d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < personal && d > 1e-3) {
+                            const k = (personal - d) / personal;
+                            // Part like a curtain: move off the player's path to the near side.
+                            let ex = dx / d, ey = dy / d;
+                            if (pspeed > 20) {
+                                const qx = -pl.vy / pspeed, qy = pl.vx / pspeed, side = dx * qx + dy * qy >= 0 ? 1 : -1;
+                                ex = qx * side + ex * 0.35; ey = qy * side + ey * 0.35;
+                            }
+                            fx += ex * k * W.player * 400; fy += ey * k * W.player * 400;
+                            if (!calm) panic[i] = Math.max(panic[i], k * 0.7);   // startled: a burst of speed
+                        }
+                        if (pspeed > P.dashSpeed && pd < P.panicR) panic[i] = 1;
+                    }
+                    // Rock ahead: turn away from it before touching it.
+                    const sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]) || 1;
+                    if (env.isOpen && !env.isOpen(px[i] + vx[i] / sp * P.lookAhead, py[i] + vy[i] / sp * P.lookAhead)) {
+                        fx += -vx[i] / sp * W.avoid * 40 + -vy[i] / sp * W.avoid * 25;
+                        fy += -vy[i] / sp * W.avoid * 40 + vx[i] / sp * W.avoid * 25;
+                    }
+                    if (panic[i] > 0.05 && near) {            // flee from the nearest player while panicking
+                        const dx = px[i] - near.x, dy = py[i] - near.y, d = Math.hypot(dx, dy) || 1;
+                        fx += dx / d * panic[i] * 120; fy += dy / d * panic[i] * 120;
+                    }
+                    pullX[i] = fx; pullY[i] = fy;
                 }
                 // Momentum: limited acceleration, then speed limits.
                 const fl = Math.sqrt(fx * fx + fy * fy), amax = P.maxAccel * quirk[i] * (1 + panic[i] * 3);
