@@ -46,7 +46,7 @@ export const ENTRIES = [
     { id: 'whale_shark', kind: 'creature', image: 'whale_shark',
         name: { de: 'Walhai', en: 'Whale shark' },
         fact: { de: 'Der Walhai ist der größte Fisch der Welt, frisst aber nur winziges Plankton.', en: 'The whale shark is the biggest fish in the world, yet it only eats tiny plankton.' } },
-    { id: 'adult_shark', kind: 'creature', image: 'player_shark',
+    { id: 'adult_shark', kind: 'creature', image: 'adult_shark',
         name: { de: 'Großer Hai', en: 'Adult shark' },
         fact: { de: 'So groß wird Sharky einmal. Erwachsene Haie ziehen ruhig ihre Bahnen und sind viel scheuer, als man denkt.', en: 'This is how big Sharky will be one day. Adult sharks cruise calmly and are much shyer than people think.' } },
     { id: 'manta', kind: 'creature', image: 'manta',

@@ -18,6 +18,8 @@ export const RHYTHM_LOOK = {
 /** The painted big corals (loaded by the title screen): a table, a brain, a fan and a staghorn thicket. While one is missing, one of the reef's own corals stands in, grown huge. */
 export const COLONY_KINDS = ['coral_table', 'coral_brain', 'coral_fan', 'coral_staghorn'];
 export const COLONY_ART = Object.fromEntries(COLONY_KINDS.map(k => [k, `img/coral/${k}.webp`]));
+/** The painted adult grey reef shark (part cards in img/parts too; loaded by the title screen). */
+export const SHARK_ART = { adult_shark: 'img/adult_shark.webp' };
 
 const hash = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
 const pick = (r, h) => r[0] + (r[1] - r[0]) * h;
