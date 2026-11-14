@@ -21,7 +21,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 19,
+    version: 20,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -571,6 +571,14 @@ export default class LevelGenerator {
             }
         }
 
+        // --- The side cave's net tangle (branches.js): a hazard, off the calm route by choice
+        {
+            const net = this.field.cave.net;
+            if (net.x >= ox && net.x < ox + CH && net.y >= oy && net.y < oy + CH) {
+                this.addHazard(chunk, 'hazard_net', net.x, net.y, new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:cave`]), 0, true);
+            }
+        }
+
         // --- Pier: deck at the surface, piles down to the rock (spans chunks) --
         const pier = this.pierAt(cx, biome);
         if (pier) this.drawPier(chunk, pier, oy, keep);
@@ -701,8 +709,12 @@ export default class LevelGenerator {
         this.coins.push({ img, r: 40, x, y, chunkKey, index });
     }
 
-    addHazard(chunk, key, x, y, rng, angle = 0) {
+    addHazard(chunk, key, x, y, rng, angle = 0, placed = false) {
         const s = this.scene, h = HAZARDS[key];
+        // The side cave holds exactly the one tangle that is put there on purpose (`placed`): its
+        // tunnel is narrow, and a second hazard would close the way.
+        const cave = this.field.cave;
+        if (!placed && x > cave.x0 - 300 && x < cave.x1 + 300 && y > cave.top - 80) return null;
         // Danger is optional (spec 5.2c): nothing harmful on or near the calm main route.
         if (Math.abs(y - this.field.routeY(x)) < ROUTE.clear + h.r) return null;
         // Wonder first: nothing harmful along the stretch where a big story event passes (the whale and her ride).

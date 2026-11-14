@@ -31,6 +31,8 @@ import { createBook } from '../game/reefbook.js';
 import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
 import SetPieceLayer from '../game/level/SetPieceLayer.js';
+import BranchLayer from '../game/level/BranchLayer.js';
+import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
@@ -184,6 +186,9 @@ export default class MainScene extends Phaser.Scene {
             : new Whale(this, this.journey, whaleAt.x, whaleAt.endX, x => this.level.field.routeY(x), (ev, x, y) => this.whaleEvent(ev, x, y));
         // The set pieces of the long sea stretches (spec 5.0e): the ghost ship, and the beacon over the grand nest.
         this.setPieces = new SetPieceLayer(this, this.level.nests[this.level.nests.length - 1]);
+        // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
+        this.pearls = this.progression.get?.('pearls', []) || [];
+        this.branch = new BranchLayer(this, this.level.field.cave, this.pearls.includes('kelp_cave'), (x, y) => this.takePearl('kelp_cave', x, y));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -496,6 +501,19 @@ export default class MainScene extends Phaser.Scene {
             .setScrollFactor(0).setDepth(99);
     }
 
+    /** The pearl of a giant clam at the end of a side way: coins, a cheer, an entry in the reef book. Once per save. */
+    takePearl(id, x, y) {
+        const de = this.lang === 'de';
+        this.pearls.push(id);
+        this.progression.set?.('pearls', this.pearls);
+        this.coins += BRANCH.coins;
+        play('nest'); play('friend');
+        this.chainMove('special');
+        this.bookEntry('giant_clam');
+        this.announce(de ? 'Eine Perle!' : 'A pearl!', `+${BRANCH.coins}`);
+        this.particles.spawn('glint', x, y, 14, { spread: 90 });
+    }
+
     /** Time counted in waves: the sea breathes with the music, one wave every two bars. */
     wavePhase() {
         return musicClock.phase(nowSeconds()).beat / (musicClock.beatsPerBar * 2);
@@ -608,6 +626,7 @@ export default class MainScene extends Phaser.Scene {
         this.progression.set?.('nest', 0);
         this.progression.set?.('banked', 0);
         this.progression.set?.('journey', []);
+        this.progression.set?.('pearls', []);
         this.world.reset();
         this.scene.restart();
     }
@@ -713,6 +732,8 @@ export default class MainScene extends Phaser.Scene {
         }
         if (x > z.storm[0] && x < z.storm[1]) { stormAt(x, y, this.time.now / 1000, add); out.x += add.x; out.y += add.y; }
         if (x > z.down[0] && x < z.down[1]) { downAt(x, y, add); out.x += add.x; out.y += add.y; }
+        const cave = this.level.field.cave;
+        if (x > cave.x0 && x < cave.x1) { caveFlow(cave, x, y, add); out.x += add.x; }      // the current in the side cave
         return out;
     }
 
@@ -1283,6 +1304,7 @@ export default class MainScene extends Phaser.Scene {
         if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = new StormLayer(this);
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
+        this.branch.update(sp, time / 1000, delta, this.particles);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);

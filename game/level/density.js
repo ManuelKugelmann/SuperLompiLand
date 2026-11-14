@@ -4,6 +4,7 @@
 import { vnoise } from './terrain.js';
 import { detour } from './weather.js';
 import { SET_PIECES, ghostShip, pinnacleTop, descentStart } from './setPieces.js';
+import { BRANCH, sideCave, ridgeTop, caveAt } from './branches.js';
 import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
 
 export const FIELD = {
@@ -69,6 +70,7 @@ const DETOUR = { y: 0, k: 0 };
 
 const SHIP_X = ghostShip().x;      // the ghost ship's place (worked out once)
 const TRENCH_FROM = BIOMES[BIOMES.length - 1].from;
+const CAVE_REACH = BRANCH.mouth + BRANCH.ends * 4;      // how far beyond mouth and exit the side cave's ridge can reach
 
 // Where the reef crest is and how far its slopes can reach (worked out once).
 const CREST_X = reefCrestX(), CREST_REACH = REEF_CREST.inset + REEF_CREST.half + 3000 / REEF_CREST.lagoonSlope;
@@ -120,6 +122,9 @@ export function createField(seed) {
         COL.fy = c0.fy + (c1.fy - c0.fy) * k; COL.open = c0.open + (c1.open - c0.open) * k; COL.sea = c0.sea + (c1.sea - c0.sea) * k;
         return COL;
     };
+
+    let cave = null;
+    const caveOf = () => cave || (cave = sideCave(routeY));      // needs the route, so it is worked out on first use
 
     const density = (x, y, withNests = true) => {
         // Two broad octaves only: big soft blobs and winding passages, no jagged detail.
@@ -180,6 +185,16 @@ export function createField(seed) {
                 }
             }
         }
+        // The side cave (branches.js): a ridge of rock under the calm route with a tunnel through it.
+        if (withNests && nests) {
+            const cv = caveOf();
+            if (x > cv.x0 - CAVE_REACH && x < cv.x1 + CAVE_REACH) {
+                const top = ridgeTop(cv, x) + BRANCH.lump * (vnoise(x / 230, 8.1, seed + 41) * 2 - 1);
+                const k = caveAt(cv, x, y, top);
+                if (k > 0) n += (FIELD.crestRock - n) * smooth01((y - top) / 100);
+                else if (k < 0) n = Math.min(n, FIELD.threshold - 0.5);
+            }
+        }
         // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.
         // Laid down last, after the calm route's lane is carved: under the ship the lane ends at the
         // keel's bed (the ship's hole is the way through), so the ship stands on rock.
@@ -215,7 +230,7 @@ export function createField(seed) {
         return { x, y: y + 12, index, grand: index === xs.length - 1, reach, biome: biomeIndexAt(x) };
     });
 
-    return { density, nests, routeY };
+    return { density, nests, routeY, cave: caveOf() };
 }
 
 /**
