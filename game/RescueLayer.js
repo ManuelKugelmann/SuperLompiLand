@@ -3,8 +3,8 @@ import { RESCUES, rescueSpots, freesRescue } from './rescues.js';
 
 export const RESCUE_LOOK = {
     near: 2600, far: 4200,   // px: a scene is built when the player is this close, removed beyond that
-    size: 150,           // px across of the caught animal
-    net: 230,            // px across of the bit of net around it
+    size: 190,           // px across of the caught animal in its trap, and of the animal once it is free
+    net: 250,            // px across of the bit of net around it while its painted trap is missing
     struggle: 9,         // px it wriggles
     glow: 240,           // px radius of the soft light that shows it from afar
     glowAlpha: 0.28,
@@ -21,6 +21,9 @@ export const RESCUE_LOOK = {
  * its happy loop, and its swim alongside the fish. Scenes are built only near the player.
  * `onFree(spot, x, y)` is called once per rescue.
  */
+/** Painted scenes (loaded by the title screen): the animal in its trap, and free. While missing: a plain shape in a bit of net. */
+export const RESCUE_ART = Object.fromEntries(RESCUES.traps.flatMap(t => [[`rescue_${t.trap}`, `img/rescue/rescue_${t.trap}.webp`], [`rescue_${t.trap}_free`, `img/rescue/rescue_${t.trap}_free.webp`]]));
+
 export default class RescueLayer {
     /** `routeY(x)` = depth of the calm route; `done` = ids already freed in this save. */
     constructor(scene, routeY, done, onFree) {
@@ -32,9 +35,10 @@ export default class RescueLayer {
     build(spot) {
         const s = this.scene, L = RESCUE_LOOK, x = spot.x, y = this.routeY(x);
         const glow = s.add.image(x, y, 'bd_glow').setDisplaySize(L.glow * 2, L.glow * 2).setTint(0xfff3b0).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
-        const img = s.textures.exists(spot.kind) ? s.add.image(x, y, spot.kind) : s.add.circle(x, y, 40, 0xffb36b);
+        const key = `rescue_${spot.trap}`, painted = s.textures.exists(key);
+        const img = painted ? s.add.image(x, y, key) : s.add.circle(x, y, 40, 0xffb36b);
         img.setDepth(4.5).setScale(L.size / Math.max(img.width, img.height));
-        const net = s.add.image(x, y, 'beat_net').setDepth(4.6).setDisplaySize(L.net, L.net);
+        const net = painted ? null : s.add.image(x, y, 'beat_net').setDepth(4.6).setDisplaySize(L.net, L.net);
         return { spot, x, y, px: x, py: y, img, glow, net, state: 'caught', left: 0, seed: x * 0.013 };
     }
 
@@ -47,8 +51,10 @@ export default class RescueLayer {
         if (a.state !== 'caught') return;
         a.state = 'happy'; a.left = RESCUE_LOOK.happyMs;
         this.done.add(a.spot.id);
+        const free = `rescue_${a.spot.trap}_free`;
+        if (this.scene.textures.exists(free) && a.img.setTexture) a.img.setTexture(free).setScale(RESCUE_LOOK.size / Math.max(a.img.width, a.img.height));
         const net = a.net; a.net = null;
-        this.scene.tweens.add({ targets: net, y: net.y + 200, angle: 70, alpha: 0, scale: net.scale * 0.6, duration: 800, ease: 'Sine.easeIn', onComplete: () => net.destroy() });
+        if (net) this.scene.tweens.add({ targets: net, y: net.y + 200, angle: 70, alpha: 0, scale: net.scale * 0.6, duration: 800, ease: 'Sine.easeIn', onComplete: () => net.destroy() });
         this.onFree(a.spot, a.x, a.y);
     }
 
@@ -71,7 +77,7 @@ export default class RescueLayer {
                 if (freesRescue(a.x, a.y, fish.x, fish.y)) { this.free(a); continue; }
                 const wx = Math.sin(t * 9 + a.seed) * L.struggle, wy = Math.cos(t * 7 + a.seed) * L.struggle * 0.6;
                 a.img.setPosition(a.x + wx, a.y + wy).setRotation(Math.sin(t * 5 + a.seed) * 0.12);
-                a.net.setRotation(Math.sin(t * 1.4 + a.seed) * 0.08);
+                a.net?.setRotation(Math.sin(t * 1.4 + a.seed) * 0.08);
                 a.glow.setAlpha(L.glowAlpha * (0.7 + 0.3 * Math.sin(t * 2.2 + a.seed)));
                 continue;
             }

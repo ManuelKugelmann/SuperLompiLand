@@ -5,7 +5,7 @@ import { PERF_TOUR, createPerfTour, perfReport } from '../game/perfTour.js';
 const biomeAt = x => (x < 5000 ? 'beach' : 'reef');
 
 test('the tour hops along the route, stays a while at each stop and ends at the last one', () => {
-    const t = createPerfTour(0, 7000, biomeAt, { ...PERF_TOUR, hop: 2400 });
+    const t = createPerfTour(0, 7000, biomeAt, { ...PERF_TOUR, hop: 2400, warmMs: 0 });
     const stops = [t.x];
     for (let i = 0; i < 2000 && !t.done; i++) if (t.step(100)) stops.push(t.x);
     assert.deepEqual(stops, [0, 2400, 4800, 7000]);
@@ -14,7 +14,7 @@ test('the tour hops along the route, stays a while at each stop and ends at the 
 });
 
 test('it keeps the worst of each number per biome and skips the frames right after a hop', () => {
-    const t = createPerfTour(0, 7000, biomeAt, { ...PERF_TOUR, hop: 2400 });
+    const t = createPerfTour(0, 7000, biomeAt, { ...PERF_TOUR, hop: 2400, warmMs: 0 });
     t.sample({ logicMs: 99, chunkMs: 99, objects: 9999, tweens: 999 });      // right at the start: not counted
     t.step(PERF_TOUR.skipMs);
     t.sample({ logicMs: 1.5, chunkMs: 8, objects: 300, tweens: 40 });
@@ -26,7 +26,7 @@ test('it keeps the worst of each number per biome and skips the frames right aft
 });
 
 test('a broken budget is named, per biome, and shows in the report', () => {
-    const t = createPerfTour(0, 7000, biomeAt, { ...PERF_TOUR, hop: 2400 });
+    const t = createPerfTour(0, 7000, biomeAt, { ...PERF_TOUR, hop: 2400, warmMs: 0 });
     for (let i = 0; i < 400 && !t.done; i++) {
         t.step(100);
         t.sample({ logicMs: t.x >= 5000 ? 6 : 1, chunkMs: 4, objects: t.x >= 5000 ? 700 : 200, tweens: 10 });
@@ -39,4 +39,11 @@ test('a broken budget is named, per biome, and shows in the report', () => {
     assert.equal(text.length, 3);
     assert.ok(text[2].includes('OVER: logicMs, objects'));
     assert.ok(!text[1].includes('OVER'));
+});
+
+test('the first seconds of the tour do not count (start-up)', () => {
+    const t = createPerfTour(0, 7000, biomeAt, { ...PERF_TOUR, hop: 2400 });
+    t.step(PERF_TOUR.skipMs + 100);
+    t.sample({ logicMs: 50, chunkMs: 50, objects: 1, tweens: 1 });
+    assert.equal(t.rows().length, 0);
 });

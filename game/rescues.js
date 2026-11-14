@@ -17,12 +17,8 @@ export const RESCUES = {
     coins: 5,
     freeRadius: 170,     // px: swimming this close frees it ...
     specialRadius: 420,  // ... and so does a special this close
-    // Who is caught, per biome (creature keys with a picture and a reef-book entry), taken in turn.
-    kinds: {
-        beach: ['friend_turtle', 'friend_snail'], mangrove: ['friend_seahorse', 'friend_turtle'], reef: ['friend_parrotfish', 'friend_seahorse'],
-        blue: ['friend_turtle', 'friend_jellyfish'], kelp: ['friend_seahorse', 'friend_nudibranch'], harbour: ['friend_turtle', 'friend_snail'],
-        wreck: ['friend_jellyfish', 'friend_turtle'], shore: ['friend_seahorse', 'friend_nudibranch'], trench: ['friend_jellyfish', 'friend_nudibranch']
-    }
+    // What it is caught in and who that is (the reef-book entry it stamps), taken in turn along the way.
+    traps: [{ trap: 'ring', kind: 'friend_parrotfish' }, { trap: 'bottle', kind: 'hermit_crab' }, { trap: 'bag', kind: 'friend_turtle' }]
 };
 
 /** Stretches of the world [x0, x1] where no small rescue stands. */
@@ -39,16 +35,14 @@ function keepOuts(cfg) {
 
 let SPOTS = null;
 
-/** Where they are, west to east: [{ id, x, kind (creature key), biome (id) }]. The same for every player. */
+/** Where they are, west to east: [{ id, x, trap, kind (reef-book entry), biome (id) }]. The same for every player. */
 export function rescueSpots(cfg = RESCUES) {
     if (cfg === RESCUES && SPOTS) return SPOTS;
-    const keep = keepOuts(cfg), out = [], turn = {};
+    const keep = keepOuts(cfg), out = [];
     for (let at = FIELD.spawn.x + cfg.first, i = 0; at < WORLD_END - cfg.every / 2; at += cfg.every, i++) {
         let x = at;
         for (const [x0, x1] of keep) if (x > x0 && x < x1) x = x1;
-        const b = BIOMES[biomeIndexAt(x)], list = cfg.kinds[b.id];
-        turn[b.id] = (turn[b.id] ?? -1) + 1;
-        out.push({ id: `r${i}`, x, kind: list[turn[b.id] % list.length], biome: b.id });
+        out.push({ id: `r${i}`, x, ...cfg.traps[i % cfg.traps.length], biome: BIOMES[biomeIndexAt(x)].id });
     }
     if (cfg === RESCUES) SPOTS = out;
     return out;

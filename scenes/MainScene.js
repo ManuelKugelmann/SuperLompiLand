@@ -39,6 +39,7 @@ import DocksLayer from '../game/level/DocksLayer.js';
 import MantaLayer from '../game/ai/MantaLayer.js';
 import SeaArchLayer from '../game/level/SeaArchLayer.js';
 import RescueLayer, { RESCUES } from '../game/RescueLayer.js';
+import BloomLayer from '../game/level/BloomLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
@@ -209,6 +210,8 @@ export default class MainScene extends Phaser.Scene {
         this.arch = new SeaArchLayer(this, seaArch(), inAir => this.throughArch(inAir), (x, y) => this.coinTaken(x, y));
         // Small rescues between the chapters (spec 5.0i): an animal in a bit of net every so often on the route.
         this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y));
+        // Moon jelly blooms drift across the route in the open seas (spec 5.0i).
+        this.blooms = new BloomLayer(this, () => this.bookEntry('friend_jellyfish'));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -1393,6 +1396,7 @@ export default class MainScene extends Phaser.Scene {
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         this.rescues?.update(sp, time / 1000, delta);
+        this.blooms.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
             const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);

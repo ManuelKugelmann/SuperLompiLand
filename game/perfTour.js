@@ -6,6 +6,7 @@ export const PERF_TOUR = {
     hop: 12000,       // px between two stops (about 80 stops along the whole journey)
     stayMs: 1800,     // ms at each stop (chunks load, things settle)
     skipMs: 500,      // ms after a hop that do not count (the jump itself builds many chunks at once)
+    warmMs: 3000,     // ms after the tour's start that do not count (start-up: first chunks, texture bakes)
     budget: { logicMs: 4, chunkMs: 15, objects: 600, tweens: 300 }
 };
 
@@ -17,7 +18,7 @@ export const PERF_TOUR = {
  */
 export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
     const rows = new Map();
-    let x = from, at = 0, done = false;
+    let x = from, at = 0, total = 0, done = false;
     const row = id => {
         if (!rows.has(id)) rows.set(id, { biome: id, logicMs: 0, worstMs: 0, sumMs: 0, chunkMs: 0, objects: 0, tweens: 0, frames: 0, all: [] });
         return rows.get(id);
@@ -27,7 +28,7 @@ export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
         get done() { return done; },
         step(ms) {
             if (done) return false;
-            at += ms;
+            at += ms; total += ms;
             if (at < cfg.stayMs) return false;
             at = 0;
             if (x >= to) { done = true; return false; }
@@ -35,7 +36,7 @@ export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
             return true;
         },
         sample(s) {
-            if (done || at < cfg.skipMs) return;
+            if (done || at < cfg.skipMs || total < cfg.warmMs) return;
             const r = row(biomeAt(x));
             // Logic: the average counts against the budget (one slow frame is a hitch, not the frame cost); the worst is shown too.
             r.all.push(s.logicMs); r.sumMs += s.logicMs; r.worstMs = Math.max(r.worstMs, s.logicMs); r.chunkMs = Math.max(r.chunkMs, s.chunkMs);

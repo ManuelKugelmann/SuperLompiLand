@@ -17,7 +17,8 @@ test('a small rescue waits every so often along the whole journey, in every biom
     }
     for (const b of BIOMES) assert.ok(spots.some(s => s.biome === b.id), `one in ${b.id}`);
     assert.equal(new Set(spots.map(s => s.id)).size, spots.length, 'ids are unique');
-    for (const s of spots) assert.ok(RESCUES.kinds[s.biome].includes(s.kind), `${s.kind} lives in ${s.biome}`);
+    for (const t of RESCUES.traps) assert.ok(spots.filter(s => s.trap === t.trap && s.kind === t.kind).length >= 5, `${t.trap} comes again and again`);
+    for (let i = 1; i < spots.length; i++) assert.notEqual(spots[i].trap, spots[i - 1].trap, 'never the same trap twice in a row');
 });
 
 test('none stands near a chapter\'s friend, a big event, a nest, the storm or the sea arch', () => {
