@@ -5,7 +5,7 @@ import { ensureFoam, SURF_ART } from './SurfLayer.js';
 export const STORM_LOOK = {
     sky: 0.6,          // how dark the sky gets in the middle of the storm
     gloom: 0.3,        // how much darker the water gets under it
-    rain: 46,          // rain streaks
+    rain: 1100,        // px above the waterline the rain falls from
     rainSpeed: 1500,   // px per second
     slant: 0.35,       // the rain falls this much sideways (the wind blows west)
     // Seen from below:
@@ -29,7 +29,7 @@ export const STORM_LOOK = {
     whirl: 0.9         // radians per second the whirl at the top of the down column turns
 };
 
-const TEX = { bands: 'storm_bands', col: 'current_col', whirl: 'current_whirl', plank: 'storm_plank', weed: 'storm_weed', edge: 'storm_edge' };
+const TEX = { rain: 'storm_rain', bands: 'storm_bands', col: 'current_col', whirl: 'current_whirl', plank: 'storm_plank', weed: 'storm_weed', edge: 'storm_edge' };
 
 /** Small deterministic random source. */
 function rnd(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -37,6 +37,19 @@ function rnd(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>>
 /** The storm's and the current's pictures, painted once (no art files needed). */
 function bake(scene) {
     const T = scene.textures, r = rnd(5);
+    if (!T.exists(TEX.rain)) {
+        // Rain: slanted streaks on one tile (one object for all of it).
+        const W = 256, H = 256, tex = T.createCanvas(TEX.rain, W, H), c = tex.getContext();
+        c.strokeStyle = 'rgba(219,232,242,0.55)'; c.lineCap = 'round';
+        for (let i = 0; i < 26; i++) {
+            const x = r() * W, y = r() * H, len = 40 + r() * 34, dx = len * STORM_LOOK.slant;
+            c.lineWidth = 1.5 + r() * 1.5;
+            for (const ox of [-W, 0, W]) for (const oy of [-H, 0, H]) {
+                c.beginPath(); c.moveTo(x + ox, y + oy); c.lineTo(x + ox - dx, y + oy + len); c.stroke();
+            }
+        }
+        tex.refresh();
+    }
     if (!T.exists(TEX.bands)) {
         // Wave shadows: soft dark bands across the light, strongest at the top, tiling sideways.
         const W = 512, H = 256, tex = T.createCanvas(TEX.bands, W, H), c = tex.getContext();
@@ -157,11 +170,23 @@ export default class StormLayer {
         // In front of the world: the light goes out of the water too, more on the storm's side.
         this.gloom = scene.add.rectangle(0, 0, W, H, 0x0e1a26, 0).setOrigin(0).setScrollFactor(0).setDepth(6.5).setVisible(false);
         this.edge = scene.add.image(0, 0, TEX.edge).setOrigin(0).setScrollFactor(0).setDisplaySize(W, H).setDepth(6.49).setVisible(false);
-        // One tile tall (stretched over the view), so it only repeats sideways.
-        // A wall of darker water at each end of the storm (world space): its edge is a place you see
-        // coming. Drawn once as gradient quads (no stretched texture, so no edge seams).
+        this.bands = scene.add.tileSprite(0, 0, W, H, TEX.bands).setOrigin(0).setScrollFactor(0).setDepth(5.65).setVisible(false);
+        this.bands.setTileScale(H / 256, H / 256);   // one tile tall (stretched over the view), so it only repeats sideways
+        this.cols = downwelling();
+        // Everything else exists only while its feature is within about a screen (object budget):
+        this.stormSet = null;     // buildStorm()
+        this.currentSet = null;   // buildCurrent()
+        this.nextBubbles = 0;
+        this.rand = rnd(9);
+    }
+
+    /** The storm's own things: walls of dark water at its ends, the churned underside, rain, torn foam and debris. */
+    buildStorm() {
+        const scene = this.scene, W = scene.scale.width, L = STORM_LOOK, R = this.rand, o = {};
         const sw = L.wall, rampEnd = WEATHER.storm.ramp, C = 0x08121e;
         const stops = [[0, 0], [0.22, 0.2], [0.4, 0.85], [0.6, 1], [1, 0.38]];   // across: share of the width, alpha
+        // A wall of darker water at each end of the storm (world space): its edge is a place you see
+        // coming. Drawn once as gradient quads (no stretched texture, so no edge seams).
         const wall = (x0, dir) => {
             const g = scene.add.graphics().setDepth(2.4).setAlpha(sw.alpha).setVisible(false);   // behind the play plane: the player stays clear
             const width = sw.out + rampEnd, deep = sw.depth * 0.7;
@@ -175,52 +200,46 @@ export default class StormLayer {
             g.span = [Math.min(x0, x0 + dir * width), Math.max(x0, x0 + dir * width)];
             return g;
         };
-        this.walls = [wall(this.span.x0 - sw.out, 1), wall(this.span.x1 + sw.out, -1)];
-        this.bands = scene.add.tileSprite(0, 0, W, H, TEX.bands).setOrigin(0).setScrollFactor(0).setDepth(5.65).setVisible(false);
-        this.bands.setTileScale(H / 256, H / 256);
-        this.under = L.underside.map(u => scene.add.tileSprite(0, u.y, W + 400, u.h, SURF_ART.line.key).setOrigin(0, 0.5)
+        o.walls = [wall(this.span.x0 - sw.out, 1), wall(this.span.x1 + sw.out, -1)];
+        o.under = L.underside.map(u => scene.add.tileSprite(0, u.y, W + 400, u.h, SURF_ART.line.key).setOrigin(0, 0.5)
             .setDepth(6.4).setTint(u.tint).setVisible(false));
-        this.rain = Array.from({ length: L.rain }, (_, i) => {
-            const r = scene.add.rectangle(0, 0, 3, 46 + (i % 3) * 18, 0xdbe8f2, 0.5).setScrollFactor(0, 1).setDepth(-28.2).setVisible(false)
-                .setRotation(L.slant);
-            r.sx = ((i * 0.6180339) % 1) * (W + 300); r.fall = ((i * 0.3819) % 1);
-            return r;
-        });
-        const R = rnd(9);
-        const flyer = (key, frame, i) => {
-            const o = scene.add.image(0, 0, key, frame).setDepth(6.3).setVisible(false);
-            o.life = -R() * 2; o.vx = 0; o.spin = 0;
-            return o;
+        o.rain = scene.add.tileSprite(0, -L.rain, W, L.rain, TEX.rain).setOrigin(0).setScrollFactor(0, 1).setDepth(-28.2).setVisible(false);
+        const flyer = (key, frame) => {
+            const f = scene.add.image(0, 0, key, frame).setDepth(6.3).setVisible(false);
+            f.life = -R() * 2; f.vx = 0; f.spin = 0;
+            return f;
         };
         const puffFrames = scene.textures.get(SURF_ART.puffs.key).frameTotal > 2;
-        this.torn = Array.from({ length: L.torn }, (_, i) => flyer(SURF_ART.puffs.key, puffFrames ? i % 4 : undefined, i));
-        this.debris = Array.from({ length: L.debris }, (_, i) => flyer(i % 2 ? TEX.weed : TEX.plank, undefined, i));
-        // The downwelling's two columns: streaks at two depths, a whirl at the top of the one going down.
-        const d = WEATHER.down, cols = downwelling(), top = d.top, bottom = d.routeY + 250;
-        this.cols = cols;
-        this.columns = [];
+        o.torn = Array.from({ length: L.torn }, (_, i) => flyer(SURF_ART.puffs.key, puffFrames ? i % 4 : undefined));
+        o.debris = Array.from({ length: L.debris }, (_, i) => flyer(i % 2 ? TEX.weed : TEX.plank));
+        o.all = [...o.walls, ...o.under, o.rain, ...o.torn, ...o.debris];
+        return o;
+    }
+
+    /** The downwelling's two columns: streaks at three depths, a whirl at the top of the one going down. */
+    buildCurrent() {
+        const scene = this.scene, L = STORM_LOOK, d = WEATHER.down, cols = this.cols, top = d.top, bottom = d.routeY + 250, o = { columns: [] };
         // Each column: three stacked strips per depth of streaks; the end strips fade (per-corner
         // alpha), so the current eases in under the surface and out at depth. All in world space,
         // exactly where the water pulls.
         const [f0, f1] = L.fadeEnds, mid = bottom - top - f0 - f1;
         for (const [x, dir] of [[cols.down, 1], [cols.up, -1]]) {
-            L.streak.forEach((s, i) => {
-                const w = d.halfWidth * 2 * s.width;
+            L.streak.forEach((st, i) => {
+                const w = d.halfWidth * 2 * st.width;
                 const strip = (y, h, a0, a1) => {
-                    const t = scene.add.tileSprite(x, y, w, h, TEX.col).setOrigin(0.5, 0).setDepth(2.6 + i * 0.05)
-                        .setTileScale(s.scale, s.scale).setVisible(false);
-                    t.setAlpha(a0 * s.alpha, a0 * s.alpha, a1 * s.alpha, a1 * s.alpha);
-                    t.dir = dir; t.speed = s.speed; t.cx = x; t.y0 = y - top; t.phase = i * 1.7 + (dir > 0 ? 0 : 3);
-                    this.columns.push(t);
+                    const t = scene.add.tileSprite(x, y, w, h, TEX.col).setOrigin(0.5, 0).setDepth(2.6 + i * 0.05).setTileScale(w / 256, st.scale);   // one tile across: the soft sides are the strip's sides
+                    t.setAlpha(a0 * st.alpha, a0 * st.alpha, a1 * st.alpha, a1 * st.alpha);
+                    t.dir = dir; t.speed = st.speed; t.cx = x; t.y0 = y - top; t.phase = i * 1.7 + (dir > 0 ? 0 : 3);
+                    o.columns.push(t);
                 };
                 strip(top, f0, 0, 1); strip(top + f0, mid, 1, 1); strip(top + f0 + mid, f1, 1, 0);
             });
         }
         // The whirl turns in a flattened container, so it reads as a funnel seen from the side.
-        this.whirlSpin = scene.add.image(0, 0, TEX.whirl);
-        this.whirl = scene.add.container(cols.down, top + 10, [this.whirlSpin]).setDepth(2.9).setScale(2.6, 1.1).setVisible(false);
-        this.nextBubbles = 0;
-        this.rand = R;
+        o.spin = scene.add.image(0, 0, TEX.whirl);
+        o.whirl = scene.add.container(cols.down, top + 10, [o.spin]).setDepth(2.9).setScale(2.6, 1.1);
+        o.all = [...o.columns, o.whirl];
+        return o;
     }
 
     /** Per frame; `camX`, `camY` = the camera's top left in the world, `particles` = the scene's particle layer. */
@@ -235,18 +254,25 @@ export default class StormLayer {
         const ahead = stormShare(camX + W * 2), behind = stormShare(camX - W);
         const diff = Math.max(Math.abs(ahead - kl), Math.abs(behind - kr)) * (1 - Math.min(kl, kr));
         this.edge.setVisible(diff > 0.01).setAlpha(Math.min(1, diff * L.edge)).setFlipX(behind - kr > ahead - kl);
-        for (const w of this.walls) w.setVisible(w.span[1] > camX - 200 && w.span[0] < camX + W + 200 && camY < L.wall.depth);
-        const wet = k > 0.01 && camY < 60;      // rain only where the sky is in view
-        for (const r of this.rain) {
-            r.setVisible(wet);
-            if (!wet) continue;
-            r.fall = (r.fall + L.rainSpeed * dt / 1100) % 1;
-            r.setPosition(((r.sx - r.fall * 1100 * L.slant) % (W + 300) + W + 300) % (W + 300) - 150, -1100 + r.fall * 1100).setAlpha(0.55 * k);
+        // The storm's own objects exist only within about a screen of it (built and dropped here).
+        const nearStorm = camX + 2 * W > this.span.x0 - L.wall.out && camX - W < this.span.x1 + L.wall.out;
+        if (nearStorm && !this.stormSet) this.stormSet = this.buildStorm();
+        if (!nearStorm && this.stormSet) { for (const o of this.stormSet.all) o.destroy(); this.stormSet = null; }
+        const set = this.stormSet;
+        if (set) {
+            for (const w of set.walls) w.setVisible(w.span[1] > camX - 200 && w.span[0] < camX + W + 200 && camY < L.wall.depth);
+            const wet = k > 0.01 && camY < 60;      // rain only where the sky is in view
+            set.rain.setVisible(wet);
+            if (wet) {
+                set.rain.setAlpha(k);
+                set.rain.tilePositionY = -t * L.rainSpeed;
+                set.rain.tilePositionX = t * L.rainSpeed * L.slant + camX * 0.05;
+            }
         }
         // Seen from below: only while the surface is near the view.
         const shallow = Phaser.Math.Clamp(1 - camY / L.bandsReach, 0, 1);
         const from = on && camY < 400;
-        this.under.forEach((u, i) => {
+        if (set) set.under.forEach((u, i) => {
             const cfg = L.underside[i];
             u.setVisible(from);
             if (!from) return;
@@ -273,15 +299,21 @@ export default class StormLayer {
             o.setPosition(sx, 10 + R() * S.depth * 0.9).setVisible(true).setScale(scale * (0.6 + R() * 0.7)).setAlpha(0.6 + R() * 0.35);
             o.vx = -(speeds[0] + R() * (speeds[1] - speeds[0])) * ky; o.spin = (R() - 0.5) * spin; o.seed = R() * 9; o.life = 6;
         };
-        for (const o of this.torn) fly(o, L.tornSpeed, 0.55, 1.5);
-        for (const o of this.debris) fly(o, L.debrisSpeed, 1, 3.2);
+        if (set) {
+            for (const o of set.torn) fly(o, L.tornSpeed, 0.55, 1.5);
+            for (const o of set.debris) fly(o, L.debrisSpeed, 1, 3.2);
+        }
         if (on && camY < S.depth && R() < near * 0.5) {
             particles.spawn('bubble', camX + W * (0.3 + R() * 0.8), 20 + R() * S.depth * 0.8, 2, { vx: -600 * near, vy: 0, spread: 60 });
         }
 
         // The downwelling: streaks pulled down one column and up the other, a whirl over the first.
         const d = WEATHER.down;
-        for (const c of this.columns) {
+        const nearCurrent = camX + 2 * W > this.cols.down - d.halfWidth && camX - W < this.cols.up + d.halfWidth;
+        if (nearCurrent && !this.currentSet) this.currentSet = this.buildCurrent();
+        if (!nearCurrent && this.currentSet) { for (const o of this.currentSet.all) o.destroy(); this.currentSet = null; }
+        const cur = this.currentSet;
+        if (cur) for (const c of cur.columns) {
             const seen = c.cx > camX - d.halfWidth - W && c.cx < camX + W + d.halfWidth + W;   // from a screen away
             c.setVisible(seen);
             if (!seen) continue;
@@ -289,9 +321,11 @@ export default class StormLayer {
             c.tilePositionY = (c.y0 - c.dir * t * c.speed) / c.tileScaleY;
             c.x = c.cx + Math.sin(t * 0.6 + c.phase) * L.sway;   // the strip sways (its soft sides stay soft)
         }
-        const ws = this.cols.down > camX - W && this.cols.down < camX + 2 * W;
-        this.whirl.setVisible(ws);
-        if (ws) this.whirlSpin.rotation = -t * L.whirl;
+        if (cur) {
+            const ws = this.cols.down > camX - W && this.cols.down < camX + 2 * W;
+            cur.whirl.setVisible(ws);
+            if (ws) cur.spin.rotation = -t * L.whirl;
+        }
         this.nextBubbles -= delta;
         if (this.nextBubbles > 0) return;
         this.nextBubbles = L.bubbleMs;
