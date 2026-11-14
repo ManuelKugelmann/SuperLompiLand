@@ -5,6 +5,7 @@
 // speeds in px per 60 Hz step, to add to the flow field.
 
 import { BIOMES } from './biomes.js';
+import { chapters } from '../journey.js';
 
 export const WEATHER = {
     storm: {
@@ -18,7 +19,11 @@ export const WEATHER = {
         wind: 0.28         // px/step per step the wind takes from anything in the air
     },
     down: {
-        biome: 'blue', at: 0.14,  // which sea, and where in it the current pulls down
+        seas: ['blue', 'wreck'],   // in which seas such currents run ...
+        at: 0.14,          // ... the first one this share of the way into each ...
+        every: 35000,      // ... and again every so many px (spec 5.0i)
+        margin: 8000,      // px before the sea's end where the last one must have come up again
+        keep: 5000,        // px they stay away from the storm and from the journey's friends and events
         span: 4400,        // px further east it comes up again
         halfWidth: 380,    // of each column; swim sideways this far and you are out
         top: 140,          // the columns begin this far under the surface
@@ -31,7 +36,7 @@ export const WEATHER = {
 const clamp01 = v => (v <= 0 ? 0 : v >= 1 ? 1 : v);
 const smooth = v => { const t = clamp01(v); return t * t * (3 - 2 * t); };
 const biome = id => BIOMES.find(b => b.id === id);
-let STORM_SPAN = null, COLUMNS = null;      // the shipped storm and current: worked out once (asked for many times a frame)
+let STORM_SPAN = null, PAIRS = null;      // the shipped storm and current: worked out once (asked for many times a frame)
 
 /** The storm's stretch of the world: { x0, x1 }. */
 export function stormSpan(cfg = WEATHER.storm) {
@@ -57,18 +62,37 @@ export function stormAt(x, y, t, out = { x: 0, y: 0 }, cfg = WEATHER.storm) {
     return out;
 }
 
-/** Where the current goes down and where it comes up again: { down, up } (world x). */
-export function downwelling(cfg = WEATHER.down) {
-    if (cfg === WEATHER.down && COLUMNS) return COLUMNS;
-    const b = biome(cfg.biome), down = b.from + b.width * cfg.at, cols = { down, up: down + cfg.span };
-    if (cfg === WEATHER.down) COLUMNS = cols;
-    return cols;
+/** Every downwelling of the world, west to east: [{ down, up }] = where each goes down and where it comes up again (world x). */
+export function downwellings(cfg = WEATHER.down) {
+    if (cfg === WEATHER.down && PAIRS) return PAIRS;
+    const { x0, x1 } = stormSpan(), keep = [[x0, x1]], out = [];
+    for (const c of chapters()) {
+        keep.push([c.x, c.x]);
+        if (c.event) keep.push([c.event.x, c.event.endX]);
+    }
+    for (const id of cfg.seas) {
+        const b = biome(id);
+        for (let down = b.from + b.width * cfg.at; down + cfg.span + cfg.margin < b.from + b.width; down += cfg.every) {
+            const from = down - cfg.ramp - cfg.keep, to = down + cfg.span + cfg.ramp + cfg.keep;
+            if (!keep.some(([a, z]) => to > a && from < z)) out.push({ down, up: down + cfg.span });
+        }
+    }
+    if (cfg === WEATHER.down) PAIRS = out;
+    return out;
+}
+
+/** The downwelling nearest to x (the first one when no x is given): { down, up }. */
+export function downwelling(x, cfg = WEATHER.down) {
+    const all = downwellings(cfg);
+    let best = all[0];
+    if (x !== undefined) for (const p of all) if (Math.abs((p.down + p.up) / 2 - x) < Math.abs((best.down + best.up) / 2 - x)) best = p;
+    return best;
 }
 
 /** The downwelling's water velocity: straight down in the one column, straight up in the other, between `top` and a little under the route. */
 export function downAt(x, y, out = { x: 0, y: 0 }, cfg = WEATHER.down) {
     out.x = 0; out.y = 0;
-    const { down, up } = downwelling(cfg), bottom = cfg.routeY + 250;
+    const { down, up } = downwelling(x, cfg), bottom = cfg.routeY + 250;
     if (y < cfg.top || y > bottom || x < down - cfg.halfWidth || x > up + cfg.halfWidth) return out;
     const ends = smooth((y - cfg.top) / 200) * smooth((bottom - y) / 300);
     const col = c => smooth(1 - Math.abs(x - c) / cfg.halfWidth);
@@ -82,7 +106,7 @@ export function downAt(x, y, out = { x: 0, y: 0 }, cfg = WEATHER.down) {
  * downwelling, it runs deep; the way down and up is gentle.
  */
 export function detour(x, out = { y: 0, k: 0 }) {
-    const s = WEATHER.storm, d = WEATHER.down, { down, up } = downwelling(d);
+    const s = WEATHER.storm, d = WEATHER.down, { down, up } = downwelling(x, d);
     const ks = stormShare(x, s);
     const kd = Math.min(smooth(0.5 + (x - down) / d.ramp), smooth(0.5 + (up - x) / d.ramp));
     if (ks >= kd) { out.y = s.routeY; out.k = ks; } else { out.y = d.routeY; out.k = kd; }
@@ -91,12 +115,12 @@ export function detour(x, out = { y: 0, k: 0 }) {
 
 /** Is x within `range` px of the storm or of the downwelling's columns? (their looks are only built when one is near) */
 export function weatherNear(x, range) {
-    const { x0, x1 } = stormSpan(), { down, up } = downwelling();
+    const { x0, x1 } = stormSpan(), { down, up } = downwelling(x);
     return (x > x0 - range && x < x1 + range) || (x > down - range && x < up + range);
 }
 
-/** The stretches of the world (x) in which the storm and the downwelling can act at all: { storm: [x0, x1], down: [x0, x1] }. */
+/** The stretches of the world (x) in which the storm and the downwellings can act at all: { storm: [x0, x1], downs: [[x0, x1], ...] }. */
 export function weatherZones() {
-    const { x0, x1 } = stormSpan(), { down, up } = downwelling();
-    return { storm: [x0, x1], down: [down - WEATHER.down.halfWidth, up + WEATHER.down.halfWidth] };
+    const { x0, x1 } = stormSpan();
+    return { storm: [x0, x1], downs: downwellings().map(p => [p.down - WEATHER.down.halfWidth, p.up + WEATHER.down.halfWidth]) };
 }

@@ -799,7 +799,7 @@ export default class MainScene extends Phaser.Scene {
             ripAt(x, y, waves, REEF_CREST.passY, add); out.x += add.x;      // the drawback runs out through the reef pass
         }
         if (x > z.storm[0] && x < z.storm[1]) { stormAt(x, y, this.time.now / 1000, add); out.x += add.x; out.y += add.y; }
-        if (x > z.down[0] && x < z.down[1]) { downAt(x, y, add); out.x += add.x; out.y += add.y; }
+        if (z.downs.some(d => x > d[0] && x < d[1])) { downAt(x, y, add); out.x += add.x; out.y += add.y; }
         const cave = this.level.field.cave;
         if (x > cave.x0 && x < cave.x1) { caveFlow(cave, x, y, add); out.x += add.x; }      // the current in the side cave
         return out;

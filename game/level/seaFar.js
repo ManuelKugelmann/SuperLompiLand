@@ -10,7 +10,7 @@ export const SEA_FAR = {
     socketX: [0.92, 0.12],   // where its foot stands on the screen (share of the width): when it first shows, and at the island's edge
     socketAlpha: [0.35, 0.7],   // how solid it is: when it first shows, and at the island's edge
     firstPass: 4,         // s after reaching open sea before the first big shape passes: everyone sees one
-    passEvery: [16, 34],  // s between two big shapes passing
+    passEvery: [11, 19],  // s between two big shapes passing (about every 15 s, spec 5.0i)
     passTime: [22, 34],   // s one takes to cross the view
     passScale: [0.5, 1],  // how big (near) or small (far) it is
     kinds: ['manta', 'shark', 'school']

@@ -327,7 +327,11 @@ export default class StormLayer {
         }
 
         // The downwelling: streaks pulled down one column and up the other, a whirl over the first.
-        const d = WEATHER.down;
+        const d = WEATHER.down, cols = downwelling(camX + W / 2);
+        if (cols !== this.cols) {      // another one is the nearest now: its look is built where it is
+            if (this.currentSet) { for (const o of this.currentSet.all) o.destroy(); this.currentSet = null; }
+            this.cols = cols;
+        }
         const nearCurrent = camX + 2 * W > this.cols.down - d.halfWidth && camX - W < this.cols.up + d.halfWidth;
         if (nearCurrent && !this.currentSet) this.currentSet = this.buildCurrent();
         if (!nearCurrent && this.currentSet) { for (const o of this.currentSet.all) o.destroy(); this.currentSet = null; }

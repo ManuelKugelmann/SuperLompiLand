@@ -28,7 +28,7 @@ export const RESCUES = {
 /** Stretches of the world [x0, x1] where no small rescue stands. */
 function keepOuts(cfg) {
     const out = setPieceStretches(), w = weatherZones(), ship = ghostShip().x;
-    out.push(w.storm, w.down, [ship - SET_PIECES.ship.clear, ship + SET_PIECES.ship.clear]);
+    out.push(w.storm, ...w.downs, [ship - SET_PIECES.ship.clear, ship + SET_PIECES.ship.clear]);
     for (const c of chapters()) {
         out.push([c.x - JOURNEY.clear, c.x + JOURNEY.clear]);
         if (c.event) out.push([c.event.x - JOURNEY.eventClear, c.event.endX + JOURNEY.eventClear]);

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WEATHER, stormSpan, stormShare, stormAt, downwelling, downAt, detour, weatherNear } from '../game/level/weather.js';
+import { WEATHER, stormSpan, stormShare, stormAt, downwelling, downwellings, downAt, detour, weatherNear } from '../game/level/weather.js';
+import { chapters } from '../game/journey.js';
 import { BIOMES, isSea } from '../game/level/biomes.js';
 import { createField, ROUTE, FIELD } from '../game/level/density.js';
 
@@ -59,4 +60,19 @@ test('weather is near around the storm and the columns, and nowhere else', () =>
     for (const x of [x0 - 3000, (x0 + x1) / 2, x1 + 3000, down - 3000, (down + up) / 2, up + 3000]) assert.ok(weatherNear(x, 4000), `near at ${x}`);
     assert.ok(!weatherNear(0, 4000));
     assert.ok(!weatherNear((up + x0) / 2, 4000), 'not on the kelp island between them');
+});
+
+test('downwellings come again and again in both open seas, never at the storm, a friend or the whale (spec 5.0i)', () => {
+    const all = downwellings(), f = createField(1337), { x0, x1 } = stormSpan(), d = WEATHER.down;
+    assert.ok(all.length >= 6, `${all.length} pairs`);
+    for (const id of d.seas) assert.ok(all.filter(p => BIOMES.find(b => b.id === id).from < p.down && p.up < BIOMES.find(b => b.id === id).from + BIOMES.find(b => b.id === id).width).length >= 2, `several in ${id}`);
+    for (let i = 1; i < all.length; i++) assert.ok(all[i].down - all[i - 1].up > 20000, 'far apart');
+    for (const p of all) {
+        assert.ok(isSea(p.down) && isSea(p.up));
+        assert.ok(p.up + d.ramp < x0 || p.down - d.ramp > x1, 'not at the storm');
+        for (const c of chapters()) assert.ok(c.x < p.down - d.ramp || c.x > p.up + d.ramp, `not at ${c.id}'s friend`);
+        assert.ok(Math.abs(f.routeY((p.down + p.up) / 2) - d.routeY) < 5, 'the route runs deep between its columns');
+        assert.ok(Math.abs(downAt(p.down, 1000).y - d.speed) < 1e-9 && Math.abs(downAt(p.up, 1000).y + d.speed) < 1e-9);
+        assert.equal(downwelling((p.down + p.up) / 2), p);
+    }
 });
