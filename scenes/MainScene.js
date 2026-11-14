@@ -55,7 +55,6 @@ import DumboLayer from '../game/level/DumboLayer.js';
 import DugongLayer from '../game/level/DugongLayer.js';
 import { powersOf, magnetStep, POWER_WORDS } from '../game/friendPowers.js';
 import { setPlaying } from '../game/pwa.js';
-import { TRAILS, trailOf, chooseTrail, trailLabel } from '../game/trails.js';
 import BonusCoins from '../game/level/BonusCoins.js';
 import DolphinLayer from '../game/level/DolphinLayer.js';
 import OctopusLayer from '../game/ai/OctopusLayer.js';
@@ -350,9 +349,6 @@ export default class MainScene extends Phaser.Scene {
         // Start at the last nest reached (kept across sessions), else the start pool.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
         this.banked = this.progression.get?.('banked', 0) || 0;
-        // Swim trails bought with coins (spec 5.0r): which are owned, which is worn.
-        this.trailsOwned = this.progression.get?.('trails', []) || [];
-        this.trailWorn = this.progression.get?.('trail', 'none') || 'none';
         this.character = getCharacter(this.registry.get('character') || loadSelectedId());
         const start = this.startPoint();
         this.camX = start.x - W / 2;
@@ -886,24 +882,6 @@ export default class MainScene extends Phaser.Scene {
         return musicClock.phase(nowSeconds()).beat / (musicClock.beatsPerBar * 2);
     }
 
-    /** Swam into a nest: coins are safe, this is the new restart point. */
-    /** The trail shop's lines for the HUD: every trail with its name, price or tick, and what a tap does. */
-    trailItems() {
-        const de = this.lang === 'de';
-        return TRAILS.list.map(t => ({
-            label: trailLabel(t, this.trailsOwned, this.trailWorn, this.lang).toUpperCase(),
-            color: t.id === this.trailWorn ? 0x2e7d32 : (t.price === 0 || this.trailsOwned.includes(t.id) ? 0x1d6f9a : 0x8a6d1a),
-            callback: () => {
-                const r = chooseTrail(t.id, this.coins, this.trailsOwned);
-                if (!r.ok) { this.announce('', de ? `Noch ${r.missing} Münzen sammeln!` : `Collect ${r.missing} more coins!`); return; }
-                if (r.coins !== this.coins) { play('nest'); this.announce(de ? 'Gekauft!' : 'Bought!', t.name[this.lang] || t.name.en); }
-                this.coins = r.coins; this.banked = Math.min(this.banked, this.coins);
-                this.trailsOwned = r.owned; this.trailWorn = r.worn;
-                this.progression.set?.('trails', this.trailsOwned); this.progression.set?.('trail', this.trailWorn); this.progression.set?.('banked', this.banked);
-            }
-        }));
-    }
-
     /** A hidden pearl is found (SecretLayer): kept, a chime, a few coins and "Perlen 2/3 · <area>". */
     pearlFound(s) {
         this.progression.set?.('secrets', [...this.pearls]);
@@ -922,6 +900,7 @@ export default class MainScene extends Phaser.Scene {
         if (w) this.time.delayedCall(2600, () => this.announce('', w[this.lang] || w.en));
     }
 
+    /** Swam into a nest: coins are safe, this is the new restart point. */
     reachNest(nest) {
         this.shellUsed = 0;      // Schildi's shell is ready again
         if (this.perfTour) return;      // the perf tour only measures: no cheers, questions or end screen
@@ -1704,14 +1683,6 @@ export default class MainScene extends Phaser.Scene {
             this.particles.spawn('bubble', view.x - v.x * 3, view.y - v.y * 3, 1, { radius: 20, spread: 20 });
         }
 
-        // The trail Lompi wears (bought with coins): a particle behind the tail while swimming.
-        const worn = TRAILS.enabled ? trailOf(this.trailWorn) : null;
-        this.wornAt = (this.wornAt || 0) - delta;
-        if (worn?.preset && speed > TRAILS.minSpeed && !this.fish.inAir && this.wornAt <= 0) {
-            this.wornAt = TRAILS.everyMs;
-            const back = this.fish.radius * 0.9 * this.fish.facing;
-            this.particles.spawn(worn.preset, view.x - back * Math.cos(view.rotation), view.y - back * Math.sin(view.rotation), 2, { radius: 14, spread: 16 });
-        }
         // Contrails: at high speed the fin tips draw thin bubble streaks (vortex trails).
         if (speed > CONTRAIL.speed && !this.fish.inAir) {
             const r = this.fish.radius, f = this.fish.facing, a = view.rotation;
