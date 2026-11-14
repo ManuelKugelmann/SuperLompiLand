@@ -115,7 +115,7 @@ const PLANKTON = { speed: 3, everyMs: 30, from: 0.25 };
 const BOOK = { scanMs: 300, seePx: 420 };
 // The fish's own light in the dark: a soft glow just behind it (px across, strength at the deepest),
 // so it lights the water and rock round it and never veils the fish itself (it stays the clearest thing).
-const FISH_LIGHT = { size: 760, alpha: 0.85, depth: 4.5 };
+const FISH_LIGHT = { size: 760, alpha: 0.85, depth: 0.9 };      // depth: under the creatures on the ground (1) and the fish, over the rock: it lights the scene, never veils a face
 /** How high coins hop on each beat (px). */
 const COIN_BOB_PX = 12;
 

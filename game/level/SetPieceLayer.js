@@ -31,7 +31,7 @@ export const SET_LOOK = {
     column: [240, 40],      // a nest's column of light: its width, and how far under the surface it ends
     columnAlpha: 0.55,
     columnTint: 0xffc84a,   // warm gold: home is down here
-    nestColumnDepth: 3.9,   // an ordinary nest's column stands behind the creatures (tester: on top it washed the starfish on the first nest out to a pale blob)
+    nestColumnDepth: 0.8,   // an ordinary nest's column stands behind the creatures (ground ones draw at 1, swimmers at 4; the nest plate at -1) (tester: on top it washed the starfish on the first nest out to a pale blob)
     columnDepth: 43,        // above the scene's light and vignette layers, so it reads in bright water too
     sparks: 5,              // sparkles rising in the column nearest to the fish ...
     sparkRise: 170,         // ... at this many px per second ...
