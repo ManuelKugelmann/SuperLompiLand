@@ -35,3 +35,31 @@ export function frontSlot(cfg = FRONT) {
     if (cfg === FRONT) SLOT = slot;
     return slot;
 }
+
+/**
+ * The front itself (open-sea idea #5): tannin-dark mangrove water on the west meets clearer
+ * water on the east along the seam. Where they meet the surface water converges: a foam line
+ * with weed caught in it, and a jet that carries the fish east across the seam just under the
+ * surface. FrontLayer.js draws it; `jetAt` is the push for MainScene.waterAt.
+ */
+export const FRONT_LOOK = {
+    haze: 1100,          // px the dark water reaches west of the seam (fading out)
+    edge: 140,           // px the seam itself is wide (the sharp part of the change)
+    jet: {
+        top: 40,         // px under the surface where the jet starts ...
+        bottom: 620,     // ... and how deep it reaches (fading)
+        half: 1100,      // px either side of the seam it runs
+        push: 8          // px per 60 Hz step at its heart (a current to ride: the chain counts from 6)
+    }
+};
+
+const smooth = v => (v <= 0 ? 0 : v >= 1 ? 1 : v * v * (3 - 2 * v));
+
+/** The jet's push at (x, y), `surface` = the water surface's y there: writes px per 60 Hz step east into add.{x, y}. */
+export function jetAt(x, y, surface, add, cfg = FRONT_LOOK) {
+    const J = cfg.jet, s = frontSlot(), d = Math.abs(x - s.x), under = y - surface;
+    const k = smooth(1 - d / J.half) * smooth((under - J.top) / 80) * smooth((J.bottom - under) / 200);
+    add.x = J.push * k;
+    add.y = 0;
+    return add;
+}

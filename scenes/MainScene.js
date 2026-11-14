@@ -59,6 +59,8 @@ import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from 
 import WhaleSharkLayer from '../game/level/WhaleSharkLayer.js';
 import CoinGlow from '../game/fx/CoinGlow.js';
 import { slipAt } from '../game/level/whaleShark.js';
+import FrontLayer from '../game/level/FrontLayer.js';
+import { frontSlot, jetAt, FRONT_LOOK } from '../game/level/front.js';
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
@@ -227,6 +229,8 @@ export default class MainScene extends Phaser.Scene {
         // The reef's wonder beat (spec 9.1): a manta glides to and fro high over the reef.
         this.manta = new MantaLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('manta'));
         // The whale shark in the ship graveyard's sea, with a slipstream along its back (5.0k #4).
+        // The ocean front in the mangroves: tea-dark water meets clear, a foam line, a jet east (5.0k #5).
+        this.front = new FrontLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('front'));
         this.whaleShark = new WhaleSharkLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('whale_shark'));
         // The rocky shore's set piece (spec 5.0g): the sea arch, with its arc of coins for a jump through it.
         this.arch = new SeaArchLayer(this, seaArch(), inAir => this.throughArch(inAir), (x, y) => this.coinTaken(x, y));
@@ -916,6 +920,8 @@ export default class MainScene extends Phaser.Scene {
         if (z.downs.some(d => x > d[0] && x < d[1])) { downAt(x, y, add); out.x += add.x; out.y += add.y; }
         const cave = this.level.field.cave;
         if (x > cave.x0 && x < cave.x1) { caveFlow(cave, x, y, add); out.x += add.x; }      // the current in the side cave
+        const fr = this.frontSeam ?? (this.frontSeam = frontSlot().x);      // the front's jet, along the surface across the seam
+        if (Math.abs(x - fr) < FRONT_LOOK.jet.half && y < FRONT_LOOK.jet.bottom + 200) { jetAt(x, y, this.surface.heightAt(x, this.time.now / 1000), add); out.x += add.x; }
         const ws = this.whaleShark?.pose;      // its slipstream, only while it is built
         if (ws && Math.abs(x - ws.x) < 1600) { slipAt(x, y, ws, add); out.x += add.x; }
         if (this.ventField?.live) { this.ventField.flowAt(x, y, add); out.y += add.y; }      // warm water rising over the smokers
@@ -1536,6 +1542,7 @@ export default class MainScene extends Phaser.Scene {
         this.docks.update(sp, time / 1000);
         this.manta.update(sp, time / 1000, delta);
         this.whaleShark.update(sp, time / 1000, delta);
+        this.front.update(sp, time / 1000);
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start

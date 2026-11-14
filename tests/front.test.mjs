@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FRONT, frontSlot } from '../game/level/front.js';
+import { FRONT, FRONT_LOOK, frontSlot, jetAt } from '../game/level/front.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { FIELD, createField } from '../game/level/density.js';
 import { rescueSpots } from '../game/rescues.js';
@@ -26,4 +26,12 @@ test('no nest, rescue, friend or set piece lies in it, and it is on the world ma
     const map = worldMap();
     assert.ok(map.features.some(ft => ft.kind === 'front' && ft.x0 === s.x0 && ft.x1 === s.x1));
     for (const ft of map.features) if (SET_PIECE_KINDS.includes(ft.kind) && ft.kind !== 'front') clear(ft.x0, ft.x1, ft.kind);
+});
+
+test('the jet carries a fish east across the seam just under the surface, and nowhere else', () => {
+    const s = frontSlot(), add = {};
+    jetAt(s.x, 250, 0, add); assert.ok(add.x > FRONT_LOOK.jet.push * 0.8);
+    jetAt(s.x, 1000, 0, add); assert.equal(add.x, 0);
+    jetAt(s.x + FRONT_LOOK.jet.half + 10, 250, 0, add); assert.equal(add.x, 0);
+    jetAt(s.x, 10, 0, add); assert.equal(add.x, 0);
 });
