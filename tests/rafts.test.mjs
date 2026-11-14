@@ -20,21 +20,21 @@ test('flying fish break the surface only out at sea', () => {
     assert.ok(!flyersAt(0));
 });
 
-test('a burst: each fish leaves the water ahead of the skim, glides a long flat arc and dives back in', () => {
+test('a burst: each fish leaves the water beside or ahead of the leap, glides a long low arc under the HUD and dives back in', () => {
     for (const dir of [1, -1]) {
         for (let i = 0; i < FLYERS.count; i++) {
-            let top = 0, far = 0, steps = 0, left = false;
+            let top = 0, far = 0, steps = 0, left = false, x0 = null;
             for (; steps < 400; steps++) {
                 const p = flyerAt(i, 3.3, 1000, -10, dir, steps);
                 if (!p.out) { assert.ok(!left, 'it waits its turn only before it flies'); continue; }
-                left = true;
+                left = true; if (x0 === null) x0 = p.x;
                 if (p.done) break;
                 assert.ok((p.x - 1000) * dir >= FLYERS.ahead[0] - 1, 'ahead of the skim, in its direction');
-                top = Math.min(top, p.y + 10); far = Math.max(far, Math.abs(p.x - 1000));
+                top = Math.min(top, p.y + 10); far = Math.max(far, Math.abs(p.x - x0));
             }
             assert.ok(steps < 400, 'it comes down again');
-            assert.ok(top < -60 && top > -400, `height ${Math.round(-top)}`);
-            assert.ok(far > 600, `a long glide: ${Math.round(far)}`);
+            assert.ok(top < -50 && top > -130, `a low arc: height ${Math.round(-top)}`);
+            assert.ok(far > 450, `a long glide: ${Math.round(far)}`);
         }
     }
     assert.notEqual(flyerAt(0, 3.3, 1000, -10, 1, 30).x, flyerAt(1, 3.3, 1000, -10, 1, 30).x, 'not in step');

@@ -18,9 +18,9 @@ export const RAFTS = {
 
 export const FLYERS = {
     count: 5,            // fish in a burst
-    ahead: [140, 420],   // px ahead of the skim where they come out of the water
+    ahead: [-150, 350],  // px ahead of the leap where they come out of the water (beside the fish: "they burst out next to me")
     speed: [11, 15],     // px per step forward
-    lift: [7, 10],       // px per step upward at the start
+    lift: [5, 7],        // px per step upward at the start: arcs peak at ~60-110 px, low over the water, under the HUD
     gravity: 0.22,       // px per step per step: a long, flat glide
     again: 2.5           // s before a skim sets off the next burst
 };
