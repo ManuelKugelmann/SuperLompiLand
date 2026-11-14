@@ -6,6 +6,7 @@ import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
 import { feedbackMenuItems } from '../game/feedback.js';
 import { soundMenuItem } from '../game/audio.js';
+import { keepInSafeArea } from '../game/orientation.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
@@ -23,6 +24,7 @@ export default class HudScene extends Phaser.Scene {
 
     create({ main }) {
         this.main = main;
+        keepInSafeArea(this);     // the picture fills the whole screen; the HUD stays clear of notch and corners
         // Remember presses that landed on HUD elements, so the game scene can
         // ignore them even if the element is gone by the time it looks (a tap
         // that closes the menu must not also steer the fish).

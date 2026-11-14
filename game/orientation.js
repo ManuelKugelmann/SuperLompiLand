@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { rotatedPageToGame, widthFor } from './orientationMath.js';
+import { rotatedPageToGame, sizeFor, gameInsets, safeView } from './orientationMath.js';
 
 /**
  * Always-landscape display.
@@ -8,6 +8,10 @@ import { rotatedPageToGame, widthFor } from './orientationMath.js';
  * OS-locked to portrait, where orientation APIs can't help — the Phaser canvas
  * is rotated 90° to fill the screen in landscape. In landscape, and on desktop
  * (any window shape), the game stays upright.
+ *
+ * The picture always fills the whole screen, no bars at any shape: scenes take the screen's
+ * shape when they start (fitToWindow), and if the window changes while a scene runs the
+ * picture covers the screen (a little is cut off at two edges) until the next scene start.
  *
  * A plain CSS rotation would break two things that this fixes:
  *   1. Phaser's FIT scaling reads the parent's bounding box, which for a
@@ -32,7 +36,7 @@ function install(game) {
     let rotated = false;
 
     // Only handheld touch devices rotate. A desktop window that happens to be
-    // taller than wide stays upright (letterboxed landscape).
+    // taller than wide stays upright (it simply sees more above and below).
     // `?rotate=1` / `?rotate=0` forces it either way for testing.
     const forced = new URLSearchParams(window.location.search).get('rotate');
     const handheld = forced !== null
@@ -42,6 +46,9 @@ function install(game) {
     // Phaser's own centering measures the (rotated) parent box, so turn it off
     // and let the container centre the canvas instead.
     scale.autoCenter = Phaser.Scale.NO_CENTER;
+    scale.scaleMode = Phaser.Scale.ENVELOP;      // cover the screen, never bars
+    scale.displaySize.setAspectMode(Phaser.Scale.ENVELOP);
+    app.style.overflow = 'hidden';
     canvas.style.marginLeft = '0';
     canvas.style.marginTop = '0';
     app.style.display = 'flex';
@@ -100,21 +107,38 @@ function install(game) {
     if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
 }
 
+function wanted(game) {
+    const rotated = !!game.registry.get('landscapeRotated');
+    return sizeFor(rotated ? window.innerHeight : window.innerWidth, rotated ? window.innerWidth : window.innerHeight);
+}
+
 /**
- * Fill the screen: give the game the width that matches the screen's shape (the
- * height stays fixed). Called when a scene starts, so a scene lays itself out
- * once for the size it will keep; returns true when the size changed.
+ * Fill the screen: give the game the size that matches the screen's shape. Called when a
+ * scene starts, so a scene lays itself out once for the size it will keep; returns true when
+ * the size changed.
  */
 export function fitToWindow(game) {
-    const rotated = !!game.registry.get('landscapeRotated');
-    const w = widthFor(rotated ? window.innerHeight : window.innerWidth, rotated ? window.innerWidth : window.innerHeight);
-    if (w === game.scale.width) return false;
-    game.scale.setGameSize(w, game.scale.height);
+    const { width, height } = wanted(game);
+    if (width === game.scale.width && height === game.scale.height) return false;
+    game.scale.setGameSize(width, height);
     return true;
 }
 
 /** Would fitToWindow change the size right now? (for scenes that can simply start again) */
 export function fitsWindow(game) {
-    const rotated = !!game.registry.get('landscapeRotated');
-    return widthFor(rotated ? window.innerHeight : window.innerWidth, rotated ? window.innerWidth : window.innerHeight) === game.scale.width;
+    const { width, height } = wanted(game);
+    return width === game.scale.width && height === game.scale.height;
+}
+
+/** Keep a heads-up scene clear of notch and rounded corners: its camera shows the whole layout inside the safe area. */
+export function keepInSafeArea(scene) {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+    document.body.appendChild(probe);
+    const cs = getComputedStyle(probe), px = v => parseFloat(v) || 0;
+    const page = { top: px(cs.paddingTop), right: px(cs.paddingRight), bottom: px(cs.paddingBottom), left: px(cs.paddingLeft) };
+    probe.remove();
+    const rotated = !!scene.game.registry.get('landscapeRotated'), W = scene.scale.width, H = scene.scale.height;
+    const v = safeView(W, H, gameInsets(page, rotated, W / (rotated ? window.innerHeight : window.innerWidth)));
+    scene.cameras.main.setViewport(v.x, v.y, v.width, v.height).setZoom(v.zoom).setScroll(v.scrollX, v.scrollY);
 }

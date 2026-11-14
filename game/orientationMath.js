@@ -16,16 +16,40 @@ export function rotatedPageToGame(pageX, pageY, rect, gameW, gameH) {
     };
 }
 
-/** The game picture is always this tall; its width follows the screen so there are no bars. */
-export const PICTURE = { height: 1080, minWidth: 1440, maxWidth: 2640 };
+/** The picture's short measures: normally 1080 tall; screens squarer than 4:3 keep the least width and grow taller. */
+export const PICTURE = { height: 1080, minWidth: 1440 };
+
+const even = v => Math.round(v / 2) * 2;      // even numbers centre cleanly
 
 /**
- * Logical game width for a screen of this shape (as seen in landscape). Between
- * 4:3 and about 22:9 the picture fills the screen exactly; beyond that it is
- * capped and the rest is letterboxed.
+ * Logical game size for a screen of this shape (as seen in landscape): the picture always has
+ * exactly the screen's shape, so it fills it with no bars. Wide screens see more of the world
+ * to the sides; screens squarer than 4:3 (and upright desktop windows) see more above and below.
  */
-export function widthFor(screenW, screenH, cfg = PICTURE) {
-    if (!(screenW > 0 && screenH > 0)) return 1920;
-    const w = Math.round(cfg.height * screenW / screenH / 2) * 2;      // even numbers centre cleanly
-    return Math.min(cfg.maxWidth, Math.max(cfg.minWidth, w));
+export function sizeFor(screenW, screenH, cfg = PICTURE) {
+    if (!(screenW > 0 && screenH > 0)) return { width: 1920, height: cfg.height };
+    const width = even(cfg.height * screenW / screenH);
+    if (width >= cfg.minWidth) return { width, height: cfg.height };
+    return { width: cfg.minWidth, height: even(cfg.minWidth * screenH / screenW) };
+}
+
+/**
+ * The screen's safe-area insets (notch, rounded corners; CSS px, page edges) as insets of the
+ * game picture, scaled by `k` (game px per CSS px). Rotated 90° clockwise the picture's left
+ * edge lies along the page's top, its top along the page's right.
+ */
+export function gameInsets(page, rotated, k = 1) {
+    const { top = 0, right = 0, bottom = 0, left = 0 } = page;
+    return rotated
+        ? { left: top * k, top: right * k, right: bottom * k, bottom: left * k }
+        : { left: left * k, top: top * k, right: right * k, bottom: bottom * k };
+}
+
+/**
+ * How a heads-up display drawn for a `w` x `h` picture fits inside the insets: the viewport to
+ * give its camera, the zoom and the scroll that keep the whole layout visible and centred there.
+ */
+export function safeView(w, h, inset) {
+    const vw = w - inset.left - inset.right, vh = h - inset.top - inset.bottom;
+    return { x: inset.left, y: inset.top, width: vw, height: vh, zoom: Math.min(vw / w, vh / h), scrollX: (w - vw) / 2, scrollY: (h - vh) / 2 };
 }

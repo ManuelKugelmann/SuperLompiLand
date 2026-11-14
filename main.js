@@ -11,14 +11,13 @@ const game = bootStandalone({
     language: 'de',
     config: {
         // Listen on the whole window, not just the canvas: on desktop the mouse
-        // keeps steering when it is over the letterbox bars or dragged outside
-        // the game area, and touches on the bars count too.
+        // keeps steering when it is dragged outside the game area.
         input: { mouse: { target: window }, touch: { target: window } }
     }
 });
 
 // Always display landscape — rotate 90° when the viewport is portrait, even if
-// the device is OS-locked to portrait. Keeps FIT scaling and input correct.
+// the device is OS-locked to portrait. The picture always covers the whole screen.
 forceLandscape(game);
 
 if (import.meta.env.DEV) window.__game = game; // console/debug handle, dev only
