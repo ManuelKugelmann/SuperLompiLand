@@ -208,6 +208,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.storm = null;                                 // dark sky, rain, and the look of the downwelling (spec 5.0c): built when one of them is near
+        this.stormBuilt = false;                           // ... its own things are made a step per frame right after the start (StormLayer.warm), then kept
         this.surf = null;                                  // surge foam on the beach, breakers on the reef's edge (spec 5.0d): built when the coast they belong to is near
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.chain = createChain();          // linked moves (game/chain.js); shown by the HUD, not in relaxed play
@@ -763,7 +764,7 @@ export default class MainScene extends Phaser.Scene {
             if (this.storm) {      // built again by itself when the storm or a current is near
                 for (const o of this.storm.made) o.destroy();
                 this.storm.dropStorm(); if (this.storm.currentSet) for (const o of this.storm.currentSet.all) o.destroy();
-                this.storm = null;
+                this.storm = null; this.stormBuilt = false;      // made again a step per frame
             }
             this.controller.destroy();
             this.controller = makeController(this.activeScheme, this, this.fish);
@@ -1760,6 +1761,10 @@ export default class MainScene extends Phaser.Scene {
         if (!this.ambientMode) this.school.update(sp, this.fish.facing, time / 1000, delta / 1000);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
         else if (this.creaturesWarm && !this.stormWarm && this.buildSlot()) this.stormWarm = !prewarmStorm(this);      // then the storm's pictures, one per frame
+        else if (this.stormWarm && !this.stormBuilt && this.buildSlot()) {      // then the storm layer itself and its tile sprites, a step per frame (each makes a canvas of its own)
+            if (!this.storm) this.storm = this.made(() => new StormLayer(this));
+            else this.stormBuilt = this.storm.warm();
+        }
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);

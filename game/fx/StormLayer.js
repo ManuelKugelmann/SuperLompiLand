@@ -246,6 +246,15 @@ export default class StormLayer {
         return { set: o, todo };
     }
 
+    /** One step of building the storm's own things; true when they are all there. Called one step per frame after the start. */
+    warm() {
+        if (this.stormSet) return true;
+        if (!this.stormJob) this.stormJob = this.buildStorm();
+        this.stormJob.todo.shift()();
+        if (!this.stormJob.todo.length) { this.stormSet = this.stormJob.set; this.stormJob = null; }
+        return !!this.stormSet;
+    }
+
     /** The storm's own things go, whole or half built. */
     dropStorm() {
         const o = this.stormSet || this.stormJob?.set;
@@ -295,12 +304,9 @@ export default class StormLayer {
         // The storm's own objects exist only within about a screen of it (built and dropped here).
         const nearStorm = camX + 2 * W > this.span.x0 - L.wall.out && camX - W < this.span.x1 + L.wall.out;
         // Built a step per frame; it shows once it is whole. Left behind, whatever exists of it goes.
-        if (nearStorm && !this.stormSet && !this.stormJob) this.stormJob = this.buildStorm();
-        if (this.stormJob) {
-            this.stormJob.todo.shift()();
-            if (!this.stormJob.todo.length) { this.stormSet = this.stormJob.set; this.stormJob = null; }
-        }
-        if (!nearStorm) this.dropStorm();
+        // Normally the set is there already (warm(), right after the start). It is kept for the whole run: its tile
+        // sprites each make and upload a canvas of their own, which was a long frame on a slow phone whenever the storm came near.
+        if (nearStorm) this.warm();
         const set = this.stormSet;
         if (set) {
             for (const w of set.walls) w.setVisible(w.span[1] > camX - 200 && w.span[0] < camX + W + 200 && camY < L.wall.depth);
