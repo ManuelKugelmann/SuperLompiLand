@@ -1049,13 +1049,14 @@ export default class LevelGenerator {
         arch.setScale(R * G.arch / arch.width);
         chunk.objects.push(arch);
         if (!s.textures.exists('grand_garden')) return;
-        const place = (depth, blend, alpha) => {
-            const g = s.add.image(nest.x, nest.y + R * G.gardenDrop, 'grand_garden').setOrigin(0.5, 0.55).setDepth(depth).setBlendMode(blend).setAlpha(alpha);
+        const place = (key, depth, blend, alpha) => {
+            const g = s.add.image(nest.x, nest.y + R * G.gardenDrop, key).setOrigin(0.5, 0.55).setDepth(depth).setBlendMode(blend).setAlpha(alpha);
             chunk.objects.push(g.setScale(R * G.garden / g.width));
             return g;
         };
-        place(-0.5, Phaser.BlendModes.NORMAL, 1);
-        const glow = place(G.glowDepth, Phaser.BlendModes.ADD, G.glow);       // shines above the trench's darkness
+        place('grand_garden', -0.5, Phaser.BlendModes.NORMAL, 1);
+        ensureGardenGlow(s);
+        const glow = place('grand_garden_glow', G.glowDepth, Phaser.BlendModes.ADD, G.glow);       // shines above the trench's darkness
         s.tweens.add({ targets: glow, alpha: G.glow * 0.6, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
 
@@ -1332,10 +1333,24 @@ export const NEST_ART = 'nest';
  * The grand nest's setting (spec 5.0m): a coral arch of dark slate rock over it, and a glowing deep
  * garden along its foot that shines in the dark trench (a second, added copy above the scene's
  * darkness). Sizes in nest radii; `archShift` = px the arch stands right of the nest, so its left
- * pillar is off the lane (the fish swims into the arch, not through its stone); `glow` = how strongly the garden shines.
+ * pillar is off the lane (the fish swims into the arch, not through its stone); `glow` = how strongly the garden shines;
+ * `glowFade`: share of the garden's height over which its glow fades in from the top (the fish
+ * on the nest stays clear of the glow and remains the clearest thing in the last frame).
  */
-export const GRAND = { arch: 3.4, archDrop: 0.12, archShift: 150, garden: 4.2, gardenDrop: 0.42, glow: 0.55, glowDepth: 41 };   // the garden lines the nest's front foot, in front of it (its glow never lies across the plate)
+export const GRAND = { arch: 3.4, archDrop: 0.12, archShift: 150, garden: 4.2, gardenDrop: 0.42, glow: 0.55, glowDepth: 41, glowFade: [0.4, 0.75] };   // the garden lines the nest's front foot, in front of it (its glow never lies across the plate)
 export const GRAND_ART = { grand_arch: 'img/finale/grand_arch.webp', grand_garden: 'img/finale/grand_garden.webp' };
+
+/** The garden's glow copy: the picture with its upper part faded out (GRAND.glowFade), baked once. */
+function ensureGardenGlow(scene) {
+    if (scene.textures.exists('grand_garden_glow')) return;
+    const src = scene.textures.get('grand_garden').getSourceImage(), W = src.width, H = src.height;
+    const t = scene.textures.createCanvas('grand_garden_glow', W, H), c = t.getContext(), [f0, f1] = GRAND.glowFade;
+    c.drawImage(src, 0, 0);
+    const g = c.createLinearGradient(0, H * f0, 0, H * f1);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+    c.globalCompositeOperation = 'destination-in'; c.fillStyle = g; c.fillRect(0, 0, W, H);
+    t.refresh();
+}
 
 /** A drawn arch when the painted one is missing: slate boulders along a half ring, coral dots on them. */
 function ensureGrandArch(scene) {

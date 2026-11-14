@@ -100,6 +100,9 @@ const SKY_START = Number(new URLSearchParams(window.location.search).get('sky'))
 const PLANKTON = { speed: 3, everyMs: 30, from: 0.25 };
 /** Reef book: how often to look around, and how close counts as seen up close (px). */
 const BOOK = { scanMs: 300, seePx: 420 };
+// The fish's own light in the dark: a soft glow just behind it (px across, strength at the deepest),
+// so it lights the water and rock round it and never veils the fish itself (it stays the clearest thing).
+const FISH_LIGHT = { size: 760, alpha: 0.85, depth: 4.5 };
 /** How high coins hop on each beat (px). */
 const COIN_BOB_PX = 12;
 
@@ -321,7 +324,7 @@ export default class MainScene extends Phaser.Scene {
             tex.refresh();
         }
         this.vignette = this.add.image(0, 0, 'vignette').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(41).setAlpha(0.5);
-        this.glow = this.add.circle(start.x, start.y, 260, 0xbfe9ff, 0).setDepth(42).setBlendMode(Phaser.BlendModes.ADD);
+        this.glow = this.add.image(start.x, start.y, 'bd_glow').setDisplaySize(FISH_LIGHT.size, FISH_LIGHT.size).setTint(0xbfe9ff).setAlpha(0).setDepth(FISH_LIGHT.depth).setBlendMode(Phaser.BlendModes.ADD);
         this.health = WORLD.maxHealth;
         this.maxHealth = WORLD.maxHealth;
 
@@ -1590,7 +1593,7 @@ export default class MainScene extends Phaser.Scene {
         moving += Math.hypot(breakerAt(view.x, view.y, waves, p).x, p.y) + Math.abs(downAt(view.x, view.y, p).y);
         updateWeatherSound(stormShare(view.x) * (1 - 0.6 * Phaser.Math.Clamp(view.y / 1500, 0, 1)), moving / WORLD.rushFull);
         // In the dark the fish carries a little light of its own.
-        this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
+        this.glow.setPosition(view.x, view.y).setAlpha(depth01 * FISH_LIGHT.alpha);
 
         this.level.update(this.camX, this.camY);
         if (this.fadeInAt && (this.level.viewReady || time > this.fadeInAt)) { this.fadeInAt = 0; this.cameras.main.fadeIn(320, 10, 40, 70); }
