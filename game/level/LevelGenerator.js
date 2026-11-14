@@ -1183,14 +1183,18 @@ export default class LevelGenerator {
 
     addVent(chunk, key, f, height, rng) {
         const s = this.scene;
-        // The plant: a cluster of round pods.
-        const g = s.add.graphics().setDepth(1);
-        [[0, 0, 44, 0x7be0c8], [-46, 10, 30, 0x58c9b0], [44, 12, 32, 0x58c9b0], [-14, -34, 26, 0xa6f2df], [22, -30, 22, 0xa6f2df]]
-            .forEach(([dx, dy, r, col]) => {
-                g.fillStyle(col, 1).fillCircle(f.x + dx, f.y - 26 + dy, r);
-                g.fillStyle(0xffffff, 0.45).fillCircle(f.x + dx - r * 0.3, f.y - 26 + dy - r * 0.3, r * 0.3);
-            });
-        chunk.objects.push(g);
+        // The plant: a cluster of round pods, painted once (a drawing would be cut into triangles anew every frame).
+        if (!s.textures.exists('vent_plant')) {
+            const g = s.make.graphics({ add: false });
+            [[0, 0, 44, 0x7be0c8], [-46, 10, 30, 0x58c9b0], [44, 12, 32, 0x58c9b0], [-14, -34, 26, 0xa6f2df], [22, -30, 22, 0xa6f2df]]
+                .forEach(([dx, dy, r, col]) => {
+                    g.fillStyle(col, 1).fillCircle(80 + dx, 64 + dy, r);
+                    g.fillStyle(0xffffff, 0.45).fillCircle(80 + dx - r * 0.3, 64 + dy - r * 0.3, r * 0.3);
+                });
+            g.generateTexture('vent_plant', 160, 112);
+            g.destroy();
+        }
+        chunk.objects.push(s.add.image(f.x, f.y - 26, 'vent_plant').setOrigin(0.5, 64 / 112).setDepth(1));
         // The bubbles: purely visual, looping up the column.
         for (let i = 0; i < Math.round(height / 110); i++) {
             const b = s.textures.exists('bubble') ? s.add.image(f.x, f.y, 'bubble') : s.add.circle(f.x, f.y, 16, 0xffffff, 0.4);
@@ -1209,10 +1213,16 @@ export default class LevelGenerator {
     /** Wooden signpost standing on the seabed. */
     drawSign(chunk, sign) {
         const s = this.scene, x = sign.x, y = sign.y;
-        const g = s.add.graphics().setDepth(0);
-        g.fillStyle(0x6b4a2b, 1).fillRect(x - 12, y - 250, 24, 260);
-        g.fillStyle(0x8a6239, 1).fillRoundedRect(x - 230, y - 330, 460, 120, 18);
-        g.lineStyle(6, 0x4f361f, 1).strokeRoundedRect(x - 230, y - 330, 460, 120, 18);
+        // Post and board, painted once (a drawing would be cut into triangles anew every frame).
+        if (!s.textures.exists('signpost')) {
+            const d = s.make.graphics({ add: false });
+            d.fillStyle(0x6b4a2b, 1).fillRect(224, 84, 24, 260);
+            d.fillStyle(0x8a6239, 1).fillRoundedRect(6, 4, 460, 120, 18);
+            d.lineStyle(6, 0x4f361f, 1).strokeRoundedRect(6, 4, 460, 120, 18);
+            d.generateTexture('signpost', 472, 344);
+            d.destroy();
+        }
+        const g = s.add.image(x, y + 10, 'signpost').setOrigin(0.5, 1).setDepth(0);
         const t = s.add.text(x, y - 270, `${sign.text}  ${sign.arrow}`, {
             fontFamily: 'Arial', fontSize: '46px', color: '#fff3d0', fontStyle: 'bold', stroke: '#3a2713', strokeThickness: 6
         }).setOrigin(0.5).setDepth(0.1);

@@ -13,7 +13,7 @@ test('what touches the view (with its own reach) counts as in it', () => {
 });
 
 test('reach: a picture’s diagonal, a rope’s farthest point and width (worked out once)', () => {
-    assert.equal(reachOf(img(0, 0, 300, 400)), 500);
+    assert.ok(reachOf(img(0, 0, 300, 400)) >= 500);
     const rope = { type: 'Rope', points: [{ x: 0, y: -200 }, { x: 30, y: 200 }], scaleX: 1, scaleY: 2, frame: { height: 20 } };
     const r = reachOf(rope);
     assert.ok(r > 400 && r < 620);

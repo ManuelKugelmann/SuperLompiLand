@@ -7,6 +7,7 @@
 
 export const VIEW_CULL = {
     pad: 300,                                           // px beyond the view within which things are still drawn
+    every: 2,                                           // judged every so many frames (the margin is far more than anything moves in that time)
     kinds: ['Image', 'Sprite', 'TileSprite', 'Rope']    // the kinds of object that are judged
 };
 
@@ -25,7 +26,7 @@ export function reachOf(o) {
         }
         return o.cullR;
     }
-    return Math.hypot(o.displayWidth, o.displayHeight);
+    return o.displayWidth + o.displayHeight;      // never less than its diagonal
 }
 
 /**
@@ -37,7 +38,8 @@ export function cullToView(objects, view, camId, cfg = VIEW_CULL) {
     const cx = view.centerX, cy = view.centerY, hw = view.width / 2 + cfg.pad, hh = view.height / 2 + cfg.pad;
     let off = 0;
     for (const o of objects) {
-        if (!cfg.kinds.includes(o.type) || o.scrollFactorX !== 1 || o.scrollFactorY !== 1 || o.noCull) continue;
+        if (o.cullKind === undefined) o.cullKind = cfg.kinds.includes(o.type);      // found out once per object
+        if (!o.cullKind || o.scrollFactorX !== 1 || o.scrollFactorY !== 1 || o.noCull) continue;
         if (touchesView(o.x, o.y, reachOf(o), cx, cy, hw, hh)) o.cameraFilter &= ~camId;
         else { o.cameraFilter |= camId; off++; }
     }
