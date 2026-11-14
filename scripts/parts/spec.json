@@ -1,5 +1,5 @@
 {
-    "_doc": "Part cards per playable picture (picture px, origin top-left). Read by scripts/parts/bake.py. body: the picture the body card is cut from (default: the key). Each part: role (motion, game/rig/cards.js), poly (the card's outline, generous into the body where it hides behind it), root (two points across where it joins the body; the pivot is their middle), front (drawn over the body; the body under it is filled from its surroundings), under (body area under a front part to fill), z (depth in body bulges: + toward the viewer), amp/phase (motion multipliers). image/at: a part that already exists as its own picture, placed at `at`. core: removed from every part (the body proper). pair: a paired fin painted only on the near side; the game adds its far twin behind the body. Median fins (dorsal, anal, ridges) exist once, on the midline (z 0).",
+    "_doc": "Part cards per playable picture (picture px, origin top-left). Read by scripts/parts/bake.py. body: the picture the body card is cut from (default: the key). Each part: role (motion, game/rig/cards.js), poly (the card's outline, generous into the body where it hides behind it), root (two points across where it joins the body; the pivot is their middle), front (drawn over the body; the body under it is filled from its surroundings), under (body area under a front part to fill; a front part takes its whole outline off the body), z (depth in body bulges: + toward the viewer), amp/phase (motion multipliers). image/at: a part that already exists as its own picture, placed at `at`. core: removed from every part (the body proper). pair: a paired fin painted only on the near side; the game adds its far twin behind the body. Median fins (dorsal, anal, ridges) exist once, on the midline (z 0).",
     "puffer_normal": {
         "body": "puffer_normal_body",
         "parts": [
@@ -46,7 +46,7 @@
             { "name": "rear", "role": "flipper", "poly": [[0,150],[62,146],[132,168],[144,200],[124,230],[80,240],[26,232],[0,200]], "root": [[126,170],[132,216]], "z": -0.2, "amp": 0.6, "phase": 1.2 },
             { "name": "farflipper", "role": "flipper", "poly": [[366,192],[422,194],[478,236],[506,292],[486,310],[436,296],[390,254]], "root": [[372,198],[402,234]], "z": -0.5, "phase": 0.5 },
             { "name": "head", "role": "head", "poly": [[330,38],[350,8],[400,0],[470,8],[512,58],[512,162],[470,192],[420,198],[380,188],[344,172],[318,130]], "root": [[338,52],[334,166]], "front": true, "under": [[322,44],[350,44],[350,168],[322,168]], "z": 0.5 },
-            { "name": "flipper", "role": "flipper", "poly": [[110,313],[146,246],[196,186],[232,136],[270,124],[296,150],[286,204],[246,246],[196,296],[150,313]], "root": [[244,134],[286,176]], "front": true, "under": [[198,168],[292,138],[302,204],[220,224]], "z": 0.8 }
+            { "name": "flipper", "role": "flipper", "poly": [[110,313],[146,246],[196,186],[232,136],[270,124],[296,150],[286,204],[246,246],[196,296],[150,313]], "root": [[244,134],[286,176]], "front": true, "under": [[180,170],[240,150],[300,140],[305,205],[300,232],[180,238]], "z": 0.8 }
         ]
     },
     "friend_jellyfish": {
@@ -58,6 +58,13 @@
         "parts": [
             { "name": "fin", "role": "median", "poly": [[0,238],[18,198],[60,188],[96,226],[100,300],[84,326],[30,320],[0,292]], "root": [[90,214],[96,302]], "z": 0.1, "amp": 1.4 },
             { "name": "tail", "role": "curl", "poly": [[16,330],[226,330],[226,512],[16,512]], "root": [[40,334],[222,334]], "z": 0 }
+        ]
+    },
+    "whale": {
+        "parts": [
+            { "name": "fluke", "role": "tail", "poly": [[0,88],[90,98],[160,174],[172,188],[172,262],[150,272],[110,330],[40,392],[0,392]], "root": [[152,186],[152,260]], "z": 0, "amp": 0.7 },
+            { "name": "farfin", "role": "pectoral", "poly": [[796,236],[934,246],[904,302],[824,402],[766,424],[754,402],[806,320]], "root": [[828,250],[920,256]], "z": -0.5, "amp": 0.35, "phase": 0.3 },
+            { "name": "pectoral", "role": "pectoral", "poly": [[872,156],[904,184],[884,232],[824,302],[744,382],[664,452],[602,456],[608,420],[698,330],[788,240],[830,176]], "root": [[840,166],[888,214]], "front": true, "under": [[700,200],[900,150],[912,250],[860,280],[780,292],[700,296]], "z": 0.7, "amp": 0.35 }
         ]
     }
 }

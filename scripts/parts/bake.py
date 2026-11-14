@@ -19,7 +19,9 @@ ATLAS_W = 1024
 PAD = 2
 
 def load(key):
-    return np.asarray(Image.open(os.path.join(IMG, key + '.png')).convert('RGBA')).astype(np.float32) / 255
+    path = os.path.join(IMG, key + '.png')
+    if not os.path.exists(path): path = os.path.join(IMG, key + '.webp')
+    return np.asarray(Image.open(path).convert('RGBA')).astype(np.float32) / 255
 
 def poly_mask(poly, W, H, ss=4):
     m = Image.new('L', (W * ss, H * ss), 0)
@@ -65,9 +67,10 @@ def crop(a):
 def pack(items):
     """Shelf packing; returns positions and the atlas height."""
     x = y = shelf = 0; pos = []
+    width = max([ATLAS_W] + [a.shape[1] for a in items])
     for a in items:
         h, w = a.shape[:2]
-        if x + w > ATLAS_W: x, y, shelf = 0, y + shelf + PAD, 0
+        if x + w > width: x, y, shelf = 0, y + shelf + PAD, 0
         pos.append((x, y)); x += w + PAD; shelf = max(shelf, h)
     return pos, y + shelf
 
@@ -93,7 +96,9 @@ for key, s in spec.items():
             cards.append(c)
             (a, b) = p['root']; pivot = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
             meta.append({'rect': [x0, y0, c.shape[1], c.shape[0]], 'pivot': pivot, 'root': p['root']})
-            rm = m if p.get('cut') == 'all' or core is not None else m * beyond(p['root'], centre, W, H)
+            # A front part leaves the body entirely (what lies under it is filled below); a part
+            # behind the body only loses what reaches beyond its root line.
+            rm = m if p.get('front') or core is not None else m * beyond(p['root'], centre, W, H)
             if p.get('front') and 'under' in p:
                 region = poly_mask(p['under'], W, H) * (src[..., 3] > 0.5)
                 known = (body[..., 3] > 0.95) * (1 - np.clip(m * 4, 0, 1))
@@ -112,7 +117,7 @@ for key, s in spec.items():
     bc, (bx, by) = crop(body)
     items = [bc] + cards
     pos, AH = pack(items)
-    atlas = np.zeros((AH, ATLAS_W, 4), np.float32)
+    atlas = np.zeros((AH, max([ATLAS_W] + [a.shape[1] for a in items]), 4), np.float32)
     for (x, y), a in zip(pos, items): atlas[y:y + a.shape[0], x:x + a.shape[1]] = a
     used = max(x + a.shape[1] for (x, y), a in zip(pos, items))
     atlas = atlas[:, :used]
