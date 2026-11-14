@@ -44,6 +44,7 @@ uniform sampler2D uMainSampler;
 uniform vec2 uScroll;      // the view's left edge wrapped to the pattern's period, and its top edge
 uniform float uTime;
 uniform float uStrength;
+uniform float uSide;        // pictures a side in this texture: 1 for a picture of its own, more for an atlas of equal places
 uniform vec3 uTint;
 varying vec2 outTexCoord;
 varying float outTintEffect;
@@ -51,6 +52,13 @@ varying vec4 outTint;
 varying vec2 outPos;
 
 float luma(vec4 c) { return dot(c.rgb, vec3(0.3, 0.59, 0.11)); }
+
+// The texel that lies off away (in shares of the picture, not of the texture), never outside the picture's own place:
+// in an atlas the neighbours are other chunks' pictures.
+vec4 near(vec2 off) {
+    vec2 lo = floor(outTexCoord * uSide) / uSide;
+    return texture2D(uMainSampler, clamp(outTexCoord + off / uSide, lo + 0.0003, lo + 1.0 / uSide - 0.0003));
+}
 
 // One layer of the web: the edges of Voronoi cells whose centres wander, the classic look of
 // light focused by waves (an organic web, not a grid). p is in cells; n = cells per period, so
@@ -83,8 +91,8 @@ void main () {
     if (uStrength > 0.0 && depth > 0.0 && texture.a > 0.02) {
         // The picture's own relief: how its brightness changes sideways and downward.
         float l0 = luma(texture) / texture.a;
-        float lx = luma(texture2D(uMainSampler, outTexCoord + vec2(${f(C.relief)}, 0.0))) / texture.a;
-        float ly = luma(texture2D(uMainSampler, outTexCoord + vec2(0.0, ${f(C.relief)}))) / texture.a;
+        float lx = luma(near(vec2(${f(C.relief)}, 0.0))) / texture.a;
+        float ly = luma(near(vec2(0.0, ${f(C.relief)}))) / texture.a;
         vec2 relief = vec2(lx - l0, ly - l0);
         vec2 p = world + relief * ${f(C.wrap)};
         float a = web(p * ${f(C.cells[0] / C.period)}, ${f(C.cells[0])}, uTime * ${f(C.drift[0])});
@@ -93,7 +101,7 @@ void main () {
         float shaft = ${f(C.shaft.floor)} + ${f(1 - C.shaft.floor)} * smoothstep(-0.3, 0.7, sin((world.x + world.y * ${f(C.shaft.slant)}) * ${TAU} * ${f(C.shaft.bands)} / ${f(C.period)} + uTime * ${f(C.shaft.speed)}));
         float catching = smoothstep(${f(C.lit[0])}, ${f(C.lit[1])}, l0) * clamp(1.0 - relief.y * ${f(C.facing)}, 0.0, 1.0);
         // Only the top skin of a surface: where the picture is opaque well above this texel too, the light is gone.
-        float cover = texture2D(uMainSampler, outTexCoord - vec2(0.0, ${f(C.skin[0])})).a * texture2D(uMainSampler, outTexCoord - vec2(0.0, ${f(C.skin[1])})).a;
+        float cover = near(vec2(0.0, ${f(-C.skin[0])})).a * near(vec2(0.0, ${f(-C.skin[1])})).a;
         catching *= 1.0 - 0.9 * cover;
         color.rgb += uTint * (light * shaft * depth * catching * uStrength * color.a);
     }
@@ -106,12 +114,25 @@ class CausticsPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
         this.view = { x: 0, y: 0, t: 0, strength: 0, r: 1, g: 1, b: 1 };
     }
 
+    /**
+     * Every picture drawn with this pipeline: one that lies in an atlas says how many places a side
+     * its texture has (`causticSide`), so the shader reads only that picture's own texels. What was
+     * batched for the other kind is drawn first.
+     */
+    onBind(gameObject) {
+        const side = gameObject?.causticSide || 1;
+        if (side === this.side) return;
+        this.flush();
+        this.set1f('uSide', side); this.side = side;
+    }
+
     onPreRender() {
         const v = this.view;
         this.set2f('uScroll', v.x, v.y);
         this.set1f('uTime', v.t);
         this.set1f('uStrength', v.strength);
         this.set3f('uTint', v.r, v.g, v.b);
+        this.set1f('uSide', 1); this.side = 1;
     }
 }
 

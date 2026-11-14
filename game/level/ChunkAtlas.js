@@ -19,7 +19,7 @@ export default class ChunkAtlas {
 
     constructor(scene, key, cell, side) {
         const r = scene.renderer, gl = r.gl;
-        this.gl = gl; this.key = key; this.cell = cell;
+        this.gl = gl; this.key = key; this.cell = cell; this.side = side;      // side: places across (and down)
         this.slots = createSlots(side, side, cell);
         const { w, h } = this.slots.size;
         this.wrapper = r.createTexture2D(0, gl.LINEAR, gl.LINEAR, gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE, gl.RGBA, null, w, h, true, true, false);

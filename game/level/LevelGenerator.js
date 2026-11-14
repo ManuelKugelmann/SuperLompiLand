@@ -560,7 +560,11 @@ export default class LevelGenerator {
         const A = this.atlases, place = A && A.back.slots.free && A.rock.slots.free ? [A.back.take(), A.rock.take()] : null;
         if (place) {
             chunk.places = [[A.back, place[0]], [A.rock, place[1]]];      // given back when the chunk is dropped
-            const put = (atlas, i, depth) => keep(s.add.image(ox, oy, atlas.key, String(i)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth));
+            const put = (atlas, i, depth) => {
+                const img = keep(s.add.image(ox, oy, atlas.key, String(i)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth));
+                img.causticSide = atlas.side;      // the caustics shader reads round each texel: only inside this picture's own place (CausticsPipeline)
+                return img;
+            };
             A.back.upload(place[0], pics.back, 0, SHADE.backSize);
             put(A.back, place[0], -6);
             yield 'upload back'; if (chunk.dead) return;
