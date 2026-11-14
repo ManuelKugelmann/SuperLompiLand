@@ -4,6 +4,7 @@
 // first play() that follows user input.
 
 import { createClock } from './music/clock.js';
+import { SCORE, chordAt, arpAt } from './music/score.js';
 
 /**
  * The one music clock (spec ch.12): visual animation may lock to its beat via
@@ -219,6 +220,113 @@ const SOUNDS = {
     rumble() { tone({ f: 55, to: 38, type: 'sawtooth', dur: 1.6, vol: 0.3 }); noise({ dur: 1.6, vol: 0.25, from: 180, to: 70, q: 0.4 }); },
     boom() { noise({ dur: 1.2, vol: 0.5, from: 900, to: 60, q: 0.3 }); tone({ f: 90, to: 30, type: 'sine', dur: 0.9, vol: 0.4 }); }
 };
+
+/**
+ * Background score and underwater ambience (spec ch.12; notes from game/music/score.js),
+ * scheduled a little ahead on the shared music clock. Starts with the first sound after a
+ * tap (browsers need that), fades in, follows the biome (new key at the next bar) and
+ * darkens with depth (the deeper, the lower the filter and the louder the hum).
+ */
+export const MUSIC = {
+    vol: 0.16,            // music bus level under the effects
+    padVol: 0.05,         // each pad voice
+    arpVol: 0.03,         // each bell note
+    ambVol: 0.045,        // sea hum
+    lookahead: 0.4,       // s scheduled ahead
+    cutoffTop: 3800,      // Hz music filter at the surface ...
+    cutoffDeep: 650,      // ... and in the deep
+    fadeInS: 2.5
+};
+let bus = null, busFilter = null, amb = null, ambFilter = null, nextBeat = -1, beatIdx = 0;
+
+function musicNodes() {
+    if (bus) return;
+    busFilter = ctx.createBiquadFilter();
+    busFilter.type = 'lowpass';
+    busFilter.frequency.value = MUSIC.cutoffTop;
+    bus = ctx.createGain();
+    bus.gain.value = 0;
+    bus.connect(busFilter).connect(master);
+    bus.gain.setTargetAtTime(MUSIC.vol, ctx.currentTime, MUSIC.fadeInS / 3);
+    // The sea: 6 s of soft (brown) noise, long enough that its loop is never heard as a throb.
+    const len = ctx.sampleRate * 6, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+    const fade = ctx.sampleRate * 0.5;          // ends meet: cross-fade the seam
+    for (let i = 0; i < fade; i++) { const k = i / fade; d[len - fade + i] = d[len - fade + i] * (1 - k) + d[i] * k; }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.loopStart = fade / ctx.sampleRate;
+    src.loopEnd = len / ctx.sampleRate;
+    ambFilter = ctx.createBiquadFilter();
+    ambFilter.type = 'lowpass';
+    ambFilter.frequency.value = 420;
+    amb = ctx.createGain();
+    amb.gain.value = 0;
+    src.connect(ambFilter).connect(amb).connect(master);
+    amb.gain.setTargetAtTime(MUSIC.ambVol, ctx.currentTime, MUSIC.fadeInS / 3);
+    src.start();
+}
+
+/** A soft pad voice: two slightly detuned triangles, slow attack and release. */
+function pad(hz, t, dur) {
+    for (const cents of [-5, 5]) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'triangle';
+        o.frequency.value = hz;
+        o.detune.value = cents;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(MUSIC.padVol, t + Math.min(1.5, dur * 0.3));
+        g.gain.setValueAtTime(MUSIC.padVol, t + dur * 0.7);
+        g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.6);
+        o.connect(g).connect(bus);
+        o.start(t);
+        o.stop(t + dur + 0.7);
+    }
+}
+
+/** A gentle bell for the arpeggio (sine plus a quiet overtone, soft decay). */
+function bellNote(hz, t) {
+    [[1, 1], [2.01, 0.25]].forEach(([m, a]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = hz * m;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(MUSIC.arpVol * a, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+        o.connect(g).connect(bus);
+        o.start(t);
+        o.stop(t + 1.5);
+    });
+}
+
+/** Call every frame: biome id of the current place and depth 0 (surface) .. 1 (abyss). */
+export function updateMusic(biomeId, depth01) {
+    if (!ctx || muted || ctx.state !== 'running') return;
+    musicNodes();
+    const now = nowSeconds(), beatS = 60 / musicClock.bpm;
+    if (nextBeat < ctx.currentTime) {          // (re)start in step with the clock
+        beatIdx = Math.floor(musicClock.phase(now).beat) + 1;
+        nextBeat = ctx.currentTime + musicClock.untilGrid(now, 1);
+    }
+    while (nextBeat < ctx.currentTime + MUSIC.lookahead) {
+        const bar = Math.floor(beatIdx / musicClock.beatsPerBar), inBar = beatIdx % musicClock.beatsPerBar;
+        if (inBar === 0 && bar % SCORE.barsPerChord === 0) {
+            for (const hz of chordAt(biomeId, bar).hz) pad(hz, nextBeat, beatS * musicClock.beatsPerBar * SCORE.barsPerChord);
+        }
+        for (const half of [0, 1]) {
+            const hz = arpAt(biomeId, bar, inBar * 2 + half);
+            if (hz) bellNote(hz, nextBeat + half * beatS / 2);
+        }
+        nextBeat += beatS;
+        beatIdx++;
+    }
+    const d = Math.max(0, Math.min(1, depth01));
+    busFilter.frequency.setTargetAtTime(MUSIC.cutoffTop * Math.pow(MUSIC.cutoffDeep / MUSIC.cutoffTop, d), ctx.currentTime, 0.6);
+    ambFilter.frequency.setTargetAtTime(520 - 200 * d, ctx.currentTime, 0.6);
+    amb.gain.setTargetAtTime(MUSIC.ambVol * (1 + 0.3 * d), ctx.currentTime, 0.6);
+}
 
 /** Play a named sound; unknown names and blocked audio are ignored silently. */
 export function play(name, arg) {

@@ -106,3 +106,20 @@ test('chain notes climb the scale under the coins, cap at the top, sparkle in fl
     assert.equal(chainNote('nowhere', { count: 1 }).hz, chainNote('reef', { count: 1 }).hz, 'unknown biome falls back');
     assert.equal(chainChord('beach').length, 4);
 });
+
+test('score: every biome has chords in its own key, slow changes, and a sparse arpeggio', async () => {
+    const { chordAt, arpAt, SCORE } = await import('../game/music/score.js');
+    const { BIOME_MUSIC, degreeHz } = await import('../game/music/melody.js');
+    for (const id of Object.keys(BIOME_MUSIC)) {
+        const c0 = chordAt(id, 0);
+        assert.equal(c0.hz.length, 3);
+        assert.ok(c0.hz[0] < c0.hz[1] && c0.hz[1] < c0.hz[2], `${id} chord rises`);
+        assert.ok(c0.hz[2] < degreeHz(id, 0), `${id} pads sit under the coin melody`);
+        assert.deepEqual(chordAt(id, SCORE.barsPerChord - 1).hz, c0.hz, 'a chord lasts barsPerChord bars');
+        let notes = 0, steps = 0;
+        for (let bar = 0; bar < 16; bar++) for (let s = 0; s < 8; s++) { steps++; if (arpAt(id, bar, s)) notes++; }
+        assert.ok(notes > steps * 0.15 && notes < steps * 0.6, `${id}: ${notes}/${steps} arpeggio notes`);
+        assert.equal(arpAt(id, 5, 3), arpAt(id, 5, 3), 'deterministic');
+    }
+    assert.deepEqual(chordAt('nowhere', 0), chordAt('reef', 0), 'unknown biome falls back');
+});

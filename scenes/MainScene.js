@@ -16,7 +16,7 @@ import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
-import { play, nowSeconds, musicClock } from '../game/audio.js';
+import { play, nowSeconds, musicClock, updateMusic } from '../game/audio.js';
 import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
 import { CHAIN, createChain, createSpin, coinWorth } from '../game/chain.js';
 import BoosterLayer from '../game/level/BoosterLayer.js';
@@ -1058,6 +1058,7 @@ export default class MainScene extends Phaser.Scene {
         const waterAmt = Phaser.Math.Linear(bl.a.water[1], bl.b.water[1], bl.t);
         const lit = mixColor(mixColor(0xffffff, water, 0.1 + waterAmt * 0.6), 0x0c1436, depth01 * 0.8);
         this.ambient.setFillStyle(lit, 1);
+        updateMusic(this.biomeId(), depth01);   // background score + sea hum (spec ch.12)
         // In the dark the fish carries a little light of its own.
         this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
 
