@@ -12,8 +12,8 @@ export const FLIGHT = {
     stall: 4,          // below this speed the wings do nothing: no lift, no steering
     speed: 12,         // from this speed on they work fully
     lift: 0.6,         // share of the weight carried in fast level flight (a character's `glide.lift` may be higher)
-    turn: 0.035,       // radians per step the heading can turn at full speed (old model: 0.009)
-    turnDrag: 0.15,    // share of speed lost per radian turned
+    turn: 0.055,       // radians per step the heading can turn at full speed (old model: 0.009); a loop takes ~2 s
+    turnDrag: 0.08,    // share of speed lost per radian turned (a full loop costs about 40 %)
     brakeDrag: 0.04    // air drag while a pose is held (the puffed ball is an air brake; normal air: 0.0015)
 };
 

@@ -18,6 +18,7 @@ import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak } from '../game/music/melody.js';
+import { CHAIN, createChain, createSpin } from '../game/chain.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
@@ -88,6 +89,9 @@ export default class MainScene extends Phaser.Scene {
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
+        this.chain = createChain();          // linked moves (game/chain.js); shown by the HUD, not in relaxed play
+        this.spin = createSpin();            // loops flown in the air
+        this.airAt = 0;
         this.streak = createStreak();        // coins in a row play a melody (game/music/melody.js)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
         this.backLayers = new BackLayers(this);   // far haze, far reef, back floor (parallax)
@@ -192,10 +196,14 @@ export default class MainScene extends Phaser.Scene {
         });
 
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
-        this.events.on('fish-special', ({ x, y }) => this.swarms.startle(x, y));
+        this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
-        this.events.on('fish-splash', ({ x, y, speed, entering }) => {
+        this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
+            // Chain moves: a fast jump out, a landing after real air time, a skip off a wave.
+            if (skim) this.chainMove('skim');
+            else if (!entering && speed >= CHAIN.minLeap) { this.airAt = this.time.now; this.chainMove('leap'); }
+            else if (entering && this.airAt && this.time.now - this.airAt >= CHAIN.minAir) { this.airAt = 0; this.chainMove('landing'); }
             if (speed < 2 || this.time.now - (this.lastSplash || -999) < 180) return; // no plop for a gentle bob
             this.lastSplash = this.time.now;
             play('splash', speed);
@@ -594,8 +602,30 @@ export default class MainScene extends Phaser.Scene {
         for (const c of this.level.coins) if (c.img.active) c.img.y = c.y - lift;
     }
 
+    /** A move that can link into a chain (game/chain.js). Relaxed and ambient play have no counter. */
+    chainMove(verb) {
+        if (this.relaxed) return;
+        const r = this.chain.add(verb, this.time.now);
+        if (r) this.events.emit('chain-move', r);
+    }
+
+    /** A chain is over: nothing is lost, a few bonus coins drift in. */
+    chainEnd(done) {
+        if (!done) return;
+        this.events.emit('chain-end', done);
+        if (!done.bonus) return;
+        this.coins += done.bonus;
+        play('coin');
+        const p = this.fish.sprite;
+        const t = this.add.text(p.x, p.y - 90, `+${done.bonus}`, {
+            fontFamily: 'Arial', fontSize: '52px', color: '#fff3b0', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 8
+        }).setOrigin(0.5).setDepth(8);
+        this.tweens.add({ targets: t, y: p.y - 190, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+    }
+
     /** Streak feedback: "x2", "x3"... when the counter steps up, a ring of light when a phrase completes. */
     streakFx(x, y, note) {
+        if (note.completed) this.chainMove('trail');
         if (note.stepped) {
             const t = this.add.text(x, y - 60, `x${note.multiplier}`, {
                 fontFamily: 'Arial', fontSize: '46px', color: '#fff3b0', fontStyle: 'bold',
@@ -662,6 +692,7 @@ export default class MainScene extends Phaser.Scene {
     /** Something hurt the fish from (x, y). Returns true when it went down. */
     hurt(x, y) {
         if (!this.fish.hit(new Phaser.Math.Vector2(x, y))) return false;
+        this.chainEnd(this.chain.end());
         play('hit');
         this.hitStop = WORLD.hitStopMs;
         this.fish.squash = -0.3;
@@ -730,6 +761,14 @@ export default class MainScene extends Phaser.Scene {
             const sail = this.fish.mode?.flow ?? 1;      // a spread fan catches the current
             fsp.setVelocity(fsp.body.velocity.x + push.x * sail, fsp.body.velocity.y + push.y * sail);
         }
+        // Chain moves: riding a current, and loops flown in the air.
+        const fv = fsp.body.velocity;
+        if (this.fish.inAir) { if (this.spin.turn(Math.atan2(fv.y, fv.x))) this.chainMove('flip'); }
+        else {
+            this.spin.reset();
+            if (Math.hypot(water.x, water.y) >= CHAIN.streamSpeed && fv.x * water.x + fv.y * water.y > 0) this.chainMove('stream');
+        }
+        this.chainEnd(this.chain.tick(this.time.now));
         // Whatever carries the fish is the water's doing, not its own swimming (it must not turn to face it).
         this.fish.flow.set(water.x, water.y + (lifted ? Math.min(0, fsp.body.velocity.y) : 0));
         this.surface.recenter(fsp.x);

@@ -343,7 +343,7 @@ export default class Player {
             if (hop) {
                 this.skips++;
                 this.sprite.setVelocity(hop.vx, hop.vy);
-                this.scene.events.emit('fish-splash', { x: this.sprite.x, y: waterY, speed: 4, entering: false });
+                this.scene.events.emit('fish-splash', { x: this.sprite.x, y: waterY, speed: 4, entering: false, skim: true });
             }
         }
         // Light swimmers sink less than the world gravity alone would make them.
