@@ -47,3 +47,19 @@ test('the first seconds of the tour do not count (start-up)', () => {
     t.sample({ logicMs: 50, chunkMs: 50, objects: 1, tweens: 1 });
     assert.equal(t.rows().length, 0);
 });
+
+test('frames after a hop, while the view is not complete, are the hop\'s cost: kept apart, and the stop\'s time waits', () => {
+    const t = createPerfTour(0, 50000, () => 'reef');
+    t.step(PERF_TOUR.warmMs);      // past the warm-up (this hops once)
+    t.step(PERF_TOUR.skipMs);
+    assert.equal(t.step(PERF_TOUR.stayMs, true), false, 'no hop while the view is still being built');
+    t.sample({ logicMs: 5, chunkMs: 120, objects: 100, tweens: 5, settling: true });
+    t.sample({ logicMs: 2, chunkMs: 6, objects: 100, tweens: 5 });
+    const r = t.rows()[0];
+    assert.equal(r.hopMs, 125);
+    assert.equal(r.chunkMs, 6, 'the steady numbers do not include it');
+    assert.equal(r.frames, 1);
+    let hopped = false;
+    for (let ms = 0; ms <= PERF_TOUR.settleMaxMs + PERF_TOUR.stayMs && !hopped; ms += 100) hopped = t.step(100, true);
+    assert.ok(hopped, 'a view that never completes does not stop the tour');
+});

@@ -91,6 +91,7 @@ const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 const OPEN_SLACK = 0.04;
 const GRUMPY_HIT = 0.5;      // hearts a grumpy's shove costs (spec 7.1)
 const STYLE_ASK_MS = 1600;   // after the nest cheer, ask how to play (once)
+const RESPAWN_HOLD_MS = 4000; // after a respawn the fade lifts when the place is built, at the latest after this
 /** Fin-tip contrails: from this speed (px per step), at these tips (× body radius, nose = +x). */
 const CONTRAIL = { speed: 11, tips: [[-0.35, -0.55], [-0.35, 0.55]] };
 /** Glowing plankton in the wake at night and in the deep (spec 5.0k): from this speed (px per step), one spark per `everyMs` at full glow. */
@@ -596,8 +597,9 @@ export default class MainScene extends Phaser.Scene {
         const built = this.level.buildMs.count !== this.perfBuilds;
         this.perfBuilds = this.level.buildMs.count;
         const chunkMs = built ? this.level.buildMs.last : 0;
-        tour.sample({ logicMs: Math.max(0, logicMs - chunkMs), chunkMs, objects: this.children.list.length, tweens: this.tweens.getTweens().length });
-        if (tour.step(delta)) {
+        const settling = !this.level.viewReady;
+        tour.sample({ logicMs: Math.max(0, logicMs - chunkMs), chunkMs, objects: this.children.list.length, tweens: this.tweens.getTweens().length, settling });
+        if (tour.step(delta, settling)) {
             const p = this.safeSpot(tour.x, this.level.field.routeY(tour.x));
             this.fish.place(p.x, p.y);
             this.fish.sprite.setVelocity(0, 0);
@@ -865,7 +867,8 @@ export default class MainScene extends Phaser.Scene {
             this.camY = p.y - this.scale.height / 2;
             this.respawning = false;
             this.swarms.arrive(p.x, p.y);      // back at the nest the water is not empty: a shoal swims into the picture
-            this.cameras.main.fadeIn(320, 10, 40, 70);
+            // The place is built off the main thread now (no freeze): the fade lifts once it is there.
+            this.fadeInAt = this.time.now + RESPAWN_HOLD_MS;
             this.announce(de ? 'Nochmal!' : 'Try again!', de ? 'Zurück am letzten Nest' : 'Back at the last nest');
         });
     }
@@ -1590,6 +1593,7 @@ export default class MainScene extends Phaser.Scene {
         this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
 
         this.level.update(this.camX, this.camY);
+        if (this.fadeInAt && (this.level.viewReady || time > this.fadeInAt)) { this.fadeInAt = 0; this.cameras.main.fadeIn(320, 10, 40, 70); }
         // A frame that built a chunk has spent its build budget: no layer builds its scene in the same frame.
         if (this.level.buildMs.count !== this.chunkBuilds) { this.chunkBuilds = this.level.buildMs.count; this.lastBuildFrame = this.game.loop.frame; }
         this.level.animate(time / 1000, view, speed, this.mp?.others(this.roomPlayers || (this.roomPlayers = [])), this.wavePhase());

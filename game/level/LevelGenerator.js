@@ -184,6 +184,8 @@ export default class LevelGenerator {
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
         this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
         this.job = null;        // the chunk build in progress (build() is cut into steps)
+        this.started = false;   // the first update builds what is on screen at once (behind the start's fade); later jumps go through the worker
+        this.viewReady = false; // every chunk on screen is complete
         this.makeKelpTexture();
         this.makeRootTextures();
         // Painted once here, at start-up, so no chunk has to pay for them while playing.
@@ -299,8 +301,8 @@ export default class LevelGenerator {
             const mx = (camX + W / 2) / CH - 0.5, my = (camY + H / 2) / CH - 0.5;
             missing.sort((p, q) => Math.hypot(p[0] - mx, p[1] - my) - Math.hypot(q[0] - mx, q[1] - my));
             const onScreen = ([cx, cy]) => cx * CH < camX + W && (cx + 1) * CH > camX && cy * CH < camY + H && (cy + 1) * CH > camY;
-            if (this.chunks.size === 0) {
-                // Very first frame: what is on screen is built right away.
+            if (!this.started || (this.chunks.size === 0 && !this.worker)) {
+                // Very first frame (and a jump without a worker): what is on screen is built right away.
                 for (const [cx, cy] of missing.filter(onScreen)) { worked = true; for (const _ of this.build(cx, cy)); }
             } else if (!this.worker) {
                 // No worker: one at a time on the main thread, in steps.
@@ -340,6 +342,11 @@ export default class LevelGenerator {
         for (const key of this.early.keys()) {
             const [cx, cy] = key.split(',').map(Number);
             if (!wanted(cx, cy)) this.dropEarly(key);
+        }
+        this.started = true;
+        this.viewReady = true;
+        for (let cy = Math.max(0, Math.floor(camY / CH)); cy <= Math.floor((camY + H) / CH) && this.viewReady; cy++) {
+            for (let cx = Math.floor(camX / CH); cx <= Math.floor((camX + W) / CH); cx++) if (!this.chunks.get(`${cx},${cy}`)?.done) { this.viewReady = false; break; }
         }
         this.cull(camX + W / 2, camY + H / 2, W / 2 + LEVEL.cullPad, H / 2 + LEVEL.cullPad);
     }
@@ -797,6 +804,7 @@ export default class LevelGenerator {
             const p = key && openSpot((HAZARDS[key].patrol || 0) / 2 + 60);
             if (p) this.addHazard(chunk, key, p.x, p.y, rng);
         }
+        chunk.done = true;
     }
 
     /**

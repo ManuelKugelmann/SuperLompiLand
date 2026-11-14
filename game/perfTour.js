@@ -5,7 +5,8 @@
 export const PERF_TOUR = {
     hop: 12000,       // px between two stops (about 80 stops along the whole journey)
     stayMs: 1800,     // ms at each stop (chunks load, things settle)
-    skipMs: 500,      // ms after a hop that do not count (the jump itself builds many chunks at once)
+    skipMs: 500,      // ms after a hop that never count as steady play ...
+    settleMaxMs: 8000, // ... and the stop's time only starts once the chunks in view are complete (at most this long after the hop)
     warmMs: 3000,     // ms after the tour's start that do not count (start-up: first chunks, texture bakes)
     budget: { logicMs: 4, chunkMs: 15, objects: 600, tweens: 300 }
 };
@@ -14,30 +15,35 @@ export const PERF_TOUR = {
  * @param from, to   world x of the tour's first and last stop
  * @param biomeAt    x -> biome id
  * Returns { x (current stop), done, step(ms) -> true when it hopped to a new stop,
- *           sample({ logicMs, chunkMs, objects, tweens }), rows() }.
+ *           sample({ logicMs, chunkMs, objects, tweens, settling }), rows() }.
+ * `settling` = the view is not complete yet after the hop: such frames are the hop's cost (a respawn's, in play),
+ * kept apart as `hopMs` (the worst of them, logic and build together), and the stop's time does not run.
  */
 export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
     const rows = new Map();
-    let x = from, at = 0, total = 0, done = false;
+    let x = from, at = 0, total = 0, done = false, waited = 0;
     const row = id => {
-        if (!rows.has(id)) rows.set(id, { biome: id, logicMs: 0, worstMs: 0, sumMs: 0, chunkMs: 0, objects: 0, tweens: 0, frames: 0, all: [] });
+        if (!rows.has(id)) rows.set(id, { biome: id, logicMs: 0, worstMs: 0, sumMs: 0, chunkMs: 0, hopMs: 0, objects: 0, tweens: 0, frames: 0, all: [] });
         return rows.get(id);
     };
     return {
         get x() { return x; },
         get done() { return done; },
-        step(ms) {
+        step(ms, settling = false) {
             if (done) return false;
-            at += ms; total += ms;
+            total += ms;
+            if (settling && waited < cfg.settleMaxMs) { waited += ms; return false; }
+            at += ms;
             if (at < cfg.stayMs) return false;
-            at = 0;
+            at = 0; waited = 0;
             if (x >= to) { done = true; return false; }
             x = Math.min(to, x + cfg.hop);
             return true;
         },
         sample(s) {
-            if (done || at < cfg.skipMs || total < cfg.warmMs) return;
+            if (done || total < cfg.warmMs) return;
             const r = row(biomeAt(x));
+            if (s.settling || at < cfg.skipMs) { r.hopMs = Math.max(r.hopMs, s.logicMs + s.chunkMs); return; }
             // Logic: the average counts against the budget (one slow frame is a hitch, not the frame cost); the worst is shown too.
             r.all.push(s.logicMs); r.sumMs += s.logicMs; r.worstMs = Math.max(r.worstMs, s.logicMs); r.chunkMs = Math.max(r.chunkMs, s.chunkMs);
             r.objects = Math.max(r.objects, s.objects); r.tweens = Math.max(r.tweens, s.tweens);
@@ -60,6 +66,6 @@ export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
 /** The result as lines of text (for the screen and the console). */
 export function perfReport(rows) {
     const pad = (v, n) => String(v).padStart(n);
-    return ['biome       logic avg       p50       p95     worst  chunk ms  objects  tweens',
-        ...rows.map(r => `${r.biome.padEnd(10)}${pad(r.logicMs.toFixed(1), 11)}${pad(r.p50Ms.toFixed(1), 10)}${pad(r.p95Ms.toFixed(1), 10)}${pad(r.worstMs.toFixed(1), 10)}${pad(r.chunkMs.toFixed(1), 10)}${pad(r.objects, 9)}${pad(r.tweens, 8)}${r.over.length ? '   OVER: ' + r.over.join(', ') : ''}`)];
+    return ['biome       logic avg       p50       p95     worst  chunk ms  objects  tweens    hop ms',
+        ...rows.map(r => `${r.biome.padEnd(10)}${pad(r.logicMs.toFixed(1), 11)}${pad(r.p50Ms.toFixed(1), 10)}${pad(r.p95Ms.toFixed(1), 10)}${pad(r.worstMs.toFixed(1), 10)}${pad(r.chunkMs.toFixed(1), 10)}${pad(r.objects, 9)}${pad(r.tweens, 8)}${pad(r.hopMs.toFixed(0), 10)}${r.over.length ? '   OVER: ' + r.over.join(', ') : ''}`)];
 }
