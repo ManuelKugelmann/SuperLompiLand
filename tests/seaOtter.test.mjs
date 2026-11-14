@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEA_OTTER, otterSpot, otterAt, roundS } from '../game/level/seaOtter.js';
+import { SEA_OTTER, otterSpot, otterAt, roundS, diveTo } from '../game/level/seaOtter.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { createField, ROUTE } from '../game/level/density.js';
 import { worldMap, LANDMARK_KINDS } from '../game/level/worldMap.js';
@@ -28,7 +28,7 @@ test('a round: it floats and taps its shell, dives to just over the lane, looks 
         wasTap = p.tap;
         deepest = Math.max(deepest, p.y);
         if (p.part === 'float') assert.ok(Math.abs(p.y - surface) <= SEA_OTTER.bob + 1e-9 && p.x === x0);
-        else assert.equal(p.tap, false);
+        else if (p.part !== 'linger') assert.equal(p.tap, false);
         prev = { ...p };
     }
     assert.deepEqual([...parts], ['float', 'dive', 'linger', 'rise']);
@@ -37,6 +37,19 @@ test('a round: it floats and taps its shell, dives to just over the lane, looks 
     assert.ok(route - SEA_OTTER.over < route - 100 && SEA_OTTER.over < ROUTE.halfWidth, 'in the picture of a fish on the route, above its middle');
     const again = otterAt(roundS() + 1, x0, surface, route, {}), first = otterAt(1, x0, surface, route, {});
     assert.equal(again.part, first.part);
+});
+
+test('with a fish about, the dive ends just ahead of it, at its eye height, within range of the floating place', () => {
+    assert.equal(diveTo(1000, 1400, 1), 1400 + SEA_OTTER.ahead);
+    assert.equal(diveTo(1000, 1400, -1), 1400 - SEA_OTTER.ahead);
+    assert.equal(diveTo(1000, 9000, 1), 1000 + SEA_OTTER.range, 'never further than its range');
+    const to = diveTo(1000, 1400, 1), p = otterAt(SEA_OTTER.floatS + SEA_OTTER.diveS + SEA_OTTER.lingerS / 2, 1000, 0, 900, {}, SEA_OTTER, to);
+    assert.equal(p.part, 'linger');
+    assert.ok(Math.abs(p.x - to) <= SEA_OTTER.look && p.y === 900 - SEA_OTTER.over);
+    let taps = 0, was = false;
+    for (let u = 0; u < SEA_OTTER.lingerS; u += 1 / 60) { const q = otterAt(SEA_OTTER.floatS + SEA_OTTER.diveS + u, 1000, 0, 900, {}, SEA_OTTER, to); if (q.tap && !was) taps++; was = q.tap; }
+    assert.ok(taps >= 4, `it cracks its shell down there (${taps} taps)`);
+    assert.ok(SEA_OTTER.length >= 1.5 * 170, 'about one and a half fish long');
 });
 
 test('where the route runs just under the surface the dive stays shallow but still goes under', () => {

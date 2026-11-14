@@ -1661,7 +1661,7 @@ export default class MainScene extends Phaser.Scene {
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);
         this.ferry.update(sp, this.fish.facing, time / 1000, delta);
-        this.seaOtter.update(sp, time / 1000, delta / 1000);
+        this.seaOtter.update(sp, this.fish.facing, time / 1000, delta / 1000);
         this.seaLion.update(sp, this.fish.facing, time / 1000, delta / 1000);
         this.baitBalls.update(sp, this.fish.view, this.fish.radius, time / 1000);
         this.rafts.update(sp, time / 1000);

@@ -1,5 +1,5 @@
 import { createRig } from '../CardRig.js';
-import { SEA_OTTER, otterSpot, otterAt } from './seaOtter.js';
+import { SEA_OTTER, otterSpot, otterAt, diveTo } from './seaOtter.js';
 
 export const SEA_OTTER_LOOK = { depth: 4.4, floatDepth: 6.2 };      // diving: just behind the fish; floating: on the waterline
 
@@ -38,7 +38,7 @@ function ensureTextures(scene) {
 /**
  * Draws the sea otter (seaOtter.js): a picture while it floats, a rig while it dives.
  *   create():  this.seaOtter = new SeaOtterLayer(scene, surfaceY, routeY, onSeen)
- *   update():  this.seaOtter.update(fish, t, dt)      // fish = { x, y }, t and dt in s
+ *   update():  this.seaOtter.update(fish, heading, t, dt)      // fish = { x, y }, heading +1 east, t and dt in s
  */
 export default class SeaOtterLayer {
     constructor(scene, surfaceY, routeY, onSeen) {
@@ -47,7 +47,7 @@ export default class SeaOtterLayer {
         this.built = null; this.seen = false; this.p = {}; this.last = null; this.tapped = false;
     }
 
-    update(fish, t, dt) {
+    update(fish, heading, t, dt) {
         const d = Math.abs(fish.x - this.spot.x);
         if (this.built && d > SEA_OTTER.near * 1.4) { this.destroy(); return; }
         if (!this.built) {
@@ -58,19 +58,24 @@ export default class SeaOtterLayer {
             const rig = createRig(s, { states: { normal: { key: SWIM, width: SEA_OTTER.length, wiggle: 9 } }, anim: 'swim', soft: 0.6 }, this.spot.x, 0, SEA_OTTER_LOOK.depth);
             this.built = { float, rig };
         }
-        const B = this.built, x0 = this.spot.x, p = otterAt(t, x0, this.surfaceY(x0), this.routeY(x0), this.p), floating = p.part === 'float';
+        const B = this.built, x0 = this.spot.x;
+        // While it floats it keeps deciding where the next dive goes: just ahead of the fish.
+        if (this.p.part === 'float' || this.diveX === undefined) this.diveX = diveTo(x0, fish.x, heading >= 0 ? 1 : -1);
+        const p = otterAt(t, x0, this.surfaceY(x0), this.routeY(this.diveX), this.p, SEA_OTTER, this.diveX), floating = p.part === 'float';
         B.float.setVisible(floating); B.rig.setVisible(!floating);
         if (floating) {
             B.float.setPosition(p.x, p.y - 6).setRotation(Math.sin(t * 1.3) * 0.04);
             // A tap on the shell: a little glint over its chest, once per tap.
             if (p.tap && !this.tapped) this.scene.particles?.spawn('glint', p.x + SEA_OTTER.length * 0.14, p.y - 24, 2, { radius: 5, spread: 14 });
-            this.tapped = p.tap;
             this.last = null;
         } else {
             const vx = this.last ? (p.x - this.last.x) / Math.max(dt, 1e-3) / 60 : 0, vy = this.last ? (p.y - this.last.y) / Math.max(dt, 1e-3) / 60 : 0;
             B.rig.draw({ x: p.x, y: p.y, vx, vy, frames: dt * 60, effort: 0.6, turn: 0.3 });
             this.last = { x: p.x, y: p.y };
+            // Down at the lane it cracks its shell too: a glint at its paws.
+            if (p.tap && !this.tapped) this.scene.particles?.spawn('glint', p.x + SEA_OTTER.length * 0.3, p.y + 6, 2, { radius: 5, spread: 14 });
         }
+        this.tapped = p.tap;
         if (!this.seen && Math.hypot(p.x - fish.x, p.y - fish.y) < SEA_OTTER.seen) { this.seen = true; this.onSeen(); }
     }
 
