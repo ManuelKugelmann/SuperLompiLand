@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ROCK_LAYERS, SUPPORT, enclosure, wallShare, layerField, lowPass, layerChunkRect, fogLayer, LAYER_CHUNK } from '../game/level/rockLayerTable.js';
+import { ROCK_LAYERS, SUPPORT, enclosure, wallShare, layerField, lowPass, layerChunkRect, fogLayer, LAYER_CHUNK, lipLayer, LIP } from '../game/level/rockLayerTable.js';
 import { BIOMES, BLEND } from '../game/level/biomes.js';
 import { FIELD, createField } from '../game/level/density.js';
 
@@ -128,4 +128,15 @@ test('nothing hangs below the cleared bands: rock always reaches down to more ro
         }
         assert.ok(floating < 6, `${L.id}: ${floating} rock bottoms with only water below`);
     }
+});
+
+test('the rock behind the play plane gets a top skin on its upward edges, in the biome\'s top colour', () => {
+    const S = 16, rgba = new Uint8ClampedArray(S * S * 4);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const o = (y * S + x) * 4; if (y >= 6) { rgba[o] = rgba[o + 1] = rgba[o + 2] = 60; rgba[o + 3] = 255; } }
+    const reef = BIOMES.find(b => b.id === 'reef');
+    lipLayer(rgba, S, reef.from + reef.width / 2, 0, 160, { ...LIP, texels: 4, specks: 0, patches: 0 });
+    const at = (x, y) => rgba[(y * S + x) * 4 + 1];
+    assert.ok(at(8, 6) > 120, `edge ${at(8, 6)}`);           // the edge takes on the moss green
+    assert.equal(at(8, 15), 60);                               // deep inside unchanged
+    assert.equal(rgba[(2 * S + 8) * 4 + 3], 0);                // open water stays open
 });

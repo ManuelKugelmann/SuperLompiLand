@@ -235,7 +235,61 @@ export function layerChunkRect(layer, cx, cy, span = LAYER_CHUNK) {
 const LIFT_LUMA = 128, FOG_LIFT = 0.35;
 
 
+/**
+ * The rock behind the play plane gets a top skin like the play plane's rock (lookdev1): along
+ * every edge that faces up, a band of the biome's top colour (pale sand in the lagoon, bright
+ * moss on the reef islands, silt in the harbour, grey in the deep), thinning in from the edge;
+ * slow light-and-dark patches across the rock; and tiny coral and shell specks along the rim.
+ * Before the fog, so the skin fades with distance like the rest. Pure; baked once per chunk.
+ */
+export const LIP = {
+    texels: 10,         // how deep the skin reaches in from the top edge (layer picture texels)
+    strength: 1,        // how much of the top colour at the very edge
+    patches: 0.2,       // light and dark patches across the rock (share of brightness)
+    patchScale: 520,    // world px of one patch
+    specks: 0.05,       // share of rim texels that carry a speck
+    afterFog: 0.5,      // share of the skin laid again after the fog: a lit top keeps some of its own colour at distance
+    tops: {             // the top colour per biome, and its specks
+        beach: [0xe2d3a2, [0xf2a3b5, 0xffffff]], mangrove: [0x8f9a4a, [0xd8c8a0]], reef: [0x9ed04a, [0xf0609a, 0xb070e0, 0xffffff]],
+        kelp: [0x8cc456, [0xf0a040, 0xffffff]], harbour: [0x9a9a7a, [0xd0d0c0]], wreck: [0x8a8a76, [0xc8b090]],
+        shore: [0xb7c4a0, [0xf0f0f0, 0x9a7ad0]], blue: [0x9aa890, [0xffffff]], trench: [0x5a6478, [0x8a9ac8]]
+    }
+};
+
+const LIP_DEFAULT = [0xa8b080, [0xffffff]];
+const ch = (c, k) => (c >> (16 - 8 * k)) & 255;
+
+/** Returns the skin: per texel, how much of which top colour ({ k: Float32Array, rgb: Float32Array }), for laying again after the fog. */
+export function lipLayer(rgba, size, ox, oy, span, cfg = LIP) {
+    const skin = { k: new Float32Array(size * size), rgb: new Float32Array(size * size * 3) };
+    const hashAt = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+    for (let px = 0; px < size; px++) {
+        const wx = ox + (px + 0.5) * span / size, { a, b, t } = biomeBlendAt(wx);
+        const ta = cfg.tops[a.id] || LIP_DEFAULT, tb = cfg.tops[b.id] || LIP_DEFAULT;
+        const col = [0, 1, 2].map(k => ch(ta[0], k) * (1 - t) + ch(tb[0], k) * t), specks = t < 0.5 ? ta[1] : tb[1];
+        let run = cfg.texels + 1;              // texels since the last open texel above (start: as if deep inside)
+        for (let py = 0; py < size; py++) {
+            const o = (py * size + px) * 4;
+            if (rgba[o + 3] < 40) { run = 0; continue; }
+            run++;
+            const wy = oy + (py + 0.5) * span / size;
+            const patch = 1 + cfg.patches * (vnoise(wx / cfg.patchScale, wy / cfg.patchScale, 77) * 2 - 1);
+            for (let c = 0; c < 3; c++) rgba[o + c] = Math.min(255, rgba[o + c] * patch);
+            if (run > cfg.texels) continue;
+            const k = cfg.strength * (1 - (run - 1) / cfg.texels) ** 1.4, q = py * size + px;
+            for (let c = 0; c < 3; c++) { rgba[o + c] = rgba[o + c] + (col[c] - rgba[o + c]) * k; skin.rgb[q * 3 + c] = col[c]; }
+            skin.k[q] = k;
+            if (run <= 2 && hashAt(px + ox, py + oy) < cfg.specks) {
+                const sc = specks[Math.floor(hashAt(py, px) * specks.length) % specks.length];
+                for (let c = 0; c < 3; c++) rgba[o + c] = ch(sc, c);
+            }
+        }
+    }
+    return skin;
+}
+
 export function fogLayer(rgba, size, ox, oy, span, layer, deepTint = SHADE.deepTint, maxDepth = 5600) {
+    const skin = lipLayer(rgba, size, ox, oy, span);
     const fog = layer.fog;
     for (let px = 0; px < size; px++) {
         const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * span / size);
@@ -256,6 +310,10 @@ export function fogLayer(rgba, size, ox, oy, span, layer, deepTint = SHADE.deepT
                 rgba[o + c] = rgba[o + c] + (water - rgba[o + c]) * fog;
             }
         }
+    }
+    for (let q = 0; q < size * size; q++) {          // the top skin again, over the fog (LIP.afterFog)
+        const k = skin.k[q] * LIP.afterFog;
+        if (k > 0) for (let c = 0; c < 3; c++) rgba[q * 4 + c] += (skin.rgb[q * 3 + c] - rgba[q * 4 + c]) * k;
     }
     softenLayer(rgba, size);
 
