@@ -5,7 +5,7 @@
 export const MICRO = {
     rate: 0.75,        // chance that a piece of floor gets something
     max: 9,            // at most this many per chunk (object budget: chunks are loaded well beyond the view)
-    width: [240, 420], // px across of one patch (a pebble in it is then 20 to 60 px)
+    width: [140, 260], // px across of one patch (sized for the painted patches)
     variants: 3        // pictures per kind
 };
 

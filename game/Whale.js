@@ -1,5 +1,5 @@
 import { createRig } from './CardRig.js';
-import { WHALE, createWhale, stepWhale, bodySpot, whaleCarry } from './ai/whale.js';
+import { WHALE, createWhale, stepWhale, bodySpot, whaleCarry, whaleSendOff } from './ai/whale.js';
 
 export const WHALE_SCENE = {
     id: 'whale',         // the journey's name for this event
@@ -85,7 +85,7 @@ function ensureDrape(scene) {
     tex.refresh();
 }
 
-const profile = width => ({ states: { normal: { key: KEY, width, wiggle: 40 } }, anim: 'swim', soft: 0.25 });
+const profile = width => ({ states: { normal: { key: KEY, width, wiggle: 40 } }, anim: 'swim', soft: 0.25, upright: true });      // upright: she swims level, whatever her speed
 const SPOT = { x: 0, y: 0 }, PULL = { x: 0, y: 0 };
 
 /**
@@ -131,6 +131,11 @@ export default class Whale {
         if (!this.mind) return 0;
         const k = Math.max(0, 1 - Math.abs(x - this.mind.x) / WHALE_SCENE.lookWithin);
         return k * k * (3 - 2 * k) * (1 - this.mind.dive);
+    }
+
+    /** At the 'send' event: the velocity her rider leaves with (px per step), or null if the fish was not at her back. */
+    sendOff(fish) {
+        return this.mind ? whaleSendOff(this.mind, fish, PULL) : null;
     }
 
     /** During her ride: the velocity the fish takes on at her back (px per step), or null. */

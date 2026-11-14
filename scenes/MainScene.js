@@ -66,6 +66,7 @@ const WORLD = {
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
     lookAhead: 9,         // camera leads the fish by velocity * this
     refitAt: 0.12,        // the window's shape must change by this share before a running game is laid out again
+    wakeS: 1.6,           // s the whale's wake carries the fish on after her send-off
     weatherRange: 7000,   // px from the storm or the downwelling at which their looks are built
     wallLook: 0.26,       // at a drop-off the camera looks down by this share of the screen height
     doubleTapMs: 320,
@@ -452,6 +453,15 @@ export default class MainScene extends Phaser.Scene {
             }
         } else if (ev === 'ride') {
             play('whale');
+        } else if (ev === 'send') {
+            // The ride ends with a flick of her fluke: her rider shoots on, up toward the route.
+            const sp = this.fish.sprite, go = this.whale.sendOff(sp);
+            if (!go) return;
+            sp.setVelocity(go.x, go.y);
+            this.wake = { x: go.x, y: go.y, left: WORLD.wakeS };      // her wake carries the fish on for a moment (fixedStep)
+            play('whale'); play('leap');
+            this.particles.spawn('bubble', sp.x, sp.y, 16, { radius: 14, spread: 80 });
+            this.announce('', de ? `Danke, ${this.character.name}!` : `Thank you, ${this.character.name}!`);
         }
     }
 
@@ -1083,6 +1093,13 @@ export default class MainScene extends Phaser.Scene {
             const push = carry(water.x, water.y, fsp.body.velocity.x, fsp.body.velocity.y, FLOW, this.flowPush || (this.flowPush = { x: 0, y: 0 }));
             const sail = (this.fish.mode?.flow ?? 1) * (this.fish.posed ? WORLD.puffSail : 1);   // a spread fan or a puffed ball catches the water
             fsp.setVelocity(fsp.body.velocity.x + push.x * sail, fsp.body.velocity.y + push.y * sail);
+        }
+        // The whale's wake after her send-off: water that runs on with the fish and dies away.
+        if (this.wake) {
+            const k = this.wake.left / WORLD.wakeS;
+            const push = carry(this.wake.x * k, this.wake.y * k, fsp.body.velocity.x, fsp.body.velocity.y, FLOW, this.flowPush || (this.flowPush = { x: 0, y: 0 }));
+            fsp.setVelocity(fsp.body.velocity.x + push.x, fsp.body.velocity.y + push.y);
+            if ((this.wake.left -= STEP_MS / 1000) <= 0) this.wake = null;
         }
         // Chain moves: riding a current, and loops flown in the air.
         const fv = fsp.body.velocity;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WHALE, createWhale, stepWhale, bodySpot, whaleCarry } from '../game/ai/whale.js';
+import { WHALE, createWhale, stepWhale, bodySpot, whaleCarry, whaleSendOff } from '../game/ai/whale.js';
 
 const route = () => 900;
 const run = (w, s, fish) => { const ev = []; for (let i = 0; i < s * 60; i++) { const e = stepWhale(w, 1 / 60, fish, route, i / 60); if (e) ev.push(e); } return ev; };
@@ -49,7 +49,7 @@ test('freed, she sings, rides east with momentum, dives at the end and is gone',
     const w = createWhale(1000, 6000);
     cutAll(w);
     const ev = run(w, 40, null);
-    assert.deepEqual(ev, ['ride', 'gone']);
+    assert.deepEqual(ev, ['ride', 'send', 'gone']);
     assert.ok(w.x >= 6000);
     assert.equal(w.state, 'gone');
 });
@@ -88,4 +88,13 @@ test('one touch tears off one piece, even where two hang within reach', () => {
     assert.equal(cuts, 1);
     for (let i = 0; i < 10; i++) if (stepWhale(w, 1 / 60, between, route, 0)) cuts++;
     assert.equal(cuts, 2, 'staying there takes the next one after a moment');
+});
+
+test('at the end of the ride she sends her rider on: forward at her speed and up; a fish elsewhere gets nothing', () => {
+    const w = createWhale(1000, 6000);
+    stepWhale(w, 1 / 60, null, route, 0);
+    const seat = bodySpot(w, WHALE.seat[0], WHALE.seat[1]);
+    const v = whaleSendOff(w, { x: seat.x + 30, y: seat.y - 20 });
+    assert.ok(v.x >= WHALE.ride / 60 && v.y < -3, 'onward and up');
+    assert.equal(whaleSendOff(w, { x: seat.x, y: seat.y + WHALE.seatRadius + 50 }), null);
 });

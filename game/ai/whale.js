@@ -5,7 +5,7 @@
 // Units: px and s; velocities handed to the fish are px per 60 Hz step.
 
 export const WHALE = {
-    length: 1700,        // px nose to fluke
+    length: 1350,        // px nose to fluke: huge, and still whole in the picture
     nets: [0.84, 0.62, 0.38, 0.12],   // where the net pieces hang, as a share of her length from the fluke
     netDrop: [-0.03, 0, -0.02, 0.01],   // ... and how far above (-) or below (+) her middle line, in lengths
     cutRadius: 240,      // px: swimming this close to a piece tears it off
@@ -19,6 +19,7 @@ export const WHALE = {
     seatRadius: 520,     // px: this close to the seat you are carried
     grip: 0.14,          // share of the difference to her speed a rider takes on per step
     diveS: 3.2,          // s she takes to dive away at the end
+    sendOff: [1.1, -6],  // the send-off at the end of the ride: the rider keeps this share of her speed and gets this push upward (px/step), back toward the route
     bob: 26              // px she rises and falls while drifting
 };
 
@@ -39,7 +40,7 @@ const SPOT = { x: 0, y: 0 };
 /**
  * Advance by dt. `fish` = { x, y } or null, `routeY(x)` = depth of the calm route, `t` s.
  * Returns 'cut' when a net piece comes off, 'freed' with the last one, 'ride' when she sets
- * off, 'gone' when she has dived away, else null.
+ * off, 'send' when the ride ends and she flicks her rider on, 'gone' when she has dived away, else null.
  */
 export function stepWhale(w, dt, fish, routeY, t = 0) {
     const c = w.cfg;
@@ -65,7 +66,7 @@ export function stepWhale(w, dt, fish, routeY, t = 0) {
         if (w.timer >= c.singS) { w.state = 'ride'; w.timer = 0; event = 'ride'; }
     } else if (w.state === 'ride') {
         want = c.ride;
-        if (w.x >= w.endX) { w.state = 'dive'; w.timer = 0; }
+        if (w.x >= w.endX) { w.state = 'dive'; w.timer = 0; event = 'send'; }      // a flick of her fluke sends her rider on
     } else if (w.state === 'dive') {
         want = c.ride * 0.4;
         w.dive = Math.min(1, w.timer / c.diveS);
@@ -88,5 +89,16 @@ export function whaleCarry(w, fish, vx, vy, out = { x: 0, y: 0 }) {
     // Her speed, plus a soft pull back toward the seat.
     const tx = w.v / 60 + dx * 0.02, ty = dy * 0.02;
     out.x = vx + (tx - vx) * c.grip; out.y = vy + (ty - vy) * c.grip;
+    return out;
+}
+
+/**
+ * The send-off: the velocity (px per step) a fish at her back leaves with when the ride ends,
+ * or null if it was not riding. Forward at her speed and up, toward the calm route.
+ */
+export function whaleSendOff(w, fish, out = { x: 0, y: 0 }) {
+    const c = w.cfg, s = bodySpot(w, c.seat[0], c.seat[1], SPOT);
+    if (Math.hypot(s.x - fish.x, s.y - fish.y) > c.seatRadius) return null;
+    out.x = c.ride / 60 * c.sendOff[0]; out.y = c.sendOff[1];
     return out;
 }
