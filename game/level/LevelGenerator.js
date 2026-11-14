@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
+import { createSwimmer, stepSwimmer } from '../ai/swimmer.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
@@ -30,16 +31,18 @@ export const LEVEL = {
 const CH = LEVEL.cell * LEVEL.cells;
 
 /** How each creature / object looks and moves. Sizes are display widths in px. */
+// `ai`: how a swimming creature behaves (game/ai/swimmer.js): own speed (px per step), home
+// range (px), turn rate (radians per step), shy (1 = normal; bigger = scared from further away).
 const FRIENDS = {
-    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5 },
-    friend_jellyfish: { size: 150, bob: 60, anim: 'pulse' },
-    friend_seahorse: { size: 120, bob: 26, anim: 'sway' },
+    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7 } },
+    friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
+    friend_seahorse: { size: 120, bob: 26, anim: 'sway', ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2 } },
     friend_starfish: { size: 170, ground: true, anim: 'wobble' },
     friend_snail: { size: 160, ground: true, anim: 'wobble' },
     friend_nudibranch: { size: 190, ground: true, anim: 'wobble' },
     urchin: { size: 140, ground: true, anim: 'throb' },
     // The anglerfish art faces left (tail on the right); it lights the deep.
-    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', tail: 'right', speed: 0.7, facesLeft: true, glow: true }
+    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', tail: 'right', speed: 0.7, facesLeft: true, glow: true, ai: { speed: 1.6, range: 620, turn: 0.04 } }
 };
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
 const HAZARDS = {
@@ -131,6 +134,9 @@ export default class LevelGenerator {
         this.chainBody = { active: false, x: 0, y: 0, vx: 0, vy: 0 };   // the swimmer, as the ropes see it
         this.chains = [];           // hanging chains: verlet ropes (rope.js) with the hazard as the weight at the end
         this.lineEnd = { x: 0, y: 0 };
+        this.brainEnv = { isOpen: (x, y) => this.isOpen(x, y, 0.05), t: 0, player: null, alarm: null };
+        this.alarm = { x: 0, y: 0 };   // where something sudden just happened (a special): creatures nearby take fright
+        this.alarmLeft = 0;
         this.tethers = [];          // lines that hold drifting things: stretched between them and their anchor every frame
         this.ready = [];            // grids that came back, waiting to be drawn
         const mats = this.loadMaterials();
@@ -184,6 +190,11 @@ export default class LevelGenerator {
             if (this.density(x, at) > LEVEL.threshold) return { y: at + 30 };
         }
         return null;
+    }
+
+    /** Something sudden happened at (x, y): creatures nearby dart away. */
+    startle(x, y) {
+        this.alarm.x = x; this.alarm.y = y; this.alarmLeft = 0.25;
     }
 
     isOpen(x, y, slack = 0.07) {
@@ -289,9 +300,26 @@ export default class LevelGenerator {
             for (let i = 0; i < r.n; i++) { pts[i].x = r.x[i] - l.x; pts[i].y = r.y[i] - l.y; }
             l.setDirty();
         }
+        // Creatures with a mind of their own (ai/swimmer.js).
+        const dt = Math.min(0.05, Math.max(0, t - (this.brainT ?? t)));
+        this.brainT = t;
+        const env = this.brainEnv;
+        env.t = t; env.player = this.chainBody.active ? this.chainBody : null;
+        env.alarm = this.alarmLeft > 0 ? this.alarm : null;
+        this.alarmLeft -= dt;
+        for (const o of this.animated) {
+            const a = o.brain;
+            if (!a || !o.active || dt <= 0) continue;
+            stepSwimmer(a, dt, env);
+            const ahead = Math.cos(a.heading);
+            if (Math.abs(ahead) > 0.25) o.face(ahead > 0 ? o.look : -o.look);
+            o.setPosition(a.x, a.y + Math.sin(t * 1.3 + a.seed) * o.bob * 0.35);
+            if (o.pitches) o.rotation += (Math.atan2(Math.sin(a.heading), Math.abs(ahead)) * 0.45 * (ahead >= 0 ? 1 : -1) - o.rotation) * 0.1;
+        }
         for (const l of this.lights) {
             if (!l.active || !l.follow.active) continue;
             l.setPosition(l.follow.x, l.follow.y);
+            l.rotation = l.follow.rotation;
             if (l.hue !== undefined) {
                 // Rainbow sheen: colours run across the body and shimmer a little.
                 l.face(l.follow.facing());
@@ -634,15 +662,12 @@ export default class LevelGenerator {
         const s = this.scene, f = FRIENDS[key];
         const img = makeCritter(s, key, x, y, f.size, f.anim, { ...f, rotation: angle }).setDepth(f.ground ? 1 : 4);
         this.animated.push(img);
-        if (f.swim) {
-            const dir = rng.sign();
-            const look = f.facesLeft ? -1 : 1; // which way the art is drawn
-            img.face(dir * look);
-            img.setX(x - dir * f.swim / 2);
-            s.tweens.add({
-                targets: img, x: x + dir * f.swim / 2, duration: rng.between(5000, 8000), yoyo: true, repeat: -1,
-                ease: 'Sine.easeInOut', onYoyo: () => img.face(-dir * look), onRepeat: () => img.face(dir * look)
-            });
+        if (f.ai) {
+            // No fixed path: it roams, rests, notices and greets the player, and darts off when rushed.
+            img.brain = createSwimmer({ x, y }, f.ai, rng.frac() * 1000);
+            img.look = f.facesLeft ? -1 : 1;      // which way the art is drawn
+            img.bob = f.bob;
+            img.pitches = f.anim === 'swim';      // long bodies tip their nose up and down
         }
         if (f.glow) {
             const light = s.add.circle(x, y, 150, 0xfff3b0, 0.16).setDepth(42).setBlendMode(Phaser.BlendModes.ADD);
@@ -663,7 +688,6 @@ export default class LevelGenerator {
         this.animated.push(sheen);
         chunk.objects.push(sheen);
         this.lights.push(sheen);
-        if (!f.ground) s.tweens.add({ targets: img, y: y - f.bob, duration: rng.between(1400, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(img);
         // Friends are numbered per chunk too. They greet you every time you come
         // back; only the coin bonus is given once per friend, for good.

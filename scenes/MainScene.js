@@ -208,7 +208,7 @@ export default class MainScene extends Phaser.Scene {
         this.flowDebug = new URLSearchParams(window.location.search).get('debug') === 'flow';
 
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
-        this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.chainMove('special'); });
+        this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.level.startle(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
