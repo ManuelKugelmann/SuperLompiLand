@@ -128,6 +128,12 @@ export default class CardRig {
 
     setAlpha(a) { this.view.setAlpha(a); return this; }
 
+    /** Multiply the whole rig by a colour (0xRRGGBB; white = none): distance haze, a storm's gloom. */
+    setTint(color = 0xffffff) {
+        this.tint = color === 0xffffff ? null : [((color >> 16) & 255) / 255, ((color >> 8) & 255) / 255, (color & 255) / 255];
+        return this;
+    }
+
     setDepth(d) {
         this.depth = d;
         for (const set of Object.values(this.sets)) set.entries.forEach((e, i) => e.rope.setDepth(d + i * 0.001));
@@ -221,7 +227,11 @@ export default class CardRig {
             const r = e.rope;
             project(e.card, e.posed, pv, r.vertices, e.bright, r.alphas, e.hue);
             const k = this.sheen * sheenFor(e.body ? null : e.part?.role), drift = this.clock.now / 1000 * SHEEN.drift;
-            for (let s = 0; s < e.bright.length; s++) r.colors[s] = sheenTint(e.bright[s], e.hue[s] + drift, k);
+            const tn = this.tint;
+            for (let s = 0; s < e.bright.length; s++) {
+                const col = sheenTint(e.bright[s], e.hue[s] + drift, k);
+                r.colors[s] = tn ? (Math.round(((col >> 16) & 255) * tn[0]) << 16) | (Math.round(((col >> 8) & 255) * tn[1]) << 8) | Math.round((col & 255) * tn[2]) : col;
+            }
             r.setPosition(x, y).setAlpha(view.alpha);
             e.drawn = true;
             r.setVisible(this.shown);
