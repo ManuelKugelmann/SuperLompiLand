@@ -22,6 +22,7 @@ test('it keeps the worst of each number per biome and skips the frames right aft
     const [r] = t.rows();
     assert.deepEqual([r.biome, r.logicMs, r.worstMs, r.chunkMs, r.objects, r.tweens, r.frames], ['beach', 2, 2.5, 8, 300, 60, 2]);
     assert.deepEqual(r.over, []);
+    assert.deepEqual([r.p50Ms, r.p95Ms], [2.5, 2.5]);
 });
 
 test('a broken budget is named, per biome, and shows in the report', () => {
