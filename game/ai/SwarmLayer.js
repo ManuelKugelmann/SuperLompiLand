@@ -26,7 +26,9 @@ export const SWARMS = { perView: 2, inView: [1000, 520], ahead: [1150, 1400],   
     farPad: 450,      // px beyond "in view" from which a shoal counts as out of sight ...
     farEvery: 3,      // ... and is then simulated only every so many frames (with the time that passed), its pictures left alone
     simEvery: 2,      // a shoal in sight is simulated every so many frames (shoals take turns); in between its fish glide on at their speed
-    maxStep: 0.07 };  // s: the longest time one simulation step covers
+    midEvery: 3,      // ... every so many when its middle is further than `mid` px from the view's middle (still in sight, but not where the child looks)
+    mid: 620,
+    maxStep: 0.1 };   // s: the longest time one simulation step covers (three frames at 30 a second)
 
 /** Texture size of one frame (px) for a species. */
 const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (sp.tall ? 1.25 : 0.8)) });
@@ -199,7 +201,8 @@ export default class SwarmLayer {
             s.owed = (s.owed || 0) + dt;
             s.turnN = (s.turnN || 0) + 1;
             if (far && s.turnN % SWARMS.farEvery) continue;
-            if (far || s.turnN % SWARMS.simEvery === 0) { s.sim.step(Math.min(s.owed, SWARMS.maxStep), env); s.owed = 0; }
+            const every = Math.hypot(c.x - cx, c.y - cy) > SWARMS.mid ? SWARMS.midEvery : SWARMS.simEvery;
+            if (far || s.turnN % every === 0) { s.sim.step(Math.min(s.owed, SWARMS.maxStep), env); s.owed = 0; }
             if (far) continue;
             const glide = s.owed;      // s since its last step: the fish are drawn that much further along their way
             const { x, y, vx, vy, panic, turn } = s.sim;
