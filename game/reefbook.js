@@ -3,7 +3,8 @@
 // Lompi sees it up close. One real, kid-friendly fact per entry. Pass/fail, no
 // scores and never a gate (spec 2.1): finding things is its own reward.
 
-/** kind: 'creature' | 'place' | 'leftover'. `image` = texture key (null: drawn as a badge). */
+/** kind: 'creature' | 'place' | 'leftover'. `image` = texture key (places: the place's typical sight;
+ *  a missing texture is drawn as a badge in the place's colours). */
 export const ENTRIES = [
     // Creatures (keys as in the level's friend table)
     { id: 'friend_turtle', kind: 'creature', image: 'friend_turtle',
@@ -47,28 +48,28 @@ export const ENTRIES = [
         name: { de: 'Laternenfisch', en: 'Lanternfish' },
         fact: { de: 'Laternenfische machen ihr eigenes Licht: mit kleinen Leuchtpunkten am Bauch.', en: 'Lanternfish make their own light with little glowing dots on their belly.' } },
     // Places (ids as in biomes.js)
-    { id: 'beach', kind: 'place', image: null,
+    { id: 'beach', kind: 'place', image: 'seagrass_1',
         name: { de: 'Sandstrand', en: 'Sandy beach' },
         fact: { de: 'Heller Strandsand besteht oft aus winzigen Stücken von Muscheln und Korallen.', en: 'Pale beach sand is often made of tiny bits of shells and coral.' } },
-    { id: 'reef', kind: 'place', image: null,
+    { id: 'reef', kind: 'place', image: 'coral_1',
         name: { de: 'Korallenriff', en: 'Coral reef' },
         fact: { de: 'Riffe werden von winzigen Tieren gebaut: den Korallenpolypen.', en: 'Reefs are built by tiny animals called coral polyps.' } },
-    { id: 'mangrove', kind: 'place', image: null,
+    { id: 'mangrove', kind: 'place', image: 'root_1',
         name: { de: 'Mangroven', en: 'Mangroves' },
         fact: { de: 'Zwischen den Wurzeln wachsen viele junge Fische geschützt auf.', en: 'Many young fish grow up safely between the roots.' } },
-    { id: 'kelp', kind: 'place', image: null,
+    { id: 'kelp', kind: 'place', image: 'kelp_stalk_1',
         name: { de: 'Tangwald', en: 'Seaweed forest' },
         fact: { de: 'Riesentang kann an einem einzigen Tag über 30 Zentimeter wachsen.', en: 'Giant kelp can grow more than 30 centimetres in a single day.' } },
-    { id: 'blue', kind: 'place', image: null,
+    { id: 'blue', kind: 'place', image: 'school_silverside',
         name: { de: 'Blaues Meer', en: 'Open blue' },
         fact: { de: 'Das offene Meer bedeckt mehr von unserer Erde als alles Land zusammen.', en: 'The open ocean covers more of our planet than all the land together.' } },
-    { id: 'wreck', kind: 'place', image: null,
+    { id: 'wreck', kind: 'place', image: 'wreck_1',
         name: { de: 'Schiffsfriedhof', en: 'Ship graveyard' },
         fact: { de: 'Mit den Jahren werden versunkene Schiffe zu einem Zuhause für Korallen und Fische.', en: 'Over the years sunken ships become a home for corals and fish.' } },
-    { id: 'harbour', kind: 'place', image: null,
+    { id: 'harbour', kind: 'place', image: 'trawler_1',
         name: { de: 'Hafen', en: 'Harbour' },
         fact: { de: 'An Hafenmauern und Pfählen leben Muscheln, Krebse und viele Fische.', en: 'Mussels, crabs and many fish live on harbour walls and piles.' } },
-    { id: 'trench', kind: 'place', image: null,
+    { id: 'trench', kind: 'place', image: 'school_lantern',
         name: { de: 'Tiefsee', en: 'Deep sea' },
         fact: { de: 'Die tiefste Stelle des Meeres liegt fast 11 Kilometer unter der Oberfläche.', en: 'The deepest point of the ocean is almost 11 kilometres down.' } },
     // Things people left behind (keys as in the level's hazard table)
