@@ -23,8 +23,10 @@ export default class GhostFinger {
         bake(scene);
         this.band = scene.add.image(0, 0, 'ghost_band').setOrigin(0, 0.5).setAlpha(0);
         this.ring = scene.add.image(0, 0, 'ghost_ring').setAlpha(0);
+        // A soft shadow under the finger lifts it off the picture (first-impression pass: it read as a flat blob).
+        this.shadow = scene.add.image(0, 0, 'ghost_finger').setOrigin(0.32, 0.06).setTint(0x06243d).setAlpha(0);
         this.finger = scene.add.image(0, 0, 'ghost_finger').setOrigin(0.32, 0.06).setAlpha(0);
-        ui.add([this.band, this.ring, this.finger]);
+        ui.add([this.band, this.ring, this.shadow, this.finger]);
     }
 
     update(dt, fx, fy) {
@@ -33,12 +35,14 @@ export default class GhostFinger {
         const f = fingerAt(this.t, this.scheme);
         if (f.done) { this.stop(); return; }
         const x = fx + f.x, y = fy + f.y;
-        this.finger.setPosition(x, y).setAlpha(f.alpha * 0.9).setScale(f.down ? 1.2 : 1.35).setRotation(f.rot);
+        const lift = f.down ? 4 : 14;        // pressed, the finger sits on the glass and its shadow comes in close
+        this.finger.setPosition(x, y).setAlpha(f.alpha * 0.72).setScale(f.down ? 1.2 : 1.35).setRotation(f.rot);
+        this.shadow.setPosition(x + lift * 0.6, y + lift).setAlpha(f.alpha * 0.28).setScale(this.finger.scaleX).setRotation(f.rot);
         if (f.ring >= 0) this.ring.setPosition(x, y).setScale(0.4 + f.ring * 0.9).setAlpha((1 - f.ring) * 0.8 * f.alpha);
         else this.ring.setAlpha(0);
         if (f.band > 0) {
             const bx = fx + f.bandFrom[0], by = fy + f.bandFrom[1], dx = x - bx, dy = y - by, len = Math.hypot(dx, dy);
-            this.band.setPosition(bx, by).setRotation(Math.atan2(dy, dx)).setScale(len / 64, 1).setAlpha(0.7 * f.band * f.alpha);
+            this.band.setPosition(bx, by).setRotation(Math.atan2(dy, dx)).setScale(len / 64, 1.6).setAlpha(0.85 * f.band * f.alpha);
         } else this.band.setAlpha(0);
     }
 

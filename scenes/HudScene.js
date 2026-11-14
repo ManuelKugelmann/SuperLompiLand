@@ -105,7 +105,8 @@ export default class HudScene extends Phaser.Scene {
             dot.friendId = c.friend.id;
             return dot;
         });
-        this.mapYou = this.add.triangle(0, this.mapY - 20, -9, -10, 9, -10, 0, 6, 0xffffff).setStrokeStyle(2, 0x06343a);
+        // You: a clear white disc on the strip itself (first-impression pass: the small arrow read as a scrollbar thumb).
+        this.mapYou = this.add.circle(0, this.mapY, 13, 0xffffff).setStrokeStyle(4, 0xff6b9a);
         this.map = this.add.container(0, 0, [mg, ...this.nestDots, ...this.friendDots, this.mapYou]).setAlpha(HUD.mapRest);
         this.mapState = '';
 
@@ -121,10 +122,10 @@ export default class HudScene extends Phaser.Scene {
         // light text with a soft shadow, no outline, never fully opaque.
         const W = this.scale.width, H = this.scale.height;
         this.bannerTitle = this.add.text(W / 2, H * 0.2, '', {
-            fontFamily: 'Arial', fontSize: '60px', color: '#ffffff', shadow: { offsetY: 2, color: '#06243d', blur: 12, fill: true }
+            fontFamily: 'Arial', fontSize: '76px', color: '#ffffff', stroke: '#06243d', strokeThickness: 3, shadow: { offsetY: 3, color: '#031a2c', blur: 16, fill: true }
         }).setOrigin(0.5).setAlpha(0);
-        this.bannerSub = this.add.text(W / 2, H * 0.2 + 56, '', {
-            fontFamily: 'Arial', fontSize: '28px', color: '#fff3b0', shadow: { offsetY: 2, color: '#06243d', blur: 10, fill: true }
+        this.bannerSub = this.add.text(W / 2, H * 0.2 + 70, '', {
+            fontFamily: 'Arial', fontSize: '44px', color: '#fff3b0', stroke: '#06243d', strokeThickness: 3, shadow: { offsetY: 3, color: '#031a2c', blur: 14, fill: true }
         }).setOrigin(0.5).setAlpha(0);
 
         new BurgerMenu(this, 60, 60, [
@@ -195,6 +196,8 @@ export default class HudScene extends Phaser.Scene {
             g.mapDot.setVisible(!!g.pos);
             if (g.pos) g.mapDot.x = this.toMap(g.pos.x);
         }
+        // The next nest to reach is drawn bigger, so the strip says where to go.
+        this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setScale(i === m.nestIndex + 1 ? 1.7 : 1); });
         this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });
         for (const d of this.friendDots) d.setFillStyle(0xff6b9a, m.journey.has(d.friendId) ? 1 : 0);
         // The strip lights up when the biome, the nest or the freed friends change, then fades back.
