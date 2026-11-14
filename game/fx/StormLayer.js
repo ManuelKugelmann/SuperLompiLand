@@ -19,10 +19,13 @@ export const STORM_LOOK = {
     debris: 6,         // planks and seaweed tumbling west
     debrisSpeed: [260, 520],
     edge: 0.75,        // how dark the side of the view toward the storm gets (its edge reads from afar)
+    wall: { alpha: 0.72, out: 2200, depth: 2200 },   // the wall of darker water standing at each end of the storm: alpha, px it reaches out, px deep
     // The downwelling:
     bubbleMs: 70,      // one burst of bubbles in each column this often
     bubbleSpeed: 420,  // px per second they stream down (or up)
-    streak: [{ alpha: 0.85, speed: 330, scale: 1 }, { alpha: 0.5, speed: 190, scale: 0.6 }],   // two depths of streaks in each column
+    streak: [{ alpha: 0.8, speed: 380, scale: 1.15, width: 1 }, { alpha: 0.6, speed: 250, scale: 0.85, width: 0.8 }, { alpha: 0.45, speed: 160, scale: 0.6, width: 0.6 }],   // three depths of streaks in each column
+    fadeEnds: [320, 520],   // px over which a column fades in under the surface and out at depth
+    sway: 18,          // px the strands sway sideways
     whirl: 0.9         // radians per second the whirl at the top of the down column turns
 };
 
@@ -53,33 +56,38 @@ function bake(scene) {
         tex.refresh();
     }
     if (!T.exists(TEX.col)) {
-        // A slice of the current, tiling downward: darker banded water, soft at its sides, full
-        // of streaks of bubbles, silt and marine snow pulled along.
-        const W = 256, H = 512, tex = T.createCanvas(TEX.col, W, H), c = tex.getContext();
-        for (let i = 0; i < 7; i++) {
-            const x = 30 + r() * (W - 60), w = 14 + r() * 40;
-            const g = c.createLinearGradient(x - w, 0, x + w, 0);
-            g.addColorStop(0, 'rgba(4,20,48,0)'); g.addColorStop(0.5, `rgba(4,20,48,${0.25 + r() * 0.3})`); g.addColorStop(1, 'rgba(4,20,48,0)');
-            c.fillStyle = g; c.fillRect(x - w, 0, w * 2, H);
-        }
-        const dash = (x, y, len, wdt, col) => {
-            for (const oy of [-H, 0, H]) { c.fillStyle = col; c.fillRect(x - wdt / 2, y + oy, wdt, len); }
-        };
-        for (let i = 0; i < 260; i++) {            // marine snow and silt: short pale streaks
-            const x = 20 + r() * (W - 40), y = r() * H;
-            dash(x, y, 6 + r() * 34, 1 + r() * 1.6, `rgba(${200 + r() * 40},${215 + r() * 30},${225 + r() * 30},${0.35 + r() * 0.45})`);
-        }
-        for (let i = 0; i < 70; i++) {             // bubbles, stretched by the pull
-            const x = 24 + r() * (W - 48), y = r() * H, rad = 2 + r() * 4;
-            for (const oy of [-H, 0, H]) {
-                c.strokeStyle = `rgba(235,250,255,${0.55 + r() * 0.35})`; c.lineWidth = 1.4;
-                c.beginPath(); c.ellipse(x, y + oy, rad, rad * 1.8, 0, 0, Math.PI * 2); c.stroke();
+        // A slice of the current, tiling downward: a soft darker haze densest in the middle,
+        // swaying strands of silt (some strung with bubbles), and loose snow and silt specks,
+        // all thinning out toward the sides. Every strand's sway repeats with the tile.
+        const W = 256, H = 1024, tex = T.createCanvas(TEX.col, W, H), c = tex.getContext();
+        const gauss = () => { let v = 0; for (let k = 0; k < 4; k++) v += r(); return (v / 4 - 0.5) * 2; };   // -1..1, middle-heavy
+        const haze = c.createLinearGradient(0, 0, W, 0);
+        haze.addColorStop(0, 'rgba(4,18,44,0)'); haze.addColorStop(0.5, 'rgba(4,18,44,0.42)'); haze.addColorStop(1, 'rgba(4,18,44,0)');
+        c.fillStyle = haze; c.fillRect(0, 0, W, H);
+        for (let i = 0; i < 26; i++) {
+            const x0 = W / 2 + gauss() * W * 0.42, amp = 4 + r() * 16, waves = 1 + Math.floor(r() * 3), ph = r() * 6.3;
+            const wdt = 0.8 + r() * 2.6, warm = r() < 0.45;
+            const xAt = y => x0 + Math.sin(y / H * Math.PI * 2 * waves + ph) * amp;
+            const edge = 1 - Math.min(1, Math.abs(x0 - W / 2) / (W * 0.5));
+            c.strokeStyle = warm ? `rgba(196,182,150,${(0.12 + r() * 0.22) * edge})` : `rgba(210,232,245,${(0.12 + r() * 0.25) * edge})`;
+            c.lineWidth = wdt;
+            c.beginPath();
+            for (let y = 0; y <= H; y += 8) { if (y === 0) c.moveTo(xAt(y), y); else c.lineTo(xAt(y), y); }
+            c.stroke();
+            if (r() < 0.5) {               // bubbles strung along this strand
+                for (let y = r() * 40; y < H; y += 14 + r() * 60) {
+                    const rad = 1.6 + r() * 3.6;
+                    c.strokeStyle = `rgba(235,250,255,${(0.45 + r() * 0.4) * edge})`; c.lineWidth = 1.2;
+                    c.beginPath(); c.ellipse(xAt(y), y, rad, rad * 1.5, 0, 0, Math.PI * 2); c.stroke();
+                }
             }
         }
-        c.globalCompositeOperation = 'destination-in';   // soft sides
-        const side = c.createLinearGradient(0, 0, W, 0);
-        side.addColorStop(0, 'rgba(0,0,0,0)'); side.addColorStop(0.22, 'rgba(0,0,0,1)'); side.addColorStop(0.78, 'rgba(0,0,0,1)'); side.addColorStop(1, 'rgba(0,0,0,0)');
-        c.fillStyle = side; c.fillRect(0, 0, W, H);
+        for (let i = 0; i < 420; i++) {    // loose marine snow and silt
+            const x = W / 2 + gauss() * W * 0.48, y = r() * H, len = 2 + r() * 14, warm = r() < 0.5;
+            const edge = 1 - Math.min(1, Math.abs(x - W / 2) / (W * 0.5));
+            c.fillStyle = warm ? `rgba(190,172,140,${(0.3 + r() * 0.5) * edge})` : `rgba(225,238,248,${(0.3 + r() * 0.5) * edge})`;
+            for (const oy of [-H, 0, H]) c.fillRect(x, y + oy, 1 + r() * 1.4, len);
+        }
         tex.refresh();
     }
     if (!T.exists(TEX.whirl)) {
@@ -150,6 +158,24 @@ export default class StormLayer {
         this.gloom = scene.add.rectangle(0, 0, W, H, 0x0e1a26, 0).setOrigin(0).setScrollFactor(0).setDepth(6.5).setVisible(false);
         this.edge = scene.add.image(0, 0, TEX.edge).setOrigin(0).setScrollFactor(0).setDisplaySize(W, H).setDepth(6.49).setVisible(false);
         // One tile tall (stretched over the view), so it only repeats sideways.
+        // A wall of darker water at each end of the storm (world space): its edge is a place you see
+        // coming. Drawn once as gradient quads (no stretched texture, so no edge seams).
+        const sw = L.wall, rampEnd = WEATHER.storm.ramp, C = 0x08121e;
+        const stops = [[0, 0], [0.22, 0.2], [0.4, 0.85], [0.6, 1], [1, 0.38]];   // across: share of the width, alpha
+        const wall = (x0, dir) => {
+            const g = scene.add.graphics().setDepth(2.4).setAlpha(sw.alpha).setVisible(false);   // behind the play plane: the player stays clear
+            const width = sw.out + rampEnd, deep = sw.depth * 0.7;
+            for (let i = 0; i < stops.length - 1; i++) {
+                const [u0, a0] = stops[i], [u1, a1] = stops[i + 1];
+                const xa = x0 + dir * u0 * width, xb = x0 + dir * u1 * width, l = Math.min(xa, xb), w = Math.abs(xb - xa);
+                const [al, ar] = dir > 0 ? [a0, a1] : [a1, a0];
+                g.fillGradientStyle(C, C, C, C, al, ar, al, ar).fillRect(l, 0, w, deep);
+                g.fillGradientStyle(C, C, C, C, al, ar, 0, 0).fillRect(l, deep, w, sw.depth - deep);   // fading out with depth
+            }
+            g.span = [Math.min(x0, x0 + dir * width), Math.max(x0, x0 + dir * width)];
+            return g;
+        };
+        this.walls = [wall(this.span.x0 - sw.out, 1), wall(this.span.x1 + sw.out, -1)];
         this.bands = scene.add.tileSprite(0, 0, W, H, TEX.bands).setOrigin(0).setScrollFactor(0).setDepth(5.65).setVisible(false);
         this.bands.setTileScale(H / 256, H / 256);
         this.under = L.underside.map(u => scene.add.tileSprite(0, u.y, W + 400, u.h, SURF_ART.line.key).setOrigin(0, 0.5)
@@ -173,22 +199,22 @@ export default class StormLayer {
         const d = WEATHER.down, cols = downwelling(), top = d.top, bottom = d.routeY + 250;
         this.cols = cols;
         this.columns = [];
-        if (!scene.textures.exists('current_fade')) {
-            // Soft ends for the columns (a mask: the current fades in under the surface and out at depth).
-            const tex = scene.textures.createCanvas('current_fade', 4, 256), c = tex.getContext(), g = c.createLinearGradient(0, 0, 0, 256);
-            g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.12, 'rgba(0,0,0,1)'); g.addColorStop(0.8, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-            c.fillStyle = g; c.fillRect(0, 0, 4, 256); tex.refresh();
-        }
+        // Each column: three stacked strips per depth of streaks; the end strips fade (per-corner
+        // alpha), so the current eases in under the surface and out at depth. All in world space,
+        // exactly where the water pulls.
+        const [f0, f1] = L.fadeEnds, mid = bottom - top - f0 - f1;
         for (const [x, dir] of [[cols.down, 1], [cols.up, -1]]) {
-            const fade = scene.make.image({ x, y: top, key: 'current_fade', add: false }).setOrigin(0.5, 0).setDisplaySize(d.halfWidth * 2, bottom - top);
-            const mask = fade.createBitmapMask();
-            for (const s of L.streak) {
-                const t = scene.add.tileSprite(x, top, d.halfWidth * 2 * (0.7 + 0.3 * s.scale), bottom - top, TEX.col).setOrigin(0.5, 0)
-                    .setDepth(2.6 + s.scale * 0.2).setAlpha(s.alpha).setTileScale(s.scale, s.scale).setVisible(false);
-                t.dir = dir; t.speed = s.speed; t.cx = x;
-                t.setMask(mask);
-                this.columns.push(t);
-            }
+            L.streak.forEach((s, i) => {
+                const w = d.halfWidth * 2 * s.width;
+                const strip = (y, h, a0, a1) => {
+                    const t = scene.add.tileSprite(x, y, w, h, TEX.col).setOrigin(0.5, 0).setDepth(2.6 + i * 0.05)
+                        .setTileScale(s.scale, s.scale).setVisible(false);
+                    t.setAlpha(a0 * s.alpha, a0 * s.alpha, a1 * s.alpha, a1 * s.alpha);
+                    t.dir = dir; t.speed = s.speed; t.cx = x; t.y0 = y - top; t.phase = i * 1.7 + (dir > 0 ? 0 : 3);
+                    this.columns.push(t);
+                };
+                strip(top, f0, 0, 1); strip(top + f0, mid, 1, 1); strip(top + f0 + mid, f1, 1, 0);
+            });
         }
         // The whirl turns in a flattened container, so it reads as a funnel seen from the side.
         this.whirlSpin = scene.add.image(0, 0, TEX.whirl);
@@ -209,6 +235,7 @@ export default class StormLayer {
         const ahead = stormShare(camX + W * 2), behind = stormShare(camX - W);
         const diff = Math.max(Math.abs(ahead - kl), Math.abs(behind - kr)) * (1 - Math.min(kl, kr));
         this.edge.setVisible(diff > 0.01).setAlpha(Math.min(1, diff * L.edge)).setFlipX(behind - kr > ahead - kl);
+        for (const w of this.walls) w.setVisible(w.span[1] > camX - 200 && w.span[0] < camX + W + 200 && camY < L.wall.depth);
         const wet = k > 0.01 && camY < 60;      // rain only where the sky is in view
         for (const r of this.rain) {
             r.setVisible(wet);
@@ -257,7 +284,10 @@ export default class StormLayer {
         for (const c of this.columns) {
             const seen = c.cx > camX - d.halfWidth - W && c.cx < camX + W + d.halfWidth + W;   // from a screen away
             c.setVisible(seen);
-            if (seen) c.tilePositionY = -c.dir * t * c.speed / c.tileScaleY;
+            if (!seen) continue;
+            // Continuous across a column's strips: the pattern starts at the column's top.
+            c.tilePositionY = (c.y0 - c.dir * t * c.speed) / c.tileScaleY;
+            c.x = c.cx + Math.sin(t * 0.6 + c.phase) * L.sway;   // the strip sways (its soft sides stay soft)
         }
         const ws = this.cols.down > camX - W && this.cols.down < camX + 2 * W;
         this.whirl.setVisible(ws);
