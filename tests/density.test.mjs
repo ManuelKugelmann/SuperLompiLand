@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY } from '../game/level/density.js';
 import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
+import { detour } from '../game/level/weather.js';
 
 const field = createField(1337);
 
@@ -93,7 +94,7 @@ test('the calm route crosses the open sea just under the surface and runs half w
     for (const b of BIOMES) {
         if (b.id === 'beach' || b.id === 'trench') continue;
         const x = b.from + b.width / 2, y = cruiseY(x);
-        if (b.zone === 'sea') assert.ok(Math.abs(y - ROUTE.seaY) < 1, `${b.id}: ${Math.round(y)}`);
+        if (b.zone === 'sea') { const x0 = b.from + b.width * 0.9; assert.ok(Math.abs(cruiseY(x0 - 3200) - ROUTE.seaY) < 1 || detour(x0 - 3200).k > 0, `${b.id}: ${Math.round(y)}`); }      // storm and downwelling stretches: tests/weather.test.mjs
         else assert.ok(y > 800 && y < 1300, `${b.id}: ${Math.round(y)}`);
     }
     assert.ok(f.nests.every(n => n.grand || BIOMES[n.biome].zone === 'island'), 'nests lie on the coasts (and the grand nest at the end)');

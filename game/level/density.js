@@ -2,6 +2,7 @@
 // the nests lie, and the density grids a chunk is drawn from. No Phaser, no DOM,
 // so it runs unchanged on the main thread, in a Web Worker and in the tests.
 import { vnoise } from './terrain.js';
+import { detour } from './weather.js';
 import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare } from './biomes.js';
 
 export const FIELD = {
@@ -49,8 +50,11 @@ export function cruiseY(x, cfg = ROUTE) {
         const fy = floorY(x + k * cfg.easeStep), coast = Math.min(cfg.maxY, Math.max(cfg.minY, Math.min(fy, cfg.seaFrom) * cfg.cruise));
         sum += coast + (cfg.seaY - coast) * smooth01((fy - cfg.seaFrom) / (cfg.seaFull - cfg.seaFrom));
     }
-    return sum / (cfg.ease * 2 + 1);
+    const y = sum / (cfg.ease * 2 + 1), d = detour(x, DETOUR);
+    return y + (d.y - y) * d.k;      // under a storm and through a downwelling the route goes deep (weather.js)
 }
+
+const DETOUR = { y: 0, k: 0 };
 
 export function createField(seed) {
     let nests = null;

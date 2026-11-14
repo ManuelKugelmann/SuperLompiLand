@@ -6,10 +6,11 @@
 // ripples and dies away. Over the shallow beach the swell runs higher (surf).
 // Pure logic, no Phaser (tests/surface.test.mjs).
 import { surfAt } from './biomes.js';
+import { WEATHER, stormShare } from './weather.js';
 
 /** The swell alone: height (world y) at world x and time t (seconds). */
 export function waveY(x, t) {
-    return (Math.sin(x / 190 + t * 1.5) * 15 + Math.sin(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10) * surfAt(x);
+    return (Math.sin(x / 190 + t * 1.5) * 15 + Math.sin(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10) * surfAt(x) * (1 + WEATHER.storm.waves * stormShare(x));
 }
 
 export const SURFACE = {
