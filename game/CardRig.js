@@ -1,6 +1,7 @@
 import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
+import { CHARACTERS } from './characters.js';
 import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose } from './rig/cards.js';
 
 /** Where the part cards come from (scripts/parts/bake.py). */
@@ -49,6 +50,8 @@ const BEND = { x: 0, y: 0 };
 export default class CardRig {
     constructor(scene, character, x, y, depth = 5) {
         this.clock = scene.time;     // the sheen drifts with game time
+        // The rainbow sheen is the playables' mark (spec 10.0 lookdev): sharks, mantas, whales and other animals keep their own colours.
+        this.sheen = CHARACTERS.some(c => c.id === character.id) ? 1 : 0;
         this.char = character;
         this.facing = 1;
         this.angle = 0;
@@ -203,7 +206,7 @@ export default class CardRig {
             pv.fade = !e.body; pv.dark = e.dark ?? 1;
             const r = e.rope;
             project(e.card, e.posed, pv, r.vertices, e.bright, r.alphas, e.hue);
-            const k = sheenFor(e.body ? null : e.part?.role), drift = this.clock.now / 1000 * SHEEN.drift;
+            const k = this.sheen * sheenFor(e.body ? null : e.part?.role), drift = this.clock.now / 1000 * SHEEN.drift;
             for (let s = 0; s < e.bright.length; s++) r.colors[s] = sheenTint(e.bright[s], e.hue[s] + drift, k);
             r.setPosition(x, y).setAlpha(view.alpha);
             e.drawn = true;
