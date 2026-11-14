@@ -18,12 +18,14 @@ export const SPECIES = {
     lantern:    { count: 60, size: 18, body: 0x1d2b4a, belly: 0x2c4166, accent: 0x7fe9ff, speed: 75, glow: true, biomes: ['trench'] }
 };
 /** How many swarms around the camera, spawn and drop distances (px). */
-export const SWARMS = { perView: 2, inView: [1000, 520], ahead: [1150, 1400],   // inView: px to either side of the view's middle that count as "in view"; ahead: px in front of the fish where a shoal is set when none is in view
-    spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6,
+export const SWARMS = { perView: 2,
+    // A new shoal starts outside the picture, beyond `farPad` past the camera's view, and swims in already formed (playtest:
+    // "start sim in a buffer zone outside view"); `spread`: px further out it may start; `warmS`: s a shoal set right by the view is pre-swum.
+    spread: 300, warmS: 1.2, dropAt: 2800, checkMs: 900, depth: 3.6,
     haze: 0.6,    // how far the farthest fish of a shoal blends into the water colour
     fade: 0.3,    // and how much it fades
     deepCount: 80,    // shoals of this many fish or more get the full depth; smaller ones less
-    farPad: 450,      // px beyond "in view" from which a shoal counts as out of sight ...
+    farPad: 450,      // px beyond the camera's view from which a shoal counts as out of sight ...
     farEvery: 3,      // ... and is then simulated only every so many frames (with the time that passed), its pictures left alone
     simEvery: 2,      // a fish of a shoal in sight decides every so many frames times boids' thinkEvery (the fish take turns); it moves every frame
     midEvery: 3,      // ... every so many when its middle is further than `mid` px from the view's middle (still in sight, but not where the child looks)
@@ -119,6 +121,28 @@ export default class SwarmLayer {
         this.checkAt = 0;
     }
 
+    /** The camera's view: its middle and half size (px), the one measure of what is in the picture. */
+    view() {
+        const v = this.scene.cameras.main.worldView, o = this.viewBox || (this.viewBox = {});
+        o.cx = v.centerX; o.cy = v.centerY; o.hw = v.width / 2; o.hh = v.height / 2;
+        return o;
+    }
+
+    /** Whether any fish of shoal `s` may be within `pad` px of the view. */
+    inSight(s, v, pad) {
+        const c = s.sim.centre();
+        return Math.abs(c.x - v.cx) - c.rx < v.hw + pad && Math.abs(c.y - v.cy) - c.ry < v.hh + pad;
+    }
+
+    /** A place for a new shoal just beyond the out-of-sight ring, on side `dir` (+1 east, -1 west) of the view, or null. */
+    startPlace(v, dir) {
+        for (let tries = 0; tries < 10; tries++) {
+            const x = v.cx + dir * (v.hw + SWARMS.farPad + 150 + Math.random() * SWARMS.spread), y = v.cy + (Math.random() - 0.5) * v.hh * 1.6;
+            if (y > 150 && this.env.isOpen(x, y) && this.env.isOpen(x + 120, y) && this.env.isOpen(x - 120, y)) return { x, y };
+        }
+        return null;
+    }
+
     spawn(id, x, y, home = null) {
         const sp = SPECIES[id];
         const count = Math.max(SWARMS.minCount, Math.round(sp.count * this.share));      // the quality tier's share of the shoal
@@ -138,7 +162,9 @@ export default class SwarmLayer {
             const z = (1 - (i + 0.5) / count) * deep;
             b.setTint(mixColor(0xffffff, water, z * SWARMS.haze)).setAlpha(1 - z * SWARMS.fade);
         });
-        this.swarms.push({ id, sim, blitter, bobs, w, h, phase, home, turnN: this.swarms.length });      // turnN: shoals take turns at simulating
+        const sw = { id, sim, blitter, bobs, w, h, phase, home, turnN: this.swarms.length, born: this.scene.game.loop.frame };      // turnN: shoals take turns at simulating
+        this.swarms.push(sw);
+        return sw;
     }
 
     /**
@@ -146,13 +172,17 @@ export default class SwarmLayer {
      * the view near its edge, so the water is not empty and the shoal swims into the picture.
      */
     arrive(cx, cy) {
-        const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(this.env.biomeAt(cx)));
+        const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(this.env.biomeAt(cx))), v = this.view();
         // Not when a shoal is in view already, and never more than the usual number plus one: coming back to the same nest again and again must not pile them up.
-        const seen = this.swarms.some(s => { const c = s.sim.centre(); return Math.abs(c.x - cx) < SWARMS.inView[0] && Math.abs(c.y - cy) < SWARMS.inView[1]; });
-        if (!native.length || seen || this.swarms.filter(s => !s.home).length > SWARMS.perView) return;
+        if (!native.length || this.swarms.some(s => this.inSight(s, v, 0)) || this.swarms.filter(s => !s.home).length > SWARMS.perView) return;
+        // Just beyond the view's edge (it swims in at once), and already swum for a moment, so it comes in as a shoal and not as a heap.
         for (let tries = 0; tries < 12; tries++) {
-            const x = cx + (tries % 2 ? -1 : 1) * SWARMS.inView[0] * (0.7 + Math.random() * 0.2), y = cy + (Math.random() - 0.5) * SWARMS.inView[1] * 1.2;
-            if (y > 150 && this.env.isOpen(x, y) && this.env.isOpen(x + 120, y) && this.env.isOpen(x - 120, y)) { this.spawn(native[Math.floor(Math.random() * native.length)], x, y); return; }
+            const dir = tries % 2 ? -1 : 1, x = v.cx + dir * (v.hw + 200), y = v.cy + (Math.random() - 0.5) * v.hh * 1.2;
+            if (y > 150 && this.env.isOpen(x, y) && this.env.isOpen(x + 120, y) && this.env.isOpen(x - 120, y)) {
+                const sw = this.spawn(native[Math.floor(Math.random() * native.length)], x, y);
+                for (let t = 0; t < SWARMS.warmS; t += SWARMS.maxStep) sw.sim.step(SWARMS.maxStep, { isOpen: this.env.isOpen, flowAt: this.env.flowAt });
+                return;
+            }
         }
     }
 
@@ -166,23 +196,16 @@ export default class SwarmLayer {
             if (Math.hypot(home.x - cx, home.y - cy) < SWARMS.dropAt * 0.8 && !this.swarms.some(s => s.home === home)) this.spawn(home.id, home.x, home.y, home);
         }
         const biome = this.env.biomeAt(cx);
-        const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(biome));
-        // One shoal should be in view most of the time: when none is, one more is set just ahead of the fish, so it swims into it.
-        const seen = this.swarms.some(s => { const c = s.sim.centre(); return Math.abs(c.x - cx) < SWARMS.inView[0] && Math.abs(c.y - cy) < SWARMS.inView[1]; });
+        const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(biome)), v = this.view();
+        // One shoal should be in view most of the time: when none is, one more starts just beyond the view ahead of the fish, so it swims into it.
+        const seen = this.swarms.some(s => this.inSight(s, v, 0));
         const roaming = this.swarms.filter(s => !s.home).length;
         if (!native.length || roaming >= SWARMS.perView + (seen ? 0 : 1)) return;
         // Prefer a species not already around: variety over repeats.
         const fresh = native.filter(id => !this.swarms.some(s => s.id === id));
         const kinds = fresh.length ? fresh : native;
-        for (let tries = 0; tries < 10; tries++) {
-            const a = Math.random() * Math.PI * 2, d = SWARMS.spawnMin + Math.random() * (SWARMS.spawnMax - SWARMS.spawnMin);
-            const x = seen ? cx + Math.cos(a) * d : cx + (this.heading || 1) * (SWARMS.ahead[0] + Math.random() * (SWARMS.ahead[1] - SWARMS.ahead[0]));
-            const y = seen ? cy + Math.sin(a) * d * 0.6 : cy + (Math.random() - 0.5) * SWARMS.inView[1] * 1.4;
-            if (y > 150 && this.env.isOpen(x, y) && this.env.isOpen(x + 120, y) && this.env.isOpen(x - 120, y)) {
-                this.spawn(kinds[Math.floor(Math.random() * kinds.length)], x, y);
-                return;
-            }
-        }
+        const at = this.startPlace(v, seen ? (Math.random() < 0.5 ? -1 : 1) : (this.heading || 1));
+        if (at) this.spawn(kinds[Math.floor(Math.random() * kinds.length)], at.x, at.y);
     }
 
     /** dt in s; players: [{x, y, vx, vy, fright?}] in px/s (the local fish and, in a room, its friends). */
@@ -190,12 +213,12 @@ export default class SwarmLayer {
         this.checkAt -= dt * 1000;
         if (this.checkAt <= 0) { this.checkAt = SWARMS.checkMs; this.manage(cx, cy); }
         if (players?.[0] && Math.abs(players[0].vx) > 40) this.heading = Math.sign(players[0].vx);      // which way the fish travels
-        const env = { isOpen: this.env.isOpen, flowAt: this.env.flowAt, players };
+        const env = { isOpen: this.env.isOpen, flowAt: this.env.flowAt, players }, v = this.view();
         this.time = (this.time || 0) + dt;
         for (const s of this.swarms) {
             // A shoal out of sight costs a third: it swims on in bigger steps and nothing is drawn of it.
-            // (Out of sight = all of it: its middle less its own reach, so a wide shoal with fish in the picture never stands still.)
-            const c = s.sim.centre(), far = Math.abs(c.x - cx) - c.rx > SWARMS.inView[0] + SWARMS.farPad || Math.abs(c.y - cy) - c.ry > SWARMS.inView[1] + SWARMS.farPad;
+            // (Out of sight = all of it, by the camera's view: a wide shoal with fish in the picture never stands still.)
+            const c = s.sim.centre(), far = !this.inSight(s, v, SWARMS.farPad);
             s.owed = (s.owed || 0) + dt;
             s.turnN = (s.turnN || 0) + 1;
             if (far && s.turnN % SWARMS.farEvery) continue;

@@ -64,7 +64,8 @@ import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
-import { cullToView } from '../game/viewCull.js';
+import { PRESETS } from '../game/fx/particles.js';
+import { VIEW_CULL, cullToView } from '../game/viewCull.js';
 import { due, everyOf } from '../game/throttle.js';
 import { setRenderScale } from '../game/renderScale.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
@@ -112,6 +113,8 @@ const STEP_MS = 1000 / 60;
 /** Leaking oil drums (spec 7.1): how often they puff and how much. */
 // `crack`: where the oil leaves the drum, in shares of its displayed size from its centre.
 const OIL = { pulseMs: 450, perPulse: 2, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5, crack: [0.19, -0.34] };
+// A drum that comes near gets its plume as it would be after leaking all along (playtest: "start some spillage before
+// simulated"): once, and again only after it has been away for longer than oil lives (else the plume would double).
 /** Plumes at the trench's vents: how often, how many smoke and steam particles. */
 const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 /** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
@@ -1162,19 +1165,26 @@ export default class MainScene extends Phaser.Scene {
         };
     }
 
-    /** Leaking oil drums near the view puff out pulses of oil that rise and pool at the surface (spec 7.1). */
-    leakOil(delta) {
+    /**
+     * Leaking oil drums near the view puff out pulses of oil that rise and pool at the surface (spec 7.1).
+     * `lead` = px the camera may travel before the next look: near means within OIL.margin plus that.
+     */
+    leakOil(delta, lead) {
         this.leakAt = (this.leakAt || 0) - delta;
-        if (this.leakAt > 0) return;
-        this.leakAt = OIL.pulseMs;
-        const cam = this.cameras.main, m = OIL.margin;
+        const pulse = this.leakAt <= 0, now = this.time.now, cam = this.cameras.main, m = OIL.margin + lead, oilLife = PRESETS.oil.life[1] * 1000;
+        if (pulse) this.leakAt = OIL.pulseMs;
         for (const h of this.level.hazards) {
             if (h.key !== 'hazard_buoy' || !h.img.active) continue;
             const { x, y } = h.img;
             if (x < cam.scrollX - m || x > cam.scrollX + cam.width + m || y < cam.scrollY - m || y > cam.scrollY + cam.height + m) continue;
+            const fresh = !(now - (h.leakSeen ?? -Infinity) < oilLife);
+            if (fresh && !this.buildSlot()) continue;      // one drum's plume per frame, in a frame that builds nothing else
+            h.leakSeen = now;
+            if (!fresh && !pulse) continue;
             const ox = OIL.crack[0] * h.img.displayWidth, oy = OIL.crack[1] * h.img.displayWidth;
-            const c = Math.cos(h.img.rotation), s = Math.sin(h.img.rotation);
-            this.particles.spawn('oil', x + ox * c - oy * s, y + ox * s + oy * c, OIL.perPulse, { radius: 12, spread: 8, vy: -40 });
+            const c = Math.cos(h.img.rotation), s = Math.sin(h.img.rotation), cx = x + ox * c - oy * s, cy = y + ox * s + oy * c, puff = { radius: 12, spread: 8, vy: -40 };
+            if (!fresh) { this.particles.spawn('oil', cx, cy, OIL.perPulse, puff); continue; }
+            for (let k = 0; k * OIL.pulseMs < oilLife; k++) this.particles.spawnAged('oil', cx, cy, OIL.perPulse, puff, k * OIL.pulseMs / 1000);
         }
     }
 
@@ -1625,7 +1635,7 @@ export default class MainScene extends Phaser.Scene {
         this.camY = Math.max(this.camY, -760); // room for a jump, not the whole sky
         this.cameras.main.setScroll(this.camX, this.camY);
 
-        this.leakOil(delta);
+        this.leakOil(delta, this.viewLead || 0);
         this.ventPlumes(delta);
         // Streams show themselves: bubbles are born along the lanes in view and ride them.
         this.laneGlints(delta);
@@ -1736,7 +1746,7 @@ export default class MainScene extends Phaser.Scene {
             }
         }
         // The light, the score and the sound of the water are read from the world a few times a second (throttle.js): they change slowly.
-        if (due(this.game.loop.frame, everyOf('sample', this.quality.tier))) {
+        if (due(this.game.loop.frame, everyOf('sample'))) {
             const bl = biomeBlendAt(view.x), hue = waterHue(view.x), deep = mixColor(0x0c1436, atLuma(hue, WATER_LIGHT.deepLuma), WATER_LIGHT.deepHue);
             const light = lightAt({ depth01, y: view.y, t: skyT, storm: stormShare(view.x), hue, deepHue: deep,
                 floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) });
@@ -1761,7 +1771,10 @@ export default class MainScene extends Phaser.Scene {
         // A frame that built a chunk has spent its build budget: no layer builds its scene in the same frame.
         if (this.level.buildMs.count !== this.chunkBuilds) { this.chunkBuilds = this.level.buildMs.count; this.lastBuildFrame = this.game.loop.frame; }
         this.level.animate(time / 1000, view, speed, this.mp?.others(this.roomPlayers || (this.roomPlayers = [])), this.wavePhase());
-        const frame = this.game.loop.frame, checkEvery = everyOf('check', this.quality.tier);
+        // Looks that keep the picture whole run at the high tier's rate on every phone (a slow one has the fewest frames to spare
+        // for a late look), with a lead of as far as the camera goes until the next one: nothing pops in at the edges.
+        const frame = this.game.loop.frame, checkEvery = everyOf('check'), jumped = Math.abs(this.camX - prevX) > this.scale.width / 2 || Math.abs(this.camY - prevY) > this.scale.height / 2;
+        this.viewLead = Math.hypot(this.camX - prevX, this.camY - prevY) * checkEvery * 1.5;
         this.revealPlayers(delta / 1000, view, due(frame, checkEvery, 1));
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.farLayers.update(this.camX);
@@ -1771,7 +1784,7 @@ export default class MainScene extends Phaser.Scene {
         // The net of light on rock, sand and props: in world space, as strong as the sun, in the water's hue.
         updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun * QUALITY[this.quality.tier].caustics, biomeBlendAt(view.x).a.water[0]);
         // Nothing outside the picture is drawn (viewCull.js): after every layer has set its things where they are for this frame.
-        if (due(frame, checkEvery)) cullToView(this.children.list, this.cameras.main.worldView, this.cameras.main.id);
+        if (jumped || due(frame, checkEvery)) cullToView(this.children.list, this.cameras.main.worldView, this.cameras.main.id, { ...VIEW_CULL, pad: VIEW_CULL.pad + this.viewLead });
         // Quality: the frame rate decides (quality.js); a fixed tier (?quality=...) and the perf tour are left alone.
         this.quality.fps = this.autotune.fps;
         if (this.quality.auto) { const tier = this.autotune.step(delta); if (tier) this.applyQuality(tier, true); }

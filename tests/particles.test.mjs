@@ -92,3 +92,19 @@ test('every preset is complete', () => {
         assert.ok(['normal', 'add', 'glow'].includes(p.blend), id);
     }
 });
+
+test('a spill born in the past: its pulses span the ages up to a lifetime, nothing in rock or above the surface, the rest untouched', () => {
+    const sim = createParticles({ capacity: 200, random: seq() });
+    sim.spawn('silt', 0, 900, 3, { spread: 0 });
+    const env = { surfaceY: () => 0, isSolid: (x, y) => y > 1000, flowAt: (x, y, out) => { out.x = 20; } };
+    const life = PRESETS.oil.life[1];
+    for (let k = 0; k * 0.45 < life + 1; k++) sim.spawnAged('oil', 0, 300, 2, { radius: 12, spread: 8, vy: -40 }, k * 0.45, env);
+    const oil = [];
+    sim.forEach((x, y, size, alpha, color, blend, i) => oil.push({ x, y, i }));
+    assert.ok(oil.length < 2 * Math.ceil((life + 1) / 0.45), 'the oldest have died as they would have');
+    assert.ok(oil.every(p => p.y >= 0 && p.y <= 1000), 'none above the surface or in the rock');
+    assert.ok(oil.some(p => p.y === 0), 'the oldest lie on the surface as a slick');
+    assert.ok(oil.some(p => p.y > 250), 'the youngest are still near the drum');
+    const silt = sim.densityAt('silt', 0, 900, 5);
+    assert.equal(silt, 3, 'what was there already did not move');
+});

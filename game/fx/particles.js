@@ -6,7 +6,8 @@
 
 export const PARTICLES = {
     capacity: 900,     // simulated particles at most (one budget constant, spec 14)
-    maxDt: 0.05        // larger frame gaps are split so nothing tunnels through rock
+    maxDt: 0.05,       // larger frame gaps are split so nothing tunnels through rock
+    agedDt: 0.1        // the step a set born in the past is brought up to now with (spawnAged): coarser, it is done in one frame
 };
 
 /**
@@ -65,6 +66,42 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
     const flow = { x: 0, y: 0 };
     let next = 0, count = 0;
 
+    /** Particle i, h seconds on: ages, drifts with the water, rises or sinks, rests against rock, spreads on the surface. */
+    function advance(i, h, env) {
+        const { flowAt, isSolid, surfaceY } = env;
+        const p = presets[kind[i]];
+        age[i] += h;
+        if (age[i] >= life[i]) { alive[i] = 0; count--; return; }
+        if (p.cool > 0) heat[i] *= Math.exp(-p.cool * h);
+        const rise = p.rise * lerp(p.coldRise, 1, heat[i]);
+        flow.x = 0; flow.y = 0;
+        if (flowAt) flowAt(x[i], y[i], flow);
+        const d = Math.min(1, p.drag * h);
+        vx[i] += (flow.x - vx[i]) * d;
+        vy[i] += (flow.y - rise - vy[i]) * d;
+        if (p.diffuse) {                        // eddies pull a plume apart, more the older it is
+            const k = p.diffuse * (age[i] / life[i]) * Math.min(1, 3 * h);
+            vx[i] += (random() * 2 - 1) * k;
+            if (!(surfaceY && y[i] <= surfaceY(x[i]) + 1)) vy[i] += (random() * 2 - 1) * k;   // a slick on the surface spreads along it only
+        }
+        const nx = x[i] + vx[i] * h, ny = y[i] + vy[i] * h;
+        if (isSolid && isSolid(nx, ny)) {
+            if (p.surface === 'slick' || p.rise < 0) { vx[i] *= -0.2; vy[i] *= -0.2; return; }   // rests against rock
+            alive[i] = 0; count--; return;
+        }
+        x[i] = nx; y[i] = ny;
+        if (surfaceY && p.surface !== 'pass') {
+            const sy = surfaceY(x[i]);
+            if (y[i] <= sy) {
+                if (p.surface === 'pop') { alive[i] = 0; count--; return; }
+                y[i] = sy;                       // slick: spread along the surface
+                vy[i] = 0;
+                vx[i] *= 1 - Math.min(1, 0.6 * h);
+            }
+        }
+    }
+    const born = [];      // the slots the last spawn filled
+
     function free() {
         // Ring search from the last spawn: cheap and fair; when full, the oldest slot is reused.
         for (let k = 0; k < capacity; k++) {
@@ -86,8 +123,10 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
             const k = PRESET_IDS.indexOf(id);
             if (k < 0) return 0;
             const p = presets[k];
+            born.length = 0;
             for (let j = 0; j < n; j++) {
                 const i = free();
+                born.push(i);
                 const a = random() * Math.PI * 2, r = radius * Math.sqrt(random());
                 x[i] = px + Math.cos(a) * r;
                 y[i] = py + Math.sin(a) * r;
@@ -104,46 +143,28 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
             return n;
         },
 
+        /**
+         * Spawn as `spawn` does, but as if it had happened `ageS` seconds ago: the new particles alone are
+         * brought up to now (in PARTICLES.agedDt steps), so what comes into view has been going on already.
+         */
+        spawnAged(id, px, py, n, opts, ageS, env = {}) {
+            if (!api.spawn(id, px, py, n, opts)) return 0;
+            const mine = born.slice();
+            for (let left = ageS; left > 1e-6;) {
+                const h = Math.min(left, PARTICLES.agedDt);
+                left -= h;
+                for (const i of mine) if (alive[i]) advance(i, h, env);
+            }
+            return n;
+        },
+
         /** Advance by dt seconds. */
         step(dt, env = {}) {
-            const { flowAt, isSolid, surfaceY } = env;
             let left = Math.max(0, dt);
             while (left > 1e-6) {
                 const h = Math.min(left, PARTICLES.maxDt);
                 left -= h;
-                for (let i = 0; i < capacity; i++) {
-                    if (!alive[i]) continue;
-                    const p = presets[kind[i]];
-                    age[i] += h;
-                    if (age[i] >= life[i]) { alive[i] = 0; count--; continue; }
-                    if (p.cool > 0) heat[i] *= Math.exp(-p.cool * h);
-                    const rise = p.rise * lerp(p.coldRise, 1, heat[i]);
-                    flow.x = 0; flow.y = 0;
-                    if (flowAt) flowAt(x[i], y[i], flow);
-                    const d = Math.min(1, p.drag * h);
-                    vx[i] += (flow.x - vx[i]) * d;
-                    vy[i] += (flow.y - rise - vy[i]) * d;
-                    if (p.diffuse) {                        // eddies pull a plume apart, more the older it is
-                        const k = p.diffuse * (age[i] / life[i]) * Math.min(1, 3 * h);
-                        vx[i] += (random() * 2 - 1) * k;
-                        if (!(surfaceY && y[i] <= surfaceY(x[i]) + 1)) vy[i] += (random() * 2 - 1) * k;   // a slick on the surface spreads along it only
-                    }
-                    const nx = x[i] + vx[i] * h, ny = y[i] + vy[i] * h;
-                    if (isSolid && isSolid(nx, ny)) {
-                        if (p.surface === 'slick' || p.rise < 0) { vx[i] *= -0.2; vy[i] *= -0.2; continue; }   // rests against rock
-                        alive[i] = 0; count--; continue;
-                    }
-                    x[i] = nx; y[i] = ny;
-                    if (surfaceY && p.surface !== 'pass') {
-                        const sy = surfaceY(x[i]);
-                        if (y[i] <= sy) {
-                            if (p.surface === 'pop') { alive[i] = 0; count--; continue; }
-                            y[i] = sy;                       // slick: spread along the surface
-                            vy[i] = 0;
-                            vx[i] *= 1 - Math.min(1, 0.6 * h);
-                        }
-                    }
-                }
+                for (let i = 0; i < capacity; i++) if (alive[i]) advance(i, h, env);
             }
         },
 

@@ -92,6 +92,9 @@ export default class ParticleLayer {
         return count ? this.sim.spawn(id, x, y, count, opts) : 0;
     }
 
+    /** Particles born `ageS` seconds ago, brought up to now in this world (particles.js spawnAged); never thinned, like spawn's counted kinds. */
+    spawnAged(id, x, y, n, opts, ageS) { return this.sim.spawnAged(id, x, y, n, opts, ageS, this.env); }
+
     /** Particles that say something the player has to be able to read (a stream's drifting bubbles): never thinned by the quality tier. */
     mark(id, x, y, n = 1, opts) { return this.sim.spawn(id, x, y, n, opts); }
 
