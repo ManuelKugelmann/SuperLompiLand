@@ -146,30 +146,31 @@ export default class CardRig {
         const target = Phaser.Math.Angle.Wrap(level + Phaser.Math.Angle.Wrap(Math.atan2(vy, vx) - level) * follow);
         this.angle = Phaser.Math.Angle.RotateTo(this.angle, target, turn * frames);
 
-        const drive = Phaser.Math.Clamp(Math.max(effort, speed / 14), 0.12, 1);
-        this.phase += (0.1 + drive * 0.42) * frames;
+        // How hard it really swims: eased in, so drifting and hovering stay calm.
+        const raw = Phaser.Math.Clamp(Math.max(effort, speed / 14), 0, 1), drive = Math.pow(raw, CARDS.driveCurve);
+        this.phase += (CARDS.cycle[0] + raw * (CARDS.cycle[1] - CARDS.cycle[0])) * frames;
         const ph = this.phase, sq = Phaser.Math.Clamp(squash, -0.35, 0.35), sc = view.baseScale * this.zoom;
         let sx = sc * (1 + sq), sy = sc * (1 - sq), rotation = Phaser.Math.Angle.Wrap(this.angle - level) + lean;
         // Idle rocking about the vertical axis keeps the volume visible, not only in turns.
         if (!this.turning) yaw = (CARDS.sway + CARDS.swayMore * drive) * Math.sin(ph * 0.31);
 
         // Body motion per style (the same styles as Rig): bend in picture px, plus pumping and rocking.
-        const amp = view.wiggle * (0.25 + drive * 0.75), style = this.char.anim || 'swim';
+        const amp = view.wiggle * drive, style = this.char.anim || 'swim';
         let bend;
         if (style === 'pulse') {
-            const push = beat ?? Math.sin(ph * 0.9), pump = 0.05 + drive * 0.09;
+            const push = beat ?? Math.sin(ph * 0.9), pump = 0.02 + drive * 0.07;
             sx *= 1 + push * pump; sy *= 1 - push * pump * 1.3;
             bend = (u, v, o) => { o.x = Math.sin(ph * 0.9 - v * 3.4) * 0.03 * W * v * v; o.y = 0; };
         } else if (style === 'sway') {
-            const k = 0.04 * (0.5 + drive);
+            const k = 0.02 + 0.03 * drive;
             bend = (u, v, o) => { o.x = Math.sin(ph * 0.7 - v * 2.2) * k * W * v; o.y = 0; };
         } else if (style === 'paddle') {
             const stroke = Math.sin(ph * 0.55);
-            rotation += stroke * 0.05 * (0.3 + drive);
-            sy *= 1 - stroke * 0.03 * (0.4 + drive);
+            rotation += stroke * 0.04 * (0.1 + drive);
+            sy *= 1 - stroke * 0.025 * (0.1 + drive);
             bend = (u, v, o) => { o.x = 0; o.y = 0; };
         } else {
-            bend = (u, v, o) => { const t = 1 - u; o.x = 0; o.y = Math.sin(ph - t * 2.6) * amp * 0.5 * t * t; };
+            bend = (u, v, o) => { const t = 1 - u; o.x = 0; o.y = Math.sin(ph - t * 2.6) * amp * 0.35 * t * t; };
         }
 
         const m = { phase: ph, drive };

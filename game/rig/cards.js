@@ -23,12 +23,16 @@ export const CARDS = {
     backside: 0.78,         // a fin seen from behind (through it) is a little darker
     twin: { shift: [-0.035, -0.05], dark: 0.66, z: -0.6 },   // far twin of a paired fin
     turnMs: 300,            // a turn-around (nose swings toward the viewer, through edge-on)
-    sway: 0.06,             // idle yaw rocking (radians) ...
-    swayMore: 0.06          // ... plus this much at full effort
+    sway: 0.012,            // idle yaw rocking (radians) ...
+    swayMore: 0.03,         // ... plus this much at full effort
+    driveCurve: 1.6,        // effort is eased in: light swimming moves little, only real effort moves a lot
+    cycle: [0.04, 0.3]      // swim cycle speed (radians per step) at rest and at full effort
 };
 
 /**
- * How each kind of part moves, as amplitudes in radians at full effort (idle uses a share):
+ * How each kind of part moves, as amplitudes in radians at full effort. Calm by default (user,
+ * 2026-11-14: "less hyperactive wiggling, sedate, natural; wiggle only if warranted"):
+ *   idle   share of the motion left while hovering (pectorals keep sculling gently, a tail rests)
  *   swing  about the root line (out of the picture plane: sculling, beating, leaning)
  *   sweep  in the picture plane about the root (a stroke)
  *   wave   bend that runs out along the part (k = waves along it)
@@ -38,15 +42,15 @@ export const CARDS = {
  *            tails and skirts lie beyond the body and swing both ways.
  */
 export const ROLES = {
-    tail:      { swing: 0.55, sweep: 0.06, wave: 0.16, k: 2.2, speed: 1 },
-    median:    { swing: 0.22, sweep: 0.04, wave: 0.12, k: 2.6, speed: 1 },
-    pectoral:  { swing: 0.85, sweep: 0.14, wave: 0.12, k: 2.0, speed: 1.15, outward: true },
-    wing:      { swing: 0.22, sweep: 0.05, wave: 0.06, k: 1.6, speed: 0.55, outward: true },
-    flipper:   { swing: 0.45, sweep: 0.32, wave: 0.12, k: 1.8, speed: 0.55, outward: true },
-    head:      { swing: 0.07, sweep: 0.04, wave: 0, k: 0, speed: 0.3 },
-    fan:       { swing: 0.1, sweep: 0.03, wave: 0.12, k: 3.0, speed: 0.9 },
-    tentacles: { swing: 0.08, sweep: 0.05, wave: 0.22, k: 3.4, speed: 0.9 },
-    curl:      { swing: 0.05, sweep: 0.06, wave: 0.18, k: 2.0, speed: 0.7 }
+    tail:      { swing: 0.38, sweep: 0.04, wave: 0.1, k: 2.2, speed: 1, idle: 0.04 },
+    median:    { swing: 0.12, sweep: 0.03, wave: 0.07, k: 2.6, speed: 1, idle: 0.15 },
+    pectoral:  { swing: 0.55, sweep: 0.08, wave: 0.06, k: 2.0, speed: 1.15, idle: 0.25, outward: true },
+    wing:      { swing: 0.12, sweep: 0.03, wave: 0.03, k: 1.6, speed: 0.55, idle: 0, outward: true },
+    flipper:   { swing: 0.35, sweep: 0.28, wave: 0.06, k: 1.8, speed: 0.55, idle: 0.08, outward: true },
+    head:      { swing: 0.04, sweep: 0.02, wave: 0, k: 0, speed: 0.3, idle: 0.3 },
+    fan:       { swing: 0.05, sweep: 0.02, wave: 0.06, k: 3.0, speed: 0.9, idle: 0.25 },
+    tentacles: { swing: 0.05, sweep: 0.03, wave: 0.14, k: 3.4, speed: 0.9, idle: 0.5 },
+    curl:      { swing: 0.03, sweep: 0.04, wave: 0.1, k: 2.0, speed: 0.7, idle: 0.3 }
 };
 
 /** Triangle strip over a (cols x rows)-cell grid (rows joined by degenerate triangles): node index per strip vertex. */
@@ -129,7 +133,7 @@ const P = [0, 0, 0], N = [0, 0, 0];
  */
 export function posePart(card, part, m, at, mirror, out) {
     const R = ROLES[part.role] || ROLES.median;
-    const effort = (0.3 + 0.7 * m.drive) * part.amp;
+    const effort = (R.idle + (1 - R.idle) * m.drive) * part.amp;
     const ph = m.phase * R.speed + part.phase * Math.PI * 2;
     const beat = Math.sin(ph + 0.6);
     const swing = R.swing * effort * (R.outward ? (0.5 + 0.5 * beat) * outwardSign(card, part) : beat);
