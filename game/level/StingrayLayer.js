@@ -10,10 +10,10 @@ import { STINGRAY, rayStart, rayGlide } from './stingray.js';
  */
 export const RAY_LOOK = { near: 2400, far: 3800, depth: 3.0, ripple: 0.08 };
 
-const RAY = 'stingray';
+const RAY = 'sand_ray';         // the painted sand ray (also the meadow's): a ray lying flat, head right
 
 /** The painted ray replaces the drawn one. */
-export const RAY_ART = { [RAY]: 'img/stingray.webp' };
+export const RAY_ART = { [RAY]: 'img/sand_ray.webp' };
 
 function ensureTexture(scene) {
     if (scene.textures.exists(RAY)) return;
