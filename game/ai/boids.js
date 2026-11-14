@@ -34,7 +34,7 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
     const P = { ...SWARM, ...opts, weights: { ...SWARM.weights, ...(opts.weights || {}) } };
     const n = count;
     const px = new Float32Array(n), py = new Float32Array(n), vx = new Float32Array(n), vy = new Float32Array(n);
-    const panic = new Float32Array(n), turn = new Float32Array(n), quirk = new Float32Array(n);
+    const panic = new Float32Array(n), quirk = new Float32Array(n);
     const flx = new Float32Array(n), fly = new Float32Array(n), next = new Int32Array(n);
     const pullX = new Float32Array(n), pullY = new Float32Array(n);      // the pull each fish chose when it last decided
     let tick = 0;
@@ -63,12 +63,21 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
     }
 
     const flow = { x: 0, y: 0 };
-    // The middle of the swarm, summed up as a by-product of each step.
-    const mid = { x: 0, y: 0 };
-    const findMid = () => { let sx = 0, sy = 0; for (let i = 0; i < n; i++) { sx += px[i]; sy += py[i]; } mid.x = sx / n; mid.y = sy / n; };
+    // The middle of the swarm and how far it reaches to the sides and up and down (rx, ry), found as a by-product of each step.
+    const mid = { x: 0, y: 0, rx: 0, ry: 0 };
+    const findMid = () => {
+        let sx = 0, sy = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+        for (let i = 0; i < n; i++) {
+            const x = px[i], y = py[i];
+            sx += x; sy += y;
+            if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+        mid.x = sx / n; mid.y = sy / n;
+        mid.rx = Math.max(x1 - mid.x, mid.x - x0); mid.ry = Math.max(y1 - mid.y, mid.y - y0);
+    };
     findMid();
     return {
-        count: n, x: px, y: py, vx, vy, panic, turn, anchor, leader,
+        count: n, x: px, y: py, vx, vy, panic, anchor, leader,
 
         /** Centre of the swarm as of its last step (for cameras, spawning checks, predators): one kept object, not to be changed. */
         centre() { return mid; },
@@ -175,15 +184,11 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                 // Momentum: limited acceleration, then speed limits.
                 const fl = Math.sqrt(fx * fx + fy * fy), amax = P.maxAccel * quirk[i] * (1 + panic[i] * 3);
                 if (fl > amax) { fx = fx / fl * amax; fy = fy / fl * amax; }
-                const ovx = vx[i], ovy = vy[i];
                 vx[i] += fx * dt; vy[i] += fy * dt;
                 const top = (P.speed + (P.maxSpeed - P.speed) * panic[i]) * quirk[i];
                 const s = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]);
                 if (s > top) { vx[i] *= top / s; vy[i] *= top / s; }
                 if (s < P.speed * 0.4) { const k = (P.speed * 0.4) / (s || 1); vx[i] *= k; vy[i] *= k; }   // fish never stop
-                // Turning amount (for the silver flank flash when the swarm wheels).
-                const t = Math.abs(Math.atan2(ovx * vy[i] - ovy * vx[i], ovx * vx[i] + ovy * vy[i]));
-                turn[i] = turn[i] * 0.85 + t * 0.15 / Math.max(dt, 1e-3) * 0.05;
                 if (env.flowAt && (i + tick) % P.flowEvery === 0) { flow.x = 0; flow.y = 0; env.flowAt(px[i], py[i], flow); flx[i] = flow.x; fly[i] = flow.y; }
                 const nx = px[i] + (vx[i] + flx[i]) * dt, ny = py[i] + (vy[i] + fly[i]) * dt;
                 if (!env.isOpen || env.isOpen(nx, ny)) { px[i] = nx; py[i] = ny; }

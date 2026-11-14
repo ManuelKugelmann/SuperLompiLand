@@ -1,5 +1,6 @@
 import { spotsOf } from './worldMap.js';
 import { mixColor, waterHue } from './biomes.js';
+import { due, everyOf } from '../throttle.js';
 import BonusCoins from './BonusCoins.js';
 import { createRig } from '../CardRig.js';
 
@@ -16,7 +17,7 @@ export const RHYTHM_LOOK = {
     // px it cruises to either side; px under the route (whole in the picture when the fish swims the lane, never beside it);
     // faded into the water; how fast it comes and goes; `far` = how much of the camera's travel it follows
     // (it drifts past slower than the play plane, like everything distant); px at which it goes into the reef book.
-    shark: { scale: [1.6, 2.1], sharky: 250, roam: 1500, below: 380, depth: -5, alpha: 0.32, pace: 0.045, far: 0.3, seen: 1300, edge: 0.3, haze: 0.55 }      // edge: its length times this stays clear of the view's bottom edge (it is never cut by it)
+    shark: { scale: [1.6, 2.1], sharky: 250, roam: 1500, below: 380, depth: -5, alpha: 0.32, pace: 0.045, far: 0.3, seen: 1300, edge: 0.3, haze: 0.55, settle: 0.02, groundReach: 4000 }      // edge: its length times this stays clear of the view's bottom edge and of the ground (never cut, never hidden); settle: share of the way to its depth per frame; groundReach: px down from the route the ground is looked for
 };
 
 /** The painted big corals (loaded by the title screen): a table, a brain, a fan and a staghorn thicket. While one is missing, one of the reef's own corals stands in, grown huge. */
@@ -89,7 +90,7 @@ export default class RhythmLayer {
         // The painted shark swims (its part rig bends tail and fins); `img` only says where it is.
         const width = L.sharky * pick(L.scale, hash(i, 3));
         const rig = createRig(s, { states: { normal: { key, width, wiggle: 8 } }, anim: 'swim', soft: 0.5, upright: true }, spot.x0, 0, L.depth).setAlpha(L.alpha).setTint(mixColor(0xffffff, waterHue(spot.x0), L.haze));
-        return { img: { x: spot.x0, y: 0 }, rig, width, book: 'adult_shark', seen: L.seen, phase: hash(i, 4) * 6.283, home: spot.x0, cruise: true, destroy: () => rig.destroy() };
+        return { img: { x: spot.x0, y: 0 }, rig, width, book: 'adult_shark', seen: L.seen, phase: hash(i, 4) * 6.283, home: spot.x0, cruise: true, turn: i, ground: Infinity, destroy: () => rig.destroy() };
     }
 
     /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s. */
@@ -108,7 +109,11 @@ export default class RhythmLayer {
                     // It comes and goes along its stretch, far under the route and the swimmer, turning round slowly at the ends.
                     const S = L.shark, a = t * S.pace + o.phase, x = o.home + Math.sin(a) * S.roam, dir = Math.cos(a) >= 0 ? 1 : -1;
                     // Drawn shifted toward the fish by `far` of the way: against the scrolling picture it moves like something far off.
-                    o.img.x = x + (fish.x - x) * S.far; o.img.y = Math.min(Math.max(this.routeY(x), fish.y) + S.below + Math.sin(t * 0.3 + o.phase) * 50, this.scene.cameras.main.worldView.bottom - o.width * S.edge);
+                    o.img.x = x + (fish.x - x) * S.far;
+                    // Its depth changes slowly (it glides, it does not bob): well below the swimmer, clear of the view's bottom edge and of the ground under it.
+                    if (due(this.scene.game.loop.frame, everyOf('sample', this.scene.quality?.tier), o.turn)) o.ground = this.scene.level.groundBelow(o.img.x, this.routeY(o.img.x), S.groundReach)?.y ?? Infinity;
+                    const want = Math.max(this.routeY(x), fish.y) + S.below, lowest = Math.min(this.scene.cameras.main.worldView.bottom, o.ground) - o.width * S.edge;
+                    o.img.y = Math.min(o.img.y ? o.img.y + (want - o.img.y) * Math.min(1, S.settle * frames) : want, lowest);
                     o.rig.draw({ x: o.img.x, y: o.img.y, vx: Math.cos(a) * S.roam * S.pace / 60, vy: 0, frames, effort: 0.25, facing: dir, turn: 0.02 });
                 }
                 if (o.book && !this.seen.has(o.book) && Math.hypot(o.img.x - fish.x, o.img.y - fish.y) < o.seen) { this.seen.add(o.book); this.onSeen(o.book); }

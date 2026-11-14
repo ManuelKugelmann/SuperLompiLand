@@ -33,51 +33,46 @@ export const SWARMS = { perView: 2, inView: [1000, 520], ahead: [1150, 1400],   
 
 /** Texture size of one frame (px) for a species. */
 const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (sp.tall ? 1.25 : 0.8)) });
-/** Frames: TAIL tail beats (left, mid, right) and FLASH, the bright flank of a turning fish. */
-const TAIL = [-1, 0, 1], FLASH = TAIL.length;
+/** Frames: the tail beats (left, mid, right). A fish keeps its colours whatever it does (playtest: shoals must not change colour when they turn or flee). */
+const TAIL = [-1, 0, 1];
 
 /** Painted art (optional): `public/img/school/<id>.webp`, loaded as `school_<id>`. */
 export const schoolArt = id => ({ key: `school_${id}`, file: `img/school/${id}.webp` });
 
 /**
  * Frames from a painted side view (facing right, tail at the left): the back third is
- * bent up and down in thin vertical strips for the tail beat; the flash frame is the
- * same image washed toward silver.
+ * bent up and down in thin vertical strips for the tail beat.
  */
 function paintedFrames(c, img, w, h) {
     const strips = 12, sw = img.width / strips;
-    [...TAIL, 0].forEach((beat, f) => {
+    TAIL.forEach((beat, f) => {
         const ox = f * w;
         for (let k = 0; k < strips; k++) {
             const tail = Math.max(0, 1 - k / (strips * 0.4));          // 1 at the tail tip, 0 from 40 % on
             const dy = beat * tail * tail * h * 0.14;
             c.drawImage(img, k * sw, 0, sw + 0.5, img.height, ox + k * w / strips, dy, w / strips + 0.5, h);
         }
-        if (f === FLASH) {
-            c.save(); c.globalCompositeOperation = 'source-atop'; c.fillStyle = 'rgba(235,240,245,0.5)';
-            c.fillRect(ox, 0, w, h); c.restore();
-        }
     });
 }
 
-/** The frames of one species (tail beats 0..2, flash 3), painted or drawn; baked once as swarm_<id>. Returns the texture key. */
+/** The frames of one species (tail beats 0..2), painted or drawn; baked once as swarm_<id>. Returns the texture key. */
 export function fishTexture(scene, id, sp) {
     const key = `swarm_${id}`;
     if (scene.textures.exists(key)) return key;
     const { w, h } = frameSize(sp);
-    const tex = scene.textures.createCanvas(key, w * (TAIL.length + 1), h);
+    const tex = scene.textures.createCanvas(key, w * TAIL.length, h);
     const c = tex.getContext();
     const art = schoolArt(sp.art || id).key;      // `art`: another species' painting at this size
     if (scene.textures.exists(art)) {
         paintedFrames(c, scene.textures.get(art).getSourceImage(), w, h);
-        [...TAIL, 0].forEach((_, f) => tex.add(f, 0, f * w, 0, w, h));
+        TAIL.forEach((_, f) => tex.add(f, 0, f * w, 0, w, h));
         tex.refresh();
         return key;
     }
-    [...TAIL, 0].forEach((beat, f) => {
-        const flash = f === FLASH, ox = f * w, cx = ox + w * 0.56, cy = h / 2;
+    TAIL.forEach((beat, f) => {
+        const ox = f * w, cx = ox + w * 0.56, cy = h / 2;
         const rx = w * (sp.tall ? 0.3 : 0.36), ry = h * (sp.tall ? 0.4 : 0.34);
-        const hex = n => `#${(flash ? lighten(n) : n).toString(16).padStart(6, '0')}`;
+        const hex = n => `#${n.toString(16).padStart(6, '0')}`;
         // Tail and fins first, a shade darker, so the body overlaps them.
         c.fillStyle = hex(shade(sp.body, 0.75));
         const tx = cx - rx * 0.92, tail = ry * (sp.tall ? 0.75 : 0.9), sway = beat * ry * 0.35;
@@ -104,7 +99,6 @@ export function fishTexture(scene, id, sp) {
     tex.refresh();
     return key;
 }
-function lighten(c) { return mix(c, 0xebf0f5, 0.6); }
 function shade(c, k) { return mix(c, 0x0a1a30, 1 - k); }
 function mix(a, b, k) {
     const ch = (s) => Math.round(((a >> s) & 255) + (((b >> s) & 255) - ((a >> s) & 255)) * k);
@@ -200,7 +194,8 @@ export default class SwarmLayer {
         this.time = (this.time || 0) + dt;
         for (const s of this.swarms) {
             // A shoal out of sight costs a third: it swims on in bigger steps and nothing is drawn of it.
-            const c = s.sim.centre(), far = Math.abs(c.x - cx) > SWARMS.inView[0] + SWARMS.farPad || Math.abs(c.y - cy) > SWARMS.inView[1] + SWARMS.farPad;
+            // (Out of sight = all of it: its middle less its own reach, so a wide shoal with fish in the picture never stands still.)
+            const c = s.sim.centre(), far = Math.abs(c.x - cx) - c.rx > SWARMS.inView[0] + SWARMS.farPad || Math.abs(c.y - cy) - c.ry > SWARMS.inView[1] + SWARMS.farPad;
             s.owed = (s.owed || 0) + dt;
             s.turnN = (s.turnN || 0) + 1;
             if (far && s.turnN % SWARMS.farEvery) continue;
@@ -210,7 +205,7 @@ export default class SwarmLayer {
             s.sim.step(Math.min(s.owed, SWARMS.maxStep), env, far ? undefined : every * SWARM.thinkEvery);
             s.owed = 0;
             if (far) continue;
-            const { x, y, vx, vy, panic, turn } = s.sim;
+            const { x, y, vx, vy } = s.sim;
             for (let i = 0; i < s.bobs.length; i++) {
                 const b = s.bobs[i], ph = s.phase[i];
                 // Tail beats faster the faster the fish swims.
@@ -218,7 +213,7 @@ export default class SwarmLayer {
                 b.x = x[i] - s.w / 2;
                 b.y = y[i] - s.h / 2 + Math.sin(ph * 1.7 + this.time * 1.3) * s.h * 0.12;
                 b.flipX = vx[i] < 0;
-                b.setFrame(turn[i] > 0.6 || panic[i] > 0.5 ? FLASH : beat < -0.33 ? 0 : beat > 0.33 ? 2 : 1);   // flash when wheeling or startled
+                b.setFrame(beat < -0.33 ? 0 : beat > 0.33 ? 2 : 1);
             }
         }
     }
