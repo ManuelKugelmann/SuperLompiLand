@@ -52,7 +52,9 @@ export default class StingrayLayer {
         const ground = this.groundY(this.x) ?? 0;
         if (this.since < 0) {
             // Lying under the sand, only the eyes and the outline showing; Lompi close by wakes it.
-            this.img.setPosition(this.x, ground - 6).setAlpha(0.45).setScale(this.base, this.base * 0.85).setRotation(0);
+            // Lying under the sand it still lives (tester: it looked static): the wing edges ripple slowly and it breathes.
+            const breathe = Math.sin(t * 1.6), ripple = Math.sin(t * 2.7);
+            this.img.setPosition(this.x + ripple * 2, ground - 6 - breathe * 1.5).setAlpha(0.5).setScale(this.base * (1 + ripple * 0.025), this.base * 0.85 * (1 + breathe * 0.05)).setRotation(ripple * 0.012);
             if (this.glides < STINGRAY.rests && Math.hypot(fish.x - this.x, fish.y - ground) < STINGRAY.wake) {
                 this.since = t; this.from = this.x;
                 this.scene.particles.spawn('silt', this.x, ground - 10, 14, { radius: STINGRAY.size * 0.4, spread: 60, vy: -60 });
@@ -64,7 +66,7 @@ export default class StingrayLayer {
         this.x = g.x;
         const under = this.groundY(g.x) ?? ground;
         this.img.setPosition(g.x, under - 8 - g.lift).setAlpha(1 - 0.55 * g.buried)
-            .setScale(this.base, this.base * (1 + Math.sin(t * 5) * L.ripple * (g.lift > 2 ? 1 : 0)));
+            .setScale(this.base * (1 + Math.sin(t * 5 + 1) * L.ripple * 0.4), this.base * (1 + Math.sin(t * 5) * L.ripple * (g.lift > 2 ? 1 : 0.4))).setRotation(Math.sin(t * 2.5) * 0.04);
         if (g.done) { this.since = -1; this.glides++; this.scene.particles.spawn('silt', g.x, under - 6, 8, { radius: STINGRAY.size * 0.3, spread: 40, vy: -30 }); }
     }
 }
