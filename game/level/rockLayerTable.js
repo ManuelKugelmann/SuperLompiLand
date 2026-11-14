@@ -413,7 +413,7 @@ function trenchSpecks(rgba, size, ox, oy, span, cfg = TRENCH_WALL) {
             const c = cfg.speckColours[Math.floor(hashAt(hy, hx) * cfg.speckColours.length)];
             const k = g * (0.5 + 0.5 * hashAt(hx + 3, hy));
             for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-                const q = o + (dy * size + dx) * 4, w = dx || dy ? k * 0.3 : k;
+                const q = o + (dy * size + dx) * 4, w = k * (dx && dy ? 0.14 : dx || dy ? 0.3 : 1);      // round: corners weaker than the sides (no little crosses)
                 if (rgba[q + 3] < 40) continue;
                 for (let ci = 0; ci < 3; ci++) rgba[q + ci] += (ch(c, ci) - rgba[q + ci]) * w;
             }
