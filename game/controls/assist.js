@@ -21,6 +21,11 @@ export const ASSIST = {
         lift: 0.5,       // the lift at full strength, as a share of a full stroke
         dive: 150        // px the finger must be below the fish for the pull to count as "steered down": only then a release takes a deeper depth to hold
     },
+    lane: {
+        below: 250,      // px under the calm lane's lower edge from which a depth the player did not choose is eased back up
+        rise: 40,        // px per second by which the held depth then rises toward that edge
+        level: 0.15      // the pull counts as level (the hold keeps working during it) while its up or down part is below this share
+    },
     level: {
         flat: 0.4,       // the pull counts as "mostly sideways" while its up or down part is below this share of it
         damp: 0.09,      // share of a full stroke per px/step of unwanted speed up or down
@@ -85,4 +90,14 @@ export function steersDown(fingerY, fishY, cfg = ASSIST.hold) {
 export function levelThrust(dirY, vy, cfg = ASSIST.level) {
     if (Math.abs(dirY) >= cfg.flat || vy * dirY > 0) return 0;      // the player steers up or down, or the fish already goes where the pull points
     return Math.max(-cfg.max, Math.min(cfg.max, -vy * cfg.damp)) + 0;      // + 0: never a negative zero
+}
+
+/**
+ * The held depth a moment later: a depth the player did not dive to, lying far below the calm
+ * lane, rises gently toward the lane's lower edge (never above `below` px under it). A depth
+ * the player chose by diving is kept. `laneBottom` = the lane's lower edge there (world y), `dt` s.
+ */
+export function easeRest(rest, laneBottom, chosen, dt, cfg = ASSIST.lane) {
+    const limit = laneBottom + cfg.below;
+    return chosen || rest === null || rest <= limit ? rest : Math.max(limit, rest - cfg.rise * dt);
 }

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
-import { slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust } from './assist.js';
+import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust, easeRest } from './assist.js';
+import { ROUTE } from '../level/density.js';
 
 const BAND_FULL = 520; // finger distance at which the pull is at full strength
 
@@ -15,6 +16,7 @@ export default class TapToMoveController extends ControllerBase {
         this.restY = null;      // the depth the fish holds when it is let go
         this.resting = false;   // let go right now
         this.dived = false;     // during this pull the finger was well below the fish: the player steered down
+        this.chosen = false;    // the depth held now was chosen by a dive (it is kept; any other sinks no further than near the lane)
         this.pull = { x: 0, y: 0, climbing: false };
         this.up = new Phaser.Math.Vector2(0, -1);
         this.hint(this.de ? `Halten = Gummiband zum Finger · Loslassen = bremsen · Doppeltipp = ${this.specialWord()}`
@@ -32,12 +34,15 @@ export default class TapToMoveController extends ControllerBase {
         if (this.held === pointer) this.held = null;
     }
 
-    update() {
+    update(dt = 1000 / 60) {
         if (this.held && !this.held.isDown) this.held = null;
+        // A depth the player did not choose, far below the calm lane, rises gently back toward it.
+        const pos = this.fish.pos;
+        this.restY = easeRest(this.restY, this.scene.level.field.routeY(pos.x) + ROUTE.halfWidth, this.chosen, dt / 1000);
         if (!this.held) {
             this.fish.brake();
             // Let go: it stays where it was, instead of sinking away while the child looks around.
-            if (!this.resting) { this.resting = true; this.restY = restDepth(this.fish.pos.y, this.restY, this.dived); this.dived = false; }
+            if (!this.resting) { this.resting = true; this.chosen = this.dived; this.restY = restDepth(this.fish.pos.y, this.restY, this.dived); this.dived = false; }
             const lift = this.fish.inAir ? 0 : holdLift(this.fish.pos.y, this.restY);
             if (lift > 0) this.fish.thrust(this.up.set(0, -lift));
             return;
@@ -56,6 +61,9 @@ export default class TapToMoveController extends ControllerBase {
             // Pointing sideways means "go there", not "and keep flying up": speed up or down that came from a slope or a current is damped.
             const level = this.fish.inAir || d.climbing ? 0 : levelThrust(d.y, this.fish.body.velocity.y);
             if (level) this.fish.thrust(this.up.set(0, level));
+            // A level pull keeps the held depth too (the hold does not only act once the finger is lifted).
+            const lift = this.fish.inAir || d.climbing || this.dived || this.restY === null || Math.abs(d.y) >= ASSIST.lane.level ? 0 : holdLift(pos.y, this.restY);
+            if (lift > 0) this.fish.thrust(this.up.set(0, -lift));
         } else {
             this.fish.brake();
         }
