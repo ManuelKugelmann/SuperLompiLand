@@ -47,6 +47,7 @@ import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
+import { lightAt, murkAt } from '../game/level/light.js';
 import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
@@ -1383,9 +1384,14 @@ export default class MainScene extends Phaser.Scene {
         const depth01 = Phaser.Math.Clamp((view.y - 2200) / 3400, 0, 1) * 0.55 + Phaser.Math.Clamp((view.y - 5600) / 3000, 0, 1) * 0.45;
         // Darkness only by depth (spec 5.0h): the biome gives the light its hue at one brightness.
         // ... and depth darkens toward a deep version of that same hue, so a deep wreck stays rusty and the trench indigo.
+        // Spec 5.0j: skylight (a slow day/sunset/night cycle, storms), the biome's hue, its sediment,
+        // the seabed's colour bouncing up close above it, and depth (game/level/light.js).
         const hue = waterHue(view.x), deep = mixColor(0x0c1436, atLuma(hue, WATER_LIGHT.deepLuma), WATER_LIGHT.deepHue);
-        const lit = mixColor(mixColor(0xffffff, hue, WATER_LIGHT.amount), deep, depth01 * 0.8);
-        this.ambient.setFillStyle(lit, 1);
+        this.lightTick = ((this.lightTick || 0) + 1) % 8;
+        if (!this.lightTick) this.floorNear = this.level.groundBelow(view.x, view.y, 700);
+        const fl = this.floorNear;
+        this.ambient.setFillStyle(lightAt({ depth01, y: view.y, t: this.time.now / 1000, storm: stormShare(view.x), hue, deepHue: deep,
+            floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) }), 1);
         // Inside the side cave the score closes in: it is played as if much deeper down.
         const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
         updateMusic(biomeBlendAt(this.fish.sprite.x), inCave ? Math.max(depth01, WORLD.caveDepth01) : depth01);   // background score + sea hum (spec ch.12)
