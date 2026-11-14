@@ -1,4 +1,4 @@
-import { CONTAINERS, containerSpan, containerField, containerCoins, landsOnRoof, roofBounce } from './containers.js';
+import { CONTAINERS, containerSpan, containerField, containerCoins, roofY, landsOnRoof, roofBounce } from './containers.js';
 import BonusCoins from './BonusCoins.js';
 
 export const CONTAINER_LOOK = {
@@ -43,7 +43,7 @@ function ensureTextures(scene) {
 export default class ContainerLayer {
     constructor(scene, routeY, surfaceY, onCoin, onSeen, onBounce) {
         this.scene = scene; this.surfaceY = surfaceY; this.onCoin = onCoin; this.onSeen = onSeen; this.onBounce = onBounce; this.seen = false;
-        this.bouncedAt = -Infinity;
+        this.bouncedAt = -Infinity; this.footBefore = null;
         this.span = containerSpan();
         this.boxes = containerField();
         this.coinSpots = containerCoins(routeY);
@@ -73,7 +73,7 @@ export default class ContainerLayer {
             if (fish.x < sp.x0 - L.near || fish.x > sp.x1 + L.near || !this.scene.buildSlot()) return;
             this.live = this.build();
         }
-        const half = CONTAINERS.size[0] * 0.3;
+        const half = CONTAINERS.size[0] * 0.3, foot = fish.y + radius * CONTAINERS.roof.body;      // the fish's drawn lower edge
         this.live.imgs.forEach((img, i) => {
             const b = this.boxes[i];
             // It lies in the surface: it rises and falls with the water under its middle and tips with the slope between its ends.
@@ -81,14 +81,15 @@ export default class ContainerLayer {
             img.setY(mid + b.y).setRotation(b.tilt + slope * 0.6 + Math.sin(t * 0.5 + i * 2.3) * CONTAINERS.rock);
             this.live.shadows[i]?.setY(mid + b.y + CONTAINERS.size[1] * 0.75);
             if (!this.seen && Math.hypot(fish.x - b.x, fish.y - (mid + b.y)) < L.seen) { this.seen = true; this.onSeen(); }
-            // A leap that comes down on its roof bounces off, like off a pad.
-            const v = fish.body.velocity;
-            if (inAir && t - this.bouncedAt > CONTAINERS.roof.again && landsOnRoof(b, mid, fish.x, fish.y + radius, v.y)) {
+            // A leap that comes down on its roof bounces off, like off a pad: when the fish's lower edge reaches the drawn roof line.
+            const v = fish.body.velocity, roof = roofY(b, mid, fish.x, img.rotation);
+            if (inAir && this.footBefore !== null && t - this.bouncedAt > CONTAINERS.roof.again && landsOnRoof(b, roof, fish.x, foot, this.footBefore, v.y)) {
                 this.bouncedAt = t;
                 fish.setVelocity(v.x, roofBounce(v.y));
-                this.onBounce(fish.x, fish.y + radius);
+                this.onBounce(fish.x, roof);
             }
         });
+        this.footBefore = foot;
         this.live.coins.update(fish, radius, t);
     }
 }

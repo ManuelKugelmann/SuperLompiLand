@@ -29,7 +29,7 @@ export const CONTAINERS = {
     rock: 0.05,          // radians each rocks in the swell
     shadow: 0.3,         // darkness of the shadow in the water under each
     // A leap that comes down on a floating container's roof bounces off it (only from above: never a wall from the side or below).
-    roof: { reach: 0.46, band: 70, spring: 1.1, least: 10, again: 0.35 }   // share of the length that counts as roof; px above and below the roof line that catch a falling fish; speed returned; the least speed up (px per step); s before it can bounce again
+    roof: { reach: 0.46, band: 12, body: 0.8, spring: 1.1, least: 10, again: 0.35 }   // share of the length that counts as roof; px above the roof line at which the fish's lower edge touches; share of the fish's radius that is its drawn lower edge; speed returned; the least speed up (px per step); s before it can bounce again
 };
 
 let SPAN = null;
@@ -78,15 +78,20 @@ export function containerCoins(routeY, cfg = CONTAINERS) {
     return out;
 }
 
+/** The roof line of a floating container at world x: `surface` = the water's height under its middle, `tilt` = how it lies right now (radians). */
+export function roofY(box, surface, x, tilt = box.tilt, cfg = CONTAINERS) {
+    return surface + box.y - cfg.size[1] / 2 / Math.cos(tilt) + Math.tan(tilt) * (x - box.x);
+}
+
 /**
- * Does a fish at (fx, fy), moving down at `vy` px per step (positive = falling), land on this
- * container's roof? `surface` = the water surface's height under the container's middle.
- * Only a floating container has a roof to land on, and only a fish that comes from above does.
+ * Does a falling fish touch this container's roof? `foot` = the fish's lower edge now and
+ * `footBefore` = a frame ago (world y), `vy` = its speed down (px per step, positive = falling),
+ * `roof` = roofY at the fish's x. It touches when its lower edge has come down to the roof line
+ * (within `band` above it) from above. Only a floating container has a roof to land on.
  */
-export function landsOnRoof(box, surface, fx, fy, vy, cfg = CONTAINERS) {
-    if (box.stacked || vy <= 0) return false;
-    const [len, h] = cfg.size, roof = surface + box.y - h / 2 + Math.tan(box.tilt) * (fx - box.x);
-    return Math.abs(fx - box.x) < len * cfg.roof.reach && Math.abs(fy - roof) < cfg.roof.band;
+export function landsOnRoof(box, roof, fx, foot, footBefore, vy, cfg = CONTAINERS) {
+    if (box.stacked || vy <= 0 || Math.abs(fx - box.x) >= cfg.size[0] * cfg.roof.reach) return false;
+    return footBefore <= roof && foot >= roof - cfg.roof.band;
 }
 
 /** The speed up (negative, px per step) a fish leaves the roof with when it came down at `vy`: a springy bounce, never a feeble one. */

@@ -24,6 +24,7 @@ import { OCTOPUS } from '../ai/octopus.js';
 import { containerSpan } from './containers.js';
 import { whaleSharkSlot } from './whaleShark.js';
 import { frontSlot } from './front.js';
+import { sandbarSpot } from './sandbar.js';
 
 /** Kinds of feature that are a place's main sight: no two of them may share a screen. */
 export const SET_PIECE_KINDS = ['crest', 'cave', 'docks', 'arch', 'ship', 'friend', 'whale', 'baitball', 'whaleshark', 'front'];
@@ -68,6 +69,7 @@ export function worldMap() {
     span('containers', containerSpan().x0, containerSpan().x1);
     span('whaleshark', whaleSharkSlot().x0, whaleSharkSlot().x1);
     span('front', frontSlot().x0, frontSlot().x1);
+    span('sandbar', sandbarSpot().x0, sandbarSpot().x1);
     for (const d of downwellings()) span('current', d.down, d.up);
     for (const f of bloomFields()) span('bloom', f.x0, f.x1);
     for (const r of raftSpots()) spot('raft', r.x);

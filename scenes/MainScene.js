@@ -47,6 +47,7 @@ import VentFieldLayer from '../game/level/VentFieldLayer.js';
 import DolphinLayer from '../game/level/DolphinLayer.js';
 import OctopusLayer from '../game/ai/OctopusLayer.js';
 import ContainerLayer from '../game/level/ContainerLayer.js';
+import SandbarLayer from '../game/level/SandbarLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
@@ -254,6 +255,8 @@ export default class MainScene extends Phaser.Scene {
         this.meadow = new MeadowLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         // Lost shipping containers floating half sunk at the surface off the harbour; coins lead up to them from the route.
         this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'), (x, y) => this.roofBounce(x, y));
+        // The lagoon's sandbar: coins lead up to it, and an arc of coins hangs in the air for the jump over its crown.
+        this.sandbar = new SandbarLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.overSandbar());
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -662,7 +665,15 @@ export default class MainScene extends Phaser.Scene {
     roofBounce(x, y) {
         play('boing');
         this.chainMove('pad');
-        this.particles.spawn('bubble', x, y, 6, { radius: 8, spread: 60, vy: -200 });
+        this.particles.spawn('bubble', x, y, 6, { radius: 8, spread: 60, vy: -200 });      // spray where it touched the roof
+        this.fish.squash = -0.25;      // it flattens a little as it pushes off
+    }
+
+    /** The fish flew over the sandbar's crown: a cheer, and the first time an entry in the reef book. */
+    overSandbar() {
+        play('friend');
+        this.bookEntry('sandbar');
+        this.announce(this.lang === 'de' ? 'Über die Sandbank!' : 'Over the sandbar!');
     }
 
     /** Through the sea arch: a chain move, the first time an entry in the reef book; flown through, a cheer. */
@@ -1555,6 +1566,7 @@ export default class MainScene extends Phaser.Scene {
         this.dolphins.update(sp, time / 1000, delta);
         { const fv = this.fish.sprite.body.velocity; this.octopus.update(sp, Math.hypot(fv.x, fv.y), time / 1000, delta); }
         this.containers.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
+        this.sandbar.update(sp, this.fish.radius, time / 1000);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
             const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);
