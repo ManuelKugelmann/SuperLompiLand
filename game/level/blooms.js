@@ -14,7 +14,7 @@ export const BLOOM = {
     top: 160, bottom: 1050,   // from just under the surface down to here (the calm route runs through it)
     keep: 1500,          // px a field stays away from storm, currents, friends, events and small rescues
     // In the deep trench the jellies glow in the dark and drift around the calm route itself, all the way down.
-    deep: { biome: 'trench', first: 12500, every: 16500, half: 480 },   // px into the trench of the first field, px between fields, px above and below the route
+    deep: { biome: 'trench', first: 12500, every: 33000, half: 480 },   // px into the trench of the first field, px between fields, px above and below the route
     count: 44,           // jellies in a field
     small: 0.4,          // share of them that are small and further back
     drift: [70, 40],     // px each drifts to and fro, sideways and up and down

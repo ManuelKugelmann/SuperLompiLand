@@ -54,6 +54,7 @@ import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import GrandNestLayer from '../game/level/GrandNestLayer.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
+import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
 import { GRAND_NEST } from '../game/level/grandNest.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
@@ -262,6 +263,8 @@ export default class MainScene extends Phaser.Scene {
         this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), (x, y) => this.seabedBelow(x, y), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y), (x, y) => this.coinTaken(x, y));
         // Moon jelly blooms drift across the route in the open seas (spec 5.0i).
         this.blooms = new BloomLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('friend_jellyfish'));
+        // Between the trench's jelly fields: long strings of lights that answer the fish with a wave of light.
+        this.siphons = new SiphonophoreLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('siphonophore'));
         // The bait ball in the open blue: hide in the swirl, gannets plunge and leave coins (5.0k).
         this.baitBalls = new BaitBallLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000),
             (x, y) => this.coinTaken(x, y), x => this.seabirdEvent('splash', x, this.surface.heightAt(x, this.time.now / 1000)),
@@ -1641,6 +1644,7 @@ export default class MainScene extends Phaser.Scene {
         else if (this.creaturesWarm && !this.stormWarm && this.buildSlot()) this.stormWarm = !prewarmStorm(this);      // then the storm's pictures, one per frame
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
+        this.siphons.update(sp, time / 1000);
         this.baitBalls.update(sp, this.fish.view, this.fish.radius, time / 1000);
         this.rafts.update(sp, time / 1000);
         this.meadow.update(sp, this.fish.radius, time / 1000, delta);
