@@ -44,6 +44,7 @@ import { FAR_ART } from '../game/level/FarLayers.js';
 import { ARCHER_ART } from '../game/level/ArcherLayer.js';
 import { EEL_ART } from '../game/level/GardenEelLayer.js';
 import { RAY_ART } from '../game/level/StingrayLayer.js';
+import { SIPHON_ART } from '../game/level/SiphonophoreLayer.js';
 import { CONTAINER_ART } from '../game/level/ContainerLayer.js';
 import { DOLPHIN_ART } from '../game/level/DolphinLayer.js';
 import { OCTOPUS_ART } from '../game/ai/OctopusLayer.js';
@@ -136,7 +137,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.textures.exists('hull_bottom')) this.load.image('hull_bottom', 'img/props/hull_bottom.webp');
         for (const [key, file] of Object.entries(SHIP_FILES.images)) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.cache.json.exists(SHIP_FILES.json[0])) this.load.json(SHIP_FILES.json[0], SHIP_FILES.json[1]);
-        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART, ...VENT_ART, ...GARDEN_ART, ...FAR_ART, ...ARCHER_ART, ...EEL_ART, ...RAY_ART, ...CONTAINER_ART, ...DOLPHIN_ART, ...OCTOPUS_ART, ...SANDBAR_ART, ...GRAND_ART, ...CONTROL_ART, ...COLONY_ART, ...SHARK_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
+        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART, ...VENT_ART, ...GARDEN_ART, ...FAR_ART, ...ARCHER_ART, ...EEL_ART, ...RAY_ART, ...SIPHON_ART, ...CONTAINER_ART, ...DOLPHIN_ART, ...OCTOPUS_ART, ...SANDBAR_ART, ...GRAND_ART, ...CONTROL_ART, ...COLONY_ART, ...SHARK_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
         for (const [key, file] of Object.entries({ ...PUP_ART, ...SEA_LION_ART, ...SEA_OTTER_ART, ...FERRY_ART })) if (!this.textures.exists(key)) this.load.image(key, file);      // the coder's sights (a line of its own: fewer merge conflicts)
         if (!this.textures.exists(MANTA_ART.key)) this.load.image(MANTA_ART.key, MANTA_ART.file);
         if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');

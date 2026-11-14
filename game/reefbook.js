@@ -49,7 +49,7 @@ export const ENTRIES = [
     { id: 'nursery', kind: 'place', image: 'lemon_pup',
         name: { de: 'Kinderstube in den Wurzeln', en: 'Nursery in the roots' },
         fact: { de: 'Zwischen Mangrovenwurzeln wachsen Jungfische und sogar kleine Zitronenhaie auf: hier kommt kein großer Räuber hinein.', en: 'Among mangrove roots young fish and even little lemon sharks grow up: no big hunter fits in here.' } },
-    { id: 'siphonophore', kind: 'creature', image: 'siphon_bead',
+    { id: 'siphonophore', kind: 'creature', image: 'siphon_card',
         name: { de: 'Staatsqualle', en: 'Siphonophore' },
         fact: { de: 'Eine Staatsqualle ist kein einzelnes Tier, sondern eine Kette aus vielen winzigen Tieren. Manche werden länger als ein Blauwal.', en: 'A siphonophore is not one animal but a chain of many tiny ones. Some grow longer than a blue whale.' } },
     { id: 'sea_lion', kind: 'creature', image: 'sea_lion',

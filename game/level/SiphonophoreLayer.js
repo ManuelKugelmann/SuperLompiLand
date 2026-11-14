@@ -1,5 +1,8 @@
 import { SIPHON, siphonSpots, stringAt, beadAt, beadGlow } from './siphonophore.js';
 
+/** The reef book's picture of a siphonophore (the string itself is drawn from beads, built only near one). */
+export const SIPHON_ART = { siphon_card: 'img/siphon_card.webp' };
+
 export const SIPHON_LOOK = {
     near: 2600, far: 4200,   // px from a spot at which its strings are built, and beyond which they are removed
     depth: 41,               // lights of their own, above the deep's darkness (MainScene ambient, 40)
