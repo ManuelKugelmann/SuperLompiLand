@@ -10,9 +10,10 @@ export const SUBZONES = {
     margin: 6000,             // px at a biome's ends without any sub-zone effect (there the biomes themselves blend)
     fade: 3000,               // px over which the effect comes in after that margin
     // floor: px the seabed lies deeper (+) or higher (-); open: rock taken away (+) or added (-);
-    // coral, kelp, propRate: factors on the biome's own rates; props: factors on its prop groups' weights.
+    // coral, kelp, propRate: factors on the biome's own rates; props: factors on its prop groups' weights;
+    // cover: factor on the small ground cover (shells, pebbles, tufts), 1 where not given.
     kinds: {
-        flats: { floor: 40, open: 0.07, coral: 0.4, kelp: 0.35, propRate: 0.55, props: { boulder: 0.4 } },
+        flats: { floor: 40, open: 0.07, coral: 0.4, kelp: 0.35, propRate: 0.8, cover: 1.5, props: { boulder: 0.4 } },
         meadow: { floor: 90, open: 0.04, coral: 0.4, kelp: 1.7, propRate: 1.5, props: { seagrass: 3.5, kelpclump: 2.5, boulder: 0.5 } },
         outcrops: { floor: -230, open: -0.06, coral: 1.2, kelp: 0.8, propRate: 1.25, props: { boulder: 3 } },
         gully: { floor: 320, open: -0.04, coral: 0.8, kelp: 1.1, propRate: 1, props: { boulder: 1.6, seafan: 2 } },
@@ -84,7 +85,7 @@ export function zonedBiome(biome, kind, cfg = SUBZONES) {
     if (cached) return cached;
     const z = cfg.kinds[kind], props = {};
     for (const [group, w] of Object.entries(biome.props || {})) props[group] = w * (z.props[group] ?? 1);
-    const row = { ...biome, zone: biome.zone, subzone: kind, coral: Math.min(0.9, biome.coral * z.coral), kelp: Math.min(0.9, biome.kelp * z.kelp), propRate: biome.propRate * z.propRate, props };
+    const row = { ...biome, zone: biome.zone, subzone: kind, coral: Math.min(0.9, biome.coral * z.coral), kelp: Math.min(0.9, biome.kelp * z.kelp), propRate: biome.propRate * z.propRate, cover: z.cover ?? 1, props };
     if (cfg === SUBZONES) ZONED.set(key, row);
     return row;
 }

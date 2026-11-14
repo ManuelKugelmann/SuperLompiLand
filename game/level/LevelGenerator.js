@@ -26,7 +26,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 31,
+    version: 32,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -59,7 +59,7 @@ const CH = LEVEL.cell * LEVEL.cells;
 // pulse, sway; sit and throb for the ones on the rock), `soft` = how loose its thin parts are,
 // `wiggle` = size of the body wave, `upright` = never tips along its movement.
 const FRIENDS = {
-    friend_turtle: { size: 320, swim: 380, bob: 18, anim: 'paddle', soft: 0.5, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
+    friend_turtle: { size: 320, every: 3, swim: 380, bob: 18, anim: 'paddle', soft: 0.5, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
     // Parrotfish graze the reef (spec 9.1 wonder beat): calm, unhurried, a little shy.
     friend_parrotfish: { size: 230, swim: 420, bob: 12, anim: 'swim', soft: 0.35, wiggle: 16, ai: { speed: 0.9, range: 420, turn: 0.03, shy: 0.9 } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', soft: 1, wiggle: 6, upright: true, ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
@@ -601,10 +601,12 @@ export default class LevelGenerator {
             // Own random stream, like the props: nothing else shifts.
             const r = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}:micro`]), next = () => r.frac();
             let placed = 0;
+            // A sub-zone can ask for more ground cover (open sand flats would be bare without it).
+            const cover = biome.cover || 1, microCfg = cover === 1 ? MICRO : { ...MICRO, rate: Math.min(1, MICRO.rate * cover) };
             for (const f of floors) {
-                if (placed >= MICRO.max) break;
+                if (placed >= Math.round(MICRO.max * cover)) break;
                 if (f.prop || reefCrest(f.x) > 0 && f.y < 400) continue;      // not under a prop; the crest's top belongs to the corals
-                const m = microAt(biome.id, f.angle, next);
+                const m = microAt(biome.id, f.angle, next, microCfg);
                 if (!m) continue;
                 const img = keep(s.add.image(f.x, f.y + 4, microKey(m.kind, m.variant)).setOrigin(0.5, MICRO_ORIGIN_Y)
                     .setRotation(f.angle).setDepth(0.9).setFlipX(m.flip));
@@ -724,7 +726,10 @@ export default class LevelGenerator {
             const p = key && openSpot(FRIENDS[key].swim || 0);
             // Grumpies never live on the calm main route (spec 5.2c): stress stays optional.
             const onRoute = p && FRIENDS[key].grumpy && Math.abs(p.y - this.field.routeY(p.x)) < ROUTE.clear + FRIENDS[key].grumpy.territory * 0.5;
-            if (p && !onRoute) this.addFriend(chunk, key, p.x, p.y, rng);
+            // A big friend is a sight, not a crowd: `every` = it lives only in every so many chunk columns, and there in one row
+            // (a turtle per 2900 px at most, never two on one screen).
+            const every = key && FRIENDS[key].every, rare = every && !(cx % every === 0 && cy === Math.floor(cx / every) % 2);
+            if (p && !onRoute && !rare) this.addFriend(chunk, key, p.x, p.y, rng);
         }
         if (!safe && rng.frac() < biome.hazardRate) {
             const key = pickWeighted(rng, only(biome.hazards, k => HAZARDS[k]?.place === 'water'), has);

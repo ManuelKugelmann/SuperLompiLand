@@ -47,6 +47,7 @@ test('a sub-zone changes what grows and lies there, within the biome\'s own thin
     const beach = BIOMES.find(b => b.id === 'beach'), meadow = zonedBiome(beach, 'meadow'), flats = zonedBiome(beach, 'flats');
     assert.ok(meadow.props.seagrass > beach.props.seagrass && meadow.propRate > beach.propRate);
     assert.ok(flats.propRate < beach.propRate && flats.coral < beach.coral);
+    assert.ok(flats.cover > 1 && meadow.cover === 1, 'open flats get more ground cover instead');
     assert.deepEqual(Object.keys(meadow.props).sort(), Object.keys(beach.props).sort(), 'no prop group a biome does not have');
     assert.equal(zonedBiome(beach, null), beach);
     assert.equal(zoneKind({ a: 'flats', b: 'meadow', t: 0.7, w: 1 }), 'meadow');

@@ -55,7 +55,7 @@ export const BIOMES = [
         coral: 0.12, kelp: 0.1, coins: 2, friendRate: 0.5, hazardRate: 0,
         wallRate: 0.1, wallLife: { anemone: 2, coral: 1 },
         props: { boulder: 2, seagrass: 5, anemone: 1 }, propRate: 2.0,
-        friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, urchin: 1 }, hazards: {}
+        friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, friend_seahorse: 2, urchin: 1 }, hazards: {}
     },
     {
         // Shallow, sheltered, full of roots to weave through. `roots` = mangrove
