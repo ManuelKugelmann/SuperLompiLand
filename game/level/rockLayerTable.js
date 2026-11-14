@@ -50,8 +50,11 @@ export const LAYER_SHADE = {
  */
 export const SUPPORT = { reach: 1800, gap: 60, spread: 120, wobble: 260, grid: 110, carryGrid: [280, 480], minCarry: 0.03, band: 0.06, lift: 0.1 };
 
-/** Near the surface: no layer rock above `below` virtual px, fading back in over `fade` px. */
-export const SURFACE_CLEAR = { below: 300, fade: 420, push: 1.2 };
+/**
+ * Near the surface: no layer rock above `below` virtual px, fading back in over `fade` px. The
+ * edge wanders by up to `wander` px along x, so rock tops are not cut flat like tables.
+ */
+export const SURFACE_CLEAR = { below: 300, fade: 420, push: 1.2, wander: 520 };
 
 /** Around the calm route: no near rock within `half` px of its middle, fading back in over `fade` px. */
 export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 0.9 };
@@ -133,12 +136,13 @@ export function lowPass(base, g) {
 export function layerField(base, layer, { route = null, sup = SUPPORT, clear = ROUTE_CLEAR } = {}) {
     // The surface clearance acts on the field itself, before the low pass and the carrying:
     // a piece removed near the surface takes its foot with it (no slab left hanging below).
-    const surfacePush = y => {
-        if (y >= SURFACE_CLEAR.below + SURFACE_CLEAR.fade) return 0;
-        const t = Math.max(0, (y - SURFACE_CLEAR.below) / SURFACE_CLEAR.fade);
+    const surfacePush = (x, y) => {
+        const below = SURFACE_CLEAR.below + (0.7 * vnoise(x / 900, 3.7, layer.seed + 11) + 0.3 * vnoise(x / 210, 5.1, layer.seed + 13)) * SURFACE_CLEAR.wander;
+        if (y >= below + SURFACE_CLEAR.fade) return 0;
+        const t = Math.max(0, (y - below) / SURFACE_CLEAR.fade);
         return SURFACE_CLEAR.push * (1 - t * t * (3 - 2 * t));
     };
-    const cleared = { density: (x, y) => base.density(x, y) - surfacePush(y) };
+    const cleared = { density: (x, y) => base.density(x, y) - surfacePush(x, y) };
     const soft = lowPass(cleared, sup.grid), carry = lowPass(cleared, sup.carryGrid);
     return {
         density(x, y) {
@@ -165,7 +169,7 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
             const v = Math.max(carry.columnMax(x + w, y0, y1),
                 carry.columnMax(x + w - sup.spread, y0, y1) - 0.02, carry.columnMax(x + w + sup.spread, y0, y1) - 0.02);
             d = Math.max(d, T - 0.05 + (sup.lift + 0.05) * smooth01((v + shift - lo) / sup.band));
-            d -= surfacePush(y);                                // never up to the surface
+            d -= surfacePush(x, y);                             // never up to the surface
             if (route && layer.clearRoute) {
                 const off = Math.abs(y - route(x)), t = Math.min(1, Math.max(0, (off - clear.half) / clear.fade));
                 d -= clear.push * (1 - t * t * (3 - 2 * t));
