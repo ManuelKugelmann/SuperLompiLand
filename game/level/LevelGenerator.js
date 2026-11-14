@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import Creature from '../Creature.js';
+import { JOURNEY, chapters } from '../journey.js';
 import { createReach } from './reach.js';
 import { createSpacing } from './spacing.js';
 import { eachCell as marchGrid, hash } from './terrain.js';
@@ -137,6 +138,7 @@ export default class LevelGenerator {
         makeNestTextures(scene);
         makeLineTexture(scene);
         this.field = createField(LEVEL.seed);
+        this.storySpots = chapters().filter(c => c.friend).map(c => ({ x: c.x, y: this.field.routeY(c.x) }));
         // Never out of reach: coins and friends are not placed in sealed pockets of water (reach.js).
         this.reachable = createReach(this.field.density, LEVEL.threshold, this.field.routeY, ROUTE.halfWidth * 0.75);
         this.nests = this.field.nests.map(n => ({ ...n, biome: BIOMES[Math.min(n.index + 1, BIOMES.length - 1)] }));
@@ -596,6 +598,8 @@ export default class LevelGenerator {
 
     addCoin(chunk, x, y, chunkKey, index) {
         if (!this.reachable(x, y)) return;      // its number stays taken, so the others keep theirs
+        // The story's net scenes stand free: no coins in front of a friend who waits for help.
+        for (const c of this.storySpots) if ((c.x - x) ** 2 + (c.y - y) ** 2 < JOURNEY.clear ** 2) return;
         const s = this.scene;
         const img = s.textures.exists('coin')
             ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)
@@ -630,7 +634,7 @@ export default class LevelGenerator {
                 chunk.objects.push(s.add.ellipse(x, rock.y - 2, 34, 22, 0x3b3a3d).setStrokeStyle(4, 0x23222a).setDepth(2.92));
             } else if (!rock && top > 40) {
                 this.addChain(chunk, x, 16, top, img, h.size * 0.46);
-                chunk.objects.push(s.add.image(x, 6, 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
+                chunk.objects.push(s.add.image(x, 6, s.textures.exists('hull_bottom') ? 'hull_bottom' : 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
             }
         } else if (h.tether || h.drift) {
             const ground = h.tether ? this.groundBelow(x, y, h.tether) : null;

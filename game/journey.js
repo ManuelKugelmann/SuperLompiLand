@@ -12,6 +12,7 @@ export const JOURNEY = {
     far: 4200,           // ... and removed again beyond this
     freeRadius: 190,     // px: swimming this close tears the net
     specialRadius: 420,  // px: a special this close tears it too
+    clear: 250,          // px around an event that stay free of coins
     coins: 10            // thank-you coins for each friend freed
 };
 

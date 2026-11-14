@@ -1,11 +1,16 @@
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import { JOURNEY } from './journey.js';
+import { musicClock, nowSeconds } from './audio.js';
 
 export const BEATS = {
-    netSize: 1.5,       // the net, in sizes of the friend caught in it
-    struggle: 9,        // px the caught friend wriggles
-    glow: 230,          // px radius of the soft light that makes the scene readable from afar
+    zoom: 1.5,          // the caught friend is shown this much bigger than it plays: it is the hero of its screen
+    netSize: 1.45,      // the net, in sizes of the friend caught in it ...
+    netMin: 330,        // ... but at least this many px
+    struggle: 16,       // px the caught friend wriggles
+    glow: 380,          // px radius of the soft light that makes the scene readable from afar
+    glowAlpha: 0.3,     // its brightness on the beat (half of that between beats)
+    helpEvery: 2,       // s between the bubbles it sends up for help
     happyMs: 3600,      // how long a freed friend dances around its spot ...
     happyRadius: 120,   // ... on a circle this big
     leaveMs: 2600,      // then it swims on east and fades
@@ -47,9 +52,11 @@ export default class StoryBeats {
     build(ch) {
         const s = this.scene, x = ch.x, y = this.routeY(x), size = ch.friend.states.normal.width;
         const rig = new Rig(s, ch.friend, x, y, 4.5);
-        const glow = s.add.circle(x, y, BEATS.glow, 0xfff3b0, 0.14).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
-        const net = s.add.image(x, y, NET_KEY).setDepth(4.6).setDisplaySize(size * BEATS.netSize, size * BEATS.netSize);
-        return { ch, x, y, rig, glow, net, state: 'caught', left: 0, seed: x * 0.01 };
+        rig.zoom = BEATS.zoom;
+        const glow = s.add.image(x, y, 'bd_glow').setDisplaySize(BEATS.glow * 2, BEATS.glow * 2).setTint(0xfff3b0).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
+        const n = Math.max(BEATS.netMin, size * BEATS.zoom * BEATS.netSize);
+        const net = s.add.image(x, y, NET_KEY).setDepth(4.6).setDisplaySize(n, n);
+        return { ch, x, y, rig, glow, net, state: 'caught', left: 0, seed: x * 0.01, help: 0, top: n * 0.5 };
     }
 
     remove(a) {
@@ -59,10 +66,21 @@ export default class StoryBeats {
 
     free(a) {
         if (a.state !== 'caught' || !this.journey.free(a.ch.friend.id)) return;
-        a.state = 'happy'; a.left = BEATS.happyMs;
+        a.state = 'happy'; a.left = BEATS.happyMs; a.rig.zoom = 1;
         const net = a.net; a.net = null;
         this.scene.tweens.add({ targets: net, y: net.y + 260, angle: 70, alpha: 0, scale: net.scale * 0.6, duration: 900, ease: 'Sine.easeIn', onComplete: () => net.destroy() });
         this.onFree(a.ch, a.x, a.y);
+    }
+
+    /** Three bubbles rise from the net and a ring spreads: someone here needs help. */
+    callForHelp(a) {
+        const s = this.scene;
+        const ring = s.add.circle(a.x, a.y, a.top * 0.6).setStrokeStyle(6, 0xfff3b0, 0.8).setDepth(4.45);
+        s.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: 1100, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
+        for (let i = 0; i < 3; i++) {
+            const b = s.add.circle(a.x + (i - 1) * 34, a.y - a.top * 0.7, 9 + i * 4, 0xffffff, 0.55).setStrokeStyle(3, 0xffffff, 0.9).setDepth(4.7);
+            s.tweens.add({ targets: b, y: b.y - 190 - i * 40, x: b.x + (i - 1) * 26, alpha: 0, duration: 1300 + i * 160, delay: i * 110, onComplete: () => b.destroy() });
+        }
     }
 
     /** A special went off at (x, y): it tears a net nearby. */
@@ -85,7 +103,9 @@ export default class StoryBeats {
                 const wx = Math.sin(t * 9 + a.seed) * BEATS.struggle, wy = Math.cos(t * 7 + a.seed) * BEATS.struggle * 0.6;
                 a.rig.draw({ x: a.x + wx, y: a.y + wy, frames, effort: 0.8, facing: fish.x < a.x ? -1 : 1 });
                 a.net.setPosition(a.x + wx * 0.5, a.y + wy * 0.5).setRotation(Math.sin(t * 1.4 + a.seed) * 0.08);
-                a.glow.setAlpha(0.1 + 0.06 * Math.sin(t * 2.2));
+                a.glow.setAlpha(BEATS.glowAlpha * (0.5 + 0.5 * musicClock.pulse(nowSeconds(), 2)));
+                a.help -= delta / 1000;
+                if (a.help <= 0) { a.help = BEATS.helpEvery; this.callForHelp(a); }
                 continue;
             }
             a.left -= delta;
@@ -101,7 +121,7 @@ export default class StoryBeats {
                 a.rig.draw({ x: a.px, y: a.py, vx: BEATS.leaveSpeed, vy: -1.2, frames, effort: 0.9 });
                 if (a.left <= 0) { this.remove(a); continue; }
             }
-            a.glow.setPosition(a.px, a.py).setAlpha(0.12);
+            a.glow.setPosition(a.px, a.py).setAlpha(BEATS.glowAlpha * 0.5 * (a.state === 'leave' ? Math.max(0, a.left / BEATS.leaveMs) : 1));
         }
     }
 
