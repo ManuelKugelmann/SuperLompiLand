@@ -58,6 +58,46 @@ def fill(rgb, known, region):
         est = (c / np.maximum(w, 1e-6)[..., None]) * k + up * (1 - k)
     return rgb * (1 - region[..., None]) + est * region[..., None]
 
+def synth(rgb, known, region, reach=110, win=4, tries=160, seed=3):
+    """Fill `region` with the body's own texture: pixel by pixel from its edge inward, each takes
+    the pixel whose neighbourhood best matches (the known pixels within `reach`, plus the
+    continuations of its filled neighbours), so shell plates and patterns carry on."""
+    rng = np.random.default_rng(seed)
+    H, W = known.shape
+    todo = (region > 0.5) & ~(known > 0.5)
+    if not todo.any(): return rgb
+    out = rgb.copy(); have = known > 0.5
+    src = np.zeros((H, W, 2), np.int32) - 1                      # where each filled pixel came from
+    ys, xs = np.nonzero(todo)
+    y0, y1 = max(win, ys.min() - reach), min(H - win - 1, ys.max() + reach)
+    x0, x1 = max(win, xs.min() - reach), min(W - win - 1, xs.max() + reach)
+    full = nd.minimum_filter(have.astype(np.uint8), size=2 * win + 1) > 0   # whole window known
+    cy, cx = np.nonzero(full[y0:y1, x0:x1]); cy += y0; cx += x0
+    if len(cy) == 0: return rgb
+    dist = nd.distance_transform_edt(~have)
+    order = np.argsort(dist[ys, xs], kind='stable')
+    off = np.arange(-win, win + 1)
+    for k in order:
+        y, x = ys[k], xs[k]
+        if y < win or x < win or y >= H - win or x >= W - win:
+            continue
+        mask = have[y - win:y + win + 1, x - win:x + win + 1]
+        patch = out[y - win:y + win + 1, x - win:x + win + 1]
+        pick = rng.integers(0, len(cy), tries)
+        cands = list(zip(cy[pick], cx[pick]))
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                sy, sx = src[y + dy, x + dx]
+                if sy >= 0:
+                    ty, tx = sy - dy, sx - dx
+                    if win <= ty < H - win and win <= tx < W - win and full[ty, tx]: cands.append((ty, tx))
+        cand = np.array(cands)
+        wy = cand[:, 0, None, None] + off[None, :, None]; wx = cand[:, 1, None, None] + off[None, None, :]
+        diff = ((rgb[wy, wx] - patch[None]) ** 2).sum(-1) * mask[None]
+        best = cand[np.argmin(diff.sum((1, 2)))]
+        out[y, x] = rgb[best[0], best[1]]; have[y, x] = True; src[y, x] = best
+    return out
+
 def crop(a):
     ys, xs = np.nonzero(a[..., 3] > 0.01)
     x0, y0 = max(0, xs.min() - PAD), max(0, ys.min() - PAD)
@@ -102,7 +142,7 @@ for key, s in spec.items():
             if p.get('front') and 'under' in p:
                 region = poly_mask(p['under'], W, H) * (src[..., 3] > 0.5)
                 known = (body[..., 3] > 0.95) * (1 - np.clip(m * 4, 0, 1))
-                body[..., :3] = fill(body[..., :3], known.astype(np.float32), region * m)
+                body[..., :3] = synth(fill(body[..., :3], known.astype(np.float32), region * m), known, region * m)
                 body[..., 3] = np.maximum(body[..., 3] * (1 - rm), region * m * src[..., 3])
             else:
                 body[..., 3] *= 1 - rm
