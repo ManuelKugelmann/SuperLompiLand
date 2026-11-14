@@ -57,6 +57,7 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import GrandNestLayer from '../game/level/GrandNestLayer.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
+import FerryLayer from '../game/level/FerryLayer.js';
 import SeaOtterLayer from '../game/level/SeaOtterLayer.js';
 import SeaLionLayer from '../game/level/SeaLionLayer.js';
 import { GRAND_NEST } from '../game/level/grandNest.js';
@@ -252,6 +253,8 @@ export default class MainScene extends Phaser.Scene {
         this.seaLion = new SeaLionLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('sea_lion'));
         // The kelp forest's sea otter (spec 5.0o): floats on its back cracking a shell, dives down to the lane and comes up again.
         this.seaOtter = new SeaOtterLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), x => this.level.field.routeY(x), () => this.bookEntry('sea_otter'));
+        // The harbour's ferry (spec 5.0o): passes overhead, its shadow sweeps the water and its wash carries the fish along.
+        this.ferry = new FerryLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), x => this.level.field.routeY(x), () => this.bookEntry('ferry'));
         // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
         this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
@@ -1026,6 +1029,7 @@ export default class MainScene extends Phaser.Scene {
         if (ws && Math.abs(x - ws.x) < 1600) { slipAt(x, y, ws, add); out.x += add.x; }
         if (this.ventField?.live) { this.ventField.flowAt(x, y, add); out.y += add.y; }      // warm water rising over the smokers
         if (this.jellyGarden?.live) { this.jellyGarden.flowAt(x, y, this.time.now / 1000, add); out.y += add.y; }      // the jellies' puffs
+        if (this.ferry?.live) { this.ferry.flowAt(x, y, add); out.x += add.x; }      // the ferry's wash
         return out;
     }
 
@@ -1656,6 +1660,7 @@ export default class MainScene extends Phaser.Scene {
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);
+        this.ferry.update(sp, this.fish.facing, time / 1000, delta);
         this.seaOtter.update(sp, time / 1000, delta / 1000);
         this.seaLion.update(sp, this.fish.facing, time / 1000, delta / 1000);
         this.baitBalls.update(sp, this.fish.view, this.fish.radius, time / 1000);
