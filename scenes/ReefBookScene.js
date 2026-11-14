@@ -6,6 +6,13 @@ import { play } from '../game/audio.js';
 
 export const BOOK_KEY = `${SCENE_KEYS.MAIN}_Book`;
 
+/** Places have no picture: a round badge in the biome's own rock colours (book cards and toasts). */
+export function placeBadge(scene, x, y, r, id, found = true) {
+    const b = BIOMES.find(q => q.id === id);
+    return scene.add.circle(x, y, r, found ? (b ? b.rock[1] : 0x2b5573) : 0x0a1f30, 1)
+        .setStrokeStyle(Math.max(2, r / 12), found ? (b?.rock[0] ?? 0xffffff) : 0x2b5573);
+}
+
 const TITLES = {
     creature: { de: 'Tiere', en: 'Creatures' },
     place: { de: 'Orte', en: 'Places' },
@@ -76,10 +83,7 @@ export default class ReefBookScene extends Phaser.Scene {
                 img.setAlpha(0.8);
             }
         } else {
-            // Places have no picture: a badge in the biome's own colours.
-            const b = BIOMES.find(x => x.id === e.id);
-            const col = b ? b.rock[1] : 0x2b5573;
-            this.add.circle(cx, cy - 18, 46, e.found ? col : 0x0a1f30, 1).setStrokeStyle(4, e.found ? (b?.rock[0] ?? 0xffffff) : 0x2b5573);
+            placeBadge(this, cx, cy - 18, 46, e.id, e.found);
         }
         this.add.text(cx, cy + 66, name, { fontFamily: 'Arial', fontSize: '19px', color: e.found ? '#ffffff' : '#7a93a8', fontStyle: 'bold', align: 'center', wordWrap: { width: CARD.w - 14 } }).setOrigin(0.5);
         if (e.found) {

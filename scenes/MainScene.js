@@ -26,7 +26,7 @@ import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
 import { ROUTE } from '../game/level/density.js';
-import { BOOK_KEY } from './ReefBookScene.js';
+import { BOOK_KEY, placeBadge } from './ReefBookScene.js';
 import { STYLE_KEY } from './PlayStyleScene.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
@@ -667,7 +667,7 @@ export default class MainScene extends Phaser.Scene {
             const img = this.add.image(70, 65, e.image);
             img.setScale(Math.min(100 / img.width, 100 / img.height));
             box.add(img);
-        }
+        } else if (e.kind === 'place') box.add(placeBadge(this, 70, 65, 44, e.id));
         box.add(this.add.text(140, 24, de ? 'Neu im Riffbuch' : 'New in the reef book', { fontFamily: 'Arial', fontSize: '24px', color: '#fff3b0', fontStyle: 'bold' }));
         box.add(this.add.text(140, 60, e.name[this.lang] || e.name.en, { fontFamily: 'Arial', fontSize: '34px', color: '#ffffff', fontStyle: 'bold' }));
         play('nest');
