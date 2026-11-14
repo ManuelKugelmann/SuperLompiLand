@@ -352,7 +352,6 @@ export default class MainScene extends Phaser.Scene {
         // Swim trails bought with coins (spec 5.0r): which are owned, which is worn.
         this.trailsOwned = this.progression.get?.('trails', []) || [];
         this.trailWorn = this.progression.get?.('trail', 'none') || 'none';
-        this.trailAt = 0;
         this.character = getCharacter(this.registry.get('character') || loadSelectedId());
         const start = this.startPoint();
         this.camX = start.x - W / 2;
@@ -1705,10 +1704,11 @@ export default class MainScene extends Phaser.Scene {
 
         // The trail Lompi wears (bought with coins): a particle behind the tail while swimming.
         const worn = TRAILS.enabled ? trailOf(this.trailWorn) : null;
-        if (worn?.preset && speed > TRAILS.minSpeed && !this.fish.inAir && time - this.trailAt > TRAILS.everyMs) {
-            this.trailAt = time;
+        this.wornAt = (this.wornAt || 0) - delta;
+        if (worn?.preset && speed > TRAILS.minSpeed && !this.fish.inAir && this.wornAt <= 0) {
+            this.wornAt = TRAILS.everyMs;
             const back = this.fish.radius * 0.9 * this.fish.facing;
-            this.particles.spawn(worn.preset, view.x - back * Math.cos(view.rotation), view.y - back * Math.sin(view.rotation), 1, { spread: 10 });
+            this.particles.spawn(worn.preset, view.x - back * Math.cos(view.rotation), view.y - back * Math.sin(view.rotation), 2, { radius: 14, spread: 16 });
         }
         // Contrails: at high speed the fin tips draw thin bubble streaks (vortex trails).
         if (speed > CONTRAIL.speed && !this.fish.inAir) {
