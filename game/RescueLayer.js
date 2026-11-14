@@ -38,6 +38,8 @@ export const RESCUE_LOOK = {
     tug: [14, 2.3],      // ... and every so many seconds (second number) it tugs this many px against its trap
     sunk: 0.3,           // share of its height a trap on the seabed lies sunk in the sand
     callEvery: 1.4,      // s between the bubbles that rise from a trap on the seabed up toward the route
+    callNear: 1500,      // px from the fish within which every trapped animal calls: it waves and bubbles rise from its trap
+    wave: 0.28, waveS: 0.9,   // radians it rocks when it waves, and s over which that dies down
     trail: 5,            // coins that lead from the route down to a trap on the seabed
     glow: 240,           // px radius of the soft light that shows it from afar
     happyMs: 1500,       // one happy loop where the net was ...
@@ -115,8 +117,15 @@ export default class RescueLayer {
                 // It struggles: a steady rocking, and now and then a tug against the trap. One lying on the sand only rocks.
                 const pull = Math.max(0, Math.sin((t + a.seed) * Math.PI * 2 / L.tug[1])) ** 8 * L.tug[0];
                 const wx = a.lying ? pull * 0.4 : Math.sin(t * 9 + a.seed) * L.struggle + pull, wy = a.lying ? 0 : Math.cos(t * 7 + a.seed) * L.struggle * 0.6;
-                a.img.setPosition(a.x + wx, a.y + wy).setRotation(Math.sin(t * 6.3 + a.seed) * L.wobble + pull * 0.006);
-                if (a.lying && (a.call -= delta / 1000) <= 0) { a.call = L.callEvery; s.particles?.spawn('bubble', a.x, a.y - L.size * 0.3, 2, { radius: 10, spread: 30, vy: -260 }); }
+                // A gentle call when the fish is about (playtest: the animals to rescue should be easier to notice): every so often
+                // it waves (a quick wide rocking that dies down) and a few small bubbles rise from its trap. One lying on the sand calls anyway.
+                const heard = Math.abs(a.x - fish.x) < L.callNear;
+                if ((heard || a.lying) && (a.call -= delta / 1000) <= 0) {
+                    a.call = L.callEvery; a.wave = heard ? 1 : 0;
+                    s.particles?.mark('bubble', a.x, a.y - L.size * 0.3, heard ? 4 : 2, { radius: 10, spread: 30, vy: -260 });
+                }
+                a.wave = Math.max(0, (a.wave || 0) - delta / 1000 / L.waveS);
+                a.img.setPosition(a.x + wx, a.y + wy).setRotation(Math.sin(t * 6.3 + a.seed) * L.wobble + pull * 0.006 + Math.sin(t * 13) * L.wave * a.wave);
                 a.net?.setRotation(Math.sin(t * 1.4 + a.seed) * 0.08);
                 a.shadow?.follow();
                 a.glow.setAlpha(RESCUE_HALO.alpha * (RESCUE_HALO.low + (1 - RESCUE_HALO.low) * (0.5 + 0.5 * Math.sin(t * 2.2 + a.seed))));
