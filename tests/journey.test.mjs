@@ -82,3 +82,29 @@ test('nobody rescues themselves: in the chapter of the friend the player plays, 
     assert.equal(j.free(JOURNEY.standIn), true);
     assert.equal(j.count, 1);
 });
+
+test('a rescue belongs to its chapter: a net that was emptied stays empty whoever is played next, and older saves still count', () => {
+    const first = chapters()[0].friend.id;
+    // Played as the first chapter's friend: Lompi hangs there and is freed.
+    const a = createJourney([], chapters(undefined, undefined, first));
+    assert.ok(a.free(JOURNEY.standIn));
+    const saved = a.toJSON();
+    assert.deepEqual(saved, [chapters()[0].id], 'the save names the chapter');
+    // Next time played as Lompi: the same net holds the first friend again, but it counts as freed.
+    const b = createJourney(saved);
+    assert.ok(b.has(first));
+    assert.equal(b.count, 1);
+    assert.equal(b.free(first), false, 'no second rescue of the same net');
+    assert.equal(b.goalAt(chapters()[0].x, 'de'), 'Weiter nach Osten!');
+    // An older save holds character ids and event ids.
+    const kelp = chapters().find(c => c.id === 'kelp');
+    const old = createJourney([kelp.friend.id, 'whale', 'nobody']);
+    assert.ok(old.has(kelp.friend.id) && old.has('whale'));
+    assert.equal(old.count, 1);
+    assert.deepEqual(old.toJSON().sort(), ['kelp', 'whale']);
+    assert.deepEqual(old.friends(), [kelp.friend.id], 'who came along is named by character, without the events');
+    // The same old save, now played as that very friend: the kelp net (Lompi in it) is still empty.
+    const again = createJourney([kelp.friend.id], chapters(undefined, undefined, kelp.friend.id));
+    assert.ok(again.has(JOURNEY.standIn));
+    assert.equal(again.count, 1);
+});

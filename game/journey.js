@@ -54,34 +54,44 @@ export function chapters(biomes = BIOMES, cfg = JOURNEY, playing = null) {
 }
 
 /**
- * The player's journey. `saved` = ids of friends already freed (from storage).
+ * The player's journey. `saved` = what was freed so far (from storage): chapter ids for the
+ * friends and event ids for the big events. A rescue belongs to its chapter, not to who hung in
+ * the net: whoever the player plays next time, a net that was emptied stays empty. (Older saves
+ * hold character ids; they are read as the chapters those characters wait in.)
  *   chapterAt(x)   the chapter this place belongs to
  *   goalAt(x, l)   what to do here, in language l: the chapter's task, or "onward" once it is done
- *   free(id)       mark a friend as freed (or an event as done); true if that was news
+ *   free(id)       mark a friend (by character id) as freed, or an event (by its id) as done; true if that was news
  *   event(id)      the big event with that id, or null
- *   has(id), count, total, progress(x) (0..1 across the world), toJSON()
+ *   has(id), count, total, friends(), progress(x) (0..1 across the world), toJSON()
  */
 export function createJourney(saved = [], list = chapters()) {
-    const isFriend = id => list.some(c => c.friend?.id === id);
-    const known = id => isFriend(id) || list.some(c => c.event?.id === id);
-    const freed = new Set((saved || []).filter(known));
+    const chapterOf = id => list.find(c => c.friend?.id === id), isEvent = id => list.some(c => c.event?.id === id);
+    const home = chapters();      // who waits where when Lompi is played: how older saves named a rescue
+    const freed = new Set();
+    for (const id of saved || []) {
+        if (isEvent(id) || list.some(c => c.id === id && c.friend)) freed.add(id);
+        else { const old = home.find(c => c.friend?.id === id); if (old) freed.add(old.id); }
+    }
     const chapterAt = x => list[biomeIndexAt(x)];
     return {
         list,
         chapterAt,
         goalAt(x, lang = 'en') {
             const c = chapterAt(x);
-            const g = c.friend && freed.has(c.friend.id) ? ONWARD : c.goal;
+            const g = c.friend && freed.has(c.id) ? ONWARD : c.goal;
             return g[lang] || g.en;
         },
         free(id) {
-            if (freed.has(id) || !known(id)) return false;
-            freed.add(id);
+            const key = chapterOf(id)?.id ?? (isEvent(id) ? id : null);
+            if (key === null || freed.has(key)) return false;
+            freed.add(key);
             return true;
         },
-        has: id => freed.has(id),
+        has: id => freed.has(chapterOf(id)?.id ?? id),
         event: id => list.find(c => c.event?.id === id)?.event || null,
-        get count() { return [...freed].filter(isFriend).length; },
+        get count() { return list.filter(c => c.friend && freed.has(c.id)).length; },
+        /** The freed friends as character ids, west to east (who came along, for the end screen). */
+        friends: () => list.filter(c => c.friend && freed.has(c.id)).map(c => c.friend.id),
         total: list.filter(c => c.friend).length,
         progress: x => Math.max(0, Math.min(1, (x - WORLD_WEST) / (WORLD_END - WORLD_WEST))),
         toJSON: () => [...freed]

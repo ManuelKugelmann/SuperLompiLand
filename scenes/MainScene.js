@@ -746,7 +746,7 @@ export default class MainScene extends Phaser.Scene {
             this.progression.set?.('nest', 0);
             this.progression.set?.('banked', 0);
             this.progression.set?.('journey', []);
-            const friends = this.journey.toJSON();      // for the end screen: who came along
+            const friends = this.journey.friends();      // for the end screen: who came along
             this.time.delayedCall(900, () => this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, won: true, friends }));
             this.announce(de ? 'Das große Nest!' : 'The Grand Nest!', de ? 'Du hast es geschafft!' : 'You made it!');
         } else if (first) {
@@ -836,7 +836,7 @@ export default class MainScene extends Phaser.Scene {
 
     finish() {
         if (this.coins > this.best) this.progression.set?.('best_coins', this.coins);
-        this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, friends: this.journey.toJSON() });
+        this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, friends: this.journey.friends() });
     }
 
     /** Playing together: what the room has collected, from the shared record, so every screen shows the same number. */
