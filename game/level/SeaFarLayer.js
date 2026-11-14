@@ -11,7 +11,11 @@ export const SEA_FAR_LOOK = {
     snowSizes: [18, 32, 50], // px across of a far, a middle and a near flake (the nearest are big and bright)
     passAlpha: 0.22,
     passSize: 900,       // px length of a big shape at scale 1
-    wreckAlpha: 0.3      // the far wrecks on the graveyard sea's floor
+    wreckAlpha: 0.3,     // the far wrecks on the graveyard sea's floor
+    // The deep below: out at sea the lower part of the view darkens toward a deep blue, so the
+    // open water reads as going on down. One baked gradient, screen space: [share of the screen
+    // height where it begins, how dark at the bottom, its colour].
+    deep: [0.4, 0.62, 0x021a36]
 };
 
 /** Soft pictures, painted once: everything out here is seen through haze. */
@@ -77,6 +81,16 @@ function ensureTextures(scene) {
             c.beginPath(); c.moveTo(x - 13, y); c.lineTo(x - 22, y - 6); c.lineTo(x - 22, y + 6); c.fill();
         }
     });
+    // The deep below: clear at the top, darkening smoothly to the bottom (eased, so it never shows an edge).
+    if (!scene.textures.exists('seafar_deep')) {
+        // Not a power of two (3 x 255): the GPU clamps its edges instead of wrapping the opaque bottom row onto the top (a hairline).
+        const W = 3, H = 255, tex = scene.textures.createCanvas('seafar_deep', W, H), ctx = tex.getContext(), img = ctx.createImageData(W, H);
+        for (let y = 0; y < H; y++) {
+            const t = y / (H - 1), a = Math.round(255 * t * t * (3 - 2 * t));
+            for (let x = 0; x < W; x++) { const o = (y * W + x) * 4; img.data[o] = img.data[o + 1] = img.data[o + 2] = 255; img.data[o + 3] = a; }
+        }
+        ctx.putImageData(img, 0, 0); tex.refresh();
+    }
     // Marine snow: one picture holding a flake in three sizes (frames 0..2), so all flakes are one object.
     if (!scene.textures.exists('seafar_snow')) {
         const sizes = SEA_FAR_LOOK.snowSizes, tex = scene.textures.createCanvas('seafar_snow', sizes.reduce((a, b) => a + b, 0), Math.max(...sizes)), ctx = tex.getContext();
@@ -103,6 +117,9 @@ export default class SeaFarLayer {
         ensureTextures(scene);
         const W = scene.scale.width, H = scene.scale.height, L = SEA_FAR_LOOK;
         const img = key => scene.add.image(0, 0, key).setScrollFactor(0).setDepth(L.depth).setTint(L.tint).setVisible(false);
+        const [from, , deepTint] = L.deep;
+        this.deep = scene.add.image(0, H * from, 'seafar_deep').setOrigin(0).setScrollFactor(0).setDepth(L.depth - 0.5)
+            .setDisplaySize(W, H * (1 - from) + 2).setTint(deepTint).setVisible(false);
         this.socket = img('seafar_socket').setOrigin(0, 1).setDisplaySize(W * 0.95, H * 1.05).setTint(L.socketTint);
         this.pass = { img: img('seafar_manta'), n: 0, t: 0, spec: passing(0), waiting: true };
         this.wrecks = [0, 1, 2].map(() => img('wreck_1').setOrigin(0.5, 1).setTint(L.socketTint));   // pool for the far wrecks in view
@@ -125,6 +142,10 @@ export default class SeaFarLayer {
     update(camX, camY, dx, dy, delta) {
         const W = this.scene.scale.width, H = this.scene.scale.height, L = SEA_FAR_LOOK, dt = delta / 1000;
         const cam = camX + W / 2, sea = seaShare(cam), under = camY > -H * 0.5 ? 1 : 0;      // nothing of this while flying high above the water
+
+        // The deep below the open sea; it thins out as the view climbs to the surface.
+        const deepA = L.deep[1] * sea * under * Math.min(1, Math.max(0, camY + H) / H);      // gone only when the view is a screen above the water
+        this.deep.setVisible(deepA > 0.01).setAlpha(deepA);
 
         const v = socketView(cam, W, undefined, this.out);
         this.socket.setVisible(!!v && under > 0);

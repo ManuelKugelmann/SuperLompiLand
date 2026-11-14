@@ -13,6 +13,7 @@ export const SEA_FAR = {
     passEvery: [11, 19],  // s between two big shapes passing (about every 15 s, spec 5.0i)
     passTime: [22, 34],   // s one takes to cross the view
     passScale: [0.5, 1],  // how big (near) or small (far) it is
+    passDepth: [0.64, 0.88],   // where it crosses (share of the screen height): below the lane, down in the deep, never across the fish's way
     kinds: ['manta', 'shark', 'school'],
     // Sunken ships far off on the graveyard sea's floor: something to hold the eye in the empty
     // sea (at night above all). One every `every` px of the sea, seen at parallax `scroll`.
@@ -72,6 +73,6 @@ export function passing(n, cfg = SEA_FAR) {
     const r = rnd(n * 7919 + 13), between = ([a, b]) => a + r() * (b - a);
     return {
         kind: cfg.kinds[Math.floor(r() * cfg.kinds.length)], wait: n === 0 ? (r(), cfg.firstPass) : between(cfg.passEvery), time: between(cfg.passTime),
-        dir: r() < 0.5 ? 1 : -1, depth: 0.25 + r() * 0.55, scale: between(cfg.passScale)
+        dir: r() < 0.5 ? 1 : -1, depth: between(cfg.passDepth), scale: between(cfg.passScale)
     };
 }

@@ -369,9 +369,13 @@ export default class MainScene extends Phaser.Scene {
         // HUD (menu, scheme switcher, puff button, counters) runs as its own
         // scene on top — see HudScene.
         if (this.ambientMode) this.startAmbient();
-        if (new URLSearchParams(window.location.search).get('perftest')) {
+        const perftest = new URLSearchParams(window.location.search).get('perftest');
+        if (perftest) {
             this.relaxed = true;
-            this.perfTour = createPerfTour(LEVEL.spawn.x, this.level.nests[this.level.nests.length - 1].x, x => BIOMES[biomeIndexAt(x)].id);
+            // `?perftest=1` tours the whole journey; `?perftest=<biome id>` only that biome (a quick before/after).
+            const only = BIOMES.find(b => b.id === perftest);
+            this.perfTour = only ? createPerfTour(only.from + 1500, only.from + only.width - 1500, x => BIOMES[biomeIndexAt(x)].id)
+                : createPerfTour(LEVEL.spawn.x, this.level.nests[this.level.nests.length - 1].x, x => BIOMES[biomeIndexAt(x)].id);
             // What drawing a frame takes (the first draw of a big picture uploads it): measured round the renderer's own work.
             const render = this.perfRender = { at: 0, ms: 0 }, pre = () => { render.at = performance.now(); }, post = () => { render.ms = performance.now() - render.at; };
             this.game.events.on(Phaser.Core.Events.PRE_RENDER, pre);

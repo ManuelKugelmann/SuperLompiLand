@@ -33,7 +33,7 @@ test('big shapes pass now and then, the same for everyone, within their limits',
         if (n === 0) assert.equal(p.wait, SEA_FAR.firstPass, 'the first one comes soon');
         else assert.ok(p.wait >= SEA_FAR.passEvery[0] && p.wait <= SEA_FAR.passEvery[1]);
         assert.ok(p.time >= SEA_FAR.passTime[0] && p.time <= SEA_FAR.passTime[1]);
-        assert.ok(p.depth > 0.2 && p.depth < 0.85 && Math.abs(p.dir) === 1);
+        assert.ok(p.depth >= 0.62 && p.depth <= 0.9 && Math.abs(p.dir) === 1);      // below the lane (the fish is at the middle)
         kinds.add(p.kind);
     }
     assert.equal(kinds.size, SEA_FAR.kinds.length);
