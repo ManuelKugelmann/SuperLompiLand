@@ -84,7 +84,8 @@ const AMBIENT_IDLE_MS = 120000;
 const TITLE = {
     refitAt: 0.04,    // the title is laid out again when the window's shape is off by more than this share ...
     refitMs: 350,     // ... and has stayed so for this long
-    shown: 2.2        // carousel places to either side of the chosen fish that are drawn
+    shown: 2.2,       // carousel places to either side of the chosen fish that are drawn
+    sideEvery: 3      // the side fish are posed every this many frames while the carousel rests
 };
 
 const IMAGES = {
@@ -566,6 +567,7 @@ export default class IntroScene extends Phaser.Scene {
         this.slot += d * Math.min(1, delta / 110);
         const bob = Math.sin(time / 600) * 12;
         const frames = Math.min(3, delta / (1000 / 60));
+        this.tick = (this.tick || 0) + 1;
         this.cards.forEach((rig, i) => {
             let off = i - this.slot;
             off = ((off % n) + n) % n;
@@ -581,9 +583,13 @@ export default class IntroScene extends Phaser.Scene {
             const shown = Math.abs(off) <= TITLE.shown;
             rig.setVisible(shown);
             if (!shown) return;
+            // The fish at the sides are small and dimmed: once the carousel rests they are posed only every
+            // TITLE.sideEvery-th frame, in turn (posing a part rig was a third of the title's work on a slow phone).
+            const side = near < 0.5 && Math.abs(d) < 0.02;
+            if (side && (this.tick + i) % TITLE.sideEvery !== 0) return;
             rig.zoom = rig.fit * (0.5 + near * 0.6);
             rig.setAlpha(0.45 + near * 0.55).setDepth(near > 0.5 ? 2 : 1);
-            rig.draw({ x, y, frames, facing: 1, effort: 0.15 + near * 0.3, squash: Math.sin(time / 520 + ph) * 0.03 * live });
+            rig.draw({ x, y, frames: side ? frames * TITLE.sideEvery : frames, facing: 1, effort: 0.15 + near * 0.3, squash: Math.sin(time / 520 + ph) * 0.03 * live });
         });
         if (this.perfText) {
             this.perfSum += performance.now() - t0;
