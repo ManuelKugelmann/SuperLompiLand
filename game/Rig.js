@@ -6,7 +6,10 @@ import { softnessMap, SoftHalo } from './rig/soft.js';
 export const RIG = {
     alignFrom: 3,          // below this speed the body stays level
     alignFull: 8,          // from this speed it fully points along its movement
-    finFlapMin: 7,         // side fin swing in degrees when idle ...
+    ease: 1.6,             // effort is eased in by this power: cruising stays gentle, only real effort shows
+    cycle: [0.04, 0.3],    // swim cycle per step: at rest and at full effort
+    idle: 0.08,            // share of the body wave left at rest
+    finFlapMin: 2,         // side fin swing in degrees when idle ...
     finFlapMore: 14,       // ... plus this much at full effort (kept small: the retouch under the fin is rough)
     cols: 14, rows: 10,    // the picture is a bendable grid of this many cells
     chains: 16, links: 5,  // soft parts: rays around the body x points per ray
@@ -174,36 +177,38 @@ export default class Rig {
         // and how fast it moves (being carried is not swimming). Idle = a slow,
         // small flutter. Each style bends the picture as a function of where a
         // point lies in it: u = 0 tail .. 1 nose, v = 0 top .. 1 bottom.
-        const drive = Phaser.Math.Clamp(Math.max(effort, speed / 14), 0.12, 1);
-        this.phase += (0.1 + drive * 0.42) * frames;
-        const ph = this.phase, amp = view.wiggle * (0.25 + drive * 0.75), w = view.frame.width;
+        // Calm by default: a body at rest is nearly still, and it only works as hard as it swims
+        // (eased in, so gentle cruising stays gentle).
+        const drive = Math.pow(Phaser.Math.Clamp(Math.max(effort, speed / 14), 0, 1), RIG.ease);
+        this.phase += (RIG.cycle[0] + drive * (RIG.cycle[1] - RIG.cycle[0])) * frames;
+        const ph = this.phase, amp = view.wiggle * (RIG.idle + drive * (1 - RIG.idle)), w = view.frame.width;
         const style = this.char.anim || 'swim';
         let bend;
         if (style === 'pulse') {
             // Jellyfish: the bell pumps (harder when swimming), the tentacles trail
             // behind the movement and ripple.
-            const push = beat ?? Math.sin(ph * 0.9), pump = 0.05 + drive * 0.09;
+            const push = beat ?? Math.sin(ph * 0.9), pump = 0.03 + drive * 0.11;
             scaleX *= 1 + push * pump; scaleY *= 1 - push * pump * 1.3;
             const trail = Phaser.Math.Clamp(-vx * 0.012, -0.35, 0.35) * flip;
             bend = (u, v, out) => { out.x = (Math.sin(ph * 0.9 - v * 3.4) * 0.06 + trail * v) * w * v * v * 2.2; out.y = 0; };
         } else if (style === 'sway') {
             // Seahorse: upright, the body curls gently from the head down; the tail swings behind.
-            const trail = Phaser.Math.Clamp(-vx * 0.01, -0.3, 0.3) * flip, k = 0.05 * (0.5 + drive);
+            const trail = Phaser.Math.Clamp(-vx * 0.01, -0.3, 0.3) * flip, k = 0.05 * (0.15 + drive * 1.35);
             bend = (u, v, out) => { out.x = (Math.sin(ph * 0.7 - v * 2.2) * k + trail * v) * w * v; out.y = 0; };
         } else if (style === 'paddle') {
             // Turtle: a stiff shell that rocks with each flipper stroke and stretches forward a little.
             const stroke = Math.sin(ph * 0.55);
-            rotation += stroke * 0.07 * (0.3 + drive) * flip;
+            rotation += stroke * 0.07 * (0.08 + drive * 1.2) * flip;
             scaleX *= 1 + stroke * 0.03 * drive; scaleY *= 1 - stroke * 0.045 * (0.4 + drive);
             bend = (u, v, out) => { const t = left ? u : 1 - u; out.x = 0; out.y = Math.sin(ph * 0.55 - t * 1.5) * amp * 0.5 * t * t * t; };
         } else if (style === 'sit') {
             // Sitters (starfish, snail, slug): they rock a little and breathe; the thin parts do the rest.
-            rotation += Math.sin(ph * 0.18) * 0.05;
-            scaleY *= 1 + Math.sin(ph * 0.25) * 0.025;
+            rotation += Math.sin(ph * 0.45) * 0.018;
+            scaleY *= 1 + Math.sin(ph * 0.6) * 0.015;
             bend = still;
         } else if (style === 'throb') {
             // Urchin: the spines swell in and out.
-            const swell = 1 + Math.sin(ph * 0.33) * 0.045;
+            const swell = 1 + Math.sin(ph * 0.8) * 0.03;
             scaleX *= swell; scaleY *= swell;
             bend = still;
         } else {
@@ -218,7 +223,7 @@ export default class Rig {
         const soft = this.char.soft ?? RIG.softDefault;
         const cos = Math.cos(rotation), sin = Math.sin(rotation);
         const size = Math.max(view.frame.width, view.frame.height);
-        const ripple = RIG.flutter * size * soft * (0.6 + drive * 0.8);
+        const ripple = RIG.flutter * size * soft * (0.12 + drive * 1.28);      // the soft parts ripple when it swims, hardly at rest
         const out = TMP, links = RIG.links, n = RIG.chains * links;
         for (let k = 0; k < n; k++) {
             const c = (k / links) | 0, f = (k % links) / (links - 1);

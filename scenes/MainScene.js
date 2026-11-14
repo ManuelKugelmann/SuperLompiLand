@@ -130,7 +130,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.storm = null;                                 // dark sky, rain, and the look of the downwelling (spec 5.0c): built when one of them is near
-        this.surf = new SurfLayer(this, this.surface);     // surge foam on the beach, breakers on the reef's edge (spec 5.0d)
+        this.surf = null;                                  // surge foam on the beach, breakers on the reef's edge (spec 5.0d): built when the coast they belong to is near
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.chain = createChain();          // linked moves (game/chain.js); shown by the HUD, not in relaxed play
         this.spin = createSpin();            // loops flown in the air
@@ -1257,7 +1257,11 @@ export default class MainScene extends Phaser.Scene {
         this.farLayers.update(this.camX, this.camY);
         this.rockLayers.update(this.camX, this.camY);
         this.waterLight.update();
-        this.surf.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
+        if (!this.surf) {
+            const z = surfZones();
+            if (sp.x < z.surge[1] + WORLD.weatherRange || (sp.x > z.reef[0] - WORLD.weatherRange && sp.x < z.reef[1] + WORLD.weatherRange)) this.surf = new SurfLayer(this, this.surface);
+        }
+        this.surf?.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
         if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = new StormLayer(this);
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.beats?.update(sp, time / 1000, delta);
