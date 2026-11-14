@@ -208,24 +208,29 @@ const SOUNDS = {
     },
     // A dolphin whistles as it blows a ring (spec 5.0k): a quick rising-falling chirp, pitched down to stay sweet.
     whistle() {
-        // Two quick chirps that bend up and back (a long sweep reads as a siren): a fast flutter and some breath.
-        const f0 = 2200 + Math.random() * 400;
-        [[0, 1], [0.21, 1.12]].forEach(([at, k]) => {
-            const t = ctx.currentTime + at, f = f0 * k, dur = 0.17;
-            const o = ctx.createOscillator(), lfo = ctx.createOscillator(), depth = ctx.createGain(), g = ctx.createGain();
-            o.frequency.setValueAtTime(f, t);
-            o.frequency.exponentialRampToValueAtTime(f * 1.32, t + dur * 0.55);
-            o.frequency.exponentialRampToValueAtTime(f * 1.12, t + dur);
-            lfo.frequency.value = 24; depth.gain.value = f * 0.025;
-            lfo.connect(depth).connect(o.frequency);
-            g.gain.setValueAtTime(0.0001, t);
-            g.gain.exponentialRampToValueAtTime(0.045, t + 0.02);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-            o.connect(g).connect(master);
-            for (const n of [o, lfo]) { n.start(t); n.stop(t + dur + 0.05); }
-            noise({ at, dur, vol: 0.012, from: f * 1.1, to: f * 1.3, q: 5 });
+        // A dolphin whistle (mix check 2026-11-14: two 65 ms blips read as UI pops): one ~0.45 s contour that
+        // rises with a small wiggle and falls at the end, a second harmonic, a soft breathy edge.
+        const t = ctx.currentTime, f0 = 2000 + Math.random() * 500, dur = 0.45, n = 64, curve = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            const u = i / (n - 1), rise = u < 0.75 ? u / 0.75 : 1 - (u - 0.75) / 0.25 * 0.35;
+            curve[i] = f0 * (1 + 0.55 * rise) * (1 + 0.05 * Math.sin(u * Math.PI * 5));
+        }
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.05, t + 0.04);
+        g.gain.setValueAtTime(0.05, t + dur - 0.1);
+        g.gain.linearRampToValueAtTime(0.0001, t + dur);
+        g.connect(master);
+        [[1, 1], [2, 0.22]].forEach(([k, a]) => {
+            const o = ctx.createOscillator(), og = ctx.createGain();
+            o.frequency.setValueCurveAtTime(curve.map(v => v * k), t, dur);
+            og.gain.value = a;
+            o.connect(og).connect(g);
+            o.start(t); o.stop(t + dur + 0.02);
         });
+        noise({ dur, vol: 0.008, from: f0 * 1.2, to: f0 * 1.5, q: 4 });
     },
+
     // Swimming through a bubble ring: a soft round pop with a bright tail.
     ringPop() { tone({ f: 520, to: 1500, type: 'sine', dur: 0.09, vol: 0.08 }); noise({ dur: 0.08, vol: 0.03, from: 2600, to: 1200, q: 1.2 }); },
     // An octopus squirts ink: a short, soft whoosh.
