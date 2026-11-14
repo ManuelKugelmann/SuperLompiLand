@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SWARM, createSwarm } from './boids.js';
 import { mixColor } from '../level/biomes.js';
+import { CARDS, makeSpine, spineTable, spineAt } from '../rig/cards.js';
 
 // Swarms and shoals of small fish (spec gamedesign §6.2, §6.2b): the boids
 // simulation (boids.js) drawn with one Blitter per swarm, so a swarm of a hundred
@@ -42,17 +43,23 @@ const TAIL = [-1, 0, 1];
 export const schoolArt = id => ({ key: `school_${id}`, file: `img/school/${id}.webp` });
 
 /**
- * Frames from a painted side view (facing right, tail at the left): the back third is
- * bent up and down in thin vertical strips for the tail beat.
+ * Frames from a painted side view (facing right, tail at the left), drawn in thin vertical
+ * strips posed by the spine wave the rigs use (CARDS.spine): the rear swings along the body
+ * (seen a little from behind) with a small up-and-down S on top. The picture fills `fill` of
+ * the frame, so the swing stays inside it.
  */
+const STRIP_POSE = { fill: 0.88, lift: 0.07 };
 function paintedFrames(c, img, w, h) {
-    const strips = 12, sw = img.width / strips;
+    const strips = 16, sw = img.width / strips, sp = CARDS.spine, T = makeSpine(), o = {}, k0 = 2 * Math.PI / sp.wave;
+    const pw = w * STRIP_POSE.fill, left = w - pw;
     TAIL.forEach((beat, f) => {
+        spineTable(k0 + beat * Math.PI / 2, 1, sp, T);               // beat 0: the tail passes the middle; -1 / 1: at either side
         const ox = f * w;
         for (let k = 0; k < strips; k++) {
-            const tail = Math.max(0, 1 - k / (strips * 0.4));          // 1 at the tail tip, 0 from 40 % on
-            const dy = beat * tail * tail * h * 0.14;
-            c.drawImage(img, k * sw, 0, sw + 0.5, img.height, ox + k * w / strips, dy, w / strips + 0.5, h);
+            const s = 1 - (k + 0.5) / strips;                          // 0 at the head .. 1 at the tail
+            spineAt(T, s, o);
+            const dx = (o.dx + o.z * sp.tilt) * pw, dy = beat * s * s * h * STRIP_POSE.lift;
+            c.drawImage(img, k * sw, 0, sw + 0.5, img.height, ox + left * 0.6 + k * pw / strips + dx, dy, pw / strips + 0.6, h);
         }
     });
 }
