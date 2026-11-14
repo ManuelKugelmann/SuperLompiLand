@@ -33,8 +33,12 @@ function softDotTexture(scene) {
     tex.refresh();
 }
 
-/** Soft clouds: render-texture resolution (share of the screen) and blur strength. */
-export const SOFT = { scale: 0.5, blur: 1.6, blurSteps: 4 };
+/**
+ * Soft clouds: render-texture resolution (share of the screen) and blur strength.
+ * gain/cut: alpha contrast after the blur (a' = gain * (a - cut)), so overlapping puffs
+ * merge into one body with a soft but defined edge (a metaball look) instead of a grey fog.
+ */
+export const SOFT = { scale: 0.5, blur: 1.6, blurSteps: 4, gain: 1.8, cut: 0.1 };
 
 const frameFor = size => {
     for (let i = 0; i < SIZES.length; i++) if (size <= SIZES[i]) return i;
@@ -51,14 +55,19 @@ export default class ParticleLayer {
         this.layers = {
             normal: this.makeBlitter(depthNormal, Phaser.BlendModes.NORMAL, capacity),
             add: this.makeBlitter(depthAdd, Phaser.BlendModes.ADD, capacity),
-            // Not on the display list: drawn into the soft render texture each frame.
-            soft: this.makeBlitter(depthNormal, Phaser.BlendModes.NORMAL, capacity, false)
         };
-        const W = scene.scale.width, H = scene.scale.height;
-        this.softRT = scene.add.renderTexture(0, 0, Math.ceil(W * SOFT.scale), Math.ceil(H * SOFT.scale))
-            .setOrigin(0).setScrollFactor(0).setScale(1 / SOFT.scale).setDepth(depthNormal);
-        this.softRT.camera.setOrigin(0, 0).setZoom(SOFT.scale);
-        this.softRT.preFX?.addBlur(1, SOFT.blur, SOFT.blur, 1, 0xffffff, SOFT.blurSteps);
+        // Soft clouds, one pass per kind ('wisp', 'goo'): a Blitter off the display list,
+        // drawn each frame into a half-resolution render texture that blurs it.
+        this.clouds = {};
+        for (const kind of ['wisp', 'goo']) {
+            const W = scene.scale.width, H = scene.scale.height;
+            const rt = scene.add.renderTexture(0, 0, Math.ceil(W * SOFT.scale), Math.ceil(H * SOFT.scale))
+                .setOrigin(0).setScrollFactor(0).setScale(1 / SOFT.scale).setDepth(depthNormal);
+            rt.camera.setOrigin(0, 0).setZoom(SOFT.scale);
+            rt.preFX?.addBlur(1, SOFT.blur, SOFT.blur, 1, 0xffffff, SOFT.blurSteps);
+            if (kind === 'goo') rt.preFX?.addColorMatrix().set([1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, SOFT.gain, -SOFT.gain * SOFT.cut * 255]);
+            this.clouds[kind] = { rt, dots: this.makeBlitter(depthNormal, Phaser.BlendModes.NORMAL, capacity, false) };
+        }
     }
 
     makeBlitter(depth, blend, n, shown = true) {
@@ -81,9 +90,10 @@ export default class ParticleLayer {
         const L = this.layers;
         L.normal.used = 0;
         L.add.used = 0;
-        L.soft.used = 0;
+        const C = this.clouds;
+        for (const k in C) C[k].dots.used = 0;
         this.sim.forEach((x, y, size, alpha, color, blend, i, soft) => {
-            const b = soft ? L.soft : blend === 'add' ? L.add : L.normal;
+            const b = soft ? C[soft].dots : blend === 'add' ? L.add : L.normal;
             const bob = b.pool[b.used++];
             const f = frameFor(size);
             bob.setFrame(f);
@@ -94,27 +104,27 @@ export default class ParticleLayer {
             bob.tint = color;
             bob.visible = true;
         });
-        for (const b of [L.normal, L.add, L.soft]) {
+        for (const b of [L.normal, L.add, ...Object.values(C).map(c => c.dots)]) {
             for (let i = b.used; i < b.pool.length && b.pool[i].visible; i++) b.pool[i].visible = false;
         }
         // Soft clouds: redraw only while there is something to show.
-        const rt = this.softRT;
-        // The game's width follows the screen shape (orientation.js): keep the texture matching.
+        const cam = this.scene.cameras.main;
+        // The game's width follows the screen shape (orientation.js): keep the textures matching.
         const want = Math.ceil(this.scene.scale.width * SOFT.scale);
-        if (rt.width !== want) rt.resize(want, Math.ceil(this.scene.scale.height * SOFT.scale));
-        if (L.soft.used || rt.wasUsed) {
-            const cam = this.scene.cameras.main;
+        for (const k in C) {
+            const { rt, dots } = C[k];
+            if (rt.width !== want) rt.resize(want, Math.ceil(this.scene.scale.height * SOFT.scale));
+            if (!dots.used && !rt.wasUsed) continue;
             rt.camera.setScroll(cam.scrollX, cam.scrollY);
             rt.clear();
-            if (L.soft.used) rt.draw(L.soft);
-            rt.wasUsed = L.soft.used > 0;
+            if (dots.used) rt.draw(dots);
+            rt.wasUsed = dots.used > 0;
         }
     }
 
     destroy() {
         this.layers.normal.destroy();
         this.layers.add.destroy();
-        this.layers.soft.destroy();
-        this.softRT.destroy();
+        for (const k in this.clouds) { this.clouds[k].dots.destroy(); this.clouds[k].rt.destroy(); }
     }
 }
