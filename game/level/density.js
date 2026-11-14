@@ -6,6 +6,7 @@ import { detour } from './weather.js';
 import { SET_PIECES, ghostShip, pinnacleTop, descentStart } from './setPieces.js';
 import { BRANCH, sideCave, ridgeTop, caveAt } from './branches.js';
 import { SEA_ARCH, seaArch } from './seaArch.js';
+import { FINALE, ventSpot, finaleY, terraceTop } from './ventField.js';
 import { BIOMES, BLEND, LANDMARK, WORLD_WEST, WORLD_END, ABYSS, zoneOpen, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
 
 export const FIELD = {
@@ -22,7 +23,8 @@ export const FIELD = {
     nestSearch: 40,               // a nest may move up to this many steps of 120 px east to find real seabed (not the top of an outcrop)
     nestEvery: 15000,             // along an island a nest lies every so many px (spec 5.0h) ...
     nestKeep: 2600,               // ... but this far away from the set pieces and the friends' nets
-    nestBucket: 4096              // px: nests are looked up by stretches of this length
+    nestBucket: 4096,             // px: nests are looked up by stretches of this length
+    terraceLump: 35               // px the finale's terraces are lumpy by
 };
 
 // The calm main route (spec 5.2c): one lane of open water through the whole journey, from
@@ -79,6 +81,9 @@ const DETOUR = { y: 0, k: 0 };
 
 const SHIP_X = ghostShip().x;      // the ghost ship's place (worked out once)
 const TRENCH_FROM = BIOMES[BIOMES.length - 1].from;
+// The finale (ventField.js): where the grand nest is, how deep the route ends over it, and where its last descent begins.
+const GRAND_X = WORLD_END - 300, GRAND_Y = floorY(GRAND_X) - ROUTE.aboveNest, FINALE_X0 = ventSpot().x0;
+const finaleRoute = x => finaleY(x, GRAND_X, GRAND_Y);
 const ARCH = seaArch(), ARCH_HALF = (ARCH.x1 - ARCH.x0) / 2;      // the rocky shore's sea arch (worked out once)
 const CAVE_REACH = BRANCH.mouth + BRANCH.rim + BRANCH.ends * 4;      // how far beyond mouth and exit the side cave's ridge can reach
 
@@ -134,6 +139,10 @@ export function createField(seed) {
         if (y !== undefined) return y;
         const x = i * ROUTE.grid;
         y = cruiseY(x);
+        // The trench: a long gentle way down to the ledge where the vent field begins, then the finale's clear descent to the grand nest (spec 5.0m).
+        const lead = descentStart();
+        if (x >= FINALE_X0) y = finaleRoute(x);
+        else if (x > lead) y += (finaleRoute(FINALE_X0) - y) * smooth01((x - lead) / (FINALE_X0 - lead));
         for (const nest of nestsNear(x)) {
             const dx = Math.abs(x - nest.x);
             if (dx < nest.reach) y += (nest.y - ROUTE.aboveNest - y) * smooth01(1 - dx / nest.reach);
@@ -271,6 +280,15 @@ export function createField(seed) {
                 + P.knobs * (flank * (vnoise(x / 90, 2.9, seed + 32) * 2 - 1) + (1 - flank) * 0.5 * vnoise(x / 90, 2.9, seed + 32));
             if (y > top) n += (FIELD.crestRock - n) * smooth01((y - top) / 80);
         }
+        // The finale's staircase (ventField.js): rock terraces under the descent, one per chimney, so the
+        // chimneys' mouths stand just below the lane; a little lumpy, falling away at both ends.
+        if (x > FINALE_X0 - FINALE.tail - 2400) {
+            const top = terraceTop(x, finaleRoute);
+            if (top !== Infinity) {
+                const lumpy = top + FIELD.terraceLump * (vnoise(x / 210, 6.1, seed + 61) * 2 - 1);
+                if (y > lumpy) n += (FIELD.crestRock - n) * smooth01((y - lumpy) / 80);
+            }
+        }
         return n;
     };
 
@@ -288,9 +306,8 @@ export function createField(seed) {
         }
         // How far to either side the route's dip to this nest reaches.
         const cruise = cruiseY(x);
-        let reach = Math.max(900, Math.abs(y + 12 - ROUTE.aboveNest - cruise) * ROUTE.descent);
-        // The way down to the grand nest begins where the trench begins (spec 5.0e): a long, gentle descent.
-        if (index === xs.length - 1) reach = Math.max(reach, x - descentStart());
+        // The grand nest is reached by the finale's own descent (routeAt): its dip only evens out the last few px.
+        const reach = index === xs.length - 1 ? 900 : Math.max(900, Math.abs(y + 12 - ROUTE.aboveNest - cruise) * ROUTE.descent);
         return { x, y: y + 12, index, grand: index === xs.length - 1, reach, biome: biomeIndexAt(x) };
     });
 

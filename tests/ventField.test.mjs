@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VENT_FIELD, ventSpot, chimneyAt, chimneyHeight, ventLift, ventCoins } from '../game/level/ventField.js';
+import { VENT_FIELD, FINALE, ventSpot, chimneyAt, chimneyHeight, ventLift, ventCoins, finaleY, terraceTop } from '../game/level/ventField.js';
+import { createField, ROUTE } from '../game/level/density.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { nestSpots } from '../game/level/density.js';
 
@@ -34,4 +35,37 @@ test('coins hang in the column, lowest first, never above the lift', () => {
     for (let k = 1; k < coins.length; k++) assert.ok(coins[k].y < coins[k - 1].y);
     assert.ok(coins.every(c => c.y > route - VENT_FIELD.reach && c.x === 1000));
     assert.ok(ventCoins({ x: 0, y: route - 200 }, route).length < VENT_FIELD.coins, 'a short column holds fewer');
+});
+
+test('the finale: the last stretch of the route drops clearly, about 1:6, and never climbs', () => {
+    const f = createField(1337), nest = f.nests.at(-1), s = ventSpot();
+    const drop = f.routeY(nest.x) - f.routeY(nest.x - 15000);
+    assert.ok(drop >= 2000 && drop <= 2500, `the last 15 000 px drop ${Math.round(drop)} px`);
+    let steepest = 0;
+    for (let x = s.x0; x < nest.x; x += 100) {
+        const d = (f.routeY(x + 100) - f.routeY(x)) / 100;
+        assert.ok(d >= -0.01, `never up, at ${x}`);
+        steepest = Math.max(steepest, d);
+    }
+    assert.ok(steepest > 0.12 && steepest < 0.25, `about 1:6 (${steepest.toFixed(2)})`);
+    assert.ok(Math.abs(f.routeY(nest.x) - (nest.y - ROUTE.aboveNest)) < 20, 'it ends above the grand nest');
+    assert.equal(finaleY(s.x0 - 500, nest.x, 5000), 5000 - FINALE.drop);
+    assert.equal(finaleY(nest.x + 500, nest.x, 5000), 5000);
+});
+
+test('the finale: every chimney stands on a terrace with its mouth just below the middle of the lane', () => {
+    const f = createField(1337);
+    for (let i = 0; i < VENT_FIELD.chimneys; i++) {
+        const c = chimneyAt(i), route = f.routeY(c.x);
+        let ground = route;
+        while (f.density(c.x, ground) < 0.53 && ground < route + 3000) ground += 10;
+        assert.ok(ground - route > ROUTE.halfWidth + 150 && ground - route < 950, `chimney ${i}: its terrace lies ${Math.round(ground - route)} px under the route`);
+        const mouth = ground - chimneyHeight(c, ground, route);
+        assert.ok(mouth - route > -150 && mouth - route < 420, `chimney ${i}: mouth ${Math.round(mouth - route)} px below the route (on screen)`);
+        for (let y = route - ROUTE.halfWidth; y <= route + ROUTE.halfWidth; y += 40) assert.ok(f.density(c.x, y) < 0.53, `the lane is open over it, at ${y}`);
+    }
+    const s = ventSpot(), flat = x => 5000;
+    assert.equal(terraceTop(s.x0 - 99999, flat), Infinity);
+    assert.equal(terraceTop((s.x0 + s.x1) / 2, flat), 5000 + FINALE.shelf);
+    assert.ok(terraceTop(s.x1 + FINALE.tail + 400, flat) > 5000 + FINALE.shelf + 900, 'past the last terrace the rock falls away');
 });

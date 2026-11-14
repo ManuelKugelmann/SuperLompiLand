@@ -50,6 +50,8 @@ import ContainerLayer from '../game/level/ContainerLayer.js';
 import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
+import GrandNestLayer from '../game/level/GrandNestLayer.js';
+import { GRAND_NEST } from '../game/level/grandNest.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
@@ -232,6 +234,8 @@ export default class MainScene extends Phaser.Scene {
             : new Whale(this, this.journey, whaleAt.x, whaleAt.endX, x => this.level.field.routeY(x), (ev, x, y) => this.whaleEvent(ev, x, y));
         // The set pieces of the long sea stretches (spec 5.0e): the ghost ship, and the beacon over the grand nest.
         this.setPieces = new SetPieceLayer(this, this.level.nests[this.level.nests.length - 1], this.level.nests.slice(0, -1));
+        // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
+        this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
         this.pearls = this.progression.get?.('pearls', []) || [];
         this.branch = new BranchLayer(this, this.level.field.cave, this.pearls.includes('kelp_cave'), (x, y) => this.takePearl('kelp_cave', x, y));
@@ -791,7 +795,11 @@ export default class MainScene extends Phaser.Scene {
             this.progression.set?.('banked', 0);
             this.progression.set?.('journey', []);
             const friends = this.journey.friends();      // for the end screen: who came along
-            this.time.delayedCall(900, () => this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, won: true, friends }));
+            // The arrival: the friends gather round, the camera holds and comes a little closer, then the end screen.
+            this.grandNest.gather();
+            this.particles.spawn('glint', nest.x, nest.y - GRAND_NEST.above, 24, { radius: 14, spread: 260 });
+            this.tweens.add({ targets: this.cameras.main, zoom: this.cameras.main.zoom * GRAND_NEST.zoom, duration: GRAND_NEST.holdMs, ease: 'Sine.easeInOut' });
+            this.time.delayedCall(GRAND_NEST.holdMs, () => this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, won: true, friends }));
             this.announce(de ? 'Das große Nest!' : 'The Grand Nest!', de ? 'Du hast es geschafft!' : 'You made it!');
         } else if (first) {
             this.announce(de ? 'Nest erreicht!' : 'Nest reached!', de ? 'Münzen gesichert · hier geht es weiter' : 'Coins saved · you restart here');
@@ -1601,6 +1609,7 @@ export default class MainScene extends Phaser.Scene {
         if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = this.made(() => new StormLayer(this));
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
+        this.grandNest.update(sp, time / 1000, delta / 1000);
         this.branch.update(sp, time / 1000, delta, this.particles);
         this.docks.update(sp, time / 1000);
         this.manta.update(sp, time / 1000, delta);

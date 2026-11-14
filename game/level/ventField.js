@@ -11,7 +11,7 @@ export const VENT_FIELD = {
     end: 5200,           // px before the trench's (and the world's) east end where the field ends ...
     width: 9500,         // ... and how long it is
     chimneys: 7,
-    height: [520, 900],  // px a chimney stands over the seabed ...
+    height: [480, 600],  // px a chimney stands over its terrace (FINALE.shelf under the route: the mouth comes out just below the lane) ...
     clear: -220,         // ... its mouth at most this far below the calm route (negative: above it; chimneys are
                          // pictures behind the fish, so the glowing mouths line the lane at eye height)
     width_px: [170, 250],    // px across at the foot
@@ -80,4 +80,43 @@ export function ventCoins(mouth, routeY, cfg = VENT_FIELD) {
         out.push({ x: mouth.x, y });
     }
     return out;
+}
+
+// The finale (spec 5.0m): from the vent field's start the calm route goes clearly down to the grand
+// nest, and under it the seabed is a staircase of rock terraces, one per chimney, so every chimney's
+// mouth stands just below the lane in turn. Past the last terrace the rock falls away to the trench
+// floor, and the grand nest's light comes into view from above.
+export const FINALE = {
+    drop: 2300,      // px the route goes down from the field's start to the grand nest
+    shelf: 680,      // px under the route (at a terrace's middle) its tread lies
+    riser: 260,      // px over which one tread turns into the next
+    tail: 500,       // px a terrace reaches beyond the field's ends ...
+    fall: 2.5        // ... before the rock falls away, this many px down per px along
+};
+
+const smooth = v => { const t = v <= 0 ? 0 : v >= 1 ? 1 : v; return t * t * (3 - 2 * t); };
+
+/**
+ * Depth of the calm route at x on the finale's descent: from `targetY - drop` at the field's start
+ * down to `targetY` over the grand nest at `nestX`; about 1:6, eased at both ends.
+ */
+export function finaleY(x, nestX, targetY, cfg = FINALE, field = VENT_FIELD) {
+    const x0 = ventSpot(field).x0, t = Math.min(1, Math.max(0, (x - x0) / (nestX - x0)));
+    return targetY - cfg.drop + cfg.drop * 0.5 * (t + smooth(t));
+}
+
+/**
+ * Depth of the terraces' upper face at x: a level tread under each chimney's stretch, `shelf`
+ * under the route at its middle, joined by short risers; falling away beyond both ends of the
+ * field. Infinity far from it. `routeY(x)` = the finale's route (finaleY).
+ */
+export function terraceTop(x, routeY, cfg = FINALE, field = VENT_FIELD) {
+    const s = ventSpot(field), step = (s.x1 - s.x0) / field.chimneys;
+    const before = s.x0 - cfg.tail - x, after = x - s.x1 - cfg.tail;
+    if (before > 2400 || after > 2400) return Infinity;
+    const tread = i => routeY(s.x0 + (Math.min(field.chimneys - 1, Math.max(0, i)) + 0.5) * step) + cfg.shelf;
+    if (before > 0) return tread(0) + before * cfg.fall;
+    if (after > 0) return tread(field.chimneys - 1) + after * cfg.fall;
+    const f = (x - s.x0) / step, i = Math.floor(f + 0.5);      // the riser between treads i - 1 and i lies round their border
+    return tread(i - 1) + (tread(i) - tread(i - 1)) * smooth(0.5 + (f - i) * step / cfg.riser);
 }
