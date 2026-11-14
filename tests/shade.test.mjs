@@ -7,7 +7,7 @@ import { backRockCover } from '../game/level/backRock.js';
 const field = createField(1337);
 const SPAN = 960, S = SHADE.rockSize;
 // A chunk of the home reef that holds both water and rock.
-const OX = 0, OY = 960;
+const OX = 0, OY = 480;      // a chunk that holds the lagoon's ground line: rock below, water above
 const pic = shadeChunk(field, 1337, OX, OY, SPAN);
 const at = (img, size, px, py) => Array.from(img.subarray((py * size + px) * 4, (py * size + px) * 4 + 4));
 const world = (px, py) => [OX + (px + 0.5) * SPAN / S, OY + (py + 0.5) * SPAN / S];

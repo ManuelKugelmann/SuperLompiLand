@@ -12,6 +12,8 @@ export const FIELD = {
     nestRadius: 230,              // half width of the sand basin a nest lies in
     nestRim: 16,                  // how far its rim stands above the middle
     crestRock: 1.4,               // density inside the reef crest (the calm route still cuts its channel through)
+    foot: 0.32,                   // how much rock is added right above a coast's seabed ...
+    footReach: 460,               // ... fading out this far above it
     seaClear: 1.3,                // how much rock the open sea takes away above its bottom (more than the noise can add)
     seaBottom: 300,               // px above the sea's bottom over which rock comes back
     nestSearch: 16                // a nest may move up to this many steps of 120 px east to find real seabed
@@ -119,12 +121,16 @@ export function createField(seed) {
         const col = columnAt(x), fy = col.fy;
         n -= col.open;                                                   // beach / open sea have less rock
         if (y < 520) n -= ((520 - y) / 520) * 0.6;                       // open water under the surface
-        if (y > fy) n += (y - fy) / 380;                                 // the seabed
+        if (y > fy) n += (y - fy) / 380 + FIELD.foot * (1 - col.sea);     // the seabed (with the coast's foot, see below: no step at the bottom)
         else {
             // Open sea: clear water from the surface down to just above the bottom. Rock that
             // hangs in mid-water belongs to the islands' flanks only (spec 5.0c).
             const sea = col.sea;
             if (sea > 0) n -= FIELD.seaClear * sea * Math.min(1, (fy - y) / FIELD.seaBottom);
+            // Along the coasts rock that hangs low over the seabed grows together with it: no slab
+            // floats a little above the bottom with a slit of water under it.
+            const low = 1 - (fy - y) / FIELD.footReach;
+            if (low > 0 && sea < 1) n += FIELD.foot * low * (1 - sea);
         }
         // Keep the abyss shaft swimmable all the way down.
         if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;

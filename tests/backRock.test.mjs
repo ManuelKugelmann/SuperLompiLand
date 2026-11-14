@@ -49,11 +49,11 @@ test('coverage is seamless across chunk borders', () => {
 });
 
 test('distance to rock is 0 in rock and grows away from it', () => {
-    const { dist, N, C, m } = backRockCover(field, T, 0, 960, SPAN);
+    const { dist, N, C, m } = backRockCover(field, T, 0, 480, SPAN);      // a chunk that holds the lagoon's ground line
     let inRock = 0, far = 0;
     for (let j = m; j < N - m; j++) {
         for (let i = m; i < N - m; i++) {
-            const d = field.density((i - m + 0.5) * C, 960 + (j - m + 0.5) * C);
+            const d = field.density((i - m + 0.5) * C, 480 + (j - m + 0.5) * C);
             if (d > T) { assert.equal(dist[j * N + i], 0); inRock++; }
             else { assert.ok(dist[j * N + i] >= C * 0.99, `water cell ${i},${j}`); far++; }
         }
