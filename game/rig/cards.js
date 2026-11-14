@@ -10,6 +10,7 @@
 // Median fins (dorsal, anal, ridges) exist once, on the midline; a paired fin painted only
 // on the near side gets its mirrored twin behind the body.
 // Pure (no Phaser): game/CardRig.js uploads the results; tests in tests/cards.test.mjs.
+import { sheenHue } from './sheen.js';
 
 export const CARDS = {
     bodyGrid: [12, 9],      // body card grid (columns x rows of cells)
@@ -202,7 +203,7 @@ const LIGHT = (() => { const [x, y, z] = CARDS.light, L = Math.hypot(x, y, z); r
  *   v: { yaw, facing, rotation, sx, sy (scale along / across, squash included), x, y,
  *        dist (camera distance, px), fade (fins fade edge-on), dark (brightness factor) }
  */
-export function project(card, posed, v, verts, bright, alpha) {
+export function project(card, posed, v, verts, bright, alpha, hue = null) {
     const cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cr = Math.cos(v.rotation), sr = Math.sin(v.rotation);
     const kx = v.sx * v.facing, ky = v.sy;
     const strip = card.strip;
@@ -224,6 +225,7 @@ export function project(card, posed, v, verts, bright, alpha) {
         let b = Math.min(1, Math.max(CARDS.shadeMin, 1 - CARDS.shade * (was - now)));
         if (nz1 < 0) b *= CARDS.backside;
         bright[s] = b * v.dark;
+        if (hue) hue[s] = sheenHue(nx1, posed.ny[i], X, posed.y[i], 0);   // rainbow sheen (game/rig/sheen.js)
         alpha[s] = v.fade ? smooth(CARDS.edgeFade[0], CARDS.edgeFade[1], Math.abs(nz1)) : 1;
     }
 }

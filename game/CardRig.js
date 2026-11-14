@@ -1,3 +1,4 @@
+import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import { CARDS, makeCard, posedBuffers, poseBody, posePart, project, turnPose } from './rig/cards.js';
@@ -47,6 +48,7 @@ const BEND = { x: 0, y: 0 };
  */
 export default class CardRig {
     constructor(scene, character, x, y, depth = 5) {
+        this.clock = scene.time;     // the sheen drifts with game time
         this.char = character;
         this.facing = 1;
         this.angle = 0;
@@ -77,7 +79,7 @@ export default class CardRig {
                 rope.uv[s * 2] = fr.u0 + (fr.u1 - fr.u0) * card.u[card.strip[s]];
                 rope.uv[s * 2 + 1] = fr.v0 + (fr.v1 - fr.v0) * card.v[card.strip[s]];
             }
-            entries.push({ card, rope, posed: posedBuffers(card.n), bright: new Float32Array(card.strip.length), ...extra });
+            entries.push({ card, rope, posed: posedBuffers(card.n), bright: new Float32Array(card.strip.length), hue: new Float32Array(card.strip.length), ...extra });
         };
         const [bc, br] = CARDS.bodyGrid;
         add(makeCard({ rect: R.body.rect, pivot: [W / 2, H / 2], size: R.size, height: R.height, bulgePx, cols: bc, rows: br }),
@@ -189,11 +191,9 @@ export default class CardRig {
             }
             pv.fade = !e.body; pv.dark = e.dark ?? 1;
             const r = e.rope;
-            project(e.card, e.posed, pv, r.vertices, e.bright, r.alphas);
-            for (let s = 0; s < e.bright.length; s++) {
-                const g = Math.round(e.bright[s] * 255);
-                r.colors[s] = (g << 16) | (g << 8) | g;
-            }
+            project(e.card, e.posed, pv, r.vertices, e.bright, r.alphas, e.hue);
+            const k = sheenFor(e.body ? null : e.part?.role), drift = this.clock.now / 1000 * SHEEN.drift;
+            for (let s = 0; s < e.bright.length; s++) r.colors[s] = sheenTint(e.bright[s], e.hue[s] + drift, k);
             r.setPosition(x, y).setAlpha(view.alpha);
             e.drawn = true;
             r.setVisible(this.shown);
