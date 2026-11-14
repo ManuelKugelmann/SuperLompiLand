@@ -49,6 +49,9 @@ export const LEVEL = {
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
     nestClear: 320,       // px to either side of a nest kept free of props and ground cover: the painted nest's own rim of grass and shells shows, its hollow stays open
+    rootMin: 350, rootMax: 1750,   // px under the surface the ground may lie for a mangrove root to stand there (its picture is stretched to that length)
+    rootBury: 30,         // px a root goes into the ground
+    rootTries: 4,         // places tried for each root of a chunk
     frontAlpha: 0.75,     // trees and kelp that stand in front of the fish are this see-through, decided when they are built and never changed
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
@@ -647,7 +650,9 @@ export default class LevelGenerator {
                 this.addKelp(chunk, f, rng.between(300, 680), rng.frac() < 0.25 ? 7 : -4, rng);
                 // Kelp forests stand in depth: a taller, hazier stalk behind the play plane.
                 if (biome.kelp > 0.5 && rng.frac() < 0.6) {
-                    this.addKelp(chunk, { ...f, x: f.x + rng.between(-160, 160) }, rng.between(700, 1100), -5, rng, KELP_BACK_TINT);
+                    // ... on its own ground (playtest: "kelp holdfasts float"): the seabed is looked up where it stands, level there.
+                    const bx = f.x + rng.between(-160, 160), bh = rng.between(700, 1100), under = this.groundBelow(bx, f.y - 260, 520);
+                    if (under) this.addKelp(chunk, { x: bx, y: under.y, angle: 0, len: f.len }, bh, -5, rng, KELP_BACK_TINT);
                 }
                 stalks++;
                 yield 'floor kelp'; if (chunk.dead) return;
@@ -815,14 +820,19 @@ export default class LevelGenerator {
         // scenery only, and front ones are kept away from where hazards float.
         if (biome.roots && cy === 0) {
             for (let k = 0; k < biome.roots; k++) {
-                const x = ox + rng.between(40, CH - 40);
-                const front = rng.frac() < 0.25;
-                // Sized by height (615-1230 px) with only a slight stretch, so painted roots keep
-                // their proportions. Two draws, as before: the coins after them keep their numbers.
-                const root = keep(s.add.image(x, -40, `root_${rng.between(1, 3)}`).setOrigin(0.5, 0));
-                const stretch = 0.9 + (rng.realInRange(1.1, 2.1) - 1.1) * 0.2;
-                const scale = rng.realInRange(1.2, 2.4) * 512 * (front ? 1.15 : 1) / root.height;
-                root.setScale(scale * stretch, scale).setDepth(front ? 7.5 : -7).setAlpha(front ? LEVEL.frontAlpha : 0.8);
+                // A root stands in the mud (playtest: "no root is cut off in mid-water"): it grows only where the ground under it is
+                // within a root's reach, and it is exactly as long as it takes to get there. A few places are tried for each.
+                let x = 0, ground = null;
+                for (let tries = 0; tries < LEVEL.rootTries && !ground; tries++) {
+                    x = ox + rng.between(40, CH - 40);
+                    ground = this.groundBelow(x, LEVEL.rootMin, LEVEL.rootMax - LEVEL.rootMin);
+                }
+                const front = rng.frac() < 0.25, art = rng.between(1, 3), width = 0.9 + rng.frac() * 0.2;
+                if (!ground) continue;
+                const root = keep(s.add.image(x, -40, `root_${art}`).setOrigin(0.5, 0));
+                // As long as the way down (and a little into the ground); its width follows, within a slight stretch, so painted roots keep their proportions.
+                const scale = (ground.y + 40 + LEVEL.rootBury) / root.height;
+                root.setScale(scale * width, scale).setDepth(front ? 7.5 : -7).setAlpha(front ? LEVEL.frontAlpha : 0.8);
                 root.fgFixed = true;      // a tree keeps its look while the fish swims past (tester: "it shouldn't change"): a front one is a little see-through for good
                 if (rng.frac() < 0.5) root.setFlipX(true);
                 if (!front) root.setTint(0x6f8f86);
