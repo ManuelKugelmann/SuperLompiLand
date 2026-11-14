@@ -429,7 +429,7 @@ export default class LevelGenerator {
             if (roll < biome.coral && corals < 5) {
                 // Never the same coral twice within sight of each other (spacing.js). The random
                 // draws are taken either way, so everything placed after stays where it was.
-                const all = ['coral_1', 'coral_2', 'coral_3'].filter(has), fresh = this.coralSpacing.options(all, f.x, f.y);
+                const all = ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5'].filter(has), fresh = this.coralSpacing.options(all, f.x, f.y);
                 const at = rng.frac(), scale = rng.realInRange(0.22, 0.42), front = rng.frac() < 0.3, flip = rng.frac() < 0.5;
                 if (!fresh.length) continue;
                 const key = fresh[Math.floor(at * fresh.length)];

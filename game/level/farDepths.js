@@ -22,8 +22,9 @@ export const FAR = {
 const K = {
     roots: [['root_1', 1, [380, 620], true], ['root_2', 1, [420, 680], true], ['root_3', 1, [300, 480], true]],
     grass: [['seagrass_1', 1, [260, 420]]],
+    piers: [['pier_deck', 1, [1000, 1500], true]],      // a far pier row: deck at the waterline, posts fade down
     kelp: [['kelp_stalk_1', 3, [700, 1300]], ['kelp_stalk_2', 3, [700, 1300]], ['kelp_stalk_3', 2, [600, 1100]]],
-    corals: [['coral_1', 3, [300, 520]], ['coral_2', 3, [300, 520]], ['coral_3', 2, [260, 460]], ['seafan_1', 2, [280, 440]]],
+    corals: [['coral_1', 3, [300, 520]], ['coral_2', 3, [300, 520]], ['coral_3', 2, [260, 460]], ['coral_4', 2, [280, 480]], ['coral_5', 2, [280, 480]], ['seafan_1', 2, [280, 440]]],
     boulders: [['boulder_1', 1, [320, 700]], ['boulder_2', 1, [320, 700]], ['boulder_4', 1, [320, 700]], ['boulder_5', 1, [320, 700]]],
     hulls: [['wreck_1', 2, [1300, 2000]], ['wreck_2', 2, [1300, 2000]], ['trawler_1', 1, [900, 1300]], ['cutter_1', 1, [800, 1100]]]
 };
@@ -41,7 +42,7 @@ export const FAR_KINDS = {
     kelp: { per: 1.2, haze: 1.4, kinds: pick(['kelp', 4], ['boulders', 0.5]) },
     blue: { per: 0, kinds: [] },
     wreck: { per: 1, kinds: pick(['hulls', 1], ['boulders', 1], ['kelp', 0.3]) },
-    harbour: { per: 0.9, kinds: pick(['hulls', 1], ['boulders', 1]) },
+    harbour: { per: 0.9, kinds: pick(['piers', 3], ['hulls', 1], ['boulders', 1]) },
     trench: { per: 0.7, kinds: pick(['boulders', 1]) }
 };
 

@@ -47,7 +47,7 @@ const IMAGES = {
     friend_turtle: 'friend_turtle.png',
     friend_jellyfish: 'friend_jellyfish.png', friend_seahorse: 'friend_seahorse.png',
     friend_starfish: 'friend_starfish.png', enemy_angler: 'enemy_angler.png', spikes: 'spikes.png',
-    friend_snail: 'friend_snail.png', friend_nudibranch: 'friend_nudibranch.png', coral_3: 'coral_3.png',
+    friend_snail: 'friend_snail.png', friend_nudibranch: 'friend_nudibranch.png', coral_3: 'coral_3.png', coral_4: 'coral_4.webp', coral_5: 'coral_5.webp',
     hazard_buoy: 'hazard_buoy.png', hazard_net: 'hazard_net.png',
     tex_rock: 'tex_rock.jpg', tex_sand: 'tex_sand.jpg',
     player_shark: 'player_shark.png', player_firefish: 'player_firefish.png', player_flyingfish: 'player_flyingfish.png',
