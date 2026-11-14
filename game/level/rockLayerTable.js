@@ -12,7 +12,10 @@
 import { vnoise } from './terrain.js';
 import { biomeBlendAt } from './biomes.js';
 import { SHADE } from './shade.js';
-import { ROUTE } from './density.js';
+import { FIELD, ROUTE } from './density.js';
+
+const T = FIELD.threshold;
+const smooth01 = t => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 export const ROCK_LAYERS = [
     // s = parallax; seed = field seed offset; share = how much of the biome's closed share
@@ -35,13 +38,16 @@ export const LAYER_SHADE = {
 };
 
 /**
- * Rock never floats: the density of rock above is carried down `steps` x `step` virtual px,
- * losing only `fall` per step, and its foot spreads by `spread` px per step (a slope, not a
- * vertical cut) with a little wobble. `grid` is the low-pass cell (virtual px): shapes
- * smaller than about two cells (specks) vanish. What is carried down is smoothed further
- * (`carryGrid`), so the feet are broad slopes and towers on top don't repeat as battlements.
+ * Rock never floats: anything up to `reach` virtual px below rock is rock too. `grid` is the
+ * low-pass cell (virtual px): shapes smaller than about two cells (specks) vanish. What is
+ * carried down is the exact maximum of a smoother field (`carryGrid` [x, y]) over the whole
+ * stretch above — continuous, so the foot is one piece (no stack of chips under a thin piece)
+ * and towers on top don't repeat as battlements. The foot is a little wider than the rock
+ * (`spread`, a slope instead of a vertical cut) with a wobble. Rock only just above the
+ * threshold is not carried (`minCarry`: a minimum piece size); carried rock saturates
+ * `lift` above the threshold within `band`, so it is a flat foot, not a ripple.
  */
-export const SUPPORT = { step: 150, steps: 12, fall: 0.003, spread: 40, wobble: 40, grid: 110, carryGrid: 280 };
+export const SUPPORT = { reach: 1800, gap: 60, spread: 120, wobble: 260, grid: 110, carryGrid: [280, 480], minCarry: 0.03, band: 0.06, lift: 0.1 };
 
 /** Around the calm route: no near rock within `half` px of its middle, fading back in over `fade` px. */
 export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 0.9 };
@@ -76,22 +82,35 @@ export function enclosure(x, layer) {
     return Math.max(-1, Math.min(1, (n - noiseQuantile(1 - c)) * 6));   // share c of stretches above the cut
 }
 
-/** A low-passed copy of a density field: smooth bilinear over a cached `g`-px grid (no specks). */
+/** A low-passed copy of a density field: smooth bilinear over a cached grid (no specks); `g` = px or [x, y]. */
 export function lowPass(base, g) {
+    const [gx, gy] = Array.isArray(g) ? g : [g, g];
     const cache = new Map();
     const at = (i, j) => {
         const k = i * 73856093 ^ j * 19349663;
         let v = cache.get(k);
         if (v === undefined) {
             if (cache.size > 400000) cache.clear();
-            v = base.density(i * g, j * g);
+            v = base.density(i * gx, j * gy);
             cache.set(k, v);
         }
         return v;
     };
+    // The field along x at grid row j (smooth in x), and the field at (x, y).
+    const rowAt = (x, j) => {
+        const fx = x / gx, i = Math.floor(fx);
+        let u = fx - i; u = u * u * (3 - 2 * u);
+        return at(i, j) + (at(i + 1, j) - at(i, j)) * u;
+    };
     return {
+        /** Largest value on the column x between y0 and y1 (exact: between rows it is monotone). */
+        columnMax(x, y0, y1) {
+            let m = Math.max(this.density(x, y0), this.density(x, y1));
+            for (let j = Math.ceil(y0 / gy); j * gy <= y1; j++) m = Math.max(m, rowAt(x, j));
+            return m;
+        },
         density(x, y) {
-            const fx = x / g, fy = y / g, i = Math.floor(fx), j = Math.floor(fy);
+            const fx = x / gx, fy = y / gy, i = Math.floor(fx), j = Math.floor(fy);
             let u = fx - i, v = fy - j;
             u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v);
             const a = at(i, j), b = at(i + 1, j), c = at(i, j + 1), d = at(i + 1, j + 1);
@@ -113,13 +132,16 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
         density(x, y) {
             const e = enclosure(x, layer);
             if (e <= -0.999) return -1;                         // open: nothing behind
-            let d = soft.density(x, y);
-            const w = (vnoise(x / 260, y / 260, layer.seed + 5) - 0.5) * sup.wobble;
-            for (let k = 1; k <= sup.steps; k++) {
-                const yy = y - k * sup.step, dx = k * sup.spread, f = k * sup.fall;
-                d = Math.max(d, carry.density(x + w, yy) - f, carry.density(x + w - dx, yy) - f, carry.density(x + w + dx, yy) - f);
-            }
-            d += layer.swing * e - 0.12;
+            const shift = layer.swing * e - 0.12;
+            let d = soft.density(x, y) + shift;
+            // The strongest rock in the stretch above (centre and both sides of the foot): once it
+            // is clearly rock, this point is too — a flat foot, smooth in x and y.
+            const w = (vnoise(x / 700, y / 380, layer.seed + 5) - 0.5) * sup.wobble + (vnoise(x / 160, y / 260, layer.seed + 8) - 0.5) * sup.wobble * 0.12;   // meandering sides
+            const y0 = y - sup.reach, y1 = y - sup.gap;
+            const v = Math.max(carry.columnMax(x + w, y0, y1),
+                carry.columnMax(x + w - sup.spread, y0, y1) - 0.02, carry.columnMax(x + w + sup.spread, y0, y1) - 0.02);
+            const lo = T + sup.minCarry;
+            d = Math.max(d, T - 0.05 + (sup.lift + 0.05) * smooth01((v + shift - lo) / sup.band));
             if (route && layer.clearRoute) {
                 const off = Math.abs(y - route(x)), t = Math.min(1, Math.max(0, (off - clear.half) / clear.fade));
                 d -= clear.push * (1 - t * t * (3 - 2 * t));

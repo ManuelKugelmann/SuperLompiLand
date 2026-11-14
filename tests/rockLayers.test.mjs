@@ -83,3 +83,20 @@ test('the near layer keeps the calm route free', () => {
         for (const dy of [-200, 0, 200]) assert.ok(f.density(x, y + dy) < T, `rock on the route at ${x},${y + dy}`);
     }
 });
+
+test('no stacks of chips: below rock the carried foot is one piece (no gaps on the way down)', () => {
+    for (const L of ROCK_LAYERS) {
+        const f = layerField(createField(1337 + L.seed), L);
+        // A stack of chips shows as short water gaps under rock in a column (real caves are taller).
+        let chips = 0;
+        for (let x = -6000; x < 64000; x += 410) {
+            let seen = false, gapAt = -1;
+            for (let y = 300; y < 5200; y += 30) {
+                const solid = f.density(x, y) > T;
+                if (solid && gapAt >= 0 && y - gapAt < 300) chips++;
+                if (solid) { seen = true; gapAt = -1; } else if (seen && gapAt < 0) gapAt = y;
+            }
+        }
+        assert.ok(chips < 12, `${L.id}: ${chips} short gaps under rock`);
+    }
+});
