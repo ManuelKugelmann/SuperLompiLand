@@ -70,3 +70,42 @@ export function gradeMatrix(light, sat = 0.18, absorb = 0.35, exposure = 0) {
         0, 0, 0, 1, 0
     ];
 }
+
+// Caustics on surfaces (spec 5.0j, user: "2.5d wrapped caustic patterns on assets and ground,
+// not flat", "animated caustics, stronger near surface and light shafts"). The pattern is worked
+// out per pixel in a shader (CausticsPipeline.js) from these numbers; the same rules are here as
+// plain functions, so they can be tested and read.
+export const SURFACE_CAUSTICS = {
+    strength: 0.5,        // how much light the net adds at its brightest (0 = off: nothing gets the shader)
+    sharp: 3,             // how thin the net's lines are (the higher, the thinner)
+    full: 600,            // px under the surface down to which it is at full strength ...
+    gone: 1800,           // ... and by which it has faded out
+    period: 4096,         // px after which the whole pattern repeats (the shader works with x wrapped to it)
+    cells: [12, 20],      // net cells per period, for the two layers that are laid over each other (even numbers)
+    drift: [0.7, 0.9],    // how fast each layer moves (radians per second of its warp)
+    wrap: 190,            // px the net is pushed along a surface's relief per unit of brightness change: it bends over bumps
+    lit: [0.08, 0.4],    // brightness of a surface from which it begins to catch the net, and from which it catches all of it
+    facing: 6,            // how quickly the net fades on a face that looks down (brightness rising downward)
+    shaft: { bands: 2, slant: 0.35, floor: 0.45, speed: 0.06 },   // light shafts: bands per period, their slant (px sideways per px down), the share of light between them, their drift
+    warmth: 0.5           // 0 = the net has the water's hue, 1 = it is white sunlight
+};
+
+const smooth01 = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/** How strong the net is at world depth y (0 = the surface): none above the water, full near the surface, gone in the deep. */
+export function causticDepth(y, cfg = SURFACE_CAUSTICS) {
+    if (y < 0) return 0;
+    const k = Math.max(0, Math.min(1, (cfg.gone - y) / (cfg.gone - cfg.full)));
+    return k * k;
+}
+
+/** How much light a shaft brings at (x, y) at time t (s): 1 inside a shaft, `floor` between two. */
+export function causticShaft(x, y, t, cfg = SURFACE_CAUSTICS) {
+    const s = cfg.shaft, a = (x + y * s.slant) * (2 * Math.PI * s.bands / cfg.period) + t * s.speed;
+    return s.floor + (1 - s.floor) * smooth01(-0.3, 0.7, Math.sin(a));
+}
+
+/** How much of the net a surface of this brightness catches, given how its brightness changes downward (per texel step). */
+export function causticCatch(luma, lumaDown, cfg = SURFACE_CAUSTICS) {
+    return smooth01(cfg.lit[0], cfg.lit[1], luma) * Math.max(0, Math.min(1, 1 - (lumaDown - luma) * cfg.facing));
+}

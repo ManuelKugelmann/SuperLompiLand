@@ -45,6 +45,7 @@ import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
+import { updateCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
 import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
@@ -1434,7 +1435,10 @@ export default class MainScene extends Phaser.Scene {
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.farLayers.update(this.camX);
         this.rockLayers.update(this.camX, this.camY);
-        this.waterLight.update(sunAt(SKY_START + this.time.now / 1000, stormShare(this.fish.sprite.x)));
+        const sun = sunAt(SKY_START + this.time.now / 1000, stormShare(this.fish.sprite.x));      // the sky's share of light: day 1, night little, less under the storm
+        this.waterLight.update(sun);
+        // The net of light on rock, sand and props: in world space, as strong as the sun, in the water's hue.
+        updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun, biomeBlendAt(view.x).a.water[0]);
         if (!this.surf) {
             const z = surfZones();
             if (sp.x < z.surge[1] + WORLD.weatherRange || (sp.x > z.reef[0] - WORLD.weatherRange && sp.x < z.reef[1] + WORLD.weatherRange)) this.surf = new SurfLayer(this, this.surface);

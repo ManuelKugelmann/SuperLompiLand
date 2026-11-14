@@ -46,3 +46,31 @@ test('exposure brightens sunlit water and does nothing in the dark', () => {
     const darkRef = apply(gradeMatrix(0, 0, 0, 0), [0.5, 0.5, 0.5]);
     assert.deepEqual(darkNo, darkRef);
 });
+
+test('caustics on surfaces: none above the water, full near the surface, gone in the deep', async () => {
+    const { SURFACE_CAUSTICS: C, causticDepth } = await import('../game/fx/causticsMath.js');
+    assert.equal(causticDepth(-50), 0);
+    assert.equal(causticDepth(0), 1);
+    assert.equal(causticDepth(C.full), 1);
+    assert.equal(causticDepth(C.gone), 0);
+    assert.equal(causticDepth(C.gone + 2000), 0);
+    let prev = 1;
+    for (let y = C.full; y <= C.gone; y += 100) { const v = causticDepth(y); assert.ok(v <= prev, 'it only fades with depth'); prev = v; }
+});
+
+test('caustics are stronger in the light shafts, and the shafts repeat with the pattern\'s period', async () => {
+    const { SURFACE_CAUSTICS: C, causticShaft } = await import('../game/fx/causticsMath.js');
+    let lo = 1, hi = 0;
+    for (let x = 0; x < C.period; x += 16) { const v = causticShaft(x, 300, 5); lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    assert.ok(Math.abs(hi - 1) < 1e-6 && Math.abs(lo - C.shaft.floor) < 1e-6, `between ${lo} and ${hi}`);
+    assert.ok(Math.abs(causticShaft(700, 300, 5) - causticShaft(700 + C.period, 300, 5)) < 1e-9, 'x can be wrapped to the period');
+    for (const n of C.cells) assert.equal(n % 2, 0, 'even cell counts keep the warp seamless at the wrap');
+});
+
+test('a lit face that looks up catches the net; a dark crevice or a face that looks down does not', async () => {
+    const { causticCatch } = await import('../game/fx/causticsMath.js');
+    assert.equal(causticCatch(0.7, 0.7), 1);
+    assert.equal(causticCatch(0.05, 0.05), 0);
+    assert.ok(causticCatch(0.7, 0.8) < causticCatch(0.7, 0.7), 'brighter below = it faces down');
+    assert.equal(causticCatch(0.7, 0.3), 1, 'darker below = it faces up');
+});

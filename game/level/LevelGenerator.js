@@ -14,6 +14,7 @@ import { createReach } from './reach.js';
 import { createSpacing } from './spacing.js';
 import { eachCell as marchGrid, hash } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
+import { CAUSTICS, installCaustics } from '../fx/CausticsPipeline.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
@@ -168,6 +169,7 @@ export default class LevelGenerator {
         this.creatures = [];
         this.lights = [];     // glows that follow a creature
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
+        this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
         this.buildMs = { last: 0, max: 0, count: 0 };   // cost of building chunks, shown by ?debug=perf
         this.makeKelpTexture();
         this.makeRootTextures();
@@ -437,7 +439,8 @@ export default class LevelGenerator {
         const chunk = { objects: [], bodies: [], textures: [], key: `${cx},${cy}` };
         this.chunks.set(chunk.key, chunk);
         this.dropEarly(chunk.key);
-        const keep = o => { chunk.objects.push(o); return o; };
+        // Every picture of the world's surfaces (rock, sand, growth, props, piles) catches the caustics (fx/CausticsPipeline.js).
+        const keep = o => { chunk.objects.push(o); if (this.caustics && o.type === 'Image') o.setPipeline(CAUSTICS); return o; };
         const has = key => s.textures.exists(key);
         const blend = biomeBlendAt(mid);
         const biome = zonedBiomeAt(blend.t < 0.5 ? blend.a : blend.b, mid);      // inside a sub-zone: its own mix of growth and props
