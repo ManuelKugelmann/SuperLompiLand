@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WEATHER, stormSpan, stormShare, stormAt, downwelling, downAt, detour } from '../game/level/weather.js';
+import { WEATHER, stormSpan, stormShare, stormAt, downwelling, downAt, detour, weatherNear } from '../game/level/weather.js';
 import { BIOMES, isSea } from '../game/level/biomes.js';
 import { createField, ROUTE, FIELD } from '../game/level/density.js';
 
@@ -52,4 +52,11 @@ test('the route passes through the middle of each column on its way down and up'
         const y = f.routeY(c);
         assert.ok(y > WEATHER.down.top + 200 && y < WEATHER.down.routeY - 200, `half way at ${c}: ${Math.round(y)}`);
     }
+});
+
+test('weather is near around the storm and the columns, and nowhere else', () => {
+    const { x0, x1 } = stormSpan(), { down, up } = downwelling();
+    for (const x of [x0 - 3000, (x0 + x1) / 2, x1 + 3000, down - 3000, (down + up) / 2, up + 3000]) assert.ok(weatherNear(x, 4000), `near at ${x}`);
+    assert.ok(!weatherNear(0, 4000));
+    assert.ok(!weatherNear((up + x0) / 2, 4000), 'not on the kelp island between them');
 });

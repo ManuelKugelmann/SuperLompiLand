@@ -88,3 +88,9 @@ export function detour(x, out = { y: 0, k: 0 }) {
     if (ks >= kd) { out.y = s.routeY; out.k = ks; } else { out.y = d.routeY; out.k = kd; }
     return out;
 }
+
+/** Is x within `range` px of the storm or of the downwelling's columns? (their looks are only built when one is near) */
+export function weatherNear(x, range) {
+    const { x0, x1 } = stormSpan(), { down, up } = downwelling();
+    return (x > x0 - range && x < x1 + range) || (x > down - range && x < up + range);
+}

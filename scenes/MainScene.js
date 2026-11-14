@@ -31,7 +31,7 @@ import StoryBeats from '../game/StoryBeats.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { surgeAt, breakerAt, ripAt } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
-import { WEATHER, stormShare, stormAt, downAt } from '../game/level/weather.js';
+import { WEATHER, stormShare, stormAt, downAt, weatherNear } from '../game/level/weather.js';
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
@@ -66,6 +66,7 @@ const WORLD = {
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
     lookAhead: 9,         // camera leads the fish by velocity * this
     refitAt: 0.12,        // the window's shape must change by this share before a running game is laid out again
+    weatherRange: 7000,   // px from the storm or the downwelling at which their looks are built
     wallLook: 0.26,       // at a drop-off the camera looks down by this share of the screen height
     doubleTapMs: 320,
     doubleTapDist: 110,
@@ -127,7 +128,7 @@ export default class MainScene extends Phaser.Scene {
         this.maxDepth = 0;
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
-        this.storm = new StormLayer(this);                 // dark sky, rain, and the bubbles of the downwelling (spec 5.0c)
+        this.storm = null;                                 // dark sky, rain, and the look of the downwelling (spec 5.0c): built when one of them is near
         this.surf = new SurfLayer(this, this.surface);     // surge foam on the beach, breakers on the reef's edge (spec 5.0d)
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.chain = createChain();          // linked moves (game/chain.js); shown by the HUD, not in relaxed play
@@ -509,7 +510,7 @@ export default class MainScene extends Phaser.Scene {
         } else if (first) {
             this.announce(de ? 'Nest erreicht!' : 'Nest reached!', de ? 'Münzen gesichert · hier geht es weiter' : 'Coins saved · you restart here');
             // The first nest asks once how to play (spec 1.4): relaxed or adventure.
-            if (!this.mp && !this.ambientMode && !this.progression.get?.('style_asked', false)) {
+            if (!this.mp && !this.ambientMode && !this.perfTour && !this.progression.get?.('style_asked', false)) {
                 this.progression.set?.('style_asked', true);
                 this.time.delayedCall(STYLE_ASK_MS, () => {
                     this.scene.pause();
@@ -1234,7 +1235,8 @@ export default class MainScene extends Phaser.Scene {
         this.rockLayers.update(this.camX, this.camY);
         this.waterLight.update();
         this.surf.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
-        this.storm.update(this.camX, this.camY, time / 1000, delta, this.particles);
+        if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = new StormLayer(this);
+        this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
