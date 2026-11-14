@@ -18,6 +18,7 @@ import { chapters } from '../journey.js';
 import { MANTA, mantaSpan } from '../ai/manta.js';
 import { baitballSlot } from './baitball.js';
 import { meadowSpot } from './meadow.js';
+import { containerSpan } from './containers.js';
 
 /** Kinds of feature that are a place's main sight: no two of them may share a screen. */
 export const SET_PIECE_KINDS = ['crest', 'cave', 'docks', 'arch', 'ship', 'friend', 'whale', 'baitball'];
@@ -56,6 +57,7 @@ export function worldMap() {
     span('storm', storm.x0, storm.x1);
     span('baitball', baitballSlot().x0, baitballSlot().x1);
     span('meadow', meadowSpot().x0, meadowSpot().x1);
+    span('containers', containerSpan().x0, containerSpan().x1);
     for (const d of downwellings()) span('current', d.down, d.up);
     for (const f of bloomFields()) span('bloom', f.x0, f.x1);
     for (const r of raftSpots()) spot('raft', r.x);

@@ -43,6 +43,7 @@ import BloomLayer from '../game/level/BloomLayer.js';
 import BaitBallLayer from '../game/level/BaitBallLayer.js';
 import RaftLayer from '../game/level/RaftLayer.js';
 import MeadowLayer from '../game/level/MeadowLayer.js';
+import ContainerLayer from '../game/level/ContainerLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
@@ -230,7 +231,9 @@ export default class MainScene extends Phaser.Scene {
         // ... and at their surface float sargassum rafts; a skip off a wave sends flying fish out of the water.
         this.rafts = new RaftLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('sargassum'));
         // The lagoon's eel meadow: garden eels that slip into the sand, and a ray that glides off.
-        this.meadow = new MeadowLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), kind => this.bookEntry(kind));
+        this.meadow = new MeadowLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
+        // Lost shipping containers drifting half sunk off the harbour; the route runs through two of them.
+        this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -723,6 +726,7 @@ export default class MainScene extends Phaser.Scene {
             this.camX = p.x - this.scale.width / 2;
             this.camY = p.y - this.scale.height / 2;
             this.respawning = false;
+            this.swarms.arrive(p.x, p.y);      // back at the nest the water is not empty: a shoal swims into the picture
             this.cameras.main.fadeIn(320, 10, 40, 70);
             this.announce(de ? 'Nochmal!' : 'Try again!', de ? 'Zurück am letzten Nest' : 'Back at the last nest');
         });
@@ -1468,7 +1472,8 @@ export default class MainScene extends Phaser.Scene {
         this.blooms.update(sp, time / 1000, delta);
         this.baitBalls.update(sp, this.fish.view, this.fish.radius, time / 1000);
         this.rafts.update(sp, time / 1000);
-        this.meadow.update(sp, time / 1000, delta);
+        this.meadow.update(sp, this.fish.radius, time / 1000, delta);
+        this.containers.update(sp, this.fish.radius, time / 1000);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
             const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);

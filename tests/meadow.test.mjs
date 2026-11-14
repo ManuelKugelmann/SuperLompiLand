@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MEADOW, meadowSpot, eelAt, eelOut, createRay, stepRay } from '../game/level/meadow.js';
+import { MEADOW, meadowSpot, meadowCoins, eelAt, eelOut, createRay, stepRay } from '../game/level/meadow.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { createField } from '../game/level/density.js';
 import { rescueSpots } from '../game/rescues.js';
@@ -52,4 +52,15 @@ test('the ray rests until the fish comes near, glides away from it over the sand
     const edge = createRay(4800);
     stepRay(edge, 100, -1, 1 / 60, 0, 5000);
     assert.equal(edge.dir, -1);
+});
+
+test('coins lead from the calm route down to the meadow and on in a row over the eels', () => {
+    const ground = () => 1800, coins = meadowCoins(f.routeY, ground);
+    assert.equal(coins.length, MEADOW.trail + MEADOW.row);
+    assert.ok(Math.abs(coins[0].y - f.routeY(coins[0].x)) < 200, 'the trail begins at the route');
+    for (let i = 1; i < MEADOW.trail; i++) assert.ok(coins[i].y > coins[i - 1].y && coins[i].x > coins[i - 1].x, 'and leads down and on');
+    const row = coins.slice(MEADOW.trail);
+    for (const c of row) assert.equal(c.y, 1800 - MEADOW.over);
+    assert.ok(row[0].x === s.x0 && Math.abs(row.at(-1).x - s.x1) < 1e-6, 'the row spans the colony');
+    assert.equal(meadowCoins(f.routeY, () => null).length, 0, 'no seabed in reach: no coins');
 });

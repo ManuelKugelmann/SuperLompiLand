@@ -1,4 +1,5 @@
-import { MEADOW, meadowSpot, eelAt, eelOut, createRay, stepRay } from './meadow.js';
+import { MEADOW, meadowSpot, meadowCoins, eelAt, eelOut, createRay, stepRay } from './meadow.js';
+import BonusCoins from './BonusCoins.js';
 
 export const MEADOW_LOOK = {
     near: 3200, far: 5000,   // px from the colony at which it is built, and beyond which it is removed
@@ -43,12 +44,14 @@ function ensureTextures(scene) {
 /**
  * What the eel meadow looks like (level/meadow.js says where it is and how its animals behave):
  * the eels as upright pictures that sink into the sand, and the ray. Built only while the fish
- * is near. `groundY(x)` = the seabed under the calm route at x (or null); `onSeen(kind)` is
- * called once each for 'garden_eel' and 'sand_ray'.
+ * is near, with a trail of coins from the route down to it and a row of coins over the eels.
+ * `routeY(x)` = depth of the calm route, `groundY(x)` = the seabed under it (or null);
+ * `onCoin(x, y)` for every coin taken, `onSeen(kind)` once each for 'garden_eel' and 'sand_ray'.
  */
 export default class MeadowLayer {
-    constructor(scene, groundY, onSeen) {
-        this.scene = scene; this.groundY = groundY; this.onSeen = onSeen;
+    constructor(scene, routeY, groundY, onCoin, onSeen) {
+        this.scene = scene; this.routeY = routeY; this.groundY = groundY; this.onCoin = onCoin; this.onSeen = onSeen;
+        this.taken = new Set();      // coins taken stay gone for this run
         this.spot = meadowSpot();
         this.seen = { eel: false, ray: false };
         ensureTextures(scene);
@@ -67,13 +70,16 @@ export default class MeadowLayer {
         const mind = createRay(this.spot.x + MEADOW.ray.from), ry = this.groundY(mind.x);
         const img = s.add.image(mind.x, ry ?? 0, RAY).setOrigin(0.5, 0.75).setDepth(L.rayDepth).setVisible(ry !== null);
         img.setScale(MEADOW.ray.width / img.width);
-        return { eels, ray: { img, mind, ground: ry, scale: img.scaleY } };
+        // The meadow lies far below the route: coins lead down to it and on over the eels (which hide as the fish follows them).
+        const left = meadowCoins(this.routeY, this.groundY).map((q, k) => ({ ...q, k })).filter(q => !this.taken.has(q.k));
+        const coins = new BonusCoins(s, left, 2, (x, y) => { const q = left.find(o => o.x === x && o.y === y); if (q) this.taken.add(q.k); this.onCoin(x, y); });
+        return { eels, coins, ray: { img, mind, ground: ry, scale: img.scaleY } };
     }
 
-    /** Per frame. `fish` = { x, y }, `t` s, `delta` ms. */
-    update(fish, t, delta) {
+    /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s, `delta` ms. */
+    update(fish, radius, t, delta) {
         const L = MEADOW_LOOK, sp = this.spot, dt = delta / 1000;
-        if (this.live && (fish.x < sp.x0 - L.far || fish.x > sp.x1 + L.far)) { for (const e of this.live.eels) e.img.destroy(); this.live.ray.img.destroy(); this.live = null; }
+        if (this.live && (fish.x < sp.x0 - L.far || fish.x > sp.x1 + L.far)) { for (const e of this.live.eels) e.img.destroy(); this.live.ray.img.destroy(); this.live.coins.destroy(); this.live = null; }
         if (!this.live) {
             if (fish.x < sp.x0 - L.near || fish.x > sp.x1 + L.near || !this.scene.buildSlot()) return;
             this.live = this.build();
@@ -84,6 +90,7 @@ export default class MeadowLayer {
             e.img.setVisible(e.out > 0.02).setScale(e.img.scaleX, e.full * e.out).setRotation(Math.sin(t * 1.3 + e.phase) * MEADOW.sway * e.out);
             if (!this.seen.eel && d < MEADOW.seen) { this.seen.eel = true; this.onSeen('garden_eel'); }
         }
+        this.live.coins.update(fish, radius, t);
         const r = this.live.ray;
         if (r.ground === null) return;
         const lift = stepRay(r.mind, Math.hypot(fish.x - r.mind.x, fish.y - r.ground), fish.x - r.mind.x, dt, sp.x0 - 600, sp.x1 + 600);

@@ -138,6 +138,19 @@ export default class SwarmLayer {
         this.swarms.push({ id, sim, blitter, bobs, w, h, phase, home });
     }
 
+    /**
+     * The fish has just been put somewhere (back at a nest): one shoal of that place is set inside
+     * the view near its edge, so the water is not empty and the shoal swims into the picture.
+     */
+    arrive(cx, cy) {
+        const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(this.env.biomeAt(cx)));
+        if (!native.length) return;
+        for (let tries = 0; tries < 12; tries++) {
+            const x = cx + (tries % 2 ? -1 : 1) * SWARMS.inView[0] * (0.7 + Math.random() * 0.2), y = cy + (Math.random() - 0.5) * SWARMS.inView[1] * 1.2;
+            if (y > 150 && this.env.isOpen(x, y) && this.env.isOpen(x + 120, y) && this.env.isOpen(x - 120, y)) { this.spawn(native[Math.floor(Math.random() * native.length)], x, y); return; }
+        }
+    }
+
     /** Keep a few swarms of the current biome around the view; drop far ones. */
     manage(cx, cy) {
         for (let i = this.swarms.length - 1; i >= 0; i--) {

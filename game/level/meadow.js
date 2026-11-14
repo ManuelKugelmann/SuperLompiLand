@@ -17,6 +17,9 @@ export const MEADOW = {
     rise: 2.6,           // ... and it comes out again over this many seconds once the fish is away
     sway: 0.16,          // radians it sways in the current
     seen: 700,           // px from an eel at which the colony counts as seen (reef book)
+    trail: 6,            // coins that lead from the calm route down to the colony's west end ...
+    row: 7,              // ... and coins in a row over the eels
+    over: 330,           // px over the sand at which that row runs
     ray: {
         from: -700,      // px from the colony's middle where it rests at first
         width: 520,      // px across as drawn
@@ -78,4 +81,21 @@ export function stepRay(ray, fishDist, fishSide, dt, x0, x1, cfg = MEADOW) {
     const lift = Math.sin(ray.t * Math.PI) * r.lift;
     if (ray.t >= 1) ray.t = 0;
     return lift;
+}
+
+/**
+ * The meadow's coins: a trail from the calm route down to the colony's west end, then a row
+ * over the eels: [{ x, y }]. `routeY(x)` = depth of the route, `groundY(x)` = the seabed under
+ * it (or null where there is none in reach: then no coins).
+ */
+export function meadowCoins(routeY, groundY, cfg = MEADOW) {
+    const s = meadowSpot(cfg), g0 = groundY(s.x0), out = [];
+    if (g0 === null) return out;
+    const top = { x: s.x0 - 700, y: routeY(s.x0 - 700) + 130 }, low = { x: s.x0, y: g0 - cfg.over };
+    for (let i = 0; i < cfg.trail; i++) { const u = i / cfg.trail; out.push({ x: top.x + (low.x - top.x) * u, y: top.y + (low.y - top.y) * u }); }
+    for (let i = 0; i < cfg.row; i++) {
+        const x = s.x0 + (s.x1 - s.x0) * i / (cfg.row - 1), g = groundY(x);
+        if (g !== null) out.push({ x, y: g - cfg.over });
+    }
+    return out;
 }
