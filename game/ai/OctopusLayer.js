@@ -17,6 +17,9 @@ export const OCTOPUS_LOOK = {
 
 const KEY = 'octopus';
 
+/** The painted octopus (loaded by the title screen); drawn procedurally while missing. */
+export const OCTOPUS_ART = { [KEY]: 'img/octopus.webp' };
+
 function ensureTexture(scene) {
     if (scene.textures.exists(KEY)) return;
     // A common octopus on the sand, side view: a round mantle, big eye, eight curling arms.
