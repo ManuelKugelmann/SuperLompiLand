@@ -13,7 +13,8 @@ import { JELLY_GARDEN, gardenSpot, jellyAt, pulseAt, gardenLift, gardenCoins } f
 export const GARDEN_LOOK = {
     near: 3000, far: 4500,   // px from the garden at which it is built, and beyond which it is removed
     depth: 3.2,              // on the mud, in front of the pebbles and props, just behind the fish
-    squeeze: 0.22            // how much a bell flattens and widens at the squeeze
+    squeeze: 0.22,           // how much a bell flattens and widens at the squeeze
+    perFrame: 6              // jellies laid down per frame once the garden is built (a phone never pays for all at once)
 };
 
 const KEY = 'cassiopea';
@@ -55,17 +56,20 @@ export default class JellyGardenLayer {
         this.live = null;
     }
 
+    /** One jelly onto the mud (part of the build, spread over frames). */
+    place(j) {
+        const s = this.scene, g = this.groundY(j.x);
+        if (g === null) return;
+        const img = s.add.image(j.x, g + 6, KEY).setOrigin(0.5, 1).setDepth(GARDEN_LOOK.depth);
+        img.setScale(j.size / s.textures.get(KEY).getSourceImage().width);
+        j.base = img.scale;
+        j.img = img;
+        this.live.items.push(img);
+    }
+
     build() {
-        const s = this.scene, src = s.textures.get(KEY).getSourceImage(), items = [];
-        for (const j of this.jellies) {
-            const g = this.groundY(j.x);
-            if (g === null) continue;
-            const img = s.add.image(j.x, g + 6, KEY).setOrigin(0.5, 1).setDepth(GARDEN_LOOK.depth);
-            img.setScale(j.size / src.width);
-            j.base = img.scale;
-            j.img = img;
-            items.push(img);
-        }
+        const s = this.scene, items = [];
+        this.next = 0;
         const mid = this.spot.x0 + JELLY_GARDEN.patch * (this.spot.x1 - this.spot.x0);
         this.ground = this.groundY(mid) ?? 0;
         const points = gardenCoins(this.ground).map((p, k) => ({ ...p, id: k })).filter(p => !this.taken.has(p.id));
@@ -81,6 +85,7 @@ export default class JellyGardenLayer {
             if (fish.x < sp.x0 - L.near || fish.x > sp.x1 + L.near || !this.scene.buildSlot()) return;
             this.live = this.build();
         }
+        for (let k = 0; k < L.perFrame && this.next < this.jellies.length; k++) this.place(this.jellies[this.next++]);
         for (const j of this.jellies) {
             if (!j.img) continue;
             const p = pulseAt(j, t);
