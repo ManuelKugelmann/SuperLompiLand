@@ -46,6 +46,7 @@ self.onmessage = e => {
     const islands = field.islandTilesFor(ox, oy, span).filter(t => !sentTiles.has(t.key));
     for (const t of islands) sentTiles.add(t.key);
     const coarse = chunkGrids(field, seed, ox, oy, span, n).fine;
+    if (e.data.noShade) { self.postMessage({ key, coarse, rock: null, back: null, islands }, [coarse.buffer]); return; }      // measuring only (?noshade): what the world costs without its pictures
     const { rock, back } = shadeChunk(field, seed, ox, oy, span, undefined, take);
     self.postMessage({ key, coarse, rock, back, islands }, [coarse.buffer, rock.buffer, back.buffer]);
 };

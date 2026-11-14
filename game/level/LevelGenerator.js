@@ -30,6 +30,9 @@ import { inBaitball } from './baitball.js';
 import {
     BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare, waterTone, zonedBiomeAt } from './biomes.js';
 
+/** Dev measurement only: `?noshade` leaves out the chunks' shaded pictures (worker shading and uploads), to see what they cost. */
+const NO_SHADE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noshade');
+
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
@@ -298,7 +301,7 @@ export default class LevelGenerator {
 
     /** A worker result that is used up (its chunk is built, or nobody needs it any more): its picture arrays go back to the worker to be written into again. */
     recycle(r) {
-        if (!r || !this.worker || !r.rock?.buffer.byteLength) return;
+        if (!r || !this.worker || !r.rock?.buffer.byteLength) return;      // (none with ?noshade)
         this.worker.postMessage({ recycle: [r.rock.buffer, r.back.buffer] }, [r.rock.buffer, r.back.buffer]);
     }
 
@@ -417,7 +420,7 @@ export default class LevelGenerator {
                     if (!this.early.has(key) && solid < LEVEL.earlyPerFrame) { this.solidNow(cx, cy, key); solid++; }
                     if (this.pending.has(key) || this.ready.some(r => r.key === key)) continue;
                     this.pending.add(key);
-                    this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells });
+                    this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells, noShade: NO_SHADE });
                 }
             }
         }
@@ -594,8 +597,10 @@ export default class LevelGenerator {
         };
         if (!baked) { yield 'shade'; if (chunk.dead) return; }
         // With the atlases: each picture goes straight to its place in the shared texture, the rock in strips.
-        const A = this.atlases, place = A && A.back.slots.free && A.rock.slots.free ? [A.back.take(), A.rock.take()] : null;
-        if (place) {
+        const A = this.atlases, place = !pics.rock ? null : A && A.back.slots.free && A.rock.slots.free ? [A.back.take(), A.rock.take()] : null;
+        if (!pics.rock) {
+            // (?noshade: no pictures at all; only for measuring what they cost)
+        } else if (place) {
             chunk.places = [[A.back, place[0]], [A.rock, place[1]]];      // given back when the chunk is dropped
             const put = (atlas, i, depth) => {
                 const img = keep(s.add.image(ox, oy, atlas.key, String(i)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth));
