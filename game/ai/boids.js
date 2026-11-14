@@ -21,7 +21,9 @@ export const SWARM = {
     dashSpeed: 520,       // px/s: faster than this nearby triggers panic
     panicR: 260,          // px
     panicDecay: 0.6,      // per s
-    panicSpread: 0.85     // share passed on to neighbours (a wave, not a switch)
+    panicSpread: 0.85,    // share passed on to neighbours (a wave, not a switch)
+    flowEvery: 4,         // each fish asks the water field every this many steps (it changes slowly; staggered)
+    avoidEvery: 2         // ... and probes for rock ahead every this many steps
 };
 
 export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, ...opts } = {}) {
@@ -29,6 +31,8 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
     const n = count;
     const px = new Float32Array(n), py = new Float32Array(n), vx = new Float32Array(n), vy = new Float32Array(n);
     const panic = new Float32Array(n), turn = new Float32Array(n), quirk = new Float32Array(n);
+    const flx = new Float32Array(n), fly = new Float32Array(n), blocked = new Uint8Array(n), next = new Int32Array(n);
+    let tick = 0;
     for (let i = 0; i < n; i++) {
         const a = random() * Math.PI * 2, r = Math.sqrt(random()) * 120;
         px[i] = x + Math.cos(a) * r; py[i] = y + Math.sin(a) * r * 0.6;
@@ -39,16 +43,17 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
     const anchor = { x, y };
     const leader = { x, y, tx: x, ty: y, retarget: 0 };
     const cell = P.neighbourR;
-    let grid = new Map();
+    // Grid as linked lists: head index per cell, next[] per fish (no allocation per step).
+    const grid = new Map();
     const key = (cx, cy) => (cx * 73856093) ^ (cy * 19349663);
 
     function buildGrid() {
-        grid = new Map();
+        grid.clear();
         for (let i = 0; i < n; i++) {
             const k = key(Math.floor(px[i] / cell), Math.floor(py[i] / cell));
-            let list = grid.get(k);
-            if (!list) grid.set(k, (list = []));
-            list.push(i);
+            const head = grid.get(k);
+            next[i] = head === undefined ? -1 : head;
+            grid.set(k, i);
         }
     }
 
@@ -100,14 +105,15 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
             });
 
             buildGrid();
+            tick++;
             const decay = Math.exp(-P.panicDecay * dt);
             for (let i = 0; i < n; i++) {
                 let sx = 0, sy = 0, ax = 0, ay = 0, cx = 0, cy = 0, m = 0, pn = 0;
                 const gx = Math.floor(px[i] / cell), gy = Math.floor(py[i] / cell);
                 for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
-                    const list = grid.get(key(gx + ox, gy + oy));
-                    if (!list) continue;
-                    for (const j of list) {
+                    const head = grid.get(key(gx + ox, gy + oy));
+                    if (head === undefined) continue;
+                    for (let j = head; j !== -1; j = next[j]) {
                         if (j === i) continue;
                         const dx = px[j] - px[i], dy = py[j] - py[i], d2 = dx * dx + dy * dy;
                         if (d2 > P.neighbourR * P.neighbourR) continue;
@@ -147,7 +153,8 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                 }
                 // Rock ahead: turn away from it before touching it.
                 const sp = Math.hypot(vx[i], vy[i]) || 1;
-                if (env.isOpen && !env.isOpen(px[i] + vx[i] / sp * P.lookAhead, py[i] + vy[i] / sp * P.lookAhead)) {
+                if (env.isOpen && (i + tick) % P.avoidEvery === 0) blocked[i] = env.isOpen(px[i] + vx[i] / sp * P.lookAhead, py[i] + vy[i] / sp * P.lookAhead) ? 0 : 1;
+                if (blocked[i]) {
                     fx += -vx[i] / sp * W.avoid * 40 + -vy[i] / sp * W.avoid * 25;
                     fy += -vy[i] / sp * W.avoid * 40 + vx[i] / sp * W.avoid * 25;
                 }
@@ -167,9 +174,8 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                 // Turning amount (for the silver flank flash when the swarm wheels).
                 const t = Math.abs(Math.atan2(ovx * vy[i] - ovy * vx[i], ovx * vx[i] + ovy * vy[i]));
                 turn[i] = turn[i] * 0.85 + t * 0.15 / Math.max(dt, 1e-3) * 0.05;
-                flow.x = 0; flow.y = 0;
-                if (env.flowAt) env.flowAt(px[i], py[i], flow);
-                const nx = px[i] + (vx[i] + flow.x) * dt, ny = py[i] + (vy[i] + flow.y) * dt;
+                if (env.flowAt && (i + tick) % P.flowEvery === 0) { flow.x = 0; flow.y = 0; env.flowAt(px[i], py[i], flow); flx[i] = flow.x; fly[i] = flow.y; }
+                const nx = px[i] + (vx[i] + flx[i]) * dt, ny = py[i] + (vy[i] + fly[i]) * dt;
                 if (!env.isOpen || env.isOpen(nx, ny)) { px[i] = nx; py[i] = ny; }
                 else { vx[i] = -vx[i] * 0.5; vy[i] = -vy[i] * 0.5; }   // bounce off, never into rock
             }
