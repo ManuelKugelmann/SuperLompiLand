@@ -19,7 +19,8 @@ export const SPECIES = {
 /** How many swarms around the camera, spawn and drop distances (px). */
 export const SWARMS = { perView: 2, spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6,
     haze: 0.6,    // how far the farthest fish of a shoal blends into the water colour
-    fade: 0.3 };  // and how much it fades
+    fade: 0.3,    // and how much it fades
+    deepCount: 80 };  // shoals of this many fish or more get the full depth; smaller ones less
 
 /** Texture size of one frame (px) for a species. */
 const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (sp.tall ? 1.25 : 0.8)) });
@@ -122,8 +123,9 @@ export default class SwarmLayer {
         // Depth inside the shoal (fake 3D, spec 10.10b): bobs draw in index order, so
         // the first are the farthest; they take on the water colour and fade a little.
         const water = sp.glow ? 0x000000 : this.env.waterAt(x);
+        const deep = Math.min(1, sp.count / SWARMS.deepCount);   // a handful of fish has little depth
         bobs.forEach((b, i) => {
-            const z = 1 - (i + 0.5) / sp.count;
+            const z = (1 - (i + 0.5) / sp.count) * deep;
             b.setTint(mixColor(0xffffff, water, z * SWARMS.haze)).setAlpha(1 - z * SWARMS.fade);
         });
         this.swarms.push({ id, sim, blitter, bobs, w, h, phase });
