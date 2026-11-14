@@ -264,6 +264,13 @@ export default class LevelGenerator {
             const [cx, cy] = key.split(',').map(Number);
             if (cx < x0 - 1 || cx > x1 + 1 || cy < y0 - 1 || cy > y1 + 1) this.drop(key);
         }
+        // Early collision of chunks nobody waits for any more goes at once, not only when the
+        // worker gets round to them: after a long fast trip its queue is long, and hundreds of
+        // idle collision strips would slow the physics down in the meantime.
+        for (const key of this.early.keys()) {
+            const [cx, cy] = key.split(',').map(Number);
+            if (!wanted(cx, cy)) this.dropEarly(key);
+        }
     }
 
     /**

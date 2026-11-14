@@ -10,6 +10,8 @@ export const CHAIN = {
     window: 4000,       // after a move, the next one within this time continues the chain
     flowAt: 5,          // chain length from which the run counts as flow
     bonusEvery: 3,      // one bonus coin per this many moves when a chain ends
+    flowCoins: 2,       // a coin collected while in flow counts this much
+    coinCap: 3,         // no coin ever counts more than this
     minLeap: 7,         // speed (px/step) through the surface for a jump to count
     minAir: 350,        // time in the air for the landing to count
     streamSpeed: 6,     // water speed (px/step) that counts as riding a current
@@ -23,6 +25,14 @@ export const CHAIN = {
 /** Bonus coins for a finished chain of this length. */
 export function bonusFor(count, cfg = CHAIN) {
     return Math.floor(count / cfg.bonusEvery);
+}
+
+/**
+ * What one collected coin counts: the coin streak's multiplier (x2, x3 ...) or, while the
+ * chain is in flow, at least `flowCoins`. The two do not stack, and there is a cap.
+ */
+export function coinWorth(streakMultiplier, inFlow, cfg = CHAIN) {
+    return Math.min(cfg.coinCap, Math.max(1, Math.floor(streakMultiplier) || 1, inFlow ? cfg.flowCoins : 1));
 }
 
 export function createChain(cfg = CHAIN) {

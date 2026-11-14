@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHAIN, bonusFor, createChain, createSpin } from '../game/chain.js';
+import { CHAIN, bonusFor, createChain, createSpin, coinWorth } from '../game/chain.js';
 
 test('moves within the window build a chain; the fifth one enters flow', () => {
     const c = createChain();
@@ -73,4 +73,16 @@ test('a flip is a long turn flown one way; a plain jump is none', () => {
     assert.equal(l, 1, 'backward loops count too');
     back.reset();
     assert.equal(back.turn(3), 0);
+});
+
+test('a coin counts more in a streak or in flow; the two do not stack and there is a cap', () => {
+    assert.equal(coinWorth(1, false), 1);
+    assert.equal(coinWorth(2, false), 2, 'streak x2');
+    assert.equal(coinWorth(3, false), 3);
+    assert.equal(coinWorth(1, true), CHAIN.flowCoins, 'flow alone');
+    assert.equal(coinWorth(2, true), 2, 'no stacking');
+    assert.equal(coinWorth(3, true), 3, 'the bigger one wins');
+    assert.equal(coinWorth(7, true), CHAIN.coinCap, 'capped');
+    assert.equal(coinWorth(undefined, false), 1, 'no streak information: one coin');
+    assert.equal(coinWorth(0, false), 1);
 });

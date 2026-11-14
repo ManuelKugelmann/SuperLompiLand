@@ -18,7 +18,7 @@ import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
-import { CHAIN, createChain, createSpin } from '../game/chain.js';
+import { CHAIN, createChain, createSpin, coinWorth } from '../game/chain.js';
 import BoosterLayer from '../game/level/BoosterLayer.js';
 import SpeedLines from '../game/fx/SpeedLines.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
@@ -785,9 +785,10 @@ export default class MainScene extends Phaser.Scene {
             c.img.destroy();
             this.world.set(c.chunkKey, 'coin', c.index);
             this.mp?.claim(c.chunkKey, 'coin', c.index);
-            this.coins++;
             const bl = biomeBlendAt(x);
             const note = this.streak.add(nowSeconds(), (bl.t < 0.5 ? bl.a : bl.b).id);
+            // A coin in a streak (x2, x3) or collected in flow really counts more (chain.js).
+            this.coins += coinWorth(note.multiplier, !this.relaxed && this.chain.flow);
             play('coin', note);
             this.streakFx(x, y, note);
             for (let i = 0; i < 5; i++) {           // sparkle
