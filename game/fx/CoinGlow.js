@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { shareOf } from '../quality.js';
 
 /**
  * Coins stay readable in the dark: the scene light (MainScene.ambient, a multiply layer at depth
@@ -34,7 +35,7 @@ export default class CoinGlow {
     /** Per frame. `light` = the scene light's colour (0xRRGGBB) this frame. */
     update(light) {
         const G = COIN_GLOW, luma = (0.299 * ((light >> 16) & 255) + 0.587 * ((light >> 8) & 255) + 0.114 * (light & 255)) / 255;
-        const k = Phaser.Math.Clamp((1 - luma - G.from) / (1 - G.from), 0, 1) * G.strength;
+        const k = Phaser.Math.Clamp((1 - luma - G.from) / (1 - G.from), 0, 1) * G.strength * shareOf(this.scene, 'glow');      // none on the low quality tier
         let n = 0;
         if (k > 0.01) {
             const view = this.scene.cameras.main.worldView;

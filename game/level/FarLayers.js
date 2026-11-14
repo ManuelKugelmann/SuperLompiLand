@@ -1,4 +1,5 @@
 import { FAR, FAR_KEYS, farCell, farBaseY, farLook, worldXFor } from './farDepths.js';
+import { shareOf } from '../quality.js';
 
 /**
  * Far scenery (farDepths.js): single painted objects, each at its own parallax depth,
@@ -63,7 +64,9 @@ export default class FarLayers {
                 const id = `${di}:${ci}`;
                 keep.add(id);
                 if (this.live.has(id)) continue;
-                this.live.set(id, farCell(di, ci, W, 1337, has).map(o => {
+                // Only the quality tier's share of them (`far`), picked by a stable hash: the same ones stay.
+                const share = shareOf(scene, 'far'), keepIt = (o, k) => share >= 1 || ((Math.sin(di * 91.7 + ci * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1 < share;
+                this.live.set(id, farCell(di, ci, W, 1337, has).filter(keepIt).map(o => {
                     const look = farLook(s, o.biome);
                     // Hanging things (mangrove roots) start at the surface: world y 0 is layer y 0.
                     const y = o.hang ? -20 * s : farBaseY(worldXFor(o.lx, s, W), s, H, o.rise);

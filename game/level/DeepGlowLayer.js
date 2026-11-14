@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DEEP_GLOW, glowCell, glowShare } from './deepGlow.js';
+import { shareOf } from '../quality.js';
 
 /**
  * Glowing life of the deep (deepGlow.js places it): pulsing jellies, swaying siphonophore
@@ -89,6 +90,7 @@ export default class DeepGlowLayer {
         // The night comes in steps: when it changes, the cells are placed again for it.
         const step = Math.round(night * 4) / 4;
         if (step !== this.night) { this.destroy(); this.night = step; }
+        if (!shareOf(this.scene, 'glow')) { if (this.live.size) this.destroy(); return; }      // the low quality tier draws no glow
         const cx0 = Math.floor(view.x / C) - m, cx1 = Math.floor((view.x + view.width) / C) + m;
         const cy0 = Math.max(0, Math.floor(view.y / C) - m), cy1 = Math.floor((view.y + view.height) / C) + m;
         const keep = new Set();

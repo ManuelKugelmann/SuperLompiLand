@@ -59,3 +59,10 @@ test('a pause is not a slow frame', () => {
     assert.equal(t.tier, 'high');
     assert.ok(t.fps > 55);
 });
+
+test('shareOf reads the scene\'s tier, and the high tier while there is none yet', async () => {
+    const { shareOf, QUALITY } = await import('../game/quality.js');
+    assert.equal(shareOf({}, 'glow'), QUALITY.high.glow);
+    assert.equal(shareOf({ quality: { tier: 'low' } }, 'glow'), 0);
+    assert.equal(shareOf({ quality: { tier: 'medium' } }, 'far'), QUALITY.medium.far);
+});

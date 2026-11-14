@@ -25,6 +25,11 @@ export const QUALITY = {
     }
 };
 
+/** A scene's current share of one look (`glow`, `far`, ...): the high tier's while the scene has no tier yet (during create). */
+export function shareOf(scene, key, cfg = QUALITY) {
+    return cfg[scene.quality?.tier ?? 'high'][key];
+}
+
 /** The tier to start with: the saved one, else medium on a phone or tablet and high on a desktop. */
 export function startTier(saved, mobile, cfg = QUALITY) {
     return cfg.tiers.includes(saved) ? saved : mobile ? 'medium' : 'high';

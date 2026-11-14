@@ -56,7 +56,7 @@ import ContainerLayer from '../game/level/ContainerLayer.js';
 import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
-import { QUALITY, startTier, createAutotune } from '../game/quality.js';
+import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
 import FriendSchool from '../game/FriendSchool.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
@@ -1678,7 +1678,7 @@ export default class MainScene extends Phaser.Scene {
         moving += Math.hypot(breakerAt(view.x, view.y, waves, p).x, p.y) + Math.abs(downAt(view.x, view.y, p).y);
         updateWeatherSound(stormShare(view.x) * (1 - 0.6 * Phaser.Math.Clamp(view.y / 1500, 0, 1)), moving / WORLD.rushFull);
         // In the dark the fish carries a little light of its own.
-        this.glow.setPosition(view.x, view.y).setAlpha(depth01 * FISH_LIGHT.alpha);
+        this.glow.setPosition(view.x, view.y).setAlpha(depth01 * FISH_LIGHT.alpha * shareOf(this, 'glow'));
 
         this.level.update(this.camX, this.camY);
         if (this.fadeInAt && (this.level.viewReady || time > this.fadeInAt)) { this.fadeInAt = 0; this.cameras.main.fadeIn(320, 10, 40, 70); }
