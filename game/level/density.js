@@ -36,6 +36,7 @@ export const ROUTE = {
     aboveNest: 240,     // it passes this far above every nest
     descent: 1.6,       // px along the way per px of depth when it dips to a nest (gentle slopes)
     clear: 420,         // hazards stay at least this far from its middle
+    nestHalf: 300,      // px to either side of a nest within which passing over it reaches it, at any depth (its light stands up to the surface)
     fadeIn: [1500, 900],   // the lane starts this far west of the start pool and reaches full depth over this many px
     fadeOut: 280,       // and it closes over this many px before the world's east end (behind the grand nest)
     wander: [110, 45],  // px its edges wander outward, on a broad and on a fine scale (never inward: the lane keeps its width)
@@ -267,4 +268,14 @@ export function chunkGrids(field, seed, ox, oy, span, n) {
 /** View a flat row-major grid as an array of rows (no copying). */
 export function gridRows(flat, side) {
     return Array.from({ length: side }, (_, j) => flat.subarray(j * side, (j + 1) * side));
+}
+
+/**
+ * Does a fish at (x, y) reach the nest? Anywhere in the water above it: a column of light stands
+ * on every nest up to the surface, and swimming through it is enough. So a child who follows the
+ * route down to the nest reaches it, and so does one who simply swims straight on overhead.
+ */
+export function nestReached(nest, x, y, cfg = ROUTE) {
+    // The grand nest is the journey's end: there you have to arrive in the lane, not pass far overhead.
+    return Math.abs(x - nest.x) < cfg.nestHalf && y < nest.y + 40 && y > (nest.grand ? nest.y - cfg.aboveNest - cfg.halfWidth - 40 : 0);
 }

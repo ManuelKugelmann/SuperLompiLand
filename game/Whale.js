@@ -5,7 +5,7 @@ export const WHALE_SCENE = {
     id: 'whale',         // the journey's name for this event
     near: 3400,          // px: she appears when the player is this close to her place ...
     far: 5600,           // ... and is taken away again beyond this while still caught
-    below: 400,          // px she swims under the calm route (which runs just under the surface out here)
+    below: 260,          // px she swims under the calm route: her back lies right under the lane, so whoever follows the coins swims along her and tears the net off
     lookWithin: 1900,    // px from her middle within which the view tips down to her
     // A piece of net is wrapped round her where it hangs: `bodyHalf` = half her height there (in
     // her lengths, one per piece, as in WHALE.nets). The near half of the wrap lies on her side

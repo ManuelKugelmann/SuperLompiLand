@@ -8,8 +8,8 @@ export const WHALE = {
     length: 1350,        // px nose to fluke: huge, and still whole in the picture
     nets: [0.84, 0.62, 0.38, 0.12],   // where the net pieces hang, as a share of her length from the fluke
     netDrop: [-0.03, 0, -0.02, 0.01],   // ... and how far above (-) or below (+) her middle line, in lengths
-    cutRadius: 240,      // px: swimming this close to a piece tears it off
-    cutPause: 0.8,       // s before the next piece can come off: one per touch
+    cutRadius: 330,      // px: swimming this close to a piece tears it off (along her back counts)
+    cutPause: 0.4,       // s before the next piece can come off: one per touch, and a swim along her takes them one after the other
     drift: 42,           // px/s while she is caught
     waitBehind: 1500,    // px: she stops and waits when the player is this far behind her
     singS: 2.6,          // s she sings before she sets off

@@ -46,7 +46,7 @@ import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from 
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
-import { ROUTE } from '../game/level/density.js';
+import { ROUTE, nestReached } from '../game/level/density.js';
 import { BOOK_KEY, placeBadge } from './ReefBookScene.js';
 import { STYLE_KEY } from './PlayStyleScene.js';
 import { HUD_KEY } from './HudScene.js';
@@ -194,7 +194,7 @@ export default class MainScene extends Phaser.Scene {
         this.whale = this.ambientMode || !whaleAt ? null
             : new Whale(this, this.journey, whaleAt.x, whaleAt.endX, x => this.level.field.routeY(x), (ev, x, y) => this.whaleEvent(ev, x, y));
         // The set pieces of the long sea stretches (spec 5.0e): the ghost ship, and the beacon over the grand nest.
-        this.setPieces = new SetPieceLayer(this, this.level.nests[this.level.nests.length - 1]);
+        this.setPieces = new SetPieceLayer(this, this.level.nests[this.level.nests.length - 1], this.level.nests.slice(0, -1));
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
         this.pearls = this.progression.get?.('pearls', []) || [];
         this.branch = new BranchLayer(this, this.level.field.cave, this.pearls.includes('kelp_cave'), (x, y) => this.takePearl('kelp_cave', x, y));
@@ -1083,7 +1083,7 @@ export default class MainScene extends Phaser.Scene {
             this.tweens.add({ targets: heart, y: heart.y - 120, alpha: 0, duration: 1100, onComplete: () => heart.destroy() });
         }
         for (const nest of this.level.nests) {
-            if (Math.abs(p.x - nest.x) < 230 && p.y > nest.y - 260 && p.y < nest.y + 40) this.reachNest(nest);
+            if (nestReached(nest, p.x, p.y)) this.reachNest(nest);
         }
         for (const h of this.level.hazards) {
             if (this.relaxed) break;

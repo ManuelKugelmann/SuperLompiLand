@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY } from '../game/level/density.js';
+import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY, nestReached } from '../game/level/density.js';
 import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS, REEF_CREST, reefCrest, reefCrestX } from '../game/level/biomes.js';
 import { detour } from '../game/level/weather.js';
 import { ghostShip } from '../game/level/setPieces.js';
@@ -139,4 +139,20 @@ test('the reef crest stands just under the surface at the reef\'s outer edge, lu
     // Solid from its top down to the pass: no shelf hanging over open water.
     for (let y = REEF_CREST.top + 250; y < f.routeY(c) - ROUTE.halfWidth * 2; y += 60) assert.ok(f.density(c + 100, y) > FIELD.threshold, `solid at ${y}`);
     assert.equal(reefCrest(c - 2000), 0);
+});
+
+test('following the calm route reaches every nest: anywhere in the lane over it counts, far above it does not', () => {
+    for (const seed of [1337, 7]) {
+        const f = createField(seed);
+        for (const n of f.nests) {
+            const ry = f.routeY(n.x);
+            for (const dy of [-ROUTE.halfWidth * 0.9, 0, ROUTE.halfWidth * 0.9]) assert.ok(nestReached(n, n.x, ry + dy), `seed ${seed}, nest ${n.index}, ${Math.round(dy)} off the route`);
+            assert.ok(nestReached(n, n.x + 200, n.y - 20), 'and at the nest itself');
+            assert.equal(nestReached(n, n.x, 200), !n.grand, 'also from anywhere in the water above it, except at the grand nest');
+            assert.ok(!nestReached(n, n.x, -50), 'not from the air');
+            assert.ok(!nestReached(n, n.x + ROUTE.nestHalf + 50, ry), 'not from beside it');
+            // Swimming along the route at any speed up to a sprint, a 60 Hz step cannot jump over the zone.
+            assert.ok(ROUTE.nestHalf * 2 > 30 * 4);
+        }
+    }
 });
