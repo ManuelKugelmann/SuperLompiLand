@@ -12,7 +12,8 @@ export const FERRY = {
     speed: 430,          // px/s (faster than a cruising fish: it overtakes)
     lead: 1900,          // px behind the fish it starts, and ahead of it where it is gone
     hull: [1000, 150],   // px long and deep in the water
-    shadow: 0.3,         // how dark its shadow is right under it (fading with depth)
+    shadow: 0.27,        // how much darker the water is under it, all the way down
+    look: { within: 600, max: 400, easeS: 0.8 },   // the camera looks up while the hull is within this many px of the fish (along x): by at most `max` px, eased over `easeS`
     wash: {
         length: 1700,    // px behind the stern the wash reaches
         half: 190,       // px above and below its middle it carries
@@ -59,4 +60,19 @@ export function washAt(x, y, hx, dir, surfaceY, routeY, out = { x: 0, y: 0 }, cf
     if (off >= W.half) return out;
     out.x = dir * W.carry * (1 - s / W.length) * smooth(1 - off / W.half);
     return out;
+}
+
+/**
+ * How far (px) the camera looks up for the ferry: enough to bring the waterline and the hull into
+ * the top of the picture, never more than `look.max`. `viewTop` = world y of the picture's top
+ * edge as it would be without the look; `k` = 0..1, how far the look is eased in.
+ */
+export function lookUp(viewTop, surfaceY, k, cfg = FERRY) {
+    return Math.max(0, Math.min(cfg.look.max, viewTop - (surfaceY - 30))) * smooth(k);
+}
+
+/** The look's ease a step later: toward 1 while the hull is within `look.within` px of the fish, back to 0 otherwise. */
+export function lookEase(k, hullDx, dt, cfg = FERRY) {
+    const step = dt / cfg.look.easeS;
+    return Math.abs(hullDx) < cfg.look.within ? Math.min(1, k + step) : Math.max(0, k - step);
 }

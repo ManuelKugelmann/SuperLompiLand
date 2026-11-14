@@ -25,7 +25,7 @@ export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
     const rows = new Map();
     let x = from, at = 0, total = 0, done = false, waited = 0;
     const row = id => {
-        if (!rows.has(id)) rows.set(id, { biome: id, logicMs: 0, worstMs: 0, sumMs: 0, chunkMs: 0, hopMs: 0, renderMs: 0, hopRenderMs: 0, objects: 0, tweens: 0, frames: 0, all: [] });
+        if (!rows.has(id)) rows.set(id, { biome: id, logicMs: 0, worstMs: 0, sumMs: 0, chunkMs: 0, hopMs: 0, renderMs: 0, hopRenderMs: 0, renders: [], objects: 0, tweens: 0, frames: 0, all: [] });
         return rows.get(id);
     };
     return {
@@ -46,7 +46,7 @@ export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
             if (done || total < cfg.warmMs) return;
             const r = row(biomeAt(x));
             if (s.settling || at < cfg.skipMs) { r.hopMs = Math.max(r.hopMs, s.logicMs + s.chunkMs); r.hopRenderMs = Math.max(r.hopRenderMs, s.renderMs || 0); return; }
-            r.renderMs = Math.max(r.renderMs, s.renderMs || 0);
+            r.renderMs = Math.max(r.renderMs, s.renderMs || 0); r.renders.push(s.renderMs || 0);
             // Logic: the average counts against the budget (one slow frame is a hitch, not the frame cost); the worst is shown too.
             r.all.push(s.logicMs); r.sumMs += s.logicMs; r.worstMs = Math.max(r.worstMs, s.logicMs); r.chunkMs = Math.max(r.chunkMs, s.chunkMs);
             r.objects = Math.max(r.objects, s.objects); r.tweens = Math.max(r.tweens, s.tweens);
@@ -56,9 +56,11 @@ export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
         /** One row per biome visited, in order, each with `over`: the names of the budgets it broke (logic: by its p95). */
         rows() {
             // p50 and p95 of the logic time: the budget is about the usual frame and the slow ones, not one hitch.
-            return [...rows.values()].map(({ all, sumMs, ...r }) => {
-                const sorted = [...all].sort((a, b) => a - b), at = q => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : 0;
-                const row = { ...r, p50Ms: at(0.5), p95Ms: at(0.95) };
+            return [...rows.values()].map(({ all, sumMs, renders, ...r }) => {
+                const pick = list => { const sorted = [...list].sort((a, b) => a - b); return q => sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : 0; };
+                const at = pick(all), drawn = pick(renders);
+                // Drawing: its usual and its slow frames too (renderMs is the single worst: one upload or shader compile shows there).
+                const row = { ...r, p50Ms: at(0.5), p95Ms: at(0.95), renderP50: drawn(0.5), renderP95: drawn(0.95) };
                 const check = { logicMs: row.p95Ms, chunkMs: row.chunkMs, objects: row.objects, tweens: row.tweens };
                 return { ...row, over: Object.keys(cfg.budget).filter(k => check[k] > cfg.budget[k]) };
             });
@@ -69,8 +71,8 @@ export function createPerfTour(from, to, biomeAt, cfg = PERF_TOUR) {
 /** The result as lines of text (for the screen and the console). */
 export function perfReport(rows) {
     const pad = (v, n) => String(v).padStart(n);
-    return ['biome       logic avg       p50       p95     worst  chunk ms  objects  tweens    hop ms render ms  hop render',
-        ...rows.map(r => `${r.biome.padEnd(10)}${pad(r.logicMs.toFixed(1), 11)}${pad(r.p50Ms.toFixed(1), 10)}${pad(r.p95Ms.toFixed(1), 10)}${pad(r.worstMs.toFixed(1), 10)}${pad(r.chunkMs.toFixed(1), 10)}${pad(r.objects, 9)}${pad(r.tweens, 8)}${pad(r.hopMs.toFixed(0), 10)}${pad(r.renderMs.toFixed(1), 10)}${pad(r.hopRenderMs.toFixed(0), 12)}${r.over.length ? '   OVER: ' + r.over.join(', ') : ''}`)];
+    return ['biome       logic avg       p50       p95     worst  chunk ms  objects  tweens    hop ms render p50/p95/max  hop render',
+        ...rows.map(r => `${r.biome.padEnd(10)}${pad(r.logicMs.toFixed(1), 11)}${pad(r.p50Ms.toFixed(1), 10)}${pad(r.p95Ms.toFixed(1), 10)}${pad(r.worstMs.toFixed(1), 10)}${pad(r.chunkMs.toFixed(1), 10)}${pad(r.objects, 9)}${pad(r.tweens, 8)}${pad(r.hopMs.toFixed(0), 10)}${pad(`${r.renderP50.toFixed(1)}/${r.renderP95.toFixed(1)}/${r.renderMs.toFixed(0)}`, 20)}${pad(r.hopRenderMs.toFixed(0), 12)}${r.over.length ? '   OVER: ' + r.over.join(', ') : ''}`)];
 }
 
 /** The build steps slower than `slowStepMs`, slowest first, as lines of text. `steps` = Map(name -> { ms, x }), `biomeAt` = x -> biome id. */

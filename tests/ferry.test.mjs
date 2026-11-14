@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FERRY, ferrySpot, passage, hullX, washY, washAt } from '../game/level/ferry.js';
+import { FERRY, ferrySpot, passage, hullX, washY, washAt, lookUp, lookEase } from '../game/level/ferry.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { worldMap, LANDMARK_KINDS } from '../game/level/worldMap.js';
 
@@ -36,4 +36,19 @@ test('the wash runs from the stern down to the lane and carries along, strongest
     for (let u = 0; u < 12; u += 1 / 60) if (washAt(6000, route, 4000 + FERRY.speed * u, 1, surface, route, {}).x > 0.5) carried += 1 / 60;
     assert.ok(carried > 1 && carried < 6, `carried for ${carried.toFixed(1)} s`);
     assert.ok(washAt(hx + FERRY.hull[0] / 2 + 700, washY(700, surface, route), hx, -1, surface, route, {}).x < -1, 'a westward passage carries west');
+});
+
+test('the camera looks up while the hull is over the fish: far enough to show the waterline, eased in and out', () => {
+    assert.equal(lookUp(345, 0, 0), 0);
+    assert.equal(lookUp(345, 0, 1), 375, 'a lane 885 px deep on a 1080 px view: the waterline comes just into the picture');
+    assert.equal(lookUp(2000, 0, 1), FERRY.look.max, 'never more than the limit');
+    assert.equal(lookUp(-100, 0, 1), 0, 'the waterline is in the picture anyway: no look');
+    assert.ok(lookUp(345, 0, 0.5) > 0 && lookUp(345, 0, 0.5) < 375);
+    let k = 0;
+    for (let i = 0; i < 60; i++) k = lookEase(k, 100, 1 / 60);
+    assert.equal(k, 1, 'fully in after about a second under the hull');
+    for (let i = 0; i < 24; i++) k = lookEase(k, FERRY.look.within + 50, 1 / 60);
+    assert.ok(k > 0 && k < 1, 'easing out once the hull has passed');
+    for (let i = 0; i < 60; i++) k = lookEase(k, Infinity, 1 / 60);
+    assert.equal(k, 0);
 });
