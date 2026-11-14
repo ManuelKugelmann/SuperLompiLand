@@ -73,7 +73,9 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
          * player {x, y, vx, vy} in px/s (all optional).
          */
         step(dt, env = {}) {
-            const W = P.weights, pl = env.player;
+            const W = P.weights;
+            // Players: the local fish and, in a room, its friends (`players`), or one `player`.
+            const players = env.players || (env.player ? [env.player] : []);
             // Leader: wander the home range, keep to open water.
             leader.retarget -= dt;
             const ld = Math.hypot(leader.tx - leader.x, leader.ty - leader.y);
@@ -88,16 +90,14 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
             const lv = Math.min(P.speed * 0.8, ld) || 0;
             if (ld > 1) { leader.x += (leader.tx - leader.x) / ld * lv * dt; leader.y += (leader.ty - leader.y) / ld * lv * dt; }
 
-            // Player: where it will be, how fast, how calm.
-            let ppx = 0, ppy = 0, pspeed = 0;
-            if (pl) {
-                ppx = pl.x + pl.vx * P.playerPredictS; ppy = pl.y + pl.vy * P.playerPredictS;
-                pspeed = Math.hypot(pl.vx, pl.vy);
-            }
+            // Each player: where it will be, how fast, how calm.
             // fright > 1: a predator (Sharky). Fish keep more room and never let it in.
-            const fright = pl?.fright || 1;
-            const calm = pl && pspeed < P.calmSpeed && fright <= 1;
-            const personal = (calm ? P.playerR * 0.45 : P.playerR * (1 + Math.min(1.5, pspeed / P.dashSpeed))) * fright;
+            const ps = players.map(pl => {
+                const speed = Math.hypot(pl.vx, pl.vy), fright = pl.fright || 1;
+                const calm = speed < P.calmSpeed && fright <= 1;
+                return { pl, speed, calm, ppx: pl.x + pl.vx * P.playerPredictS, ppy: pl.y + pl.vy * P.playerPredictS,
+                    personal: (calm ? P.playerR * 0.45 : P.playerR * (1 + Math.min(1.5, speed / P.dashSpeed))) * fright };
+            });
 
             buildGrid();
             const decay = Math.exp(-P.panicDecay * dt);
@@ -126,8 +126,11 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                 }
                 // Follow the leader loosely, and stay near home.
                 fx += (leader.x - px[i]) * W.leader * 0.3; fy += (leader.y - py[i]) * W.leader * 0.3;
-                // The player: part around its predicted path; a dash nearby starts a panic.
-                if (pl) {
+                // The players: part around each predicted path; a dash nearby starts a panic.
+                let near = null, nearD = Infinity;
+                for (const { pl, speed: pspeed, calm, ppx, ppy, personal } of ps) {
+                    const pd = Math.hypot(px[i] - pl.x, py[i] - pl.y);
+                    if (pd < nearD) { nearD = pd; near = pl; }
                     const dx = px[i] - ppx, dy = py[i] - ppy, d = Math.hypot(dx, dy);
                     if (d < personal && d > 1e-3) {
                         const k = (personal - d) / personal;
@@ -140,7 +143,7 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                         fx += ex * k * W.player * 400; fy += ey * k * W.player * 400;
                         if (!calm) panic[i] = Math.max(panic[i], k * 0.7);   // startled: a burst of speed
                     }
-                    if (pspeed > P.dashSpeed && Math.hypot(px[i] - pl.x, py[i] - pl.y) < P.panicR) panic[i] = 1;
+                    if (pspeed > P.dashSpeed && pd < P.panicR) panic[i] = 1;
                 }
                 // Rock ahead: turn away from it before touching it.
                 const sp = Math.hypot(vx[i], vy[i]) || 1;
@@ -148,8 +151,8 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                     fx += -vx[i] / sp * W.avoid * 40 + -vy[i] / sp * W.avoid * 25;
                     fy += -vy[i] / sp * W.avoid * 40 + vx[i] / sp * W.avoid * 25;
                 }
-                if (panic[i] > 0.05 && pl) {              // flee from the player while panicking
-                    const dx = px[i] - pl.x, dy = py[i] - pl.y, d = Math.hypot(dx, dy) || 1;
+                if (panic[i] > 0.05 && near) {            // flee from the nearest player while panicking
+                    const dx = px[i] - near.x, dy = py[i] - near.y, d = Math.hypot(dx, dy) || 1;
                     fx += dx / d * panic[i] * 120; fy += dy / d * panic[i] * 120;
                 }
                 // Momentum: limited acceleration, then speed limits.

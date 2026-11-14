@@ -982,7 +982,11 @@ export default class MainScene extends Phaser.Scene {
         this.particles.update(delta / 1000);
         const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step
         pl.x = view.x; pl.y = view.y; pl.vx = v.x * 60; pl.vy = v.y * 60; pl.fright = this.character.fright || 1;
-        this.swarms.update(delta / 1000, view.x, view.y, pl);
+        // In a room, friends are players for the shoals too (spec ch.13 "Creatures in a room").
+        const players = this.swarmPlayers || (this.swarmPlayers = []);
+        players.length = 0; players.push(pl);
+        for (const g of this.mp?.ghosts.values() ?? []) if (g.pos) players.push({ x: g.pos.x, y: g.pos.y, vx: 0, vy: 0 });
+        this.swarms.update(delta / 1000, view.x, view.y, players);
         this.oilExposure(delta / 1000);
         this.bobCoins();
         this.discover(delta);

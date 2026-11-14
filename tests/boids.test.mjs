@@ -82,3 +82,17 @@ test('fish never enter rock', () => {
     run(sw, 15, { isOpen: open });
     for (let i = 0; i < sw.count; i++) assert.ok(open(sw.x[i], sw.y[i]), `fish ${i} at ${sw.y[i]}`);
 });
+
+test('a list of players (a room): the swarm parts around a friend too', () => {
+    const sw = createSwarm({ count: 100, random: seq(21) });
+    run(sw, 5);
+    const c = sw.centre();
+    let min = Infinity;
+    run(sw, 2, t => {
+        const friend = { x: c.x - 400 + t * 400, y: c.y, vx: 400, vy: 0 };
+        const me = { x: c.x + 3000, y: c.y, vx: 0, vy: 0 };
+        for (let i = 0; i < sw.count; i++) min = Math.min(min, Math.hypot(sw.x[i] - friend.x, sw.y[i] - friend.y));
+        return { players: [me, friend] };
+    });
+    assert.ok(min > 25, `closest fish to the friend: ${min.toFixed(1)} px`);
+});

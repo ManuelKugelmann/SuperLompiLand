@@ -153,11 +153,11 @@ export default class SwarmLayer {
         }
     }
 
-    /** dt in s; player {x, y, vx, vy} in px/s. */
-    update(dt, cx, cy, player) {
+    /** dt in s; players: [{x, y, vx, vy, fright?}] in px/s (the local fish and, in a room, its friends). */
+    update(dt, cx, cy, players) {
         this.checkAt -= dt * 1000;
         if (this.checkAt <= 0) { this.checkAt = SWARMS.checkMs; this.manage(cx, cy); }
-        const env = { isOpen: this.env.isOpen, flowAt: this.env.flowAt, player };
+        const env = { isOpen: this.env.isOpen, flowAt: this.env.flowAt, players };
         this.time = (this.time || 0) + dt;
         for (const s of this.swarms) {
             s.sim.step(Math.min(dt, 0.05), env);
