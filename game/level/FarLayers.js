@@ -19,8 +19,8 @@ export const depthFor = s => -22.5 + 12 * s;
 // Far things are under water too. A far layer's surface lies lower on screen than the real one
 // once the camera rises above the water, so a tall far object would stand in the sky. Each one
 // is therefore made no taller than what stays under the real waterline with the camera's top
-// edge this share of the screen height above the surface (higher than that only in a jump).
-const CAMERA_ABOVE = 1 / 3, HEADROOM = 24, MIN_HEIGHT = 70;
+// edge this share of the screen height above the surface (it goes that high in a jump).
+const CAMERA_ABOVE = 0.5, HEADROOM = 24, MIN_HEIGHT = 70;
 
 export default class FarLayers {
     constructor(scene) {
