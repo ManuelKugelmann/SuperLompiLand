@@ -38,6 +38,7 @@ import BranchLayer from '../game/level/BranchLayer.js';
 import DocksLayer from '../game/level/DocksLayer.js';
 import MantaLayer from '../game/ai/MantaLayer.js';
 import SeaArchLayer from '../game/level/SeaArchLayer.js';
+import RescueLayer, { RESCUES } from '../game/RescueLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
@@ -206,6 +207,8 @@ export default class MainScene extends Phaser.Scene {
         this.manta = new MantaLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('manta'));
         // The rocky shore's set piece (spec 5.0g): the sea arch, with its arc of coins for a jump through it.
         this.arch = new SeaArchLayer(this, seaArch(), inAir => this.throughArch(inAir), (x, y) => this.coinTaken(x, y));
+        // Small rescues between the chapters (spec 5.0i): an animal in a bit of net every so often on the route.
+        this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -308,7 +311,7 @@ export default class MainScene extends Phaser.Scene {
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
         // A grumpy's shove (ai/grumpy.js, spec 7.1): half a heart, never the last half; relaxed play only gets the push.
         this.events.on('grumpy-hit', ({ x, y }) => this.softHit(x, y));
-        this.events.on('fish-special', ({ x, y }) => { this.docks.special(x, y); this.beats?.special(x, y); this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
+        this.events.on('fish-special', ({ x, y }) => { this.docks.special(x, y); this.beats?.special(x, y); this.rescues?.special(x, y); this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
@@ -532,6 +535,17 @@ export default class MainScene extends Phaser.Scene {
         console.log(text);
         this.add.text(40, 120, text, { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
             .setScrollFactor(0).setDepth(99);
+    }
+
+    /** A small animal is out of its bit of net (RescueLayer): a few coins, a cheer, its stamp in the reef book. */
+    smallRescue(spot, x, y) {
+        this.progression.set?.('rescues', this.rescues.toJSON());
+        this.coins += RESCUES.coins;
+        play('friend');
+        this.chainMove('special');
+        this.bookEntry(spot.kind);
+        this.announce(this.lang === 'de' ? 'Befreit!' : 'Set free!', `+${RESCUES.coins}`);
+        this.particles.spawn('bubble', x, y, 8, { radius: 9, spread: 46 });
     }
 
     /** Through the sea arch: a chain move, the first time an entry in the reef book; flown through, a cheer. */
@@ -1378,6 +1392,7 @@ export default class MainScene extends Phaser.Scene {
         this.manta.update(sp, time / 1000, delta);
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
+        this.rescues?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
             const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);

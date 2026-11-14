@@ -1,3 +1,4 @@
+import { rescueSpots } from '../rescues.js';
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
@@ -23,7 +24,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 26,
+    version: 27,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -166,7 +167,7 @@ export default class LevelGenerator {
         makeMicroTextures(scene);
         this.field = createField(LEVEL.seed);
         this.docks = docksSpot();
-        this.storySpots = chapters().filter(c => c.friend).map(c => ({ x: c.x, y: this.field.routeY(c.x) }));
+        this.storySpots = [...chapters().filter(c => c.friend), ...rescueSpots()].map(c => ({ x: c.x, y: this.field.routeY(c.x) }));      // friends' nets and small rescues
         this.storyStretches = chapters().filter(c => c.event).map(c => ({ x0: c.event.x - JOURNEY.eventClear, x1: c.event.endX + JOURNEY.eventClear }));
         this.storyStretches.push({ x0: ghostShip().x - SET_PIECES.ship.clear, x1: ghostShip().x + SET_PIECES.ship.clear });      // nothing harmful around the ghost ship
         // Never out of reach: coins and friends are not placed in sealed pockets of water (reach.js).

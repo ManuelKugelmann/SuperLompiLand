@@ -82,15 +82,19 @@ const CAVE_REACH = BRANCH.mouth + BRANCH.rim + BRANCH.ends * 4;      // how far 
 // Where the reef crest is and how far its slopes can reach (worked out once).
 const CREST_X = reefCrestX(), CREST_REACH = REEF_CREST.inset + REEF_CREST.half + 3000 / REEF_CREST.lagoonSlope;
 
-/** Stretches where no nest may lie: [x0, x1] around the reef crest, the side cave, the docks, the sea arch and every chapter's net. */
-function nestKeepOuts() {
-    const k = FIELD.nestKeep, by = id => BIOMES.find(b => b.id === id), cave = by(BRANCH.biome).from + by(BRANCH.biome).width * BRANCH.at;
+/** The set pieces' stretches of the world, [x0, x1] each: the reef crest, the side cave, the sea arch, the landmark at a biome's entry (the docks). */
+export function setPieceStretches() {
+    const by = id => BIOMES.find(b => b.id === id), cave = by(BRANCH.biome).from + by(BRANCH.biome).width * BRANCH.at;
     const out = [[CREST_X - CREST_REACH, Infinity === CREST_REACH ? CREST_X : CREST_X + REEF_CREST.inset], [cave - CAVE_REACH, cave + BRANCH.length + CAVE_REACH],
         [ARCH.x0 - SEA_ARCH.approach, ARCH.x1 + SEA_ARCH.approach]];
-    for (const b of BIOMES) {
-        out.push([b.from + b.width * 0.55 - 400, b.from + b.width * 0.55 + 400]);      // the chapter's net (journey.js JOURNEY.at)
-        if (b.landmark) out.push([b.from + LANDMARK.entry - 1200, b.from + LANDMARK.entry + 1200]);
-    }
+    for (const b of BIOMES) if (b.landmark) out.push([b.from + LANDMARK.entry - 1200, b.from + LANDMARK.entry + 1200]);
+    return out;
+}
+
+/** Stretches where no nest may lie: the set pieces and every chapter's net, with room around them. */
+function nestKeepOuts() {
+    const k = FIELD.nestKeep, out = setPieceStretches();
+    for (const b of BIOMES) out.push([b.from + b.width * 0.55 - 400, b.from + b.width * 0.55 + 400]);      // the chapter's net (journey.js JOURNEY.at)
     return out.map(([x0, x1]) => [x0 - k, x1 + k]);
 }
 
