@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import Rig from './Rig.js';
+import { createRig } from './CardRig.js';
 import { JOURNEY } from './journey.js';
 import { musicClock, nowSeconds } from './audio.js';
 
@@ -17,10 +17,10 @@ export const BEATS = {
     leaveSpeed: 7       // px per step
 };
 
-export const NET_KEY = 'beat_net';
+const NET_KEY = 'beat_net';
 
 /** The ghost net as a picture: a sagging mesh of old rope (fallback art, drawn once). */
-export function ensureNet(scene) {
+function ensureNet(scene) {
     if (scene.textures.exists(NET_KEY)) return;
     const S = 256, c = S / 2, g = scene.make.graphics({ add: false });
     g.lineStyle(5, 0xb9a27a, 0.95);
@@ -51,7 +51,7 @@ export default class StoryBeats {
 
     build(ch) {
         const s = this.scene, x = ch.x, y = this.routeY(x), size = ch.friend.states.normal.width;
-        const rig = new Rig(s, ch.friend, x, y, 4.5);
+        const rig = createRig(s, ch.friend, x, y, 4.5);
         rig.zoom = BEATS.zoom;
         const glow = s.add.image(x, y, 'bd_glow').setDisplaySize(BEATS.glow * 2, BEATS.glow * 2).setTint(0xfff3b0).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
         const n = Math.max(BEATS.netMin, size * BEATS.zoom * BEATS.netSize);

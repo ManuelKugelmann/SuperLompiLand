@@ -714,12 +714,15 @@ export default class LevelGenerator {
         // two can be told apart at a glance.
         // The sheen is the friend's own picture once more, added on top in travelling
         // rainbow colours: it lies exactly on the body and bends with it.
-        const sheen = img.addOverlay(s, f.ground ? 1.05 : 4.05).setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
-        // Pure colour inside the picture's outline (a tint would only multiply with the body colour).
-        if (Phaser.TintModes) sheen.setTintMode?.(Phaser.TintModes.FILL); else sheen.tintFill = true;
-        sheen.follow = img;
-        sheen.hue = rng.frac();
-        this.lights.push(sheen);
+        const sheen = img.addOverlay(s, f.ground ? 1.05 : 4.05);
+        if (sheen) {
+            sheen.setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
+            // Pure colour inside the picture's outline (a tint would only multiply with the body colour).
+            if (Phaser.TintModes) sheen.setTintMode?.(Phaser.TintModes.FILL); else sheen.tintFill = true;
+            sheen.follow = img;
+            sheen.hue = rng.frac();
+            this.lights.push(sheen);
+        }
         chunk.objects.push(img);
         // Friends are numbered per chunk too. They greet you every time you come
         // back; only the coin bonus is given once per friend, for good.

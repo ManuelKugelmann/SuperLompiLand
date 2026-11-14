@@ -1,4 +1,4 @@
-import Rig from './Rig.js';
+import { createRig } from './CardRig.js';
 import { musicClock, nowSeconds } from './audio.js';
 import { createSwimmer, stepSwimmer } from './ai/swimmer.js';
 import { createCrawler, stepCrawler } from './ai/crawler.js';
@@ -31,7 +31,7 @@ export default class Creature {
         this.body = { x, y, dir: 1, lean: angle, lift: 0, bob: row.bob || 0 };
         this.size = 1;
         this.pulses = row.anim === 'pulse';
-        this.rig = new Rig(scene, rigProfile(key, row), x, y, row.ground ? 1 : 4);
+        this.rig = createRig(scene, rigProfile(key, row), x, y, row.ground ? 1 : 4);   // part cards where the art has them
         if (row.crawl) {
             const c = createCrawler(x, y, env.density, env.threshold, row.crawl, seed);
             if (c.onRock) { this.crawler = c; this.body.lift = Math.hypot(x - c.x, y - c.y); }
@@ -46,8 +46,8 @@ export default class Creature {
 
     get height() { return this.rig.view.displayHeight; }
 
-    /** A copy of the body on top of it that bends with it (the friends' rainbow sheen). */
-    addOverlay(scene, depth) { return this.rig.addOverlay(scene, depth); }
+    /** A copy of the body on top of it that bends with it (the friends' rainbow sheen); null for a body made of part cards. */
+    addOverlay(scene, depth) { return this.rig.addOverlay?.(scene, depth) ?? null; }
 
     /**
      * Think and draw one frame. `t` s, `dt` s since the last frame; `water` = the swimmers' and
