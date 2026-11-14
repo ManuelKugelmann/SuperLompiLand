@@ -31,7 +31,7 @@ import SpeedLines from '../game/fx/SpeedLines.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
-import { JOURNEY, createJourney } from '../game/journey.js';
+import { JOURNEY, chapters, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
 import SetPieceLayer from '../game/level/SetPieceLayer.js';
 import BranchLayer from '../game/level/BranchLayer.js';
@@ -214,7 +214,8 @@ export default class MainScene extends Phaser.Scene {
         }, (ev, x, y) => this.seabirdEvent(ev, x, y));
         this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
         // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
-        this.journey = createJourney(this.progression.get?.('journey', []) || []);
+        // Whoever the player plays is not waiting in a net: Lompi waits there instead (journey.js).
+        this.journey = createJourney(this.progression.get?.('journey', []) || [], chapters(undefined, undefined, this.registry.get('character') || loadSelectedId()));
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y));
         // The great whale of the open blue: free her from the net and she carries you east (spec 9.0).
         const whaleAt = this.journey.event(WHALE_SCENE.id);

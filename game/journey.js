@@ -15,7 +15,8 @@ export const JOURNEY = {
     specialRadius: 420,  // px: a special this close tears it too
     clear: 250,          // px around an event that stay free of coins
     eventClear: 1800,    // px before and after a big event's stretch that stay free of hazards
-    coins: 10            // thank-you coins for each friend freed
+    coins: 10,           // thank-you coins for each friend freed
+    standIn: 'lompi'     // who waits in the net of the chapter whose friend the player is playing: nobody rescues themselves
 };
 
 /** Per biome: who waits there (a character id) and what the chapter asks, in a child's words. */
@@ -35,13 +36,17 @@ const CHAPTERS = {
 
 const ONWARD = { de: 'Weiter nach Osten!', en: 'Onward, east!' };
 
-/** The chapters west to east: { index, id, name, goal, friend (character or null), x (of its event) }. */
-export function chapters(biomes = BIOMES, cfg = JOURNEY) {
+/**
+ * The chapters west to east: { index, id, name, goal, friend (character or null), x (of its event) }.
+ * `playing` = id of the character the player plays: in the chapter where that friend would wait,
+ * the stand-in waits instead (where things are does not change).
+ */
+export function chapters(biomes = BIOMES, cfg = JOURNEY, playing = null) {
     return biomes.map((b, index) => {
         const c = CHAPTERS[b.id] || {};
         return {
             index, id: b.id, name: b.name, goal: c.goal || ONWARD,
-            friend: CHARACTERS.find(ch => ch.id === c.friend) || null,
+            friend: CHARACTERS.find(ch => ch.id === (c.friend && c.friend === playing ? cfg.standIn : c.friend)) || null,
             x: c.x ?? b.from + b.width * cfg.at,
             event: c.event ? { id: c.event.id, x: b.from + b.width * c.event.from, endX: b.from + b.width * c.event.from + c.event.length } : null
         };

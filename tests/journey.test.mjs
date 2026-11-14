@@ -67,3 +67,18 @@ test('the whale waits in the open blue, after the friend there, and is remembere
     assert.equal(j.count, 0);
     assert.ok(createJourney(j.toJSON()).has('whale'));
 });
+
+test('nobody rescues themselves: in the chapter of the friend the player plays, Lompi waits instead', () => {
+    const plain = chapters(), first = plain[0].friend.id;
+    const mine = chapters(undefined, undefined, first);
+    assert.equal(mine[0].friend.id, JOURNEY.standIn);
+    assert.equal(mine[0].x, plain[0].x, 'where it waits does not change');
+    assert.ok(!mine.some(c => c.friend?.id === first), 'the played character waits nowhere');
+    assert.equal(mine.filter(c => c.friend).length, plain.filter(c => c.friend).length, 'still as many friends');
+    assert.equal(new Set(mine.filter(c => c.friend).map(c => c.friend.id)).size, 6, 'each one once');
+    for (let i = 1; i < plain.length; i++) assert.equal(mine[i].friend?.id, plain[i].friend?.id, 'the other chapters keep theirs');
+    assert.deepEqual(chapters(undefined, undefined, JOURNEY.standIn).map(c => c.friend?.id), plain.map(c => c.friend?.id), 'playing Lompi changes nothing');
+    const j = createJourney([], mine);
+    assert.equal(j.free(JOURNEY.standIn), true);
+    assert.equal(j.count, 1);
+});
