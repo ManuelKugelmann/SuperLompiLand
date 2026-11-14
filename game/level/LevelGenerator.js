@@ -1037,7 +1037,7 @@ export default class LevelGenerator {
     drawGrandSetting(chunk, nest, R) {
         const s = this.scene, G = GRAND;
         ensureGrandArch(s);
-        const arch = s.add.image(nest.x, nest.y + R * G.archDrop, 'grand_arch').setOrigin(0.5, 0.97).setDepth(-1.5);
+        const arch = s.add.image(nest.x + G.archShift, nest.y + R * G.archDrop, 'grand_arch').setOrigin(0.5, 0.97).setDepth(-1.5);
         arch.setScale(R * G.arch / arch.width);
         chunk.objects.push(arch);
         if (!s.textures.exists('grand_garden')) return;
@@ -1323,9 +1323,10 @@ export const NEST_ART = 'nest';
 /**
  * The grand nest's setting (spec 5.0m): a coral arch of dark slate rock over it, and a glowing deep
  * garden along its foot that shines in the dark trench (a second, added copy above the scene's
- * darkness). Sizes in nest radii; `glow` = how strongly the garden shines.
+ * darkness). Sizes in nest radii; `archShift` = px the arch stands right of the nest, so its left
+ * pillar is off the lane (the fish swims into the arch, not through its stone); `glow` = how strongly the garden shines.
  */
-export const GRAND = { arch: 3.4, archDrop: 0.12, garden: 4.2, gardenDrop: 0.42, glow: 0.55, glowDepth: 41 };   // the garden lines the nest's front foot, in front of it (its glow never lies across the plate)
+export const GRAND = { arch: 3.4, archDrop: 0.12, archShift: 150, garden: 4.2, gardenDrop: 0.42, glow: 0.55, glowDepth: 41 };   // the garden lines the nest's front foot, in front of it (its glow never lies across the plate)
 export const GRAND_ART = { grand_arch: 'img/finale/grand_arch.webp', grand_garden: 'img/finale/grand_garden.webp' };
 
 /** A drawn arch when the painted one is missing: slate boulders along a half ring, coral dots on them. */

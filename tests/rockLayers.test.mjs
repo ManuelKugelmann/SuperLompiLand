@@ -140,3 +140,25 @@ test('the rock behind the play plane gets a top skin on its upward edges, in the
     assert.equal(at(8, 15), 60);                               // deep inside unchanged
     assert.equal(rgba[(2 * S + 8) * 4 + 3], 0);                // open water stays open
 });
+
+test('the trench wall stands behind the descent below its rim, has windows, and opens before the grand nest', async () => {
+    const { trenchWallAt, TRENCH_WALL } = await import('../game/level/rockLayerTable.js');
+    const { WORLD_END } = await import('../game/level/biomes.js');
+    const { descentStart } = await import('../game/level/setPieces.js');
+    const route = x => 1000 + (x - descentStart()) / 30;
+    const x0 = descentStart() + TRENCH_WALL.fadeIn, x1 = WORLD_END - TRENCH_WALL.reveal[0];
+    let solid = 0, open = 0, n = 0;
+    for (let x = x0; x < x1; x += 211) {
+        const below = trenchWallAt(x, route(x) + 600, route);
+        if (below > 0.99) solid++; else if (below < 0.01) open++;
+        n++;
+        assert.equal(trenchWallAt(x, route(x) - TRENCH_WALL.above[1] - TRENCH_WALL.rough - TRENCH_WALL.edge, route), 0);   // open water above the rim
+    }
+    assert.ok(solid / n > 0.55, `mostly wall (${solid}/${n})`);
+    assert.ok(open > 0, 'some windows');
+    for (const x of [descentStart() - 10, WORLD_END - TRENCH_WALL.reveal[1] + 10, WORLD_END - 100]) assert.equal(trenchWallAt(x, route(x) + 600, route), 0);
+    // Only the layer that carries it shows it, as rock.
+    const L = ROCK_LAYERS.find(l => l.trenchWall), f = layerField(createField(1337 + L.seed), L, { route });
+    let x = x0; while (trenchWallAt(x, route(x) + 600, route) < 0.99) x += 97;
+    assert.ok(f.density(x, route(x) + 600) > T);
+});

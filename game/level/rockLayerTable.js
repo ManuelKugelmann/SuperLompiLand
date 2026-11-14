@@ -11,7 +11,8 @@
 // Tested in tests/rockLayers.test.mjs.
 import { vnoise } from './terrain.js';
 import { softenLayer } from './layerMath.js';
-import { biomeBlendAt, seaShare, waterTone } from './biomes.js';
+import { biomeBlendAt, seaShare, waterTone, WORLD_END } from './biomes.js';
+import { descentStart } from './setPieces.js';
 import { SHADE } from './shade.js';
 import { FIELD, ROUTE } from './density.js';
 
@@ -28,7 +29,8 @@ export const ROCK_LAYERS = [
     // drawn over it would read as solid, gamedesigner 2026-11-14).
     // socket: closed share in front of an island at least (its rocky underwater base: no far
     // view right in front of an island, spec 5.0c); it eases off into the open sea.
-    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.45, dark: 0.92, depth: -9.5, socket: 0.85 },
+    // trenchWall: this layer carries the trench wall behind the descent (TRENCH_WALL).
+    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.45, dark: 0.92, depth: -9.5, socket: 0.85, trenchWall: true },
     { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.3, dark: 0.95, depth: -7, clearRoute: true }
 ];
 
@@ -71,6 +73,39 @@ export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 1.2, wander
  * (virtual px: big lazy bends, plus a little rough detail).
  */
 export const WALL_EDGE = { bend: 700, bendScale: [600, 450], rough: 120, roughScale: [150, 170] };
+
+/**
+ * The trench wall (spec 5.0m): the trench is one carved abyss, so the layer fields are empty there.
+ * Behind the descent stands a dark rock face instead: solid from a rim `above` px over the route
+ * (wandering between the two values, rough by `rough`) all the way down, so the way down reads as
+ * swimming along a wall into the dark. It grows in over `fadeIn` px from the descent's start, has
+ * open `windows` (share of stretches, period `windowScale`), and gives way before the grand nest
+ * (`reveal`: px before the world's end where it starts and finishes opening) so the beacon and
+ * the warm pool come into view. `specks`: faint glowing specks baked into it (share of texels).
+ */
+export const TRENCH_WALL = {
+    above: [250, 900], rimScale: 2600, rough: 140, roughScale: 260, edge: 260,
+    fadeIn: 4000, windows: 0.68, windowScale: 7000, reveal: [9000, 4500],   // windows: noise level above which the wall is open (higher = fewer windows)
+    relief: [0.16, 0.05, 0.07],   // density bulges (broad, knobs) and ledge step height on the face
+    ledge: 460, ledgeBend: 380,   // px between ledges, how far they bend up and down along the wall
+    specks: 0.0025, speckPatch: 900, speckColours: [0x7fe8ff, 0xb08cff, 0x8affd0], speckGlow: 0.7   // specks gather in patches (speckPatch px): colonies, not a starfield
+};
+
+/**
+ * How much the trench wall lifts a layer's field at (x, y) toward rock (0 = not at all, 1 = solid),
+ * given the calm route (world x -> y).
+ */
+export function trenchWallAt(x, y, route, cfg = TRENCH_WALL) {
+    const x0 = descentStart(), x1 = WORLD_END - cfg.reveal[1];
+    if (x <= x0 || x >= x1) return 0;
+    const grow = smooth01((x - x0) / cfg.fadeIn) * smooth01((x1 - x) / (cfg.reveal[0] - cfg.reveal[1]));
+    const E = WALL_EDGE, bent = x + (vnoise(x / E.bendScale[0], y / E.bendScale[1], 71) - 0.5) * E.bend * 1.6;   // window edges meander down the wall
+    const win = smooth01((cfg.windows - vnoise(bent / cfg.windowScale, 2.9, 61)) / 0.08);
+    const [a0, a1] = cfg.above;
+    const rim = route(x) - a0 - (a1 - a0) * vnoise(x / cfg.rimScale, 4.3, 63)
+        + (vnoise(x / cfg.roughScale, y / cfg.roughScale, 65) - 0.5) * cfg.rough;
+    return grow * win * smooth01((y - rim) / cfg.edge);
+}
 
 /** Enclosure noise at world x (0..1): two octaves, so every biome sees many open and closed stretches. */
 const encNoise = (x, layer) => 0.62 * vnoise(x / layer.scale, layer.seed * 0.37, layer.seed)
@@ -193,6 +228,14 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
             const lo = T + sup.minCarry;
             let d = Math.min(soft.density(x, y) + shift - (sup.minCarry + sup.band * 0.5),
                 T + (carry.density(x, y) + shift - lo) * 2);
+            // The trench wall: a rock face with its own relief (broad bulges, small knobs, and
+            // ledges: a sawtooth in depth, so each step catches the light on its upper edge).
+            const tw = layer.trenchWall && route ? trenchWallAt(x, y, route) : 0;
+            if (tw > 0) {
+                const W = TRENCH_WALL, s = (y + W.ledgeBend * vnoise(x / 1500, 6.1, 73)) / W.ledge;
+                d = Math.max(d, T - 0.06 + 0.18 * tw + W.relief[0] * (vnoise(x / 420, y / 360, 67) - 0.5)
+                    + W.relief[1] * (vnoise(x / 130, y / 150, 69) - 0.5) + W.relief[2] * (s - Math.floor(s)));
+            }
             if (e <= -0.999) return d - surfacePush(x, y);      // open: no walls, so no feet to look for
             // The strongest rock in the stretch above (centre and both sides of the foot): once it
             // is clearly rock, this point is too — a flat foot, smooth in x and y.
@@ -348,6 +391,32 @@ export function fogLayer(rgba, size, ox, oy, span, layer, deepTint = SHADE.deepT
         if (k > 0) for (let c = 0; c < 3; c++) rgba[q * 4 + c] += (skin.rgb[q * 3 + c] - rgba[q * 4 + c]) * k;
     }
     softenLayer(rgba, size);
-
+    trenchSpecks(rgba, size, ox, oy, span);
     return rgba;
+}
+
+/** Faint glowing specks on the trench rock (TRENCH_WALL.specks): a bright texel with a soft halo, after the soften so they stay crisp. */
+function trenchSpecks(rgba, size, ox, oy, span, cfg = TRENCH_WALL) {
+    const hashAt = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+    const step = span / size, g = cfg.speckGlow;
+    for (let px = 1; px < size - 1; px++) {
+        const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * step);
+        const share = (a.id === 'trench' ? 1 - t : 0) + (b.id === 'trench' ? t : 0);
+        if (share <= 0) continue;
+        for (let py = 1; py < size - 1; py++) {
+            const o = (py * size + px) * 4;
+            // Hashed on the virtual position, so a speck stays put across chunk borders.
+            const hx = Math.round(ox / step) + px, hy = Math.round(oy / step) + py;
+            const wx = ox + (px + 0.5) * step, wy = oy + (py + 0.5) * step;
+            const patch = Math.max(0, vnoise(wx / cfg.speckPatch, wy / cfg.speckPatch, 75) - 0.45) * 4.4;   // 0 in most places, up to ~2.4 in a colony
+            if (rgba[o + 3] < 200 || hashAt(hx * 0.37, hy * 0.53) >= cfg.specks * share * patch) continue;
+            const c = cfg.speckColours[Math.floor(hashAt(hy, hx) * cfg.speckColours.length)];
+            const k = g * (0.5 + 0.5 * hashAt(hx + 3, hy));
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const q = o + (dy * size + dx) * 4, w = dx || dy ? k * 0.3 : k;
+                if (rgba[q + 3] < 40) continue;
+                for (let ci = 0; ci < 3; ci++) rgba[q + ci] += (ch(c, ci) - rgba[q + ci]) * w;
+            }
+        }
+    }
 }
