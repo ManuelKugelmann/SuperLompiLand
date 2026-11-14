@@ -3,7 +3,7 @@
 // so it runs unchanged on the main thread, in a Web Worker and in the tests.
 import { vnoise } from './terrain.js';
 import { detour } from './weather.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest } from './biomes.js';
+import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
@@ -92,8 +92,10 @@ export function createField(seed) {
         // Keep the abyss shaft swimmable all the way down.
         if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;
         // The reef crest: solid coral from just under the surface down, whatever the noise says.
-        const crest = reefCrest(x);
-        if (crest > 0 && y > REEF_CREST.top) n += (FIELD.crestRock - n) * crest * smooth01((y - REEF_CREST.top) / 120);
+        // Its upper face is lumpy, slopes away to both sides and has grooves: no flat top, no cut faces.
+        const crestTop = reefCrestTop(x) + REEF_CREST.lump * (vnoise(x / 170, 3.7, seed + 21) * 2 - 1);
+        const crest = crestTop < fy ? reefCrest(x) : 0;
+        if (crestTop < fy && y > crestTop) n += (FIELD.crestRock - n) * smooth01((y - crestTop) / 120);
         if (x < WORLD_WEST + 900) n += (WORLD_WEST + 900 - x) / 500;     // western shore
         if (x > WORLD_END + 900) n += (x - WORLD_END - 900) / 500;       // wall behind the grand nest
         const ds = Math.hypot(x - FIELD.spawn.x, y - FIELD.spawn.y);

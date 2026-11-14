@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import Creature from '../Creature.js';
+import { surgeShare, surgeWave } from './surf.js';
 import { JOURNEY, chapters } from '../journey.js';
 import { createReach } from './reach.js';
 import { createSpacing } from './spacing.js';
@@ -11,19 +12,22 @@ import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup } from './biomes.js';
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest } from './biomes.js';
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 9,
+    version: 10,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
+    kelpMinDepth: 420,    // no kelp where the water is shallower than this
+    propHeadroom: 50,     // a prop's top stays at least this far under the surface
+    surgeLean: 0.45,      // how far the surge bends the plants in the surf zone (share of a full bend)
     friendSheen: 0.4,     // strength of the rainbow sheen on friends
     sheenSpeed: 0.1,      // how fast its colours travel (turns of the colour wheel per second)
     sheenSpread: 1.3,     // how much of the colour wheel lies across one friend
@@ -295,15 +299,17 @@ export default class LevelGenerator {
         this.early.delete(key);
     }
 
-    /** Per frame: bend / pulse every creature and plant. `t` in seconds; `others` = the other players in the room. */
-    animate(t, fish, speed = 0, others = null) {
+    /** Per frame: bend / pulse every creature and plant. `t` in seconds; `others` = the other players in the room; `waves` = time in waves (surf.js). */
+    animate(t, fish, speed = 0, others = null, waves = 0) {
         for (const o of this.animated) {
             if (!o.active) continue;
             if (o.isPlant && fish) {
+                // In the surf zone the plants lean with every push of the surge and swing back with the backwash.
+                const surge = o.surf ? -surgeWave(o.x, waves) * o.surf * LEVEL.surgeLean : 0;
                 // Swimming past pushes plants aside; they swing back when it is calm.
                 const dx = o.x - fish.x, d = Math.hypot(dx, o.y - fish.y);
                 const push = d < LEVEL.wakeRadius ? Math.sign(dx || 1) * (1 - d / LEVEL.wakeRadius) * Math.min(1, speed / 9) : 0;
-                o.bend += (push - o.bend) * 0.1;
+                o.bend += (push + surge - o.bend) * 0.1;
             }
             o.animate(t, o.bend || 0);
         }
@@ -466,7 +472,9 @@ export default class LevelGenerator {
                 // Never floating: rock must lie under both ends, below the buried part.
                 const rockUnder = (x, y) => { for (let d = 0; d <= h * p.reach; d += 20) if (this.density(x, y + d) > T) return true; return false; };
                 const below = f => f.y + h * p.sink * 0.8;
+                // Nothing stands out of the water, and the reef crest carries corals only.
                 const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat * (forced ? 2 : 1)
+                    && f.y - h * (1 - p.sink) > LEVEL.propHeadroom && reefCrest(f.x) === 0
                     && rockUnder(f.x - w * 0.45, below(f)) && rockUnder(f.x + w * 0.45, below(f)));
                 if (!spot) continue;
                 spot.prop = true;
@@ -479,6 +487,7 @@ export default class LevelGenerator {
                         { root: 'bottom', amp: p.sway, speed: rng.realInRange(0.5, 0.8), scaleY: h / tex.height });
                     plant.setRotation(angle).setDepth(p.depth);
                     plant.isPlant = true;
+                    plant.surf = surgeShare(plant.x, 0);
                     plant.bend = 0;
                     keep(plant);
                     this.animated.push(plant);
@@ -925,6 +934,9 @@ export default class LevelGenerator {
      */
     addKelp(chunk, f, h, depth, rng, tint = null) {
         const s = this.scene;
+        // Kelp never reaches out of the water, and none grows in the shallows or on the reef crest.
+        if (f.y < LEVEL.kelpMinDepth || reefCrest(f.x) > 0) return;
+        h = Math.min(h, f.y * 0.85);
         const key = rng.pick(KELP_STALKS.filter(k => s.textures.exists(k))) || 'kelp';
         const frame = s.textures.getFrame(key);
         const up = { x: Math.sin(f.angle), y: -Math.cos(f.angle) };

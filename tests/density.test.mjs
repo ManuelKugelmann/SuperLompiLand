@@ -118,13 +118,21 @@ test('the open sea is clear water: no rock hangs between the surface and just ab
     }
 });
 
-test('the reef crest stands just under the surface at the reef\'s outer edge, and the calm route has its channel through it', () => {
+test('the reef crest stands just under the surface at the reef\'s outer edge, lumpy and sloping, and the calm route has its channel through it', () => {
     const f = createField(1337), c = reefCrestX();
-    for (const dx of [-300, 0, 300]) {
-        assert.ok(f.density(c + dx, REEF_CREST.top - 60) < FIELD.threshold, 'water over the crest');
-        for (const y of [REEF_CREST.top + 160, 500]) assert.ok(f.density(c + dx, y) > FIELD.threshold, `coral at ${c + dx}, ${y}`);
-        assert.ok(f.density(c + dx, f.routeY(c + dx)) < FIELD.threshold, 'the channel');
+    const topAt = x => { let y = 40; while (y < 3000 && f.density(x, y) < FIELD.threshold) y += 10; return y; };
+    const tops = [];
+    for (let x = c - REEF_CREST.half + 40; x <= c + REEF_CREST.half - 40; x += 40) {
+        const y = topAt(x);
+        tops.push(y);
+        assert.ok(y > REEF_CREST.top - REEF_CREST.lump - 80 && y < REEF_CREST.top + REEF_CREST.lump + REEF_CREST.groove[2] + 140, `crest top at ${x}: ${y}`);
+        assert.ok(f.density(x, f.routeY(x)) < FIELD.threshold, 'the channel');
     }
+    assert.ok(Math.max(...tops) - Math.min(...tops) > 40, 'no flat table: the top rises and falls');
+    assert.ok(tops.filter(y => y < REEF_CREST.top + 120).length > tops.length * 0.6, 'most of it stands just under the surface');
+    // It slopes away on both sides instead of ending in a cut face.
+    assert.ok(topAt(c + REEF_CREST.half + 200) > topAt(c + REEF_CREST.half - 100) + 100, 'the seaward slope');
+    assert.ok(topAt(c - REEF_CREST.half - 150) > topAt(c - REEF_CREST.half + 100) + 100, 'the lagoon side slope');
     assert.ok(f.routeY(c) > REEF_CREST.top + ROUTE.halfWidth + 200, 'the channel lies well under the crest');
     assert.equal(reefCrest(c - 2000), 0);
 });

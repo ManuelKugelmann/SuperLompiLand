@@ -192,12 +192,33 @@ export function isSea(x) {
 // The reef crest (spec 5.0d): at the coral reef's outer edge the reef grows up to just under
 // the surface, a wall of coral from there down to the seabed. Waves break on it; the calm
 // route passes through it as a channel; beyond it the seabed falls away into the open sea.
-export const REEF_CREST = { inset: 520, half: 400, ramp: 300, top: 180 };
+export const REEF_CREST = {
+    inset: 520,          // px before the reef's outer edge where its middle lies
+    half: 400,           // px to either side of the middle that it stands at full height
+    ramp: 300,           // px beyond that over which things count as "on the crest"
+    top: 180,            // px under the surface of its top
+    lump: 45,            // px its top rises and falls (a grown thing, not a table)
+    lagoonSlope: 2.6,    // px it falls per px toward the lagoon beyond its full part ...
+    seaSlope: 1.5,       // ... and toward the open sea: a long encrusted slope
+    groove: [310, 64, 150]   // spur and groove: every so many px a notch this wide, this deep
+};
 
 /** World x of the middle of the reef crest. */
 export function reefCrestX(cfg = REEF_CREST) {
     const reef = BIOMES.find(b => b.id === 'reef');
     return reef.from + reef.width - cfg.inset;
+}
+
+/**
+ * Depth of the crest's upper face at x (world y), before its lumps: `top` on the crest, falling
+ * away on both sides as slopes, with narrow grooves cut across it. Past the reef's outer edge
+ * there is none.
+ */
+export function reefCrestTop(x, cfg = REEF_CREST) {
+    const dx = x - reefCrestX(cfg), out = Math.max(0, Math.abs(dx) - cfg.half);
+    if (dx > cfg.inset) return Infinity;      // the reef ends here: beyond its edge the wall falls into the open sea
+    const [every, width, depth] = cfg.groove, g = Math.abs(((dx % every) + every) % every - every / 2);
+    return cfg.top + out * (dx < 0 ? cfg.lagoonSlope : cfg.seaSlope) + depth * smooth(1 - g / (width / 2));
 }
 
 /** How much of the reef crest stands at x: 1 on it, 0 away from it. */
