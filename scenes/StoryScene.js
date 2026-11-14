@@ -1,3 +1,4 @@
+import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { createTimeline } from '../game/timeline.js';
 import Phaser from 'phaser';
 import { play } from '../game/audio.js';
@@ -18,8 +19,18 @@ export function storySeen() {
     try { return window.localStorage.getItem(SEEN_KEY) === '1'; } catch { return true; }
 }
 
+/** What each beat says, in a few big words (spec, "Story captions"); {name} = the chosen character's name. */
+const CAPTIONS = [
+    { de: 'Ein ruhiger Morgen im Riff', en: 'A calm morning on the reef' },
+    { de: 'Was grollt da?', en: "What's that rumble?" },
+    { de: 'Der Vulkan bricht aus!', en: 'The volcano erupts!' },
+    { de: 'Alle Freunde schwimmen weg!', en: 'All the friends swim away!' },
+    { de: '{name} hat keine Angst.', en: "{name} isn't scared." },
+    { de: 'Finde deine Freunde!', en: 'Find your friends!' }
+];
+
 /**
- * Opening story, about eight seconds, no words needed:
+ * Opening story, about ten seconds, with a caption of a few big words per beat:
  *   1 calm reef  2 the ground rumbles  3 the volcano erupts, above and under
  *   water  4 dark things sink out of the ash, the friends scatter  5 Lompi
  *   looks east and puffs up  6 the water clears; a red glow stays in the east.
@@ -55,18 +66,25 @@ export default class StoryScene extends Phaser.Scene {
         // They play by themselves; a tap goes on to the next beat at once (one tap, one beat). Only
         // the small button in the corner leaves the story.
         this.timeline = createTimeline([
-            { at: 1500, run: () => { this.cameras.main.shake(1400, 0.006); play('rumble'); } },                    // 2 rumble
+            { at: 1500, run: () => { this.say(1); this.cameras.main.shake(1400, 0.006); play('rumble'); } },                    // 2 rumble
             { at: 1900, run: () => this.friends.forEach(f => this.tweens.add({ targets: f, angle: -10, duration: 300, yoyo: true })) },
-            { at: 3000, run: () => this.erupt() },                                             // 3 eruption
-            { at: 4500, run: () => this.fallout() },                                           // 4 dark things, friends scatter
-            { at: 6000, run: () => this.resolve() },                                           // 5 Lompi puffs up
-            { at: 7600, run: () => this.tweens.add({ targets: this.glow, alpha: 0.4, duration: 500 }) },  // 6 the glow stays
-            { at: 8400, run: () => this.finish() }
+            { at: 3000, run: () => { this.say(2); this.erupt(); } },                                             // 3 eruption
+            { at: 4500, run: () => { this.say(3); this.fallout(); } },                                           // 4 dark things, friends scatter
+            { at: 6000, run: () => { this.say(4); this.resolve(); } },                                           // 5 Lompi puffs up
+            { at: 7600, run: () => { this.say(5); this.tweens.add({ targets: this.glow, alpha: 0.4, duration: 500 }); } },  // 6 the glow stays
+            { at: 9600, run: () => this.finish() }
         ]);
         const de = (this.registry.get('currentLanguage') || 'de') === 'de';
-        const skip = this.add.text(W - 28, H - 24, de ? 'Überspringen' : 'Skip', {
-            fontFamily: 'Arial', fontSize: '30px', color: '#ffffff', backgroundColor: '#00000055', padding: { x: 18, y: 10 }
-        }).setOrigin(1, 1).setScrollFactor(0).setDepth(60).setAlpha(0.75).setInteractive({ useHandCursor: true });
+        // A few big words per beat, for children who read and those who are read to.
+        this.caption = this.add.text(W / 2, H * 0.1, '', {
+            fontFamily: 'Arial, sans-serif', fontSize: '76px', fontStyle: 'bold', color: '#ffffff', stroke: '#0a3f6e', strokeThickness: 12, align: 'center'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(60).setShadow(0, 5, 'rgba(4,30,52,0.6)', 12, true, true);
+        const name = getCharacter(this.registry.get('character') || loadSelectedId())?.name || 'Lompi';
+        this.lines = CAPTIONS.map(l => l[de ? 'de' : 'en'].replace('{name}', name));
+        this.say(0);
+        const skip = this.add.text(W - 32, H - 28, de ? 'Überspringen  ›' : 'Skip  ›', {
+            fontFamily: 'Arial', fontSize: '42px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0a3f6ecc', padding: { x: 26, y: 14 }
+        }).setOrigin(1, 1).setScrollFactor(0).setDepth(60).setInteractive({ useHandCursor: true });
         skip.on('pointerdown', (p, x, y, ev) => { ev?.stopPropagation(); this.skipped = true; this.finish(); });
         this.skipped = false;
         this.input.on('pointerdown', () => { if (!this.skipped && !this.done) this.timeline.next(); });
@@ -75,6 +93,14 @@ export default class StoryScene extends Phaser.Scene {
 
     update(time, delta) {
         if (!this.done) this.timeline.step(delta);
+    }
+
+    /** Show the caption of a beat: the old one fades, the new one pops in. */
+    say(i) {
+        const c = this.caption;
+        this.tweens.killTweensOf(c);
+        c.setText(this.lines[i]).setAlpha(0).setScale(0.85);
+        this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 260, ease: 'Back.easeOut' });
     }
 
     /** The painted stage: one picture of the volcano island above and below the water, cover on the sand, corals. */
