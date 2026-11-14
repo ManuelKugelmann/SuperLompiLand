@@ -11,14 +11,15 @@ export const CONTAINERS = {
     biome: 'kelp',
     at: 0.922,           // where in the biome the field's middle lies (share of the width): off the harbour, where ships lose them
     size: [980, 400],    // px length and height of one container as drawn
-    // Each container: px from the field's middle, the share of its height under the waterline, its tilt
+    // Each container: px from the field's middle, the share of its height under the waterline (the painted
+    // pictures have their wet band and algae at 64 % of their height, so about 0.36), its tilt
     // (radians), which paint it wears (index into the look's colours), `open` = both ends open (the fish
     // swims through), `on` = it lies on top of the container with that index instead of floating.
     boxes: [
-        { dx: -1500, sunk: 0.55, tilt: 0.1, paint: 0 },
-        { dx: -350, sunk: 0.62, tilt: -0.05, paint: 2, open: true },      // paint 2 is the picture with its doors open
-        { dx: 800, sunk: 0.5, tilt: 0.14, paint: 1 },
-        { dx: 2000, sunk: 0.6, tilt: -0.12, paint: 0 },
+        { dx: -1500, sunk: 0.36, tilt: 0.1, paint: 0 },
+        { dx: -350, sunk: 0.39, tilt: -0.05, paint: 2, open: true },      // paint 2 is the picture with its doors open
+        { dx: 800, sunk: 0.34, tilt: 0.14, paint: 1 },
+        { dx: 2000, sunk: 0.37, tilt: -0.12, paint: 0 },
         { dx: 900, tilt: -0.2, paint: 0, on: 2 }
     ],
     through: 5,          // coins in a line through the open container's sunken half

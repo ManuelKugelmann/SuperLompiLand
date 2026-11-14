@@ -18,8 +18,8 @@ test('the containers lie half sunk in the surface; one lies on top of another, o
     const floating = boxes.filter(b => !b.stacked), stacked = boxes.filter(b => b.stacked);
     assert.ok(floating.length >= 4 && stacked.length === 1);
     for (const b of floating) {
-        // Its top is above the waterline, its bottom well below: between 40 and 70 % under water.
-        assert.ok(b.y - h / 2 < 0 && b.y + h / 2 > h * 0.4 && b.y + h / 2 < h * 0.7, `${b.id}: middle ${Math.round(b.y)} under the surface`);
+        // Its top is above the waterline, its bottom below: about a third under water (the pictures' wet band).
+        assert.ok(b.y - h / 2 < 0 && b.y + h / 2 > h * 0.3 && b.y + h / 2 < h * 0.45, `${b.id}: middle ${Math.round(b.y)} under the surface`);
         assert.ok(Math.abs(b.tilt) < 0.2);
         assert.ok(f.density(b.x, 80) < FIELD.threshold, 'open water at the surface there');
     }
