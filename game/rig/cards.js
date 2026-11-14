@@ -50,7 +50,8 @@ export const ROLES = {
     head:      { swing: 0.04, sweep: 0.02, wave: 0, k: 0, speed: 0.3, idle: 0.3 },
     fan:       { swing: 0.05, sweep: 0.02, wave: 0.06, k: 3.0, speed: 0.9, idle: 0.25 },
     tentacles: { swing: 0.05, sweep: 0.03, wave: 0.14, k: 3.4, speed: 0.9, idle: 0.5 },
-    curl:      { swing: 0.03, sweep: 0.04, wave: 0.1, k: 2.0, speed: 0.7, idle: 0.3 }
+    curl:      { swing: 0.03, sweep: 0.04, wave: 0.1, k: 2.0, speed: 0.7, idle: 0.3 },
+    flap:      { swing: 0.42, sweep: 0.04, wave: 0.16, k: 1.4, speed: 0.6, idle: 0.35 }   // ray wings: slow, wide beats up and down
 };
 
 /** Triangle strip over a (cols x rows)-cell grid (rows joined by degenerate triangles): node index per strip vertex. */
