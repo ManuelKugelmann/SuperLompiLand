@@ -55,6 +55,8 @@ const CH = LEVEL.cell * LEVEL.cells;
 // `wiggle` = size of the body wave, `upright` = never tips along its movement.
 const FRIENDS = {
     friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'paddle', soft: 0.5, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
+    // Parrotfish graze the reef (spec 9.1 wonder beat): calm, unhurried, a little shy.
+    friend_parrotfish: { size: 230, swim: 420, bob: 12, anim: 'swim', soft: 0.35, wiggle: 16, ai: { speed: 0.9, range: 420, turn: 0.03, shy: 0.9 } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', soft: 1, wiggle: 6, upright: true, ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
     friend_seahorse: { size: 120, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.

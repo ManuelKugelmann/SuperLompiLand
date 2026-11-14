@@ -68,7 +68,7 @@ export const BIOMES = [
         coral: 0.6, kelp: 0.12, coins: 2, friendRate: 0.4, hazardRate: 0.12,
         wallRate: 0.5, wallLife: { coral: 4, seafan: 2, anemone: 1 },
         props: { boulder: 2, seafan: 2, anemone: 2, seagrass: 1 }, propRate: 1.5,
-        friends: { friend_starfish: 2, friend_snail: 2, friend_turtle: 1, friend_seahorse: 1, urchin: 2 },
+        friends: { friend_starfish: 2, friend_snail: 2, friend_turtle: 1, friend_seahorse: 1, friend_parrotfish: 2, urchin: 2 },
         hazards: { spikes: 1 }
     },
     {
