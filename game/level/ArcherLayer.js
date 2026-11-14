@@ -14,7 +14,7 @@ export const ARCHER_LOOK = { depth: 4.4, size: 170, leaf: 1.5, fly: 1.7, far: 26
 const FISH = 'archerfish', LEAF = 'mangrove_leaf', FLY = 'leaf_fly', DROP = 'jet_drop';
 
 /** Painted pictures loaded under these keys replace the drawn ones. */
-export const ARCHER_ART = { [FISH]: 'img/archerfish.webp' };
+export const ARCHER_ART = { [FISH]: 'img/archerfish.webp', [LEAF]: 'img/mangrove_leaf.webp' };
 
 function ensureTextures(scene) {
     const tex = scene.textures, TAU = Math.PI * 2;
