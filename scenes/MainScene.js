@@ -127,15 +127,17 @@ export default class MainScene extends Phaser.Scene {
 
     create(data) {
         fitToWindow(this.game);     // the picture fills the screen, whatever its shape
-        // The window got a clearly different shape while playing: lay everything out again for it
-        // and carry on where the fish was; until then the picture covers the screen (a sliver cropped).
+        // The window got a clearly different shape while playing: lay the screen out again for it
+        // (relayout) and carry on; until then the picture covers the screen (a sliver cropped).
         this.resume = data?.resume || null;
         this.resumed = !!this.resume;     // carrying on after a reshape: no fresh biome banner
         const refit = () => {
-            if (this.refitting || this.mp || !misfit(this.game, WORLD.refitAt)) return;
+            if (this.refitting || !misfit(this.game, WORLD.refitAt)) return;
             this.refitting = this.time.delayedCall(600, () => {
                 this.refitting = null;
                 if (!misfit(this.game, WORLD.refitAt)) return;
+                // Laid out again while the game goes on; only if that fails (and never in a room) the scene starts again where the fish was.
+                if (this.relayout() || this.mp) return;
                 const sp = this.fish.sprite;
                 this.scene.restart({ resume: { x: sp.x, y: sp.y, coins: this.coins, health: this.health } });
             });
@@ -169,7 +171,7 @@ export default class MainScene extends Phaser.Scene {
         this.spin = createSpin();            // loops flown in the air
         this.airAt = 0;
         this.streak = createStreak();        // coins in a row play a melody (game/music/melody.js)
-        this.backdrop = new Backdrop(this, LEVEL.maxDepth);
+        this.backdrop = this.made(() => new Backdrop(this, LEVEL.maxDepth));
         this.farLayers = new FarLayers(this);     // far scenery: single objects, each at its own parallax depth
         this.waterLight = new WaterLight(this);   // light shafts, caustics, depth grade
         // What has been collected stays collected (per chunk bitfields, see worldState.js).
@@ -285,7 +287,7 @@ export default class MainScene extends Phaser.Scene {
             ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 144);
             tex.refresh();
         }
-        this.add.image(0, 0, 'vignette').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(41).setAlpha(0.5);
+        this.vignette = this.add.image(0, 0, 'vignette').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(41).setAlpha(0.5);
         this.glow = this.add.circle(start.x, start.y, 260, 0xbfe9ff, 0).setDepth(42).setBlendMode(Phaser.BlendModes.ADD);
         this.health = WORLD.maxHealth;
         this.maxHealth = WORLD.maxHealth;
@@ -589,6 +591,47 @@ export default class MainScene extends Phaser.Scene {
         this.bookEntry(spot.kind);
         this.announce(this.lang === 'de' ? 'Befreit!' : 'Set free!', `+${RESCUES.coins}`);
         this.particles.spawn('bubble', x, y, 8, { radius: 9, spread: 46 });
+    }
+
+    /** Make a screen layer and remember every game object it adds while it is made (for layers that have no destroy of their own). */
+    made(make) {
+        const n = this.children.list.length, layer = make();
+        layer.made = this.children.list.slice(n);
+        return layer;
+    }
+
+    /**
+     * The window has a new shape: everything that was drawn for the old picture size is made anew
+     * for the new one, while the game goes on (the world, the fish, creatures and progress do not
+     * care about the picture's size). Returns false when something failed.
+     */
+    relayout() {
+        try {
+            fitToWindow(this.game);
+            const W = this.scale.width, H = this.scale.height;
+            this.ambient.setSize(W, H);
+            this.vignette.setDisplaySize(W, H);
+            for (const o of this.backdrop.made) o.destroy();
+            this.backdrop.seaFar.snowLayer?.destroy();      // made later, on first use
+            this.backdrop = this.made(() => new Backdrop(this, LEVEL.maxDepth));
+            this.farLayers.destroy(); this.farLayers = new FarLayers(this);
+            this.waterLight.destroy(); this.waterLight = new WaterLight(this);
+            this.rockLayers.destroy(); this.rockLayers = new RockLayers(this);
+            this.particles.destroy(); this.particles = new ParticleLayer(this, this.particleEnv());
+            this.speedLines.destroy(); this.speedLines = new SpeedLines(this);
+            if (this.storm) {      // built again by itself when the storm or a current is near
+                for (const o of this.storm.made) o.destroy();
+                for (const set of [this.storm.stormSet, this.storm.currentSet]) if (set) for (const o of set.all) o.destroy();
+                this.storm = null;
+            }
+            this.controller.destroy();
+            this.controller = makeController(this.activeScheme, this, this.fish);
+            if (this.scene.isActive(HUD_KEY)) this.scene.get(HUD_KEY).scene.restart({ main: this });
+            return true;
+        } catch (e) {
+            console.warn('relayout failed', e);
+            return false;
+        }
     }
 
     /**
@@ -1469,7 +1512,7 @@ export default class MainScene extends Phaser.Scene {
             if (sp.x < z.surge[1] + WORLD.weatherRange || (sp.x > z.reef[0] - WORLD.weatherRange && sp.x < z.reef[1] + WORLD.weatherRange)) this.surf = new SurfLayer(this, this.surface);
         }
         this.surf?.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
-        if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = new StormLayer(this);
+        if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = this.made(() => new StormLayer(this));
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
         this.branch.update(sp, time / 1000, delta, this.particles);
