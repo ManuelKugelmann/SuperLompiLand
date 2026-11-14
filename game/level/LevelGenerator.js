@@ -26,7 +26,8 @@ export const LEVEL = {
     wakeRadius: 300,      // how close the fish must swim to bend a plant
     coinGap: 92,          // minimum distance between two coins
     coinStep: 110,        // distance between the coins of a trail
-    trailChance: 0.13     // chance of a coin trail in a chunk, per point of the biome's `coins` value
+    trailChance: 0.13,    // chance of a coin trail in a chunk, per point of the biome's `coins` value
+    laneBand: 260         // px: trails on the main route stay within this band around its middle
 };
 const CH = LEVEL.cell * LEVEL.cells;
 
@@ -513,7 +514,13 @@ export default class LevelGenerator {
             let x = ox + rng.between(80, CH * 0.4), y = oy + rng.between(140, CH - 140);
             let heading = rng.realInRange(-0.45, 0.45);
             const bend = rng.realInRange(-0.12, 0.12);
+            // Where the calm main route crosses this chunk, the trail rides it (spec 5.2c: the
+            // bright, inviting way). Same random draws, so coin indices do not move.
+            const lane = this.field.routeY(x);
+            const onLane = lane > oy && lane < oy + CH;
+            const laneOffset = (y - oy) / CH - 0.5;   // reuse the draw: -0.5..0.5 of a gentle band
             for (let k = rng.between(5, 8); k > 0; k--) {
+                if (onLane) y = this.field.routeY(x) + laneOffset * LEVEL.laneBand;
                 if (this.isOpen(x, y, 0.09) && coinIndex < 64
                     && !placed.some(q => Math.abs(q.x - x) < LEVEL.coinGap && Math.abs(q.y - y) < LEVEL.coinGap)) {
                     placed.push({ x, y });
