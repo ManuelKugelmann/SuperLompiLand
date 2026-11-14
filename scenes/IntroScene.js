@@ -15,7 +15,6 @@ import { setRenderScale } from '../game/renderScale.js';
 import { fromCookie } from '../systems/savepoints.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { createRig, loadParts } from '../game/CardRig.js';
-import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
 import { MATERIALS } from '../game/level/materials.js';
@@ -211,7 +210,6 @@ export default class IntroScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         this.buildCarousel(lang);
-        flushFeedbackQueue();
         this.buildTogether(lang);
         this.buildAmbient(lang);
         this.buildSaves(lang);
@@ -229,7 +227,6 @@ export default class IntroScene extends Phaser.Scene {
 
         new GameMenu(this, this.scale.height * MENU.button * 0.6, this.scale.height * MENU.button * 0.6, [
             { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => this.scene.start(STORY_KEY) },
-            ...feedbackMenuItems(lang, () => ({ screen: 'title' })),
             soundMenuItem(lang, () => this.scene.restart()),
             ...pwaMenuItems(this, lang),
             { label: lang === 'de' ? 'DANKE' : 'CREDITS', color: 0x00796b, callback: () => openCredits(lang) },

@@ -244,10 +244,10 @@ Netlify / Vercel / Cloudflare Pages (drag-drop or git).
 
 ```
 scenes/        title (character carousel), story intro, game, HUD, end
-game/          player fish, characters, control schemes, audio, PWA, feedback
+game/          player fish, characters, control schemes, audio, PWA
 game/level/    world generator, biomes, terrain math, creatures, backdrop
 systems/       progression (localStorage)
-worker/        feedback relay (Cloudflare Worker)
+worker/        multiplayer relay (Cloudflare Worker)
 tests/         unit tests
 scripts/       icon generator, static server, dev log helper
 ```

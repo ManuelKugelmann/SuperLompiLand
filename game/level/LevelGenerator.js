@@ -115,8 +115,8 @@ const WALL_LIFE = {
 const HAZARDS = {
     // Keys are historical; what they show now: spikes = wreck scrap, hazard_buoy =
     // leaking oil drum, mine = lost anchor on its chain, hazard_net = ghost net.
-    spikes: { size: 240, r: 62, place: 'floor', lift: 26 },
-    hazard_buoy: { size: 260, r: 98, place: 'floor', lift: 58 },   // the oil comes from its crack (OIL.crack in MainScene)
+    spikes: { size: 240, r: 62, place: 'floor', lift: 26, tilt: 0.3 },
+    hazard_buoy: { size: 260, r: 98, place: 'floor', lift: 58, tilt: 0.5 },   // the oil comes from its crack (OIL.crack in MainScene)
     // The lost anchor hangs on its chain from a hull at the surface: the chain runs all the way up.
     // An anchor hangs on a chain of at most `reach` px (from a hull at the surface or from rock
     // above); where that is not possible there is no anchor.
@@ -133,13 +133,20 @@ const HAZARDS = {
  * ground, how far below that rock must lie under both ends (`reach`, share of the height),
  * the steepest floor it stands on (radians), its depth (behind the rock
  * = half buried, the rock in front hides the keel; `back` = hazed toward the water: what is
- * passable must read as behind the play plane), at most how many per chunk, and
+ * passable must read as behind the play plane), at most how many per chunk, `tilt` = how far
+ * (radians) a lost thing may lie turned either way (each lies its own way: leanAt), and
  * `sway` for plants (rooted, swaying with the water and pushed aside by the fish).
  */
+/** How a lost thing at x lies turned (radians, within +-max): its own way for each place, the same every time (playtest: waste must not all lie the same way). */
+function leanAt(x, max) {
+    const h = Math.sin(x * 12.9898) * 43758.5453;
+    return ((h - Math.floor(h)) * 2 - 1) * max;
+}
+
 export const PROPS = {
     boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.32, reach: 0.15, flat: 0.4, depth: -3, back: true, max: 2 },
-    barrel: { keys: ['barrel_1', 'barrel_2'], width: [SIZES.oilDrum * 0.8, SIZES.oilDrum], sink: 0.24, reach: 0.15, flat: 0.45, depth: -3, back: true, max: 2 },
-    crate: { keys: ['crate_1'], width: [SIZES.crate * 0.85, SIZES.crate], sink: 0.22, reach: 0.15, flat: 0.35, depth: -3, back: true, max: 1 },
+    barrel: { keys: ['barrel_1', 'barrel_2'], width: [SIZES.oilDrum * 0.8, SIZES.oilDrum], sink: 0.24, reach: 0.15, flat: 0.45, depth: -3, back: true, max: 2, tilt: 0.55 },
+    crate: { keys: ['crate_1'], width: [SIZES.crate * 0.85, SIZES.crate], sink: 0.22, reach: 0.15, flat: 0.35, depth: -3, back: true, max: 1, tilt: 0.3 },
     // Sizes of ships and cargo come from the one scale table (game/scale.js, spec 5.0j).
     // Hulls share one slot per chunk, and only every third chunk column has one, so they never overlap.
     wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: SIZES.sailingWreck, sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
@@ -702,7 +709,7 @@ export default class LevelGenerator {
                 if (!spot) continue;
                 spot.prop = true;
                 used[slot(group)] = (used[slot(group)] || 0) + 1;
-                const angle = spot.angle * 0.6;
+                const angle = spot.angle * 0.6 + (p.tilt ? leanAt(spot.x, p.tilt) : 0);
                 if (p.sway) {
                     // Rooted mesh: the middle sits half the visible height above the ground.
                     const lift = h * (0.5 - p.sink);
@@ -979,7 +986,7 @@ export default class LevelGenerator {
         if (h.chain && top - (rock ? rock.y : 16) > h.reach) return null;
         // A boat lies at anchor near a coast, not out in the open sea: no anchor hangs there from the surface.
         if (h.chain && !rock && seaShare(x) > 0.5) return null;
-        const img = makeCritter(s, key, x, y, h.size, h.anim || 'still', { ...h, rotation: angle }).setDepth(3);
+        const img = makeCritter(s, key, x, y, h.size, h.anim || 'still', { ...h, rotation: angle + (h.tilt ? leanAt(x, h.tilt) : 0) }).setDepth(3);
         this.animated.push(img);
         chunk.objects.push(img);
         if (h.patrol) {

@@ -5,7 +5,6 @@ import { heartRow, textStyle, pillImage } from '../game/ui/kit.js';
 import { CONTROL_SCHEMES } from '../game/controls/index.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES } from '../game/level/biomes.js';
-import { feedbackMenuItems } from '../game/feedback.js';
 import { soundMenuItem } from '../game/audio.js';
 import { keepInSafeArea, canFullscreen, isFullscreen, toggleFullscreen } from '../game/orientation.js';
 import { SCENE_KEYS } from './keys.js';
@@ -118,10 +117,6 @@ export default class HudScene extends Phaser.Scene {
             main.relaxed
                 ? { label: de ? 'MODUS: ENTSPANNT' : 'MODE: RELAXED', color: 0x00897b, callback: () => main.setRelaxed(false) }
                 : { label: de ? 'MODUS: ABENTEUER' : 'MODE: ADVENTURE', color: 0xc62828, callback: () => main.setRelaxed(true) },
-            ...feedbackMenuItems(main.lang, () => ({
-                biome: BIOMES[main.biomeIndex]?.id, x: Math.round(main.fish.sprite.x), depth: main.depthMeters(),
-                character: main.character.id, controls: main.activeScheme, mode: main.relaxed ? 'relaxed' : 'adventure'
-            })),
             soundMenuItem(main.lang, () => main.scene.restart()),
             ...pwaMenuItems(this, main.lang),
             { label: de ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => main.scene.start('MainMenuScene') }
