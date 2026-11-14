@@ -43,6 +43,7 @@ import BloomLayer from '../game/level/BloomLayer.js';
 import BaitBallLayer from '../game/level/BaitBallLayer.js';
 import RaftLayer from '../game/level/RaftLayer.js';
 import MeadowLayer from '../game/level/MeadowLayer.js';
+import VentFieldLayer from '../game/level/VentFieldLayer.js';
 import ContainerLayer from '../game/level/ContainerLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
@@ -231,6 +232,8 @@ export default class MainScene extends Phaser.Scene {
         // ... and at their surface float sargassum rafts; a skip off a wave sends flying fish out of the water.
         this.rafts = new RaftLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('sargassum'));
         // The lagoon's eel meadow: garden eels that slip into the sand, and a ray that glides off.
+        // The vent field at the trench's end: glowing black smokers whose warm water lifts the fish toward the grand nest.
+        this.ventField = new VentFieldLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), x => this.level.field.routeY(x), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         this.meadow = new MeadowLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         // Lost shipping containers drifting half sunk off the harbour; the route runs through two of them.
         this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'));
@@ -851,6 +854,7 @@ export default class MainScene extends Phaser.Scene {
         if (z.downs.some(d => x > d[0] && x < d[1])) { downAt(x, y, add); out.x += add.x; out.y += add.y; }
         const cave = this.level.field.cave;
         if (x > cave.x0 && x < cave.x1) { caveFlow(cave, x, y, add); out.x += add.x; }      // the current in the side cave
+        if (this.ventField?.live) { this.ventField.flowAt(x, y, add); out.y += add.y; }      // warm water rising over the smokers
         return out;
     }
 
@@ -1473,6 +1477,7 @@ export default class MainScene extends Phaser.Scene {
         this.baitBalls.update(sp, this.fish.view, this.fish.radius, time / 1000);
         this.rafts.update(sp, time / 1000);
         this.meadow.update(sp, this.fish.radius, time / 1000, delta);
+        this.ventField.update({ x: sp.x, y: sp.y, radius: this.fish.radius }, time / 1000, delta);
         this.containers.update(sp, this.fish.radius, time / 1000);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);

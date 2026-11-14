@@ -18,6 +18,7 @@ import { chapters } from '../journey.js';
 import { MANTA, mantaSpan } from '../ai/manta.js';
 import { baitballSlot } from './baitball.js';
 import { meadowSpot } from './meadow.js';
+import { ventSpot } from './ventField.js';
 import { containerSpan } from './containers.js';
 import { whaleSharkSlot } from './whaleShark.js';
 
@@ -58,6 +59,7 @@ export function worldMap() {
     span('storm', storm.x0, storm.x1);
     span('baitball', baitballSlot().x0, baitballSlot().x1);
     span('meadow', meadowSpot().x0, meadowSpot().x1);
+    span('vents', ventSpot().x0, ventSpot().x1);
     span('containers', containerSpan().x0, containerSpan().x1);
     span('whaleshark', whaleSharkSlot().x0, whaleSharkSlot().x1);
     for (const d of downwellings()) span('current', d.down, d.up);
