@@ -19,7 +19,7 @@ import CleanerLayer from '../game/ai/CleanerLayer.js';
 import { glowShare } from '../game/level/deepGlow.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
-import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
+import { makeController, CONTROL_SCHEMES, BOT_SCHEME } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
@@ -407,6 +407,7 @@ export default class MainScene extends Phaser.Scene {
 
         const saved = this.progression.get?.('controls', null);
         this.activeScheme = CONTROL_SCHEMES.some(s => s.id === saved) ? saved : CONTROL_SCHEMES[0].id;
+        if (new URLSearchParams(window.location.search).get('bot')) this.activeScheme = BOT_SCHEME.id;      // the bot plays (never saved)
         this.controller = makeController(this.activeScheme, this, this.fish);
 
         this.coins = this.banked;
@@ -1437,10 +1438,10 @@ export default class MainScene extends Phaser.Scene {
         const p = this.fish.pos, fr = this.fish.radius, mag = this.powers().magnet;
         BonusCoins.magnet = mag;      // the set pieces' and the route's coins feel it too
         for (const c of this.level.coins) {
-            if (mag && c.img.active) {      // Hüpfi's power (spec 5.0r): coins in reach drift to Lompi
-                const s = magnetStep(c.img.x, c.img.y, p.x, p.y, mag);
+            if (mag && c.img.active) {      // coins in reach fly to Lompi (everyone's pull, Hüpfi's from further away)
+                const s = magnetStep(c.img.x, c.img.y, p.x, p.y, mag, c.pullAge || 0);
                 // The coin's stored place moves too: the bob sets img.y from c.y every frame.
-                if (s) { if (!c.pulled) { this.tweens.killTweensOf(c.img); c.pulled = true; } const lift = c.y - c.img.y; c.img.setPosition(s.x, s.y); c.x = s.x; c.y = s.y + lift; }
+                if (s) { if (!c.pullAge) this.tweens.killTweensOf(c.img); c.pullAge = (c.pullAge || 0) + 1; const lift = c.y - c.img.y; c.img.setPosition(s.x, s.y); c.x = s.x; c.y = s.y + lift; }
             }
             if (!c.img.active || p.distance(c.img) > fr + c.r) continue;
             const { x, y } = c.img;
