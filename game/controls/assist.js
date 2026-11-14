@@ -2,6 +2,7 @@
 // a child points where the fish should go and should get there. Two small helps, both gentle:
 //   wall slide   a step or ledge straight in the way is climbed: the pull turns up along its face
 //   depth hold   let go, and the fish stays about where it was instead of slowly sinking away
+//   level        while the pull is mostly sideways, speed up or down that the player did not ask for is damped
 // These are feel constants: they are tuned with a person on a device, not guessed for good.
 
 export const ASSIST = {
@@ -15,9 +16,15 @@ export const ASSIST = {
         maxRise: 5       // px per step: a fish already rising this fast gets no more lift from the climb
     },
     hold: {
-        slack: 50,       // px the fish may sink below where it was let go before the hold begins to lift it
-        full: 220,       // px below that at which the lift is at full strength
-        lift: 0.5        // the lift at full strength, as a share of a full stroke
+        slack: 15,       // px the fish may sink below where it was let go before the hold begins to lift it
+        full: 90,        // px below that at which the lift is at full strength
+        lift: 0.5,       // the lift at full strength, as a share of a full stroke
+        dive: 150        // px the finger must be below the fish for the pull to count as "steered down": only then a release takes a deeper depth to hold
+    },
+    level: {
+        flat: 0.4,       // the pull counts as "mostly sideways" while its up or down part is below this share of it
+        damp: 0.09,      // share of a full stroke per px/step of unwanted speed up or down
+        max: 0.6         // ... but never more than this share of a full stroke
     }
 };
 
@@ -53,4 +60,29 @@ export function holdLift(y, restY, cfg = ASSIST.hold) {
 /** How hard to pull while climbing (0..1 of a full pull) for a fish moving at `vy` px per step (negative = rising): nothing once it rises fast enough. */
 export function climbForce(vy, cfg = ASSIST.slide) {
     return vy <= -cfg.maxRise ? 0 : cfg.force;
+}
+
+/**
+ * The depth to hold after letting go at `y`, given the depth held before (`rest`, or null) and
+ * whether the player steered down during the pull: the shallower of the two, unless the player
+ * dived on purpose. So a row of level taps does not ratchet the fish downward, and a child who
+ * dives to the eels stays there.
+ */
+export function restDepth(y, rest, steeredDown) {
+    return rest !== null && y > rest && !steeredDown ? rest : y;
+}
+
+/** Did the player steer down? `fingerY` and `fishY` in world px. */
+export function steersDown(fingerY, fishY, cfg = ASSIST.hold) {
+    return fingerY - fishY > cfg.dive;
+}
+
+/**
+ * While the player pulls mostly sideways: the thrust (share of a full stroke, positive = down)
+ * that damps speed up or down the player did not ask for (after a slope, a current, a bounce).
+ * `dirY` = the up or down part of the pull's unit direction, `vy` = the fish's speed down (px/step).
+ */
+export function levelThrust(dirY, vy, cfg = ASSIST.level) {
+    if (Math.abs(dirY) >= cfg.flat || vy * dirY > 0) return 0;      // the player steers up or down, or the fish already goes where the pull points
+    return Math.max(-cfg.max, Math.min(cfg.max, -vy * cfg.damp)) + 0;      // + 0: never a negative zero
 }

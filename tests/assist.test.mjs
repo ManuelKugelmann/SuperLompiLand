@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSIST, slideDir, climbForce, holdLift } from '../game/controls/assist.js';
+import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust } from '../game/controls/assist.js';
 
 // A seabed step: rock below y 1000 west of x 500, and below y 800 east of it (a 200 px step up).
 const step = (x, y) => y < (x < 500 ? 1000 : 800);
@@ -60,4 +60,27 @@ test('a climb is a steady pull, not a launch: a fish that already rises fast get
     assert.equal(climbForce(-S.maxRise), 0);
     assert.equal(climbForce(-12), 0);
     assert.ok(S.force < 1);
+});
+
+test('tap after tap does not ratchet the fish down: the shallower depth is held, unless the player dived on purpose', () => {
+    assert.equal(restDepth(800, null, false), 800, 'the first release');
+    assert.equal(restDepth(860, 800, false), 800, 'it sagged: still the old depth');
+    assert.equal(restDepth(1400, 800, false), 800, 'however far it sagged while the taps were level');
+    assert.equal(restDepth(1400, 800, true), 1400, 'the player dived: the new depth');
+    assert.equal(restDepth(700, 800, false), 700, 'it was taken up: the new depth');
+    let rest = null, y = 800;
+    for (let i = 0; i < 40; i++) { rest = restDepth(y, rest, false); y = rest + 40; }      // forty level taps, sagging 40 px after each
+    assert.equal(rest, 800);
+    assert.ok(steersDown(1000 + ASSIST.hold.dive + 1, 1000) && !steersDown(1000 + ASSIST.hold.dive - 1, 1000) && !steersDown(900, 1000));
+});
+
+test('a sideways pull damps speed up or down the player did not ask for; a pull up or down is left alone', () => {
+    const L = ASSIST.level;
+    assert.ok(levelThrust(0, -8) > 0, 'rising after a slope: pushed down');
+    assert.ok(levelThrust(0, 6) < 0, 'sinking: pushed up');
+    assert.equal(levelThrust(0, 0), 0);
+    assert.equal(levelThrust(-0.7, -8), 0, 'the player steers up: nothing');
+    assert.equal(levelThrust(-0.2, -8), 0, 'a little up, and it goes up: that is what was asked');
+    assert.ok(levelThrust(-0.2, 8) < 0, 'a little up, but it sinks: helped');
+    assert.equal(levelThrust(0, -100), L.max, 'never more than its cap');
 });

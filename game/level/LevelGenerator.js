@@ -28,7 +28,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 34,
+    version: 35,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -50,6 +50,8 @@ export const LEVEL = {
     coinStep: 110,        // distance between the coins of a trail
     trailChance: 0.13,    // chance of a coin trail in a chunk, per point of the biome's `coins` value
     laneBand: 260,        // px: trails on the main route stay within this band around its middle
+    ventClear: 80,        // px a bubble column ends below the calm route's lane ...
+    ventMin: 320,         // ... and a column that would be shorter than this is not there at all
     coinTop: 250          // px under the surface above which no chunk coin lies: near the surface that part of the view is the HUD's band (counter, hearts)
 };
 const CH = LEVEL.cell * LEVEL.cells;
@@ -642,7 +644,13 @@ export default class LevelGenerator {
         // --- Bubble plants: a column of bubbles that carries the fish upward --
         const abyssFloor = Math.abs(mid - ABYSS.x) < CH && oy + CH > floorY(ABYSS.x) - 400;
         const ventSpot = floors.find(f => this.isOpen(f.x, f.y - 300, 0.05));
-        if (ventSpot && (abyssFloor || rng.frac() < 0.14)) this.addVent(chunk, `${cx},${cy}`, ventSpot, abyssFloor ? 2600 : rng.between(700, 1300), rng);
+        if (ventSpot && (abyssFloor || rng.frac() < 0.14)) {
+            // A column of bubbles lifts whatever swims into it: it ends under the calm route's lane, so the
+            // route itself never throws the fish upward (the abyss's column is the way out of the abyss).
+            const want = abyssFloor ? 2600 : rng.between(700, 1300);
+            const height = abyssFloor ? want : Math.min(want, ventSpot.y - (this.field.routeY(ventSpot.x) + ROUTE.halfWidth + LEVEL.ventClear));
+            if (height >= LEVEL.ventMin) this.addVent(chunk, `${cx},${cy}`, ventSpot, height, rng);
+        }
 
         // --- Signposts --------------------------------------------------------
         for (const sign of this.signs) {
