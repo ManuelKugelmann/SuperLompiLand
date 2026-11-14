@@ -2,6 +2,14 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## An island chain: the great whale in the open blue, a storm to dive under, currents that pull deep, gannets that hunt near the coasts
+
+[`8489824`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8489824) · 2026-11-14 11:40
+
+![The great whale with ghost net hanging on her: tear it off piece by piece and she carries you east](22-island-chain-whale.jpg)
+![Under the storm: the surface heaves, foam and planks are torn west, the calm way on is below](22-island-chain-storm.jpg)
+![A gannet folds its wings and plunge-dives: dive deeper, hide, swerve or puff up](22-island-chain-gannet.jpg)
+
 ## A world above the water: every area has its own coast on the horizon, and the volcano in the east comes closer as you travel
 
 [`a087bf8`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/a087bf8) · 2026-11-14 11:06

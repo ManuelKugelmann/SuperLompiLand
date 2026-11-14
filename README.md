@@ -5,6 +5,10 @@
 <!-- devlog:start -->
 ## Dev log
 
+**An island chain: the great whale in the open blue, a storm to dive under, currents that pull deep, gannets that hunt near the coasts** — [`8489824`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8489824) · 2026-11-14 11:40
+
+![The great whale with ghost net hanging on her: tear it off piece by piece and she carries you east](docs/devlog/22-island-chain-whale.jpg)
+
 **A world above the water: every area has its own coast on the horizon, and the volcano in the east comes closer as you travel** — [`a087bf8`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/a087bf8) · 2026-11-14 11:06
 
 ![A world above the water: every area has its own coast on the horizon, and the volcano in the east comes closer as you travel](docs/devlog/21-a-world-above-the-water-every-area-has-its-own-c.jpg)
@@ -12,10 +16,6 @@
 **Bubble cannons along the currents: a shot counts as a move in the chain** — [`850be96`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/850be96) · 2026-11-14 05:10
 
 ![Bubble cannons along the currents: a shot counts as a move in the chain](docs/devlog/20-bubble-cannons-along-the-currents-a-shot-counts-.jpg)
-
-**A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive** — [`3c01d46`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/3c01d46) · 2026-11-14 03:12
-
-![A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive](docs/devlog/19-a-wreck-greets-you-in-the-ship-graveyard-every-b.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
