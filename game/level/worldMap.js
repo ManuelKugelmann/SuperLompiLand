@@ -29,6 +29,7 @@ import { nurserySpot } from './nursery.js';
 import { gardenSpot } from './jellyGarden.js';
 import { archerX } from './archerfish.js';
 import { siphonSpots } from './siphonophore.js';
+import { otterSpot } from './seaOtter.js';
 import { seaLionSpot } from './seaLion.js';
 
 /** Kinds of feature that are a place's main sight: no two of them may share a screen. */
@@ -56,7 +57,7 @@ export const SCENERY_KINDS = ['colony', 'arch'];
  * Kinds that are a landmark (spec 5.0n): what moves or answers the child (animals that act, toys,
  * rides, rescues, weather). Still scenery, however big, is not.
  */
-export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion'].filter(k => !SCENERY_KINDS.includes(k));
+export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion', 'otter'].filter(k => !SCENERY_KINDS.includes(k));
 
 
 /** Landmarks merged into moments (those closer than `merge` play as one): [{ x0, x1, kinds }], west to east. */
@@ -136,6 +137,7 @@ export function worldMap() {
     span('jelly_garden', gardenSpot().x0, gardenSpot().x1);
     spot('archerfish', archerX());
     for (const sp of siphonSpots()) span('siphonophore', sp.x0, sp.x1);
+    span('otter', otterSpot().x0, otterSpot().x1);
     span('sealion', seaLionSpot().x0, seaLionSpot().x1);
     for (const d of downwellings()) span('current', d.down, d.up);
     for (const f of bloomFields()) span('bloom', f.x0, f.x1);
