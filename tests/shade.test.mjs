@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SHADE, shadeChunk } from '../game/level/shade.js';
 import { FIELD, createField } from '../game/level/density.js';
+import { backRockCover } from '../game/level/backRock.js';
 
 const field = createField(1337);
 const SPAN = 960, S = SHADE.rockSize;
@@ -85,14 +86,19 @@ test('faces looking up are brighter than faces looking down', () => {
     assert.ok(up / upN > 1.5 * down / downN, `floor ${up / upN | 0} vs ceiling ${down / downN | 0}`);
 });
 
-test('the water next to rock is shaded, open water is left alone', () => {
+test('the water next to rock is shaded, open water (no back rock) is left alone', () => {
     const B = SHADE.backSize;
+    const br = backRockCover(field, FIELD.threshold, OX, OY, SPAN);
+    const cover = (px, py) => {                   // the most of the cells the picture blends between
+        const i = Math.floor((px + 0.5) * SPAN / B / br.C + br.m - 0.5), j = Math.floor((py + 0.5) * SPAN / B / br.C + br.m - 0.5), k = j * br.N + i;
+        return Math.max(br.cov[k], br.cov[k + 1], br.cov[k + br.N], br.cov[k + br.N + 1]);
+    };
     let near = 0, nearN = 0;
     for (let py = 2; py < B; py += 4) {
         for (let px = 2; px < B; px += 4) {
             const d = field.density(OX + (px + 0.5) * SPAN / B, OY + (py + 0.5) * SPAN / B);
             const a = at(pic.back, B, px, py)[3];
-            if (d < FIELD.threshold - 0.25) assert.equal(a, 0, `open water at ${px},${py}`);
+            if (d < FIELD.threshold - 0.25 && cover(px, py) < 0.001) assert.equal(a, 0, `open water at ${px},${py}`);
             if (d > FIELD.threshold - 0.01 && d < FIELD.threshold) { near += a; nearN++; }
         }
     }

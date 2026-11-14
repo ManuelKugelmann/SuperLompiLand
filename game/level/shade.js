@@ -11,6 +11,7 @@ import { hash, vnoise } from './terrain.js';
 import { biomeBlendAt } from './biomes.js';
 import { FIELD } from './density.js';
 import { MAT, BIOME_INDEX, materialTiles } from './materials.js';
+import { backRockCover } from './backRock.js';
 
 export const SHADE = {
     rockSize: 640,        // rock picture, px per chunk side
@@ -34,6 +35,9 @@ export const SHADE = {
     sandReach: 60,        // world px into the rock that sand covers on upward faces
     wallMix: [0x0a, 0x2a, 0x44],
     wallAlpha: 0.62,
+    backRockAlpha: 0.8,   // back rock under overhangs (backRock.js): how solid at its fullest
+    backRockDark: 0.62,   // its stone colour is darkened by this much (unlit, far)
+    backRockFog: 0.38,    // and moved this far toward the biome's water colour
     occlusion: 0.36,      // darkest shade in the water right at the rock
     occlusionReach: 0.085 // density range in the water over which it fades out
 };
@@ -218,19 +222,40 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
         }
     }
 
-    // Back picture: cave walls behind the water, and shade that gathers next to rock.
+    // Back picture: cave walls behind the water, back rock under overhangs (backRock.js) and
+    // shade that gathers next to rock. Back rock is unlit, darker and fogged toward the
+    // biome's water, so it never reads as something to bump into.
     const B = cfg.backSize, bn = S / B, back = new Uint8ClampedArray(B * B * 4);
+    const br = backRockCover(field, T, ox, oy, span), bc = br.cov, BN = br.N, bk = span / B / br.C, b0 = br.m - 0.5;
+    const fogCol = new Float32Array(B * 3);
+    if (br.any) {
+        for (let px = 0; px < B; px++) {
+            const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * span / B);
+            for (let c = 0; c < 3; c++) {
+                const sh = 16 - c * 8, wa = (a.water[0] >> sh) & 255, wb = (b.water[0] >> sh) & 255;
+                fogCol[px * 3 + c] = ((wa + (wb - wa) * t) + cfg.deepTint[c]) / 2;
+            }
+        }
+    }
     for (let py = 0; py < B; py++) {
         const fy = (py + 0.5) * bn / node + 1, j = Math.floor(fy), v = fy - j;
         const wy = oy + (py + 0.5) * span / B;
         const tintK = cfg.deepMix * Math.min(1, Math.max(0, wy / FIELD.maxDepth));
+        const cy = (py + 0.5) * bk + b0, cj = Math.min(BN - 2, Math.max(0, Math.floor(cy))), cv = Math.min(1, Math.max(0, cy - cj));
         for (let px = 0; px < B; px++) {
             const fx = (px + 0.5) * bn / node + 1, i = Math.floor(fx), u = fx - i;
             const i00 = j * W + i, i10 = i00 + 1, i01 = i00 + W, i11 = i01 + 1;
             const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
             const d = D[i00] * w00 + D[i10] * w10 + D[i01] * w01 + D[i11] * w11;
             const m = mask[i00] * w00 + mask[i10] * w10 + mask[i01] * w01 + mask[i11] * w11;
-            const wallA = cfg.wallAlpha * m * smooth(T - 0.17, T - 0.1, d);
+            const caveA = cfg.wallAlpha * m * smooth(T - 0.17, T - 0.1, d);
+            let rockA = 0;
+            if (br.any) {
+                const cx = (px + 0.5) * bk + b0, ci = Math.min(BN - 2, Math.max(0, Math.floor(cx))), cu = Math.min(1, Math.max(0, cx - ci));
+                const k = cj * BN + ci;
+                rockA = cfg.backRockAlpha * ((bc[k] * (1 - cu) + bc[k + 1] * cu) * (1 - cv) + (bc[k + BN] * (1 - cu) + bc[k + BN + 1] * cu) * cv);
+            }
+            const wallA = caveA + rockA * (1 - caveA);
             const occ = smooth(T - cfg.occlusionReach, T, d);
             const occA = cfg.occlusion * occ * occ;
             const a = occA + wallA * (1 - occA);
@@ -238,11 +263,20 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             const grain = g.h[(((ty0 >> 1) + py) & 255) * TILE + (((tx0 >> 1) + px) & 255)];
             const p = Math.min(S - 1, Math.floor((px + 0.5) * bn)) * 15 + 6;       // the middle rock colour
             const o = (py * B + px) * 4;
+            // Back rock takes the stone's own texture (the biome's main material) when loaded.
+            let tone = 0.8 + 0.4 * grain;
+            if (rockA > 0 && mats) {
+                const t = mats[colA[Math.floor((px + 0.5) * bn) * 4]], X = (tx0 + px * bn) & MM, Y = (ty0 + py * bn) & MM, q = (Y * MS + X) * 4;
+                const l = (t[q] + t[q + 1] + t[q + 2]) / 384; tone = l * Math.sqrt(l);              // a little more contrast: rock, not haze
+            }
             for (let c = 0; c < 3; c++) {
                 let wall = pal[p + c] + (cfg.wallMix[c] - pal[p + c]) * 0.45;
                 wall += (cfg.deepTint[c] - wall) * tintK;
-                wall *= 0.8 + 0.4 * grain;
-                back[o + c] = (DARK[c] * occA + wall * wallA * (1 - occA)) / a;
+                const cave = wall * (0.8 + 0.4 * grain);
+                let far = pal[p + c] * tone * cfg.backRockDark;
+                far += (fogCol[px * 3 + c] - far) * cfg.backRockFog;
+                const w = wallA > 0 ? (cave * caveA + far * rockA * (1 - caveA)) / wallA : 0;
+                back[o + c] = (DARK[c] * occA + w * wallA * (1 - occA)) / a;
             }
             back[o + 3] = a * 255;
         }
