@@ -2,6 +2,10 @@ import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import RigEyes from './rig/RigEyes.js';
+import { Breath } from './rig/breath.js';
+
+/** Breathing (rig/breath.js): how much the body swells with each breath, and the bubble let go every few breaths. */
+export const RIG_BREATH = { swell: 0.014, bubble: 'bubble' };
 import { CHARACTERS } from './characters.js';
 import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
 
@@ -51,6 +55,8 @@ const BEND = { x: 0, y: 0, z: 0, a: 0 }, SP = { z: 0, a: 0, dx: 0 }, FIN = { z: 
 export default class CardRig {
     constructor(scene, character, x, y, depth = 5) {
         this.clock = scene.time;     // the sheen drifts with game time
+        this.scene = scene;
+        this.breath = new Breath((character.id || '').length * 7 + 3);
         this.cam = scene.cameras.main;
         // The rainbow sheen is the playables' mark (spec 10.0 lookdev): sharks, mantas, whales and other animals keep their own colours.
         this.sheen = CHARACTERS.some(c => c.id === character.id) ? 1 : 0;
@@ -114,22 +120,25 @@ export default class CardRig {
         view.wiggle = st.wiggle;
         this.views[Object.keys(this.char.states).find(k => this.char.states[k] === st)] = view;
         const set = { entries, poseOrder, size: R.size, view };
+        // Points on the body (eyes, mouth) ride the body vertex nearest to them.
+        const body = entries.find(e => e.body), c = body.card;
+        const anchor = a => {
+            const ex = a.x - W / 2, ey = a.y - H / 2;
+            let best = 0, d = Infinity;
+            for (let s = 0; s < c.strip.length; s++) {
+                const i = c.strip[s], dd = (c.pivot[0] + c.lx[i] - ex) ** 2 + (c.pivot[1] + c.ly[i] - ey) ** 2;
+                if (dd < d) { d = dd; best = s; }
+            }
+            const i = c.strip[best];
+            return { s: best, dx: ex - (c.pivot[0] + c.lx[i]), dy: ey - (c.pivot[1] + c.ly[i]) };
+        };
+        set.bodyEntry = body;
         if (st.eyes) {
-            // Living eyes (rig/RigEyes.js), each riding the body vertex nearest to it.
-            const body = entries.find(e => e.body), c = body.card;
+            // Living eyes (rig/RigEyes.js).
             set.eyes = new RigEyes(scene, st.eyes, (this.char.id || st.key).length + Object.keys(this.sets).length);
-            set.eyeAt = st.eyes.at.map(a => {
-                const ex = a.x - W / 2, ey = a.y - H / 2;
-                let best = 0, d = Infinity;
-                for (let s = 0; s < c.strip.length; s++) {
-                    const i = c.strip[s], dd = (c.pivot[0] + c.lx[i] - ex) ** 2 + (c.pivot[1] + c.ly[i] - ey) ** 2;
-                    if (dd < d) { d = dd; best = s; }
-                }
-                const i = c.strip[best];
-                return { s: best, dx: ex - (c.pivot[0] + c.lx[i]), dy: ey - (c.pivot[1] + c.ly[i]) };
-            });
-            set.bodyEntry = body;
+            set.eyeAt = st.eyes.at.map(anchor);
         }
+        if (st.mouth) set.mouthAt = anchor(st.mouth);
         return set;
     }
 
@@ -203,7 +212,9 @@ export default class CardRig {
         this.phase += step;
         this.spinePh += step * this.spine.rate;
         const ph = this.phase, sq = Phaser.Math.Clamp(squash, -0.35, 0.35), sc = view.baseScale * this.zoom;
-        let sx = sc * (1 + sq), sy = sc * (1 - sq), rotation = Phaser.Math.Angle.Wrap(this.angle - level) + lean;
+        // Breathing: always, slow at rest and quicker after effort; the body swells a little with each breath.
+        const br = this.breath.update(frames / 60, raw), swell = RIG_BREATH.swell * (br.gill - 0.3);
+        let sx = sc * (1 + sq - swell * 0.4), sy = sc * (1 - sq + swell), rotation = Phaser.Math.Angle.Wrap(this.angle - level) + lean;
         // Steering shows in the body (user: 'creatures should bend tail fin or body when steering'): while the
         // nose turns, the tail lags behind and the body curves into the turn; it straightens when the turn ends.
         const turned = Phaser.Math.Angle.Wrap(rotation - lean - (this.lastRot ?? rotation - lean)) / Math.max(0.25, frames);
@@ -286,15 +297,17 @@ export default class CardRig {
             e.drawn = true;
             r.setVisible(this.shown);
         }
+        // Points on the body (projected just now): each rides its body vertex, offset by its distance from it.
+        const verts = set.bodyEntry.rope.vertices, cr = Math.cos(rotation), sr = Math.sin(rotation);
+        const pointAt = (k, out) => {
+            const ox = k.dx * sx * flip, oy = k.dy * sy;
+            out.x = x + verts[k.s * 2] + ox * cr - oy * sr; out.y = y + verts[k.s * 2 + 1] + ox * sr + oy * cr; out.s = sc;
+        };
+        if (br.blub && set.mouthAt && this.shown && spread < 0.5) { pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn(RIG_BREATH.bubble, MOUTH.x, MOUTH.y, 1); }
         if (set.eyes) {
             if (!this.shown) set.eyes.hide();
             else {
-                // Each eye rides its body vertex (projected just now), offset by its distance from it.
-                const verts = set.bodyEntry.rope.vertices, cr = Math.cos(rotation), sr = Math.sin(rotation);
-                const place = (a, out) => {
-                    const k = set.eyeAt[set.eyes.spec.at.indexOf(a)], ox = k.dx * sx * flip, oy = k.dy * sy;
-                    out.x = x + verts[k.s * 2] + ox * cr - oy * sr; out.y = y + verts[k.s * 2 + 1] + ox * sr + oy * cr; out.s = sc;
-                };
+                const place = (a, out) => pointAt(set.eyeAt[set.eyes.spec.at.indexOf(a)], out);
                 const look = this.look || { x: x + flip * 400 + vx * 30, y: y + vy * 30 };
                 set.eyes.update(place, { rotation, facing: flip, alpha: view.alpha, edge: Math.abs(Math.cos(yaw)) }, look, frames / 60, { scared: this.scared || 0 });
             }
@@ -309,7 +322,7 @@ export default class CardRig {
     }
 }
 
-const CARRY = { x: 0, y: 0, a: 0 };
+const CARRY = { x: 0, y: 0, a: 0 }, MOUTH = { x: 0, y: 0, s: 1 };
 
 /** How many parents a part hangs below (the body and free parts: 0), so parents are posed first. */
 function depthOf(e) {
