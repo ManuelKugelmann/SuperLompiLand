@@ -13,6 +13,7 @@
 import { sheenHue } from './sheen.js';
 
 export const CARDS = {
+    offView: 200,           // px beyond the view (plus its own size) at which a rig is no longer posed
     bodyGrid: [12, 9],      // body card grid (columns x rows of cells)
     partGrid: [6, 4],       // fin card grid along its longer side x across
     bulge: 0.17,            // how far the body's middle stands toward the viewer, in picture widths

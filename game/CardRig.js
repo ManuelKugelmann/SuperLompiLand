@@ -50,6 +50,7 @@ const BEND = { x: 0, y: 0 };
 export default class CardRig {
     constructor(scene, character, x, y, depth = 5) {
         this.clock = scene.time;     // the sheen drifts with game time
+        this.cam = scene.cameras.main;
         // The rainbow sheen is the playables' mark (spec 10.0 lookdev): sharks, mantas, whales and other animals keep their own colours.
         this.sheen = CHARACTERS.some(c => c.id === character.id) ? 1 : 0;
         this.char = character;
@@ -137,6 +138,13 @@ export default class CardRig {
     draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, lean = 0, beat, spread = 0 }) {
         const view = this.view, set = this.sets[this.state], [W, H] = set.size;
         view.x = x; view.y = y;
+        // Out of the picture: not posed (posing the cards was the largest script cost of a creature-rich
+        // stretch on a slow phone). Its cards only follow its place, so nothing of it is left standing in view.
+        const wv = this.cam.worldView, reach = Math.max(W, H) * view.baseScale * this.zoom + CARDS.offView;
+        if (!this.turning && (x < wv.x - reach || x > wv.right + reach || y < wv.y - reach || y > wv.bottom + reach)) {
+            for (const e of set.entries) e.rope.setPosition(x, y);
+            return;
+        }
         const speed = Math.hypot(vx, vy);
         const want = facing ?? (Math.abs(vx) > 0.8 ? (vx < 0 ? -1 : 1) : this.facing);
         // Turn-around: the nose swings toward the viewer, through edge-on, onto the other side.
