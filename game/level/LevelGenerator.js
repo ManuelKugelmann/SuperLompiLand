@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
+import { createRope, stepRope } from './rope.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
@@ -115,6 +116,8 @@ export default class LevelGenerator {
         // then drawn on the main thread, one per frame.
         this.pending = new Set();   // chunk keys requested from the worker
         this.early = new Map();     // chunk key -> collision bodies laid down while the worker is busy
+        this.chainBody = { active: false, x: 0, y: 0, vx: 0, vy: 0 };   // the swimmer, as the ropes see it
+        this.chains = [];           // hanging chains: verlet ropes (rope.js) with the hazard as the weight at the end
         this.tethers = [];          // lines that hold drifting things: stretched between them and their anchor every frame
         this.ready = [];            // grids that came back, waiting to be drawn
         const mats = this.loadMaterials();
@@ -251,6 +254,19 @@ export default class LevelGenerator {
                 o.bend += (push - o.bend) * 0.1;
             }
             o.animate(t, o.bend || 0);
+        }
+        // Chains swing as ropes; the hazard on the end hangs from the last link and turns with it.
+        this.chainBody.active = !!fish;
+        if (fish) { this.chainBody.vx = fish.x - this.chainBody.x; this.chainBody.vy = fish.y - this.chainBody.y; this.chainBody.x = fish.x; this.chainBody.y = fish.y; }
+        for (const c of this.chains) {
+            if (!c.active) continue;
+            const r = stepRope(c.sim, t, this.chainBody.active ? this.chainBody : null), last = r.n - 1, pts = c.points;
+            for (let i = 0; i <= last; i++) { pts[i].x = r.x[i] - c.x; pts[i].y = r.y[i] - c.y; }
+            c.setDirty();
+            if (c.weight.active) {
+                const lean = Math.atan2(r.x[last] - r.x[last - 1], r.y[last] - r.y[last - 1]);
+                c.weight.setPosition(r.x[last] + Math.sin(lean) * c.hang, r.y[last] + Math.cos(lean) * c.hang).setRotation(-lean);
+            }
         }
         for (const line of this.tethers) {
             if (!line.active || !line.follow.active) continue;
@@ -522,10 +538,10 @@ export default class LevelGenerator {
             // it is caught on the rock above, around a wedged shackle.
             makeLineTexture(s);
             if (rock && top - rock.y > 8) {
-                chunk.objects.push(s.add.tileSprite(x, rock.y - 6, 16, top - rock.y + 6, 'hz_chain').setOrigin(0.5, 0).setDepth(2.9));
+                this.addChain(chunk, x, rock.y - 6, top, img, h.size * 0.46);
                 chunk.objects.push(s.add.ellipse(x, rock.y - 2, 34, 22, 0x3b3a3d).setStrokeStyle(4, 0x23222a).setDepth(2.92));
             } else if (!rock && top > 40) {
-                chunk.objects.push(s.add.tileSprite(x, 16, 16, top - 16, 'hz_chain').setOrigin(0.5, 0).setDepth(2.9));
+                this.addChain(chunk, x, 16, top, img, h.size * 0.46);
                 chunk.objects.push(s.add.image(x, 6, 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
             }
         } else if (h.tether || h.drift) {
@@ -565,6 +581,23 @@ export default class LevelGenerator {
         }
         this.hazards.push({ img, r: h.r * LEVEL.hitSlack, key });
         return img;
+    }
+
+    /**
+     * A chain hanging from (x, y0) to y1 with `weight` (a hazard) on its end, `hang` px below
+     * the last link. It is a rope (rope.js): it sways, and whoever swims through shoves it.
+     */
+    addChain(chunk, x, y0, y1, weight, hang) {
+        const s = this.scene, r = createRope(x, y0, y1);
+        // The frame is as long as the chain, so the links keep their size.
+        const tex = s.textures.get('hz_chain_long'), links = Math.min(46, Math.ceil((y1 - y0) / 44)), frame = `links${links}`;
+        if (!tex.has(frame)) tex.add(frame, 0, 0, 0, 16, links * 44);
+        const points = [];
+        for (let i = 0; i < r.n; i++) points.push(new Phaser.Math.Vector2(0, r.y[i] - y0));
+        const rope = s.add.rope(x, y0, 'hz_chain_long', frame, points, false).setDepth(2.9);
+        rope.sim = r; rope.weight = weight; rope.hang = hang;
+        chunk.objects.push(rope);
+        this.chains.push(rope);
     }
 
     addFriend(chunk, key, x, y, rng, angle = 0) {
@@ -797,6 +830,7 @@ export default class LevelGenerator {
         this.animated = this.animated.filter(o => o.active);
         this.lights = this.lights.filter(o => o.active);
         this.tethers = this.tethers.filter(o => o.active);
+        this.chains = this.chains.filter(o => o.active);
         this.vents = this.vents.filter(v => v.chunk !== key);
     }
 }
@@ -867,6 +901,10 @@ function makeLineTexture(scene) {
     cc.strokeStyle = 'rgba(190, 200, 190, 0.35)'; cc.lineWidth = 1;
     cc.beginPath(); cc.moveTo(4.6, 6); cc.lineTo(4.6, 16); cc.stroke();
     chain.refresh();
+    // The same links 46 times over: ropes cut frames of the length they need from it.
+    const long = scene.textures.createCanvas('hz_chain_long', 16, 2024), lc = long.getContext();
+    for (let k = 0; k < 46; k++) lc.drawImage(chain.getSourceImage(), 0, k * 44);
+    long.refresh();
 
     // The underside of a boat at the surface: a dark, soft-edged hull seen from below.
     const hull = scene.textures.createCanvas('hz_hull', 560, 150), hc = hull.getContext();
