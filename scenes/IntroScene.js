@@ -72,7 +72,8 @@ const IMAGES = {
     nest: 'nest.webp',             // the painted nest (LevelGenerator NEST_ART)
     giant_clam: 'cave/giant_clam.webp', giant_clam_open: 'cave/giant_clam_open.webp',   // the kelp cave (BranchLayer)
     cave_rope: 'cave/cave_rope.webp', cave_pearl: 'cave/cave_pearl.webp',
-    ghost_finger: 'ui/ghost_finger.webp', ghost_ring: 'ui/ghost_ring.webp'              // the tutorial's hand (scripts/fx/ghost_finger.py)
+    ghost_finger: 'ui/ghost_finger.webp', ghost_ring: 'ui/ghost_ring.webp',   // the tutorial's hand (scripts/fx/ghost_finger.py)
+    manta: 'manta.png'             // the manta (part cards in img/parts); also glides through the title's sea
 };
 
 export default class IntroScene extends Phaser.Scene {
@@ -145,6 +146,7 @@ export default class IntroScene extends Phaser.Scene {
         if (this.textures.exists('bg_far')) {
             this.add.image(W / 2, H / 2, 'bg_far').setDisplaySize(W, H);
         }
+        this.buildDeepLife(W, H);
 
         this.add.text(W / 2, H * 0.13, 'Super Lompi Land', {
             fontFamily: 'Arial, sans-serif', fontSize: '128px', color: '#ffffff',
@@ -174,6 +176,24 @@ export default class IntroScene extends Phaser.Scene {
     }
 
     /** Character carousel: swipe, arrows or tap a neighbour to choose; tap the middle one or GO to start. */
+    /**
+     * The sea's scale on the first screen: the great whale far off in the blue and a manta
+     * gliding nearer, both hazy and slow behind the fish to choose from.
+     */
+    buildDeepLife(W, H) {
+        for (const key of ['whale', 'manta']) {
+            if (!this.textures.exists(key)) continue;
+            const far = key === 'whale', dir = far ? 1 : -1;
+            const o = this.add.image(0, H * (far ? 0.84 : 0.7), key).setTint(far ? 0x0d3a55 : 0x6a9fb6).setAlpha(far ? 0.42 : 0.5).setFlipX(dir < 0);
+            o.setScale(W * (far ? 0.34 : 0.15) / o.width);
+            const span = W + o.displayWidth, from = dir > 0 ? -o.displayWidth / 2 : W + o.displayWidth / 2;
+            o.x = from + dir * span * (far ? 0.25 : 0.6);   // already on its way when the screen opens
+            this.tweens.add({ targets: o, x: from + dir * span, duration: (far ? 70000 : 34000) * (far ? 0.75 : 0.4), ease: 'Linear',
+                onComplete: () => { o.x = from; this.tweens.add({ targets: o, x: from + dir * span, duration: far ? 70000 : 34000, repeat: -1 }); } });
+            this.tweens.add({ targets: o, y: o.y - (far ? 12 : 20), angle: far ? 0.8 : 3, duration: far ? 5200 : 3100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        }
+    }
+
     buildCarousel(lang) {
         const W = this.scale.width, H = this.scale.height;
         const cy = H * 0.52, SPACING = 430, ARROW_OFF = 292;
