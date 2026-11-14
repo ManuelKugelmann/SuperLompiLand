@@ -184,6 +184,7 @@ export default class LevelGenerator {
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
         this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
         this.job = null;        // the chunk build in progress (build() is cut into steps)
+        this.stepMax = new Map();   // step name -> { ms, x }: the slowest it has been and where the view was (perf tour, ?debug=perf)
         this.started = false;   // the first update builds what is on screen at once (behind the start's fade); later jumps go through the worker
         this.viewReady = false; // every chunk on screen is complete
         this.makeKelpTexture();
@@ -293,8 +294,12 @@ export default class LevelGenerator {
         // One step of the build in progress; false once the frame's budget is used up.
         const step = () => {
             worked = true;
-            if (this.job.next().done) this.job = null;
-            return performance.now() - t0 < LEVEL.buildBudgetMs;
+            const t = performance.now(), r = this.job.next(), now = performance.now();
+            if (r.done) this.job = null;
+            // The slowest each kind of step has been, and where: a step runs to its end, so one heavy step is one long frame.
+            const worst = this.stepMax.get(r.value);
+            if (r.value && (!worst || now - t > worst.ms)) this.stepMax.set(r.value, { ms: now - t, x: camX + W / 2 });
+            return now - t0 < LEVEL.buildBudgetMs;
         };
         let budget = !this.job || step();
         if (missing.length) {
@@ -465,7 +470,8 @@ export default class LevelGenerator {
     /**
      * Builds one chunk in steps (a generator: every `yield` is a place where the frame may end and
      * the build goes on next frame; LEVEL.buildBudgetMs). The order of everything, and so every
-     * random draw, is the same as in one go. A chunk dropped meanwhile is abandoned.
+     * random draw, is the same as in one go. A chunk dropped meanwhile is abandoned. Each step hands
+     * back its name, for the record of the slowest steps (stepMax).
      */
     *build(cx, cy, baked = null) {
         const s = this.scene, T = LEVEL.threshold, N = LEVEL.cells;
@@ -496,15 +502,15 @@ export default class LevelGenerator {
             tex.refresh();
             keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
         };
-        if (!baked) { yield; if (chunk.dead) return; }
+        if (!baked) { yield 'shade'; if (chunk.dead) return; }
         const back = paint('back', pics.back, SHADE.backSize);
-        yield; if (chunk.dead) return;
+        yield 'paint back'; if (chunk.dead) return;
         show(back, SHADE.backSize, -6);
-        yield; if (chunk.dead) return;
+        yield 'upload back'; if (chunk.dead) return;
         const rock = paint('rock', pics.rock, SHADE.rockSize);
-        yield; if (chunk.dead) return;
+        yield 'paint rock'; if (chunk.dead) return;
         show(rock, SHADE.rockSize, -2);
-        yield; if (chunk.dead) return;
+        yield 'upload rock'; if (chunk.dead) return;
 
         // Collision strips and floor spots come from the coarse grid (corners
         // shared with the neighbours -> seamless).
@@ -514,10 +520,10 @@ export default class LevelGenerator {
         marchGrid(val, ox, oy, CH, T, c => { for (const e of c.edges) edges.push(e); });
         for (let i = 0; i < edges.length; i++) {
             this.addEdge(chunk, edges[i][0], edges[i][1], floors, walls);
-            if (i % LEVEL.edgeBatch === LEVEL.edgeBatch - 1) { yield; if (chunk.dead) return; }
+            if (i % LEVEL.edgeBatch === LEVEL.edgeBatch - 1) { yield 'strips'; if (chunk.dead) return; }
         }
         this.dropEarly(chunk.key);      // the early collision stays until the chunk's own is complete
-        yield; if (chunk.dead) return;
+        yield 'strips'; if (chunk.dead) return;
 
         // --- Nest ------------------------------------------------------------
         for (const nest of this.nests) {
@@ -563,7 +569,7 @@ export default class LevelGenerator {
             }
         }
 
-        yield; if (chunk.dead) return;
+        yield 'floor life'; if (chunk.dead) return;
         // --- Life on the walls: corals, sea fans and anemones grow out of steep rock faces,
         // thickest where an island drops off into the open sea (spec 5.0c). Own random stream.
         const wallLife = walls.length ? wallLifeAt(mid) : null;
@@ -584,7 +590,7 @@ export default class LevelGenerator {
             }
         }
 
-        yield; if (chunk.dead) return;
+        yield 'wall life'; if (chunk.dead) return;
         // --- Scenery props on the seabed --------------------------------------
         if (biome.props) {
             // Own random stream: props never shift which index a coin or friend gets.
@@ -640,7 +646,7 @@ export default class LevelGenerator {
             }
         }
 
-        yield; if (chunk.dead) return;
+        yield 'props'; if (chunk.dead) return;
         // --- Rippled sand on the lagoon's flat floor (spec 5.5c "ground surface") ----
         if (biome.id === 'beach' && s.textures.exists('sand_ripples')) {
             let strips = 0;
@@ -672,7 +678,7 @@ export default class LevelGenerator {
             }
         }
 
-        yield; if (chunk.dead) return;
+        yield 'ground cover'; if (chunk.dead) return;
         // --- The side cave's net tangle (branches.js): a hazard, off the calm route by choice
         {
             const net = this.field.cave.net;
@@ -689,12 +695,12 @@ export default class LevelGenerator {
             }
         }
 
-        yield; if (chunk.dead) return;
+        yield 'nets'; if (chunk.dead) return;
         // --- Pier: deck at the surface, piles down to the rock (spans chunks) --
         const pier = this.pierAt(cx, biome);
         if (pier) this.drawPier(chunk, pier, oy, keep);
 
-        yield; if (chunk.dead) return;
+        yield 'pier'; if (chunk.dead) return;
         // --- Bubble plants: a column of bubbles that carries the fish upward --
         const abyssFloor = Math.abs(mid - ABYSS.x) < CH && oy + CH > floorY(ABYSS.x) - 400;
         const ventSpot = floors.find(f => this.isOpen(f.x, f.y - 300, 0.05));
@@ -735,7 +741,7 @@ export default class LevelGenerator {
             }
         }
 
-        yield; if (chunk.dead) return;
+        yield 'vents signs roots'; if (chunk.dead) return;
         // --- Coin trails through open water ----------------------------------
         // Every coin has a stable number within its chunk (order of generation,
         // decided by the chunk's own seed only), so a collected coin stays gone.
@@ -780,7 +786,7 @@ export default class LevelGenerator {
             }
         }
 
-        yield; if (chunk.dead) return;
+        yield 'coins'; if (chunk.dead) return;
         // --- Swimmers ---------------------------------------------------------
         const openSpot = (span = 0) => {
             for (let tries = 6; tries > 0; tries--) {
@@ -805,6 +811,7 @@ export default class LevelGenerator {
             if (p) this.addHazard(chunk, key, p.x, p.y, rng);
         }
         chunk.done = true;
+        return 'swimmers';
     }
 
     /**

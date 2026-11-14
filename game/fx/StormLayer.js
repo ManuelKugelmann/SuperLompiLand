@@ -36,8 +36,8 @@ const TEX = { rain: 'storm_rain', bands: 'storm_bands', col: 'current_col', whir
 /** Small deterministic random source. */
 function rnd(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
-/** The storm's and the current's pictures, painted once (no art files needed). */
-function bake(scene) {
+/** The storm's and the current's pictures, painted once (no art files needed). `one` = only the next missing one (returns true when it painted one). */
+function bake(scene, one = false) {
     const T = scene.textures, r = rnd(5);
     if (!T.exists(TEX.rain)) {
         // Rain: slanted streaks on one tile (one object for all of it).
@@ -51,6 +51,7 @@ function bake(scene) {
             }
         }
         tex.refresh();
+        if (one) return true;
     }
     if (!T.exists(TEX.bands)) {
         // Wave shadows: soft dark bands across the light, strongest at the top, tiling sideways.
@@ -69,6 +70,7 @@ function bake(scene) {
         fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(1, 'rgba(0,0,0,0.15)');
         c.fillStyle = fade; c.fillRect(0, 0, W, H);
         tex.refresh();
+        if (one) return true;
     }
     if (!T.exists(TEX.col)) {
         // A slice of the current, tiling downward: a soft darker haze densest in the middle,
@@ -104,6 +106,7 @@ function bake(scene) {
             for (const oy of [-H, 0, H]) c.fillRect(x, y + oy, 1 + r() * 1.4, len);
         }
         tex.refresh();
+        if (one) return true;
     }
     if (!T.exists(TEX.whirl)) {
         // The whirl at the top of the down column: curved streaks spiralling in.
@@ -124,6 +127,7 @@ function bake(scene) {
         g.addColorStop(0, 'rgba(4,22,52,0.6)'); g.addColorStop(1, 'rgba(4,22,52,0)');
         c.fillStyle = g; c.beginPath(); c.arc(0, 0, 60, 0, Math.PI * 2); c.fill();
         tex.refresh();
+        if (one) return true;
     }
     if (!T.exists(TEX.plank)) {
         const W = 110, H = 22, tex = T.createCanvas(TEX.plank, W, H), c = tex.getContext();
@@ -133,6 +137,7 @@ function bake(scene) {
         c.fillStyle = 'rgba(255,240,210,0.18)'; c.fillRect(2, 3, W - 4, 3);
         c.clearRect(W - 14, 3, 12, 6);   // a broken corner
         tex.refresh();
+        if (one) return true;
     }
     if (!T.exists(TEX.weed)) {
         const W = 90, H = 64, tex = T.createCanvas(TEX.weed, W, H), c = tex.getContext();
@@ -142,6 +147,7 @@ function bake(scene) {
             c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x0 + Math.cos(a + 0.8) * L * 0.6, y0 + Math.sin(a + 0.8) * L * 0.6, x0 + Math.cos(a) * L, y0 + Math.sin(a) * L * 0.7); c.stroke();
         }
         tex.refresh();
+        if (one) return true;
     }
     if (!T.exists(TEX.edge)) {
         const tex = T.createCanvas(TEX.edge, 256, 4), c = tex.getContext(), g = c.createLinearGradient(0, 0, 256, 0);
@@ -149,7 +155,14 @@ function bake(scene) {
         g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(1, `rgba(${rgb},1)`);
         c.fillStyle = g; c.fillRect(0, 0, 256, 4);
         tex.refresh();
+        if (one) return true;
     }
+    return false;
+}
+
+/** One of the storm's pictures per call, ahead of time (each takes a few ms: together they would be one long frame when the storm comes near). True while more are left. */
+export function prewarmStorm(scene) {
+    return bake(scene, true);
 }
 
 /**

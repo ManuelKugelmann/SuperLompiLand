@@ -134,10 +134,11 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                 fx += (leader.x - px[i]) * W.leader * 0.3; fy += (leader.y - py[i]) * W.leader * 0.3;
                 // The players: part around each predicted path; a dash nearby starts a panic.
                 let near = null, nearD = Infinity;
-                for (const { pl, speed: pspeed, calm, ppx, ppy, personal } of ps) {
-                    const pd = Math.hypot(px[i] - pl.x, py[i] - pl.y);
+                for (let q = 0; q < ps.length; q++) {
+                    const { pl, speed: pspeed, calm, ppx, ppy, personal } = ps[q];
+                    const pdx = px[i] - pl.x, pdy = py[i] - pl.y, pd = Math.sqrt(pdx * pdx + pdy * pdy);
                     if (pd < nearD) { nearD = pd; near = pl; }
-                    const dx = px[i] - ppx, dy = py[i] - ppy, d = Math.hypot(dx, dy);
+                    const dx = px[i] - ppx, dy = py[i] - ppy, d = Math.sqrt(dx * dx + dy * dy);
                     if (d < personal && d > 1e-3) {
                         const k = (personal - d) / personal;
                         // Part like a curtain: move off the player's path to the near side.
@@ -152,7 +153,7 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                     if (pspeed > P.dashSpeed && pd < P.panicR) panic[i] = 1;
                 }
                 // Rock ahead: turn away from it before touching it.
-                const sp = Math.hypot(vx[i], vy[i]) || 1;
+                const sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]) || 1;
                 if (env.isOpen && (i + tick) % P.avoidEvery === 0) blocked[i] = env.isOpen(px[i] + vx[i] / sp * P.lookAhead, py[i] + vy[i] / sp * P.lookAhead) ? 0 : 1;
                 if (blocked[i]) {
                     fx += -vx[i] / sp * W.avoid * 40 + -vy[i] / sp * W.avoid * 25;
@@ -163,12 +164,12 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                     fx += dx / d * panic[i] * 120; fy += dy / d * panic[i] * 120;
                 }
                 // Momentum: limited acceleration, then speed limits.
-                const fl = Math.hypot(fx, fy), amax = P.maxAccel * quirk[i] * (1 + panic[i] * 3);
+                const fl = Math.sqrt(fx * fx + fy * fy), amax = P.maxAccel * quirk[i] * (1 + panic[i] * 3);
                 if (fl > amax) { fx = fx / fl * amax; fy = fy / fl * amax; }
                 const ovx = vx[i], ovy = vy[i];
                 vx[i] += fx * dt; vy[i] += fy * dt;
                 const top = (P.speed + (P.maxSpeed - P.speed) * panic[i]) * quirk[i];
-                const s = Math.hypot(vx[i], vy[i]);
+                const s = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]);
                 if (s > top) { vx[i] *= top / s; vy[i] *= top / s; }
                 if (s < P.speed * 0.4) { const k = (P.speed * 0.4) / (s || 1); vx[i] *= k; vy[i] *= k; }   // fish never stop
                 // Turning amount (for the silver flank flash when the swarm wheels).

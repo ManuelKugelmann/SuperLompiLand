@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PERF_TOUR, createPerfTour, perfReport } from '../game/perfTour.js';
+import { PERF_TOUR, createPerfTour, perfReport, slowSteps } from '../game/perfTour.js';
 
 const biomeAt = x => (x < 5000 ? 'beach' : 'reef');
 
@@ -62,4 +62,12 @@ test('frames after a hop, while the view is not complete, are the hop\'s cost: k
     let hopped = false;
     for (let ms = 0; ms <= PERF_TOUR.settleMaxMs + PERF_TOUR.stayMs && !hopped; ms += 100) hopped = t.step(100, true);
     assert.ok(hopped, 'a view that never completes does not stop the tour');
+});
+
+test('build steps over the limit are named, slowest first, with the biome they happened in', () => {
+    const steps = new Map([['paint rock', { ms: 12.4, x: 5000 }], ['strips', { ms: 3, x: 100 }], ['props', { ms: 30, x: 9000 }]]);
+    const lines = slowSteps(steps, x => (x > 6000 ? 'blue' : 'reef'));
+    assert.equal(lines.length, 2);
+    assert.match(lines[0], /props.*30\.0 ms.*blue/);
+    assert.match(lines[1], /paint rock.*12\.4 ms.*reef/);
 });

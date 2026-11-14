@@ -53,12 +53,13 @@ import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import GrandNestLayer from '../game/level/GrandNestLayer.js';
+import NurseryLayer from '../game/level/NurseryLayer.js';
 import { GRAND_NEST } from '../game/level/grandNest.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
-import { createPerfTour, perfReport } from '../game/perfTour.js';
+import { createPerfTour, perfReport, slowSteps } from '../game/perfTour.js';
 import { depthMeters } from '../game/level/depthMeters.js';
 import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics } from '../game/fx/CausticsPipeline.js';
@@ -71,7 +72,7 @@ import CoinGlow from '../game/fx/CoinGlow.js';
 import { slipAt } from '../game/level/whaleShark.js';
 import FrontLayer from '../game/level/FrontLayer.js';
 import { frontSlot, jetAt, FRONT_LOOK } from '../game/level/front.js';
-import StormLayer from '../game/fx/StormLayer.js';
+import StormLayer, { prewarmStorm } from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
 import { ROUTE, nestReached } from '../game/level/density.js';
@@ -240,6 +241,8 @@ export default class MainScene extends Phaser.Scene {
             : new Whale(this, this.journey, whaleAt.x, whaleAt.endX, x => this.level.field.routeY(x), (ev, x, y) => this.whaleEvent(ev, x, y));
         // The set pieces of the long sea stretches (spec 5.0e): the ghost ship, and the beacon over the grand nest.
         this.setPieces = new SetPieceLayer(this, this.level.nests[this.level.nests.length - 1], this.level.nests.slice(0, -1));
+        // The root nursery in the mangrove (spec 5.0n): a cloud of fry that parts round the fish, and two lemon shark pups.
+        this.nursery = new NurseryLayer(this, x => this.level.field.routeY(x), () => this.character.id === 'shark', () => this.bookEntry('nursery'));
         // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
         this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
@@ -615,8 +618,10 @@ export default class MainScene extends Phaser.Scene {
             this.camX = p.x - this.scale.width / 2; this.camY = p.y - this.scale.height / 2;
         }
         if (!tour.done) return;
-        const rows = tour.rows(), lines = perfReport(rows);
+        const steps = slowSteps(this.level.stepMax, x => BIOMES[biomeIndexAt(x)].id);
+        const rows = tour.rows(), lines = [...perfReport(rows), ...steps];
         window.__perftest = rows;      // for automated runs
+        window.__perfsteps = [...this.level.stepMax].map(([name, v]) => ({ name, ms: v.ms, x: v.x }));
         const text = lines.join(String.fromCharCode(10));
         console.log(text);
         this.add.text(40, 120, text, { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
@@ -1624,6 +1629,7 @@ export default class MainScene extends Phaser.Scene {
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
         this.grandNest.update(sp, time / 1000, delta / 1000);
+        this.nursery.update(sp, this.fish.facing, time / 1000, delta / 1000);
         this.branch.update(sp, time / 1000, delta, this.particles);
         this.docks.update(sp, time / 1000);
         this.manta.update(sp, time / 1000, delta);
@@ -1632,6 +1638,7 @@ export default class MainScene extends Phaser.Scene {
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
+        else if (this.creaturesWarm && !this.stormWarm && this.buildSlot()) this.stormWarm = !prewarmStorm(this);      // then the storm's pictures, one per frame
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.baitBalls.update(sp, this.fish.view, this.fish.radius, time / 1000);

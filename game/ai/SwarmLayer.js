@@ -24,7 +24,9 @@ export const SWARMS = { perView: 2, inView: [1000, 520], ahead: [1150, 1400],   
     fade: 0.3,    // and how much it fades
     deepCount: 80,    // shoals of this many fish or more get the full depth; smaller ones less
     farPad: 450,      // px beyond "in view" from which a shoal counts as out of sight ...
-    farEvery: 3 };    // ... and is then simulated only every so many frames (with the time that passed), its pictures left alone
+    farEvery: 3,      // ... and is then simulated only every so many frames (with the time that passed), its pictures left alone
+    simEvery: 2,      // a shoal in sight is simulated every so many frames (shoals take turns); in between its fish glide on at their speed
+    maxStep: 0.07 };  // s: the longest time one simulation step covers
 
 /** Texture size of one frame (px) for a species. */
 const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (sp.tall ? 1.25 : 0.8)) });
@@ -137,7 +139,7 @@ export default class SwarmLayer {
             const z = (1 - (i + 0.5) / sp.count) * deep;
             b.setTint(mixColor(0xffffff, water, z * SWARMS.haze)).setAlpha(1 - z * SWARMS.fade);
         });
-        this.swarms.push({ id, sim, blitter, bobs, w, h, phase, home });
+        this.swarms.push({ id, sim, blitter, bobs, w, h, phase, home, turnN: this.swarms.length });      // turnN: shoals take turns at simulating
     }
 
     /**
@@ -195,17 +197,18 @@ export default class SwarmLayer {
             // A shoal out of sight costs a third: it swims on in bigger steps and nothing is drawn of it.
             const c = s.sim.centre(), far = Math.abs(c.x - cx) > SWARMS.inView[0] + SWARMS.farPad || Math.abs(c.y - cy) > SWARMS.inView[1] + SWARMS.farPad;
             s.owed = (s.owed || 0) + dt;
-            if (far && (s.skipped = (s.skipped || 0) + 1) % SWARMS.farEvery) continue;
-            s.sim.step(Math.min(s.owed, 0.05), env);
-            s.owed = 0;
+            s.turnN = (s.turnN || 0) + 1;
+            if (far && s.turnN % SWARMS.farEvery) continue;
+            if (far || s.turnN % SWARMS.simEvery === 0) { s.sim.step(Math.min(s.owed, SWARMS.maxStep), env); s.owed = 0; }
             if (far) continue;
+            const glide = s.owed;      // s since its last step: the fish are drawn that much further along their way
             const { x, y, vx, vy, panic, turn } = s.sim;
             for (let i = 0; i < s.bobs.length; i++) {
                 const b = s.bobs[i], ph = s.phase[i];
                 // Tail beats faster the faster the fish swims.
                 const beat = Math.sin(ph + this.time * (6 + Math.hypot(vx[i], vy[i]) * 0.06));
-                b.x = x[i] - s.w / 2;
-                b.y = y[i] - s.h / 2 + Math.sin(ph * 1.7 + this.time * 1.3) * s.h * 0.12;
+                b.x = x[i] + vx[i] * glide - s.w / 2;
+                b.y = y[i] + vy[i] * glide - s.h / 2 + Math.sin(ph * 1.7 + this.time * 1.3) * s.h * 0.12;
                 b.flipX = vx[i] < 0;
                 b.setFrame(turn[i] > 0.6 || panic[i] > 0.5 ? FLASH : beat < -0.33 ? 0 : beat > 0.33 ? 2 : 1);   // flash when wheeling or startled
             }

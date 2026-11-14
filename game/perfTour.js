@@ -8,6 +8,7 @@ export const PERF_TOUR = {
     skipMs: 500,      // ms after a hop that never count as steady play ...
     settleMaxMs: 8000, // ... and the stop's time only starts once the chunks in view are complete (at most this long after the hop)
     warmMs: 3000,     // ms after the tour's start that do not count (start-up: first chunks, texture bakes)
+    slowStepMs: 8,    // build steps slower than this are named in the report
     budget: { logicMs: 4, chunkMs: 15, objects: 600, tweens: 300 }
 };
 
@@ -68,4 +69,10 @@ export function perfReport(rows) {
     const pad = (v, n) => String(v).padStart(n);
     return ['biome       logic avg       p50       p95     worst  chunk ms  objects  tweens    hop ms',
         ...rows.map(r => `${r.biome.padEnd(10)}${pad(r.logicMs.toFixed(1), 11)}${pad(r.p50Ms.toFixed(1), 10)}${pad(r.p95Ms.toFixed(1), 10)}${pad(r.worstMs.toFixed(1), 10)}${pad(r.chunkMs.toFixed(1), 10)}${pad(r.objects, 9)}${pad(r.tweens, 8)}${pad(r.hopMs.toFixed(0), 10)}${r.over.length ? '   OVER: ' + r.over.join(', ') : ''}`)];
+}
+
+/** The build steps slower than `slowStepMs`, slowest first, as lines of text. `steps` = Map(name -> { ms, x }), `biomeAt` = x -> biome id. */
+export function slowSteps(steps, biomeAt, cfg = PERF_TOUR) {
+    return [...steps].filter(([, v]) => v.ms > cfg.slowStepMs).sort((a, b) => b[1].ms - a[1].ms)
+        .map(([name, v]) => `slow build step: ${name.padEnd(18)} ${v.ms.toFixed(1).padStart(7)} ms  (${biomeAt(v.x)}, x ${Math.round(v.x)})`);
 }
