@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { DOCKS, docksSpot, docksShare, freesCrab } from '../game/level/docks.js';
 import { BIOMES, landmarkGroup } from '../game/level/biomes.js';
 import { createField, ROUTE } from '../game/level/density.js';
+import { chapters } from '../game/journey.js';
 
 const spot = docksSpot(), f = createField(1337);
 
@@ -12,6 +13,8 @@ test('the docks are under the harbour\'s landmark pier, at the surface', () => {
     assert.equal(landmarkGroup(Math.floor(spot.x / DOCKS.chunk), DOCKS.chunk), 'pier', 'the pier is forced into this chunk column');
     assert.equal(spot.x % DOCKS.chunk, DOCKS.chunk / 2, 'its middle is the column\'s middle');
     assert.ok(spot.top > 0 && spot.bottom < 600);
+    // The chapter's friend hangs in its net near the biome's middle: the docks are at its entry, so each has its own screen.
+    assert.ok(Math.abs(chapters().find(c => c.id === 'harbour').x - spot.x) > 2500);
 });
 
 test('they lie far off the calm route: everything in them is clear of the lane and of the hazard-free corridor', () => {

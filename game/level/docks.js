@@ -4,15 +4,15 @@
 // bottle cap. A special set off close by (or a nudge) frees it. Nothing here blocks the way:
 // it is a place to go to, not through.
 
-import { BIOMES } from './biomes.js';
+import { BIOMES, LANDMARK } from './biomes.js';
 
 export const DOCKS = {
     biome: 'harbour',
-    chunk: 960,          // the pier stands in the middle of the chunk column at the biome's middle (LevelGenerator.pierAt)
+    chunk: 960,          // the pier stands in the middle of the chunk column where the biome is entered (LevelGenerator.pierAt)
     half: 620,           // px to either side of the pier's middle that count as "under the docks"
     top: 60, bottom: 470,   // from just under the surface down to here
     net: [-190, 250],    // the net tangle: px from the pier's middle, and its depth
-    crab: [250, 340],    // the hermit crab in its bottle cap, hanging in a rope
+    crab: [250, 400],    // the hermit crab in its bottle cap, hanging in a rope at eye level under the deck
     ropes: [-430, -60, 250, 470],   // loose ropes hanging from the deck (px from the middle); the third holds the crab
     freeRadius: 340,     // px: a special set off this close frees the crab ...
     nudge: 80,           // ... and so does swimming right up to it
@@ -21,7 +21,8 @@ export const DOCKS = {
 
 /** Where the docks are: { x (the pier's middle), x0, x1, top, bottom, net: {x, y}, crab: {x, y}, ropes: [x, ...] }. */
 export function docksSpot(biomes = BIOMES, cfg = DOCKS) {
-    const b = biomes.find(bi => bi.id === cfg.biome), cx = Math.floor((b.from + b.width / 2) / cfg.chunk), x = cx * cfg.chunk + cfg.chunk / 2;
+    // The pier at the biome's entry, not the one at its middle: the chapter's friend hangs in its net near the middle, and each needs its own screen.
+    const b = biomes.find(bi => bi.id === cfg.biome), cx = Math.floor((b.from + LANDMARK.entry) / cfg.chunk), x = cx * cfg.chunk + cfg.chunk / 2;
     return {
         x, x0: x - cfg.half, x1: x + cfg.half, top: cfg.top, bottom: cfg.bottom,
         net: { x: x + cfg.net[0], y: cfg.net[1] }, crab: { x: x + cfg.crab[0], y: cfg.crab[1] }, ropes: cfg.ropes.map(dx => x + dx)

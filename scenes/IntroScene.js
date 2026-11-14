@@ -25,6 +25,7 @@ import { SPECIES, schoolArt } from '../game/ai/SwarmLayer.js';
 import { PAD_ART } from '../game/level/BoosterLayer.js';
 import { SURF_ART } from '../game/fx/SurfLayer.js';
 import { SHIP_FILES } from '../game/level/SetPieceLayer.js';
+import { DOCKS_ART } from '../game/level/DocksLayer.js';
 import { SKY_ART } from '../game/level/SkyLayer.js';
 import { STORY_ART } from './StoryScene.js';
 import { STORM_LOOK } from '../game/fx/StormLayer.js';
@@ -104,6 +105,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.textures.exists('hull_bottom')) this.load.image('hull_bottom', 'img/props/hull_bottom.webp');
         for (const [key, file] of Object.entries(SHIP_FILES.images)) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.cache.json.exists(SHIP_FILES.json[0])) this.load.json(SHIP_FILES.json[0], SHIP_FILES.json[1]);
+        for (const [key, file] of Object.entries(DOCKS_ART)) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);
         if (!this.textures.exists(SURF_ART.puffs.key)) this.load.spritesheet(SURF_ART.puffs.key, SURF_ART.puffs.file, { frameWidth: SURF_ART.puffs.frame, frameHeight: SURF_ART.puffs.frame });

@@ -98,7 +98,7 @@ export default class BranchLayer {
     constructor(scene, cave, taken, onPearl) {
         this.scene = scene; this.cave = cave; this.onPearl = onPearl; this.taken = taken; this.open = taken;
         ensureTextures(scene);
-        const L = BRANCH_LOOK, murk = (x, y, a, s = 1) => scene.add.image(x, y, KEYS.murk).setDisplaySize(L.murkSize * s, L.murkSize * s).setAlpha(a).setDepth(5.6);
+        const L = BRANCH_LOOK, murk = (x, y, a, s = 1) => scene.add.image(x, y, KEYS.murk).setDisplaySize(L.murkSize * s, L.murkSize * s).setAlpha(a).setDepth(43);      // above the scene's light and vignette layers, so it shows
         murk(cave.x0, cave.top + 60, L.murk);
         murk(cave.x1, cave.top + 60, L.murk * 0.8);
         for (let x = cave.x0 + 250; x < cave.x1; x += 420) murk(x, cave.y, L.murkInside, 0.9);
