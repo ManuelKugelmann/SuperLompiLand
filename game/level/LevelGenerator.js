@@ -35,6 +35,9 @@ export const LEVEL = {
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
+    buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
+    edgeBatch: 10,        // collision strips made per build step
+    canvasPool: 12,       // canvas textures of dropped chunks kept for the next ones, per size
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     rippleMax: 8,         // strips of rippled sand per chunk, at most
@@ -179,7 +182,8 @@ export default class LevelGenerator {
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
         this.playerKey = getCharacter(scene.registry.get('character') || loadSelectedId())?.states.normal.key;      // the playable's picture
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
-        this.buildMs = { last: 0, max: 0, count: 0 };   // cost of building chunks, shown by ?debug=perf
+        this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
+        this.job = null;        // the chunk build in progress (build() is cut into steps)
         this.makeKelpTexture();
         this.makeRootTextures();
         // Painted once here, at start-up, so no chunk has to pay for them while playing.
@@ -282,22 +286,25 @@ export default class LevelGenerator {
         for (let cy = y0; cy <= y1; cy++) {
             for (let cx = x0; cx <= x1; cx++) if (!this.chunks.has(`${cx},${cy}`)) missing.push([cx, cy]);
         }
-        const timed = (cx, cy, grids) => {
-            const t0 = performance.now();
-            this.build(cx, cy, grids);
-            const ms = performance.now() - t0;
-            this.buildMs.last = ms; this.buildMs.count++;
-            if (ms > this.buildMs.max) this.buildMs.max = ms;
+        const t0 = performance.now();
+        let worked = false;
+        // One step of the build in progress; false once the frame's budget is used up.
+        const step = () => {
+            worked = true;
+            if (this.job.next().done) this.job = null;
+            return performance.now() - t0 < LEVEL.buildBudgetMs;
         };
+        let budget = !this.job || step();
         if (missing.length) {
             const mx = (camX + W / 2) / CH - 0.5, my = (camY + H / 2) / CH - 0.5;
             missing.sort((p, q) => Math.hypot(p[0] - mx, p[1] - my) - Math.hypot(q[0] - mx, q[1] - my));
             const onScreen = ([cx, cy]) => cx * CH < camX + W && (cx + 1) * CH > camX && cy * CH < camY + H && (cy + 1) * CH > camY;
             if (this.chunks.size === 0) {
                 // Very first frame: what is on screen is built right away.
-                for (const [cx, cy] of missing.filter(onScreen)) timed(cx, cy);
+                for (const [cx, cy] of missing.filter(onScreen)) { worked = true; for (const _ of this.build(cx, cy)); }
             } else if (!this.worker) {
-                timed(missing[0][0], missing[0][1]);          // no worker: one per frame on the main thread
+                // No worker: one at a time on the main thread, in steps.
+                if (!this.job && budget) { this.job = this.build(missing[0][0], missing[0][1]); budget = step(); }
             } else {
                 for (const [cx, cy] of missing) {             // ask the worker for the maths
                     const key = `${cx},${cy}`;
@@ -308,13 +315,20 @@ export default class LevelGenerator {
                 }
             }
         }
-        // Draw at most one finished chunk per frame; results nobody needs any more are dropped.
-        while (this.ready.length) {
-            const r = this.ready.shift();
-            const [cx, cy] = r.key.split(',').map(Number);
-            if (!wanted(cx, cy) || this.chunks.has(r.key)) { this.dropEarly(r.key); continue; }
-            timed(cx, cy, r);
-            break;
+        // Finished maths become chunks step by step, as far as the frame's budget goes; results nobody needs any more are dropped.
+        while (budget && (this.job || this.ready.length)) {
+            if (!this.job) {
+                const r = this.ready.shift();
+                const [cx, cy] = r.key.split(',').map(Number);
+                if (!wanted(cx, cy) || this.chunks.has(r.key)) { this.dropEarly(r.key); continue; }
+                this.job = this.build(cx, cy, r);
+            }
+            budget = step();
+        }
+        if (worked) {
+            const ms = performance.now() - t0;
+            this.buildMs.last = ms; this.buildMs.count++;
+            if (ms > this.buildMs.max) this.buildMs.max = ms;
         }
         for (const key of [...this.chunks.keys()]) {
             const [cx, cy] = key.split(',').map(Number);
@@ -441,13 +455,17 @@ export default class LevelGenerator {
     }
 
     /** @param baked { coarse, rock, back } from the worker; computed here when omitted */
-    build(cx, cy, baked = null) {
+    /**
+     * Builds one chunk in steps (a generator: every `yield` is a place where the frame may end and
+     * the build goes on next frame; LEVEL.buildBudgetMs). The order of everything, and so every
+     * random draw, is the same as in one go. A chunk dropped meanwhile is abandoned.
+     */
+    *build(cx, cy, baked = null) {
         const s = this.scene, T = LEVEL.threshold, N = LEVEL.cells;
         const ox = cx * CH, oy = cy * CH, mid = ox + CH / 2;
         const rng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}`]);
         const chunk = { objects: [], bodies: [], textures: [], key: `${cx},${cy}` };
         this.chunks.set(chunk.key, chunk);
-        this.dropEarly(chunk.key);
         // Every picture of the world's surfaces (rock, sand, growth, props, piles) catches the caustics (fx/CausticsPipeline.js).
         const keep = o => { chunk.objects.push(o); if (this.caustics && o.type === 'Image') o.setPipeline(CAUSTICS); return o; };
         const has = key => s.textures.exists(key);
@@ -458,23 +476,41 @@ export default class LevelGenerator {
         // worker) and shown as two plain images per chunk: nothing about the
         // terrain is redrawn while playing.
         const pics = baked || { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, ...shadeChunk(this.field, LEVEL.seed, ox, oy, CH) };
-        const show = (name, data, size, depth) => {
+        // Each picture in two steps (painting it, then handing it to the graphics card): together they are the build's biggest cost.
+        const paint = (name, data, size) => {
             const key = `chunk:${chunk.key}:${name}`;
             if (s.textures.exists(key)) s.textures.remove(key);
-            const tex = s.textures.createCanvas(key, size, size);
+            const tex = this.canvasFor(key, size);
             tex.context.putImageData(new ImageData(data, size, size), 0, 0);
-            tex.refresh();
             chunk.textures.push(key);
-            keep(s.add.image(ox, oy, key).setOrigin(0).setScale(CH / size).setDepth(depth));
+            return tex;
         };
-        show('back', pics.back, SHADE.backSize, -6);
-        show('rock', pics.rock, SHADE.rockSize, -2);
+        const show = (tex, size, depth) => {
+            tex.refresh();
+            keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
+        };
+        if (!baked) { yield; if (chunk.dead) return; }
+        const back = paint('back', pics.back, SHADE.backSize);
+        yield; if (chunk.dead) return;
+        show(back, SHADE.backSize, -6);
+        yield; if (chunk.dead) return;
+        const rock = paint('rock', pics.rock, SHADE.rockSize);
+        yield; if (chunk.dead) return;
+        show(rock, SHADE.rockSize, -2);
+        yield; if (chunk.dead) return;
 
         // Collision strips and floor spots come from the coarse grid (corners
         // shared with the neighbours -> seamless).
         const val = gridRows(pics.coarse, N + 1);
         const floors = [], walls = [];
-        marchGrid(val, ox, oy, CH, T, c => { for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors, walls); });
+        const edges = [];
+        marchGrid(val, ox, oy, CH, T, c => { for (const e of c.edges) edges.push(e); });
+        for (let i = 0; i < edges.length; i++) {
+            this.addEdge(chunk, edges[i][0], edges[i][1], floors, walls);
+            if (i % LEVEL.edgeBatch === LEVEL.edgeBatch - 1) { yield; if (chunk.dead) return; }
+        }
+        this.dropEarly(chunk.key);      // the early collision stays until the chunk's own is complete
+        yield; if (chunk.dead) return;
 
         // --- Nest ------------------------------------------------------------
         for (const nest of this.nests) {
@@ -520,6 +556,7 @@ export default class LevelGenerator {
             }
         }
 
+        yield; if (chunk.dead) return;
         // --- Life on the walls: corals, sea fans and anemones grow out of steep rock faces,
         // thickest where an island drops off into the open sea (spec 5.0c). Own random stream.
         const wallLife = walls.length ? wallLifeAt(mid) : null;
@@ -540,6 +577,7 @@ export default class LevelGenerator {
             }
         }
 
+        yield; if (chunk.dead) return;
         // --- Scenery props on the seabed --------------------------------------
         if (biome.props) {
             // Own random stream: props never shift which index a coin or friend gets.
@@ -595,6 +633,7 @@ export default class LevelGenerator {
             }
         }
 
+        yield; if (chunk.dead) return;
         // --- Rippled sand on the lagoon's flat floor (spec 5.5c "ground surface") ----
         if (biome.id === 'beach' && s.textures.exists('sand_ripples')) {
             let strips = 0;
@@ -626,6 +665,7 @@ export default class LevelGenerator {
             }
         }
 
+        yield; if (chunk.dead) return;
         // --- The side cave's net tangle (branches.js): a hazard, off the calm route by choice
         {
             const net = this.field.cave.net;
@@ -642,10 +682,12 @@ export default class LevelGenerator {
             }
         }
 
+        yield; if (chunk.dead) return;
         // --- Pier: deck at the surface, piles down to the rock (spans chunks) --
         const pier = this.pierAt(cx, biome);
         if (pier) this.drawPier(chunk, pier, oy, keep);
 
+        yield; if (chunk.dead) return;
         // --- Bubble plants: a column of bubbles that carries the fish upward --
         const abyssFloor = Math.abs(mid - ABYSS.x) < CH && oy + CH > floorY(ABYSS.x) - 400;
         const ventSpot = floors.find(f => this.isOpen(f.x, f.y - 300, 0.05));
@@ -686,6 +728,7 @@ export default class LevelGenerator {
             }
         }
 
+        yield; if (chunk.dead) return;
         // --- Coin trails through open water ----------------------------------
         // Every coin has a stable number within its chunk (order of generation,
         // decided by the chunk's own seed only), so a collected coin stays gone.
@@ -730,6 +773,7 @@ export default class LevelGenerator {
             }
         }
 
+        yield; if (chunk.dead) return;
         // --- Swimmers ---------------------------------------------------------
         const openSpot = (span = 0) => {
             for (let tries = 6; tries > 0; tries--) {
@@ -753,6 +797,33 @@ export default class LevelGenerator {
             const p = key && openSpot((HAZARDS[key].patrol || 0) / 2 + 60);
             if (p) this.addHazard(chunk, key, p.x, p.y, rng);
         }
+    }
+
+    /**
+     * A canvas texture of `size` px under `key`: one a dropped chunk left behind when there is one
+     * (making a new one allocates the canvas and uploads it once more), else a new one. The pool
+     * belongs to the game (its registry), since textures outlive the scene.
+     */
+    canvasFor(key, size) {
+        const t = this.scene.textures, spare = this.canvasPool()[size]?.pop();
+        if (!spare) return t.createCanvas(key, size, size);
+        t.renameTexture(spare, key);
+        return t.get(key);
+    }
+
+    /** A dropped chunk's canvas texture goes back to the pool (up to LEVEL.canvasPool per size), else it is removed. */
+    poolCanvas(key) {
+        const t = this.scene.textures, pool = this.canvasPool(), size = t.get(key).source[0].width, list = pool[size] || (pool[size] = []);
+        if (list.length >= LEVEL.canvasPool) { t.remove(key); return; }
+        const spare = `chunkpool:${size}:${pool.made = (pool.made || 0) + 1}`;
+        t.renameTexture(key, spare);
+        list.push(spare);
+    }
+
+    canvasPool() {
+        const reg = this.scene.registry;
+        if (!reg.get('chunkCanvasPool')) reg.set('chunkCanvasPool', {});
+        return reg.get('chunkCanvasPool');
     }
 
     /** One rock outline segment: collision strip + remember upward-facing ones (floors) and steep ones (walls). */
@@ -1228,9 +1299,10 @@ export default class LevelGenerator {
 
     drop(key) {
         const chunk = this.chunks.get(key);
+        chunk.dead = true;      // a build still in progress stops at its next step
         for (const b of chunk.bodies) this.scene.matter.world.remove(b);
         for (const o of chunk.objects) { this.scene.tweens.killTweensOf(o); o.destroy(); }
-        for (const key of chunk.textures) this.scene.textures.remove(key);
+        for (const key of chunk.textures) this.poolCanvas(key);
         this.chunks.delete(key);
         this.coins = this.coins.filter(c => c.img.active);
         this.hazards = this.hazards.filter(h => h.img.active);
