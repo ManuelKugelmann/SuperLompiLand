@@ -36,7 +36,7 @@ test('dropped anywhere, inside rock or not, the body pops into open water close 
 
 test('a body just inside the rock comes out on its own side, not through the wall', () => {
     let checked = 0;
-    for (let i = 0; i < 6000 && checked < 60; i++) {
+    for (let i = 0; i < 20000 && checked < 60; i++) {      // a third of this stretch is open sea with no rock to test
         const x = hash(i, 3, 9) * 30000, y = 400 + hash(i, 4, 9) * 3000;
         const d = density(x, y);
         if (d < FIELD.threshold + 0.005 || d > FIELD.threshold + 0.03) continue;      // shallow in the rock

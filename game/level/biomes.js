@@ -180,13 +180,20 @@ export const ABYSS = { x: BIOMES[BIOMES.length - 1].from + 5200, halfWidth: 650,
 // How the seabed gets from one biome's depth to the next (px along the way). Between an island
 // and the sea the whole slope lies on the sea's side, so an island's coast keeps its depth right
 // up to its edge: leaving an island the bottom falls away as a wall, toward one it climbs gently.
-export const SEABED = { dropOff: 900, rise: 2600, coast: 1600 };
+export const SEABED = { dropOff: 900, rise: 2600, coast: 1600, seaEdge: [300, 900] };   // seaEdge: px over which the open sea begins after an island and ends before one
 
 const smooth = v => { const t = clamp(v, 0, 1); return t * t * (3 - 2 * t); };
 
 /** Is the water at x open sea (far from any island's coast)? */
 export function isSea(x) {
     return BIOMES[biomeIndexAt(x)].zone === 'sea';
+}
+
+/** How much the water at x is open sea: 0 along the coasts, 1 out at sea, easing in just past an island's edge and out before the next. */
+export function seaShare(x, cfg = SEABED) {
+    const b = BIOMES[biomeIndexAt(x)];
+    if (b.zone !== 'sea') return 0;
+    return Math.min(smooth((x - b.from) / cfg.seaEdge[0]), smooth((b.from + b.width - x) / cfg.seaEdge[1]));
 }
 
 /** Seabed depth: shallow along the islands, far down in the open sea between them, plus the abyss. */

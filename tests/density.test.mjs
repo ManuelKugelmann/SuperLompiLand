@@ -99,3 +99,20 @@ test('the calm route crosses the open sea just under the surface and runs half w
     assert.ok(f.nests.every(n => n.grand || BIOMES[n.biome].zone === 'island'), 'nests lie on the coasts (and the grand nest at the end)');
     assert.equal(f.nests.length, BIOMES.filter(b => b.zone === 'island').length + 1);
 });
+
+test('the open sea is clear water: no rock hangs between the surface and just above the bottom', () => {
+    for (const seed of [1337, 7, 4242]) {
+        const f = createField(seed);
+        for (const b of BIOMES) {
+            if (b.zone !== 'sea') continue;
+            // From just past the island's edge to just before the next; not at the abyss, whose shaft is narrower than its floor.
+            for (let x = b.from + 320; x < b.from + b.width - 920; x += 170) {
+                if (Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 3) continue;
+                const fy = floorY(x);
+                for (let y = 60; y < fy - FIELD.seaBottom; y += 90) {
+                    assert.ok(f.density(x, y) < FIELD.threshold, `seed ${seed}: rock in the ${b.id} sea at ${x}, ${y} (bottom ${Math.round(fy)})`);
+                }
+            }
+        }
+    }
+});

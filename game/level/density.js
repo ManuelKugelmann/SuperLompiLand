@@ -2,7 +2,7 @@
 // the nests lie, and the density grids a chunk is drawn from. No Phaser, no DOM,
 // so it runs unchanged on the main thread, in a Web Worker and in the tests.
 import { vnoise } from './terrain.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY } from './biomes.js';
+import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
@@ -10,6 +10,8 @@ export const FIELD = {
     maxDepth: 5600,               // deepest regular seabed (the abyss goes further)
     nestRadius: 230,              // half width of the sand basin a nest lies in
     nestRim: 16,                  // how far its rim stands above the middle
+    seaClear: 1.3,                // how much rock the open sea takes away above its bottom (more than the noise can add)
+    seaBottom: 300,               // px above the sea's bottom over which rock comes back
     nestSearch: 16                // a nest may move up to this many steps of 120 px east to find real seabed
 };
 
@@ -75,7 +77,13 @@ export function createField(seed) {
         n -= a.open + (b.open - a.open) * t;                             // beach / open sea have less rock
         if (y < 520) n -= ((520 - y) / 520) * 0.6;                       // open water under the surface
         const fy = floorY(x);
-        if (y > fy) n += (y - fy) / 380;                                 // seabed, deeper toward the east
+        if (y > fy) n += (y - fy) / 380;                                 // the seabed
+        else {
+            // Open sea: clear water from the surface down to just above the bottom. Rock that
+            // hangs in mid-water belongs to the islands' flanks only (spec 5.0c).
+            const sea = seaShare(x);
+            if (sea > 0) n -= FIELD.seaClear * sea * Math.min(1, (fy - y) / FIELD.seaBottom);
+        }
         // Keep the abyss shaft swimmable all the way down.
         if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;
         if (x < WORLD_WEST + 900) n += (WORLD_WEST + 900 - x) / 500;     // western shore
