@@ -102,14 +102,14 @@ function ready() {
 }
 
 /** One enveloped oscillator note. Frequencies may glide from `f` to `to`. */
-function tone({ f, to = f, type = 'sine', at = 0, dur = 0.15, vol = 0.3 }) {
+function tone({ f, to = f, type = 'sine', at = 0, dur = 0.15, vol = 0.3, rise = 0.012 }) {
     const t = ctx.currentTime + at;
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(f, t);
     if (to !== f) o.frequency.exponentialRampToValueAtTime(Math.max(20, to), t + dur);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(vol, t + rise);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g).connect(master);
     o.start(t);
@@ -412,10 +412,13 @@ const SOUNDS = {
     tap() { tone({ f: 880, type: 'sine', dur: 0.06, vol: 0.12 }); },
     /** Going down past depth mark i (game/level/depthMeters.js): a soft bell, a step lower every mark. */
     deeper(i = 0) {
-        const f = 523.25 * Math.pow(0.8909, i * 2);      // two semitones lower per mark
-        tone({ f, type: 'sine', dur: 1.4, vol: 0.12 });
-        tone({ f: f * 2.01, type: 'sine', dur: 0.8, vol: 0.03 });
-        tone({ f: f / 2, type: 'triangle', at: 0.05, dur: 1.6, vol: 0.05 });
+        // Quieter than a coin, a soft swell instead of a strike, low and dark (earshot: the first version
+        // was 8 dB louder than the coin and read as a "success chime"; a version at 98 Hz read as a sub bass drop that phones cannot play).
+        // The body stays where phone speakers play (above ~300 Hz); a faint octave below adds depth on headphones.
+        const f = 440 * Math.pow(0.8909, i);               // A4, a whole tone lower per mark (A4 .. B3 over nine marks)
+        tone({ f, type: 'sine', dur: 1.7, vol: 0.032, rise: 0.1 });
+        tone({ f: f * 1.5, type: 'sine', at: 0.02, dur: 1.1, vol: 0.008, rise: 0.12 });
+        tone({ f: f / 2, type: 'sine', at: 0.04, dur: 1.9, vol: 0.013, rise: 0.2 });
     },
     rumble() { tone({ f: 55, to: 38, type: 'sawtooth', dur: 1.6, vol: 0.3 }); noise({ dur: 1.6, vol: 0.25, from: 180, to: 70, q: 0.4 }); },
     boom() { noise({ dur: 1.2, vol: 0.5, from: 900, to: 60, q: 0.3 }); tone({ f: 90, to: 30, type: 'sine', dur: 0.9, vol: 0.4 }); }
