@@ -19,7 +19,7 @@ def ramp(l):
     f = (t - i)[..., None]
     return RAMP[i] * (1 - f) + RAMP[i + 1] * f
 
-def grade(name, round_across=False):
+def grade(name, round_across=False, gain=1.0):
     a = np.asarray(Image.open(os.path.join(SRC, name + '.webp')).convert('RGBA')).astype(np.float32) / 255
     rgb = a[..., :3]
     mx, mn = rgb.max(-1), rgb.min(-1)
@@ -32,11 +32,14 @@ def grade(name, round_across=False):
     if round_across:                       # a post: light from the upper left, round across its width
         u = np.linspace(-1, 1, a.shape[1])[None, :]
         l = np.clip(l * (0.72 + 0.4 * np.cos(u * 1.35 + 0.35)), 0, 1)
-    out = rgb * (1 - wood[..., None]) + ramp(l) * wood[..., None]
+    out = rgb * (1 - wood[..., None]) + ramp(l * gain) * wood[..., None]
     Image.fromarray((np.dstack([np.clip(out, 0, 1), a[..., 3]]) * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(OUT, name + '.webp'), quality=90, method=6)
     print(name, a.shape[1::-1])
 
 grade('pier_deck')
-grade('pier_pile_mid', round_across=True)
-grade('pier_band', round_across=True)
-grade('pier_foot', round_across=True)
+# The piles stand under the deck's own posts: graded down to the posts' tone, so no band shows
+# where a post's faded foot meets the pile (measured on screen: piles were ~1.33x brighter).
+PILE = 0.76
+grade('pier_pile_mid', round_across=True, gain=PILE)
+grade('pier_band', round_across=True, gain=PILE)
+grade('pier_foot', round_across=True, gain=PILE)
