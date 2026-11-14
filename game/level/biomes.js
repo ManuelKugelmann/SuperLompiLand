@@ -169,6 +169,36 @@ export function biomeBlendAt(x) {
     return { a: cur, b: cur, t: 0 };
 }
 
+/**
+ * Light depends on depth alone (spec 5.0h, user): biomes give the water its HUE, never its
+ * brightness. Every water colour is brought to the same luminance, and laid over the view by the
+ * same amount everywhere; depth darkens separately.
+ */
+export const WATER_LIGHT = { luma: 150, amount: 0.22 };
+
+const lumaOf = c => 0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255);
+
+/** A colour with its luminance set to luma (hue and saturation kept as far as 0..255 allows). */
+export function atLuma(c, luma = WATER_LIGHT.luma) {
+    let k = luma / Math.max(1, lumaOf(c));
+    for (let i = 0; i < 4; i++) {                    // channels that clip give their share to the others
+        const ch = [16, 8, 0].map(sh => Math.min(255, ((c >> sh) & 255) * k));
+        const got = 0.299 * ch[0] + 0.587 * ch[1] + 0.114 * ch[2];
+        if (Math.abs(got - luma) < 1 || got <= 0) return (Math.round(ch[0]) << 16) | (Math.round(ch[1]) << 8) | Math.round(ch[2]);
+        const free = 0.299 * (ch[0] < 255) + 0.587 * (ch[1] < 255) + 0.114 * (ch[2] < 255);
+        if (free <= 0) break;
+        k *= 1 + (luma - got) / Math.max(1, got);
+    }
+    const ch = [16, 8, 0].map(sh => Math.min(255, Math.round(((c >> sh) & 255) * k)));
+    return (ch[0] << 16) | (ch[1] << 8) | ch[2];
+}
+
+/** The water's hue at x: the biomes' colours blended, at the one shared brightness. */
+export function waterHue(x) {
+    const { a, b, t } = biomeBlendAt(x);
+    return atLuma(mixColor(a.water[0], b.water[0], t));
+}
+
 export function mixColor(c1, c2, t) {
     const k = clamp(t, 0, 1);
     const ch = shift => Math.round(((c1 >> shift) & 255) + (((c2 >> shift) & 255) - ((c1 >> shift) & 255)) * k);

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { biomeBlendAt, mixColor } from './biomes.js';
+import { biomeBlendAt, mixColor, waterHue, WATER_LIGHT } from './biomes.js';
 import SkyLayer from './SkyLayer.js';
 import SeaFarLayer from './SeaFarLayer.js';
 
@@ -106,7 +106,7 @@ export default class Backdrop {
         this.dark.setAlpha(Phaser.Math.Clamp((camY + H / 2 - 2200) / 3400, 0, 1) * 0.7);
         // Each biome colours the water; neighbours fade into each other.
         const bl = biomeBlendAt(camX + W / 2);
-        this.tint.setFillStyle(mixColor(bl.a.water[0], bl.b.water[0], bl.t), Phaser.Math.Linear(bl.a.water[1], bl.b.water[1], bl.t));
+        this.tint.setFillStyle(waterHue(camX + W / 2), WATER_LIGHT.amount);      // hue only: darkness comes from depth (spec 5.0h)
 
         const t = this.scene.time.now / 1000;
 

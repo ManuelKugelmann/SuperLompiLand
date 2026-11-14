@@ -5,7 +5,7 @@ import WorldState from '../systems/worldState.js';
 import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
-import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor, dropOffView, REEF_CREST } from '../game/level/biomes.js';
+import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor, dropOffView, REEF_CREST , waterHue, WATER_LIGHT } from '../game/level/biomes.js';
 import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
@@ -1344,9 +1344,8 @@ export default class MainScene extends Phaser.Scene {
         const bl = biomeBlendAt(view.x);
         // Bright down to the reef floor, dimming only in real depth; the abyss is dark.
         const depth01 = Phaser.Math.Clamp((view.y - 2200) / 3400, 0, 1) * 0.55 + Phaser.Math.Clamp((view.y - 5600) / 3000, 0, 1) * 0.45;
-        const water = mixColor(bl.a.water[0], bl.b.water[0], bl.t);
-        const waterAmt = Phaser.Math.Linear(bl.a.water[1], bl.b.water[1], bl.t);
-        const lit = mixColor(mixColor(0xffffff, water, 0.1 + waterAmt * 0.6), 0x0c1436, depth01 * 0.8);
+        // Darkness only by depth (spec 5.0h): the biome gives the light its hue at one brightness.
+        const lit = mixColor(mixColor(0xffffff, waterHue(view.x), WATER_LIGHT.amount), 0x0c1436, depth01 * 0.8);
         this.ambient.setFillStyle(lit, 1);
         // Inside the side cave the score closes in: it is played as if much deeper down.
         const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
