@@ -490,12 +490,13 @@ export default class LevelGenerator {
         // terrain is redrawn while playing.
         const pics = baked || { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, ...shadeChunk(this.field, LEVEL.seed, ox, oy, CH) };
         // Each picture in two steps (painting it, then handing it to the graphics card): together they are the build's biggest cost.
-        const paint = (name, data, size) => {
-            const key = `chunk:${chunk.key}:${name}`;
-            if (s.textures.exists(key)) s.textures.remove(key);
-            const tex = this.canvasFor(key, size);
-            tex.context.putImageData(new ImageData(data, size, size), 0, 0);
-            chunk.textures.push(key);
+        // `rows` = [from, to) as shares of the picture's height: the big rock picture is painted in two halves, a step each.
+        const paint = (name, data, size, rows = [0, 1]) => {
+            const key = `chunk:${chunk.key}:${name}`, first = rows[0] === 0;
+            if (first && s.textures.exists(key)) s.textures.remove(key);
+            const tex = first ? this.canvasFor(key, size) : s.textures.get(key);
+            tex.context.putImageData(new ImageData(data, size, size), 0, 0, 0, rows[0] * size, size, (rows[1] - rows[0]) * size);
+            if (first) chunk.textures.push(key);
             return tex;
         };
         const show = (tex, size, depth) => {
@@ -507,8 +508,10 @@ export default class LevelGenerator {
         yield 'paint back'; if (chunk.dead) return;
         show(back, SHADE.backSize, -6);
         yield 'upload back'; if (chunk.dead) return;
-        const rock = paint('rock', pics.rock, SHADE.rockSize);
+        paint('rock', pics.rock, SHADE.rockSize, [0, 0.5]);
         yield 'paint rock'; if (chunk.dead) return;
+        const rock = paint('rock', pics.rock, SHADE.rockSize, [0.5, 1]);
+        yield 'paint rock 2'; if (chunk.dead) return;
         show(rock, SHADE.rockSize, -2);
         yield 'upload rock'; if (chunk.dead) return;
 
