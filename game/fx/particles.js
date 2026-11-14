@@ -17,12 +17,14 @@ export const PARTICLES = {
  * happens at the waterline ('pop' ends it, 'slick' spreads it along the surface,
  * 'pass' ignores it); blend: 'normal' or 'add'; soft: drawn as one blurred, merged
  * cloud instead of separate dots: 'wisp' (smoke, ash: fades out softly) or 'goo'
- * (oil: overlapping blobs fuse into one body with a defined edge).
+ * (oil: overlapping blobs fuse into one body with a defined edge). Optional: diffuse = turbulent
+ * spreading (px/s of random drift, growing with age) and thin = how much of its alpha a particle
+ * loses by the end of its life, so a spill spreads out, drifts with the water and thins (spec 5.0j).
  */
 export const PRESETS = {
     silt:   { life: [0.9, 1.7], size: [10, 22], grow: 1.8, drag: 3.0, rise: -10, coldRise: 1, cool: 0, alpha: 0.42, color: 0xd8c49c, colorEnd: 0xd8c49c, surface: 'pop', blend: 'normal' },
     bubble: { life: [1.0, 1.8], size: [5, 13], grow: 1.35, drag: 1.6, rise: 150, coldRise: 1, cool: 0, alpha: 0.55, color: 0xffffff, colorEnd: 0xdff6ff, surface: 'pop', blend: 'add' },
-    oil:    { life: [6, 9], size: [12, 26], grow: 2.2, drag: 0.9, rise: 55, coldRise: 0.6, cool: 0.12, alpha: 0.78, color: 0x2b2118, colorEnd: 0x3a3026, surface: 'slick', blend: 'normal', soft: 'goo' },
+    oil:    { life: [6, 9], size: [18, 32], grow: 4, drag: 0.9, rise: 55, coldRise: 0.6, cool: 0.12, alpha: 0.7, color: 0x2b2118, colorEnd: 0x3a3026, surface: 'slick', blend: 'normal', soft: 'goo', diffuse: 170, thin: 0.75 },
     smoker: { life: [3, 5], size: [16, 34], grow: 3.0, drag: 1.1, rise: 120, coldRise: 0.15, cool: 0.45, alpha: 0.6, color: 0x2e2c30, colorEnd: 0x55575c, surface: 'pop', blend: 'normal', soft: 'wisp' },
     steam:  { life: [0.8, 1.4], size: [6, 14], grow: 0.6, drag: 1.4, rise: 240, coldRise: 1, cool: 0, alpha: 0.6, color: 0xffffff, colorEnd: 0xcfe9f2, surface: 'pop', blend: 'add' },
     lava:   { life: [1.2, 2.2], size: [4, 10], grow: 0.7, drag: 0.6, rise: -180, coldRise: 1.4, cool: 0.9, alpha: 1, color: 0xffb347, colorEnd: 0x3a1a10, surface: 'pass', blend: 'add' },
@@ -115,6 +117,11 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
                     const d = Math.min(1, p.drag * h);
                     vx[i] += (flow.x - vx[i]) * d;
                     vy[i] += (flow.y - rise - vy[i]) * d;
+                    if (p.diffuse) {                        // eddies pull a plume apart, more the older it is
+                        const k = p.diffuse * (age[i] / life[i]) * Math.min(1, 3 * h);
+                        vx[i] += (random() * 2 - 1) * k;
+                        if (!(surfaceY && y[i] <= surfaceY(x[i]) + 1)) vy[i] += (random() * 2 - 1) * k;   // a slick on the surface spreads along it only
+                    }
                     const nx = x[i] + vx[i] * h, ny = y[i] + vy[i] * h;
                     if (isSolid && isSolid(nx, ny)) {
                         if (p.surface === 'slick' || p.rise < 0) { vx[i] *= -0.2; vy[i] *= -0.2; continue; }   // rests against rock
@@ -144,7 +151,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
                 const p = presets[kind[i]];
                 const t = age[i] / life[i];
                 const fade = Math.min(1, t / 0.12, (1 - t) / 0.3);
-                fn(x[i], y[i], size0[i] * lerp(1, p.grow, t), p.alpha * Math.max(0, fade),
+                fn(x[i], y[i], size0[i] * lerp(1, p.grow, t), p.alpha * Math.max(0, fade) * (1 - (p.thin || 0) * t),
                     p.color === p.colorEnd ? p.color : mixColor(p.color, p.colorEnd, p.cool > 0 ? 1 - heat[i] : t), p.blend, i, p.soft || null);
             }
         },

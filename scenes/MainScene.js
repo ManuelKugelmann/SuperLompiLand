@@ -64,7 +64,7 @@ const STEP_MS = 1000 / 60;
 /** World tunables. */
 /** Leaking oil drums (spec 7.1): how often they puff and how much. */
 // `crack`: where the oil leaves the drum, in shares of its displayed size from its centre.
-const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5, crack: [0.19, -0.34] };
+const OIL = { pulseMs: 450, perPulse: 2, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5, crack: [0.19, -0.34] };
 /** Plumes at the trench's vents: how often, how many smoke and steam particles. */
 const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 /** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
@@ -82,7 +82,7 @@ const WORLD = {
     gravity: 0.12,         // gentle sink
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
     lookAhead: 9,         // camera leads the fish by velocity * this
-    refitAt: 0.12,        // the window's shape must change by this share before a running game is laid out again
+    refitAt: 0.03,        // the picture fills AND fits the screen (user 2026-11-14): a settled shape change beyond this share lays the game out again
     caveDepth01: 0.8,     // how deep the music is played inside the side cave (0 surface .. 1 deepest)
     wakeS: 1.6,           // s the whale's wake carries the fish on after her send-off
     weatherRange: 7000,   // px from the storm or the downwelling at which their looks are built
@@ -116,11 +116,12 @@ export default class MainScene extends Phaser.Scene {
     create(data) {
         fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         // The window got a clearly different shape while playing: lay everything out again for it
-        // and carry on where the fish was (small changes, like a phone's address bar, just crop).
+        // and carry on where the fish was; until then the picture covers the screen (a sliver cropped).
         this.resume = data?.resume || null;
+        this.resumed = !!this.resume;     // carrying on after a reshape: no fresh biome banner
         const refit = () => {
             if (this.refitting || this.mp || !misfit(this.game, WORLD.refitAt)) return;
-            this.refitting = this.time.delayedCall(450, () => {
+            this.refitting = this.time.delayedCall(600, () => {
                 this.refitting = null;
                 if (!misfit(this.game, WORLD.refitAt)) return;
                 const sp = this.fish.sprite;
@@ -1442,7 +1443,7 @@ export default class MainScene extends Phaser.Scene {
         // Announce a biome when the fish swims into it.
         const bi = biomeIndexAt(sp.x);
         if (bi !== this.biomeIndex) {
-            if (this.biomeIndex !== -1 || time > 0) this.announce(BIOMES[bi].name[this.lang] || BIOMES[bi].name.en, this.journey.goalAt(sp.x, this.lang));
+            if (this.biomeIndex !== -1 || (time > 0 && !this.resumed)) this.announce(BIOMES[bi].name[this.lang] || BIOMES[bi].name.en, this.journey.goalAt(sp.x, this.lang));
             this.biomeIndex = bi;
         }
     }

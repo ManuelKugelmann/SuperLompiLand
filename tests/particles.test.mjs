@@ -31,6 +31,17 @@ test('oil rises and spreads as a slick at the surface instead of popping', () =>
     for (const p of positions(sim)) assert.ok(p.y >= 100 - 1e-3 && p.y <= 101, `on the surface: ${p.y}`);
 });
 
+test('an oil plume spreads out and thins as it ages', () => {
+    const spreadOf = sim => { const ps = positions(sim), mx = ps.reduce((a, p) => a + p.x, 0) / ps.length; return Math.sqrt(ps.reduce((a, p) => a + (p.x - mx) ** 2, 0) / ps.length); };
+    const sim = createParticles({ capacity: 40, random: seq() });
+    sim.spawn('oil', 0, 0, 30, { spread: 5, radius: 5 });
+    sim.step(1.5);
+    const early = spreadOf(sim), a0 = positions(sim)[0].alpha;
+    sim.step(4);
+    assert.ok(spreadOf(sim) > early * 3, `spread ${early.toFixed(1)} -> ${spreadOf(sim).toFixed(1)}`);
+    assert.ok(positions(sim)[0].alpha < a0 * 0.8, 'thinner');
+});
+
 test('hot plumes slow down as they cool', () => {
     const sim = createParticles({ capacity: 4, random: () => 0.5 });
     sim.spawn('smoker', 0, 0, 1, { spread: 0 });
