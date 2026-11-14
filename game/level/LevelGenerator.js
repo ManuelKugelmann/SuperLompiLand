@@ -25,7 +25,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 29,
+    version: 30,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -114,18 +114,19 @@ const HAZARDS = {
  */
 export const PROPS = {
     boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.32, reach: 0.15, flat: 0.4, depth: -3, back: true, max: 2 },
-    barrel: { keys: ['barrel_1', 'barrel_2'], width: [110, 170], sink: 0.24, reach: 0.15, flat: 0.45, depth: -3, back: true, max: 2 },
-    crate: { keys: ['crate_1'], width: [130, 190], sink: 0.22, reach: 0.15, flat: 0.35, depth: -3, back: true, max: 1 },
+    barrel: { keys: ['barrel_1', 'barrel_2'], width: [SIZES.oilDrum * 0.8, SIZES.oilDrum], sink: 0.24, reach: 0.15, flat: 0.45, depth: -3, back: true, max: 2 },
+    crate: { keys: ['crate_1'], width: [SIZES.crate * 0.85, SIZES.crate], sink: 0.22, reach: 0.15, flat: 0.35, depth: -3, back: true, max: 1 },
+    // Sizes of ships and cargo come from the one scale table (game/scale.js, spec 5.0j).
     // Hulls share one slot per chunk, and only every third chunk column has one, so they never overlap.
-    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
-    trawler: { keys: ['trawler_1', 'cutter_1'], width: [880, 1150], sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
+    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: SIZES.sailingWreck, sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
+    trawler: { keys: ['trawler_1', 'cutter_1'], width: SIZES.fishingBoat, sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
     // Pier (generated art): stands at the surface, not on a floor spot (pierAt / drawPier).
     // `piles` = pile positions across the deck (under its own posts), `pileWidth` = post width (share of the deck),
     // `pileWood` = share of the pile art that is wood (band, seamless wood strip and foot are cut from one
     // generated pile, soft-edged), `above` = share of the deck above the waterline.
     pier: { keys: ['pier_deck', 'pier_pile_mid', 'pier_band', 'pier_foot'], width: [1300, 1600], surface: true, every: 4, chance: 0.5, max: 1,
         piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileWood: 0.7, above: 0.2, depth: -3, tint: 0xc4d0d4 },
-    rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.3, reach: 0.2, flat: 0.35, depth: -3, back: true, max: 1 },
+    rowboat: { keys: ['rowboat_1'], width: SIZES.rowboat, sink: 0.3, reach: 0.2, flat: 0.35, depth: -3, back: true, max: 1, every: 2 },
     // Generated art (FLUX.2 klein, Replicate): plants between the kelp stalks.
     seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, reach: 0.2, flat: 0.6, depth: -1, max: 2, sway: 0.6 },
     seafan: { keys: ['seafan_1'], width: [200, 330], sink: 0.08, reach: 0.2, flat: 0.6, depth: -1, max: 1, sway: 0.25 },

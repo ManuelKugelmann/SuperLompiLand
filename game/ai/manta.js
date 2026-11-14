@@ -3,6 +3,7 @@
 // does nothing to the player and wants nothing; it is there to be looked up at.
 
 import { BIOMES } from '../level/biomes.js';
+import { SIZES } from '../scale.js';
 
 export const MANTA = {
     biome: 'reef',
@@ -12,7 +13,7 @@ export const MANTA = {
     swell: 90,          // px it rises and falls on its way
     speed: 85,          // px per second
     turn: 900,          // px over which it slows, banks and comes about at each end
-    width: 620,         // px wing tip to wing tip as drawn
+    width: SIZES.manta, // px wing tip to wing tip as drawn (the one scale table, game/scale.js)
     seen: 560           // px: this close, it goes into the reef book
 };
 
