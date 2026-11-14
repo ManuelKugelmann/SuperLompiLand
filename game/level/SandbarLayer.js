@@ -11,6 +11,9 @@ export const SANDBAR_LOOK = {
 
 const KEY = 'sandbar';
 
+/** The painted sandbar (scripts/fx/sandbar.py; loaded by the title screen); drawn procedurally while missing. */
+export const SANDBAR_ART = { [KEY]: 'img/sandbar.webp' };
+
 /** Fallback picture: a long low mound of pale rippled sand, its crown a little above the waterline, fading out below (a painted file under the same key replaces it). */
 function ensureTexture(scene) {
     if (scene.textures.exists(KEY)) return;
