@@ -8,7 +8,9 @@ import { LEVEL } from './LevelGenerator.js';
  * second procedural rock field shaded in the terrain worker (stone materials, soft unlit
  * rims, fog toward the water baked in), shown as plain images with the layer's scroll factor,
  * fading in. At most one chunk is put on screen per frame; nothing is redrawn while
- * playing. Without a worker the layers stay empty (the game looks fine without them).
+ * playing. Their canvases come from and go back to the chunk canvas pool (LevelGenerator
+ * canvasFor / poolCanvas): no allocation and first upload while swimming. Without a worker the
+ * layers stay empty (the game looks fine without them).
  *
  *   create():  this.rockLayers = new RockLayers(this)   (after the LevelGenerator: it needs the materials)
  *   update():  this.rockLayers.update(camX, camY)
@@ -47,7 +49,7 @@ export default class RockLayers {
             for (const [id, c] of l.chunks) {
                 const [cx, cy] = id.split(',').map(Number);
                 if (cx >= x0 - 1 && cx <= x1 + 1 && cy >= y0 - 1 && cy <= y1 + 1) continue;
-                if (c !== 'pending') { scene.tweens.killTweensOf(c.img); c.img.destroy(); scene.textures.remove(c.key); }
+                if (c !== 'pending') { scene.tweens.killTweensOf(c.img); c.img.destroy(); scene.level.poolCanvas(c.key); }
                 l.chunks.delete(id);
             }
         });
@@ -65,7 +67,7 @@ export default class RockLayers {
         const [cx, cy] = r.key.split(',').map(Number);
         const key = `rl:${def.id}:${r.key}`;
         if (scene.textures.exists(key)) scene.textures.remove(key);
-        const tex = scene.textures.createCanvas(key, S, S);
+        const tex = scene.level.canvasFor(key, S, S);
         tex.context.putImageData(new ImageData(new Uint8ClampedArray(r.rock.buffer), S, S), 0, 0);
         tex.refresh();
         // The fog toward the water is baked in by the worker (fogLayer); a slight darkening on top.
@@ -78,7 +80,7 @@ export default class RockLayers {
     destroy() {
         this.worker?.terminate();
         for (const l of this.layers) {
-            for (const c of l.chunks.values()) if (c !== 'pending') { c.img.destroy(); this.scene.textures.remove(c.key); }
+            for (const c of l.chunks.values()) if (c !== 'pending') { c.img.destroy(); this.scene.level.poolCanvas(c.key); }
             l.chunks.clear();
         }
     }
