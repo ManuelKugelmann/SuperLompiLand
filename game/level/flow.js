@@ -20,7 +20,8 @@ export const FLOW = {
     streamWidth: 150,      // distance from the middle at which the pull has dropped to about a third
     streamSpeed: 19,       // speed of the water in the middle of a stream: above the swimmers' own top speed (Lompi ~17); was 11
     streamWave: 170,       // how far a stream's path swings up and down
-    carry: 0.045           // how quickly the water takes a body up to its own speed (per step)
+    carry: 0.045,          // how quickly the water takes a body up to its own speed (per step)
+    calm: [200, 420]       // px from the calm route's middle: no stream pull inside the first, full pull beyond the second
 };
 
 /**
@@ -43,7 +44,11 @@ export function streamY(s, x) {
     return s.y0 + Math.sin((x - s.x0) / 520 + s.phase) * s.wave;
 }
 
-export function createFlow(seed, cfg = FLOW) {
+/**
+ * @param calmY  optional: x -> y of the calm main route. Streams lose their pull near it,
+ *               so the route stays calm even where a stream crosses it.
+ */
+export function createFlow(seed, cfg = FLOW, calmY = null) {
     const slots = new Map();
     const slot = i => { if (!slots.has(i)) slots.set(i, streamInSlot(i, seed, cfg)); return slots.get(i); };
 
@@ -73,7 +78,11 @@ export function createFlow(seed, cfg = FLOW) {
             const cy = streamY(s, x), d = (y - cy) / cfg.streamWidth;
             if (Math.abs(d) > 2.6) continue;
             const ends = Math.min(1, (x - s.x0) / 260, (s.x1 - x) / 260);          // fades in and out
-            const speed = cfg.streamSpeed * Math.exp(-d * d) * ends * ends * (3 - 2 * ends);
+            let speed = cfg.streamSpeed * Math.exp(-d * d) * ends * ends * (3 - 2 * ends);
+            if (calmY) {
+                const k = Math.min(1, Math.max(0, (Math.abs(y - calmY(x)) - cfg.calm[0]) / (cfg.calm[1] - cfg.calm[0])));
+                speed *= k * k * (3 - 2 * k);
+            }
             const slope = Math.cos((x - s.x0) / 520 + s.phase) * s.wave / 520;     // the lane's direction
             const len = Math.hypot(1, slope);
             out.x += speed / len; out.y += speed * slope / len;

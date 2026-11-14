@@ -108,7 +108,8 @@ export default class MainScene extends Phaser.Scene {
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
         this.level = new LevelGenerator(this, this.world);
         this.density = (x, y) => this.level.density(x, y);
-        this.flow = createFlow(LEVEL.seed);     // currents and swell: one field for player and particles
+        // Currents and swell: one field for player and particles. Streams lose their pull at the calm route.
+        this.flow = createFlow(LEVEL.seed, FLOW, x => this.level.field.routeY(x));
         this.flowAt = { x: 0, y: 0 };
         this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
         this.swarms = new SwarmLayer(this, {   // shoals of small fish around the view (spec 6.2)
@@ -202,7 +203,9 @@ export default class MainScene extends Phaser.Scene {
         });
 
         // Bubble cannons and bounce pads along the streams (game/level/boosters.js).
-        this.boosters = new BoosterLayer(this, this.flow, (x, y) => y > 60 && this.density(x, y) <= LEVEL.threshold);
+        // Cannons and pads are optional: none inside the calm route.
+        this.boosters = new BoosterLayer(this, this.flow, (x, y) => y > 60 && this.density(x, y) <= LEVEL.threshold
+            && Math.abs(y - this.level.field.routeY(x)) > ROUTE.halfWidth);
 
         this.speedLines = new SpeedLines(this);     // streaks rushing past while in flow
         // ?debug=flow: arrows show where the water moves and how fast (also with the Debug button).

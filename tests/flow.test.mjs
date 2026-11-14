@@ -81,3 +81,15 @@ test('water takes a body up to its speed and never slows it down', () => {
     for (let i = 0; i < 400; i++) vx += carry(10, 0, vx, 0, FLOW, out).x;
     assert.ok(vx > 9.5 && vx <= 10.0001, `ends at ${vx}`);
 });
+
+test('streams lose their pull at the calm route and keep it away from it', () => {
+    const s = flow.streamsIn(WORLD_WEST, WORLD_END)[0], x = (s.x0 + s.x1) / 2, y = streamY(s, x);
+    const plain = createFlow(SEED).at(x, y, 3, { x: 0, y: 0 });
+    assert.ok(Math.hypot(plain.x, plain.y) > FLOW.streamSpeed * 0.7);
+    const onRoute = createFlow(SEED, FLOW, () => y).at(x, y, 3, { x: 0, y: 0 });
+    assert.ok(Math.hypot(onRoute.x, onRoute.y) < 1.2, `the route runs through the stream: ${Math.hypot(onRoute.x, onRoute.y)}`);
+    const farRoute = createFlow(SEED, FLOW, () => y + 900).at(x, y, 3, { x: 0, y: 0 });
+    assert.deepEqual(farRoute, plain, 'a route far away changes nothing');
+    const edge = createFlow(SEED, FLOW, () => y + (FLOW.calm[0] + FLOW.calm[1]) / 2).at(x, y, 3, { x: 0, y: 0 });
+    assert.ok(Math.hypot(edge.x, edge.y) > 2 && Math.hypot(edge.x, edge.y) < Math.hypot(plain.x, plain.y) - 2, 'a soft edge');
+});
