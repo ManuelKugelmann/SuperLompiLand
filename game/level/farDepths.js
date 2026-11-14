@@ -41,13 +41,14 @@ const pick = (...groups) => groups.flatMap(([g, w]) => K[g].map(([key, kw, size,
  * clearly behind the play plane).
  */
 export const FAR_KINDS = {
-    beach: { per: 0.8, kinds: pick(['boulders', 2], ['kelp', 0.3]) },
-    reef: { per: 1, kinds: pick(['corals', 2], ['boulders', 1], ['kelp', 0.3]) },
+    // Far kelp only in the kelp forest: elsewhere its faded foot hung in open water, a stalk without a base (user: no orphans).
+    beach: { per: 0.8, kinds: pick(['boulders', 2]) },
+    reef: { per: 1, kinds: pick(['corals', 2], ['boulders', 1]) },
     mangrove: { per: 0.6, haze: 1.4, kinds: pick(['roots', 2], ['grass', 1], ['boulders', 0.4]) },
     kelp: { per: 0.55, haze: 1.6, kinds: pick(['kelp', 4], ['boulders', 0.8]) },   // few far stalks: many overlap their fronds into a mesh that reads like a net (look audit)
     blue: { per: 0, kinds: [] },
     wreck: { per: 0, kinds: [] },
-    shore: { per: 1, kinds: pick(['boulders', 3], ['kelp', 0.6]) },
+    shore: { per: 1, kinds: pick(['boulders', 3]) },
     harbour: { per: 0.9, kinds: pick(['hulls', 1], ['boulders', 2]) },   // no far pier rows: at several depths they stack into a stair of deck tops (the near quay coast stands above water)
     trench: { per: 0, kinds: [] }
 };
