@@ -124,12 +124,6 @@ export function fitToWindow(game) {
     return true;
 }
 
-/** Would fitToWindow change the size right now? (for scenes that can simply start again) */
-export function fitsWindow(game) {
-    const { width, height } = wanted(game);
-    return width === game.scale.width && height === game.scale.height;
-}
-
 /** Is the picture's shape off from the screen's by more than `share` (0.1 = 10 %)? */
 export function misfit(game, share) {
     const { width, height } = wanted(game);

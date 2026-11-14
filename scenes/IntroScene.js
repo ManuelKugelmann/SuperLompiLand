@@ -20,7 +20,7 @@ import { MATERIALS } from '../game/level/materials.js';
 import { PROPS, KELP_STALKS } from '../game/level/LevelGenerator.js';
 import { openCredits } from '../game/credits.js';
 import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
-import { fitToWindow, fitsWindow } from '../game/orientation.js';
+import { fitToWindow, misfit } from '../game/orientation.js';
 import { SPECIES, schoolArt } from '../game/ai/SwarmLayer.js';
 import { PAD_ART } from '../game/level/BoosterLayer.js';
 import { SURF_ART } from '../game/fx/SurfLayer.js';
@@ -57,6 +57,11 @@ export const gameMeta = {
 // Generated art in public/img — loaded by relative URL so any deploy base works.
 /** Title screen idle time before the ambient reef starts by itself (spec ch.12). */
 const AMBIENT_IDLE_MS = 120000;
+const TITLE = {
+    refitAt: 0.04,    // the title is laid out again when the window's shape is off by more than this share ...
+    refitMs: 350,     // ... and has stayed so for this long
+    shown: 2.2        // carousel places to either side of the chosen fish that are drawn
+};
 
 const IMAGES = {
     puffer_normal: 'puffer_normal.png', puffer_inflated: 'puffer_inflated.png',
@@ -138,7 +143,18 @@ export default class IntroScene extends Phaser.Scene {
         fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         const W = this.scale.width, H = this.scale.height;
         const lang = this.registry.get('currentLanguage') || 'de';
-        const refit = () => { if (!this.modal && !fitsWindow(this.game)) this.scene.restart(); };
+        // A phone's browser reshapes the window all the time by a few pixels (its address bar comes
+        // and goes): the title only lays itself out again for a real change of shape, and only once
+        // the window has settled. Starting again on every such event made this screen slow on phones.
+        this.refitTimer = null;
+        this.registry.set('titleStarts', (this.registry.get('titleStarts') || 0) + 1);
+        const refit = () => {
+            if (this.modal || this.refitTimer || !misfit(this.game, TITLE.refitAt)) return;
+            this.refitTimer = this.time.delayedCall(TITLE.refitMs, () => {
+                this.refitTimer = null;
+                if (!this.modal && misfit(this.game, TITLE.refitAt)) this.scene.restart();
+            });
+        };
         this.scale.on('resize', refit);
         this.events.once('shutdown', () => this.scale.off('resize', refit));
 
@@ -171,6 +187,12 @@ export default class IntroScene extends Phaser.Scene {
         this.add.text(W - 24, H - 20, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '22px', color: '#ffffff'
         }).setOrigin(1, 1).setAlpha(0.45);
+
+        // ?debug=perf: frame rate, this screen's own work per frame and how often it was laid out, for checking on a real device.
+        if (new URLSearchParams(window.location.search).get('debug') === 'perf') {
+            this.perfText = this.add.text(W - 24, 110, '', { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000aa', padding: { x: 10, y: 6 } }).setOrigin(1, 0).setDepth(200);
+            this.perfSum = 0; this.perfN = 0;
+        }
 
         new BurgerMenu(this, 60, 60, [
             { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => this.scene.start(STORY_KEY) },
@@ -510,6 +532,7 @@ export default class IntroScene extends Phaser.Scene {
 
     update(time, delta) {
         if (!this.cards) return;
+        const t0 = this.perfText ? performance.now() : 0;
         const W = this.scale.width, n = CHARACTERS.length;
         // Ease the (wrapping) carousel position toward the selected index.
         let d = this.index - this.slot;
@@ -528,10 +551,21 @@ export default class IntroScene extends Phaser.Scene {
             const ph = i * 1.7, live = 0.45 + near * 0.55;
             const x = W / 2 + off * this.carousel.SPACING + Math.sin(time / 1300 + ph) * 10 * live;
             const y = this.carousel.cy + Math.sin(time / 600 + ph) * 14 * live + (near > 0.5 ? bob * 0.5 : 0);
-            rig.zoom = rig.fit * (0.5 + near * 0.6);
-            rig.setAlpha(Math.abs(off) > 2.2 ? 0 : 0.45 + near * 0.55).setDepth(near > 0.5 ? 2 : 1);
-            rig.draw({ x, y, frames, facing: 1, effort: 0.15 + near * 0.3, squash: Math.sin(time / 520 + ph) * 0.03 * live });
             rig.hit.setPosition(x, y);
+            // Only the chosen fish and the ones beside it are on screen: the rest are neither posed nor drawn.
+            const shown = Math.abs(off) <= TITLE.shown;
+            rig.setVisible(shown);
+            if (!shown) return;
+            rig.zoom = rig.fit * (0.5 + near * 0.6);
+            rig.setAlpha(0.45 + near * 0.55).setDepth(near > 0.5 ? 2 : 1);
+            rig.draw({ x, y, frames, facing: 1, effort: 0.15 + near * 0.3, squash: Math.sin(time / 520 + ph) * 0.03 * live });
         });
+        if (this.perfText) {
+            this.perfSum += performance.now() - t0;
+            if (++this.perfN >= 30) {
+                this.perfText.setText(`${Math.round(this.game.loop.actualFps)} fps  title ${(this.perfSum / this.perfN).toFixed(2)} ms  layouts ${this.registry.get('titleStarts')}`);
+                this.perfSum = 0; this.perfN = 0;
+            }
+        }
     }
 }
