@@ -129,11 +129,25 @@ npm run serve      # zero-dep static server for dist/ (tests the real PWA/SW)
 
 ## The game
 
-Lompi the pufferfish lives on a reef. A volcano erupts, and what it shakes loose —
-mines, nets, buoys — drifts into the sea. Lompi sets out east across the
-ocean, from the shallow lagoon through reef, kelp forest, open blue, ship graveyard and
-harbour down into the deep trench, to reach the grand nest.
+Lompi the pufferfish lives in a lagoon. A volcano erupts far in the east, and what it
+shakes loose — lost anchors, nets, rusty drums — drifts into the sea; Lompi's friends are
+scattered. Lompi sets out east along a chain of islands: from the home island (lagoon,
+mangroves, coral reef) over the reef's edge into the open sea, past the kelp island and
+its harbour, across a stormy sea with wrecks far below, along a rocky shore and down into
+the deep trench, to reach the grand nest.
 
+- **A story you cannot lose:** every stretch has a goal, shown when you arrive. On the
+  islands and out at sea a friend hangs in a ghost net right on the way; swim up and it
+  is free, dances and swims on. The strip at the top right shows who is found.
+- **The great whale** waits in the open blue with net wrapped round her. Tear it off
+  piece by piece and she sings, then carries you east on her back.
+- **Islands and open sea:** along a coast the water is shallow and full of life; between
+  the islands the bottom is far below and the way across runs just under the surface.
+  A storm closes the surface for a stretch (the way on is underneath), and a current
+  pulls down into the deep and lifts you up again further on.
+- **The coast moves:** in the surf on the beach the water pushes in and pulls back with
+  every wave; on the reef's edge breakers come in sets, with a quiet gap to cross.
+  Seabirds dive after shoals near the islands (and after a careless fish at the surface).
 - **Nests** on the seabed save your coins, refill your health and are where you
   continue — also next time you play. Running out of health is never the end.
 - **Friends** (turtle, seahorse, snail, starfish, urchin, anglerfish, …) cheer you
