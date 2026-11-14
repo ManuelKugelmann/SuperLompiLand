@@ -3,6 +3,7 @@
 // so it runs unchanged on the main thread, in a Web Worker and in the tests.
 import { vnoise } from './terrain.js';
 import { detour } from './weather.js';
+import { SET_PIECES, ghostShip, pinnacleTop, descentStart } from './setPieces.js';
 import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
 
 export const FIELD = {
@@ -54,7 +55,9 @@ export function cruiseY(x, cfg = ROUTE) {
     let sum = 0;
     for (let k = -cfg.ease; k <= cfg.ease; k++) {
         const fy = floorY(x + k * cfg.easeStep), coast = Math.min(cfg.maxY, Math.max(cfg.minY, Math.min(fy, cfg.seaFrom) * cfg.cruise));
-        sum += coast + (cfg.seaY - coast) * smooth01((fy - cfg.seaFrom) / (cfg.seaFull - cfg.seaFrom));
+        // Not in the trench: there the way leads down to the grand nest and never comes back up to the surface.
+        const sx = x + k * cfg.easeStep, up = sx > TRENCH_FROM ? 0 : 1;
+        sum += coast + (cfg.seaY - coast) * up * smooth01((fy - cfg.seaFrom) / (cfg.seaFull - cfg.seaFrom));
     }
     const y = sum / (cfg.ease * 2 + 1), d = detour(x, DETOUR);
     const deep = y + (d.y - y) * d.k;      // under a storm and through a downwelling the route goes deep (weather.js)
@@ -63,6 +66,9 @@ export function cruiseY(x, cfg = ROUTE) {
 }
 
 const DETOUR = { y: 0, k: 0 };
+
+const SHIP_X = ghostShip().x;      // the ghost ship's place (worked out once)
+const TRENCH_FROM = BIOMES[BIOMES.length - 1].from;
 
 // Where the reef crest is and how far its slopes can reach (worked out once).
 const CREST_X = reefCrestX(), CREST_REACH = REEF_CREST.inset + REEF_CREST.half + 3000 / REEF_CREST.lagoonSlope;
@@ -134,6 +140,11 @@ export function createField(seed) {
         }
         // Keep the abyss shaft swimmable all the way down.
         if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;
+        // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.
+        if (Math.abs(x - SHIP_X) < 2600) {
+            const top = pinnacleTop(x) + SET_PIECES.ship.lump * (vnoise(x / 210, 5.3, seed + 31) * 2 - 1);
+            if (y > top) n += (FIELD.crestRock - n) * smooth01((y - top) / 140);
+        }
         // The reef crest: solid coral from just under the surface down, whatever the noise says.
         // Its upper face is lumpy, slopes away to both sides and has grooves: no flat top, no cut faces.
         const crestTop = Math.abs(x - CREST_X) > CREST_REACH ? Infinity      // nowhere near it: nothing to work out
@@ -192,7 +203,9 @@ export function createField(seed) {
         }
         // How far to either side the route's dip to this nest reaches.
         const cruise = cruiseY(x);
-        const reach = Math.max(900, Math.abs(y + 12 - ROUTE.aboveNest - cruise) * ROUTE.descent);
+        let reach = Math.max(900, Math.abs(y + 12 - ROUTE.aboveNest - cruise) * ROUTE.descent);
+        // The way down to the grand nest begins where the trench begins (spec 5.0e): a long, gentle descent.
+        if (index === xs.length - 1) reach = Math.max(reach, x - descentStart());
         return { x, y: y + 12, index, grand: index === xs.length - 1, reach, biome: biomeIndexAt(x) };
     });
 

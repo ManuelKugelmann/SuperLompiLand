@@ -28,6 +28,7 @@ import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
+import SetPieceLayer from '../game/level/SetPieceLayer.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
@@ -174,6 +175,8 @@ export default class MainScene extends Phaser.Scene {
         const whaleAt = this.journey.event(WHALE_SCENE.id);
         this.whale = this.ambientMode || !whaleAt ? null
             : new Whale(this, this.journey, whaleAt.x, whaleAt.endX, x => this.level.field.routeY(x), (ev, x, y) => this.whaleEvent(ev, x, y));
+        // The set pieces of the long sea stretches (spec 5.0e): the ghost ship, and the beacon over the grand nest.
+        this.setPieces = new SetPieceLayer(this, this.level.nests[this.level.nests.length - 1]);
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -1264,6 +1267,7 @@ export default class MainScene extends Phaser.Scene {
         this.surf?.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
         if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = new StormLayer(this);
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
+        this.setPieces.update(time / 1000);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
