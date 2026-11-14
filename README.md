@@ -144,6 +144,10 @@ the deep trench, to reach the grand nest.
 - **A ghost ship** stands on a pinnacle of rock under the storm, lanterns still lit; the
   way on leads through the hole in its bow. In the trench the way goes down and down,
   toward the glow of the grand nest.
+- **Side ways by choice:** off the calm route there are places to dare. A cave on the
+  kelp island, marked by old fishing floats, with a current through it, a net to slip
+  under and a giant clam that gives a pearl; and the murky docks under the harbour's
+  pier, where a hermit crab is stuck in a bottle cap. The calm route never leads there.
 - **Islands and open sea:** along a coast the water is shallow and full of life; between
   the islands the bottom is far below and the way across runs just under the surface.
   A storm closes the surface for a stretch (the way on is underneath), and a current
