@@ -91,6 +91,7 @@ const WORLD = {
     lookAhead: 9,         // camera leads the fish by velocity * this
     refitAt: 0.03,        // the picture fills AND fits the screen (user 2026-11-14): a settled shape change beyond this share lays the game out again
     caveDepth01: 0.8,     // how deep the music is played inside the side cave (0 surface .. 1 deepest)
+    nightDepth01: 0.7,    // at night the score plays as if this deep: sparser and softer
     wakeS: 1.6,           // s the whale's wake carries the fish on after her send-off
     weatherRange: 7000,   // px from the storm or the downwelling at which their looks are built
     wallLook: 0.26,       // at a drop-off the camera looks down by this share of the screen height
@@ -1426,7 +1427,9 @@ export default class MainScene extends Phaser.Scene {
             floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) }), 1);
         // Inside the side cave the score closes in: it is played as if much deeper down.
         const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
-        updateMusic(biomeBlendAt(this.fish.sprite.x), inCave ? Math.max(depth01, WORLD.caveDepth01) : depth01);   // background score + sea hum (spec ch.12)
+        // The score plays as if deeper inside the cave, and partway at night (sparser, softer; spec 5.0k).
+        const musicDepth = Math.max(depth01, inCave ? WORLD.caveDepth01 : 0, nightShare(skyT) * WORLD.nightDepth01);
+        updateMusic(biomeBlendAt(this.fish.sprite.x), musicDepth);   // background score + sea hum (spec ch.12)
         // The storm rumbles overhead (loudest near the surface); strong moving water rushes past the fish.
         const p = this.soundProbe || (this.soundProbe = { x: 0, y: 0 }), waves = this.waves ?? this.wavePhase();
         let moving = Math.hypot(surgeAt(view.x, view.y, waves, p).x, p.y);
