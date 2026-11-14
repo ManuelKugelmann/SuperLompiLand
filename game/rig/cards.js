@@ -147,24 +147,17 @@ const P = [0, 0, 0], N = [0, 0, 0];
  * m: { phase, drive, fold (0 spread .. 1 folded) } of the rig; part: { role, axis:[ax,ay], amp, phase, z (px) };
  * at: [x, y] where its pivot is now (the body's bend carries it); mirror: the far twin.
  */
-export function posePart(card, part, m, at, mirror, out) {
-    const R = ROLES[part.role] || ROLES.median;
-    const effort = (R.idle + (1 - R.idle) * m.drive) * part.amp;
-    const ph = m.phase * R.speed + part.phase * Math.PI * 2;
-    const beat = Math.sin(ph + 0.6);
-    const swing = R.swing * effort * (R.outward ? (0.5 + 0.5 * beat) * outwardSign(card, part) : beat);
-    const sweep = R.sweep * effort * Math.sin(ph);
-    const [ax, ay] = part.axis;
-    const f = R.fold && m.fold ? m.fold : 0, fa = f ? R.fold.angle * f * foldTurn(card) : 0, fs = 1 - (f ? R.fold.shrink * f : 0);
-    const fc = Math.cos(fa) * fs, fsn = Math.sin(fa) * fs;
+export function posePart(card, part, m, at, mirror, out, turn = 0) {
+    const q = motion(card, part, m, MOTION), { R, effort, ph, swing, fc, fsn } = q, [ax, ay] = part.axis;
     for (let i = 0; i < card.n; i++) {
         const t = card.t[i];
         // Fold first (in the picture plane, about the root), then swing about the hinge (depth
-        // comes only from it, so it stays on its side), then stroke and undulation in the plane.
+        // comes only from it, so it stays on its side), then stroke and undulation in the plane
+        // (plus `turn`: the in-plane angle of the part it hangs on, see carryPoint).
         const lx = card.lx[i] * fc - card.ly[i] * fsn, ly = card.lx[i] * fsn + card.ly[i] * fc;
         aboutAxis(lx, ly, 0, ax, ay, swing, P);
         aboutAxis(0, 0, 1, ax, ay, swing, N);
-        const a = sweep + R.wave * effort * Math.sin(ph - R.k * t) * t;
+        const a = q.sweep + turn + R.wave * effort * Math.sin(ph - R.k * t) * t;
         const ca = Math.cos(a), sa = Math.sin(a);
         const zs = mirror ? -1 : 1;
         out.x[i] = at[0] + P[0] * ca - P[1] * sa; out.y[i] = at[1] + P[0] * sa + P[1] * ca; out.z[i] = (part.z + P[2]) * zs;
@@ -172,6 +165,36 @@ export function posePart(card, part, m, at, mirror, out) {
         out.rz[i] = part.z * zs;        // rest depth and normal: perspective and light only show the change
         out.rnx[i] = 0; out.rny[i] = 0; out.rnz[i] = zs;
     }
+}
+
+const MOTION = {};
+
+/** This frame's motion of a part (shared by posePart and carryPoint); written into o. */
+function motion(card, part, m, o) {
+    const R = ROLES[part.role] || ROLES.median;
+    const effort = (R.idle + (1 - R.idle) * m.drive) * part.amp;
+    const ph = m.phase * R.speed + part.phase * Math.PI * 2;
+    const beat = Math.sin(ph + 0.6);
+    const f = R.fold && m.fold ? m.fold : 0, fa = f ? R.fold.angle * f * foldTurn(card) : 0, fs = 1 - (f ? R.fold.shrink * f : 0);
+    o.R = R; o.effort = effort; o.ph = ph;
+    o.swing = R.swing * effort * (R.outward ? (0.5 + 0.5 * beat) * outwardSign(card, part) : beat);
+    o.sweep = R.sweep * effort * Math.sin(ph);
+    o.fc = Math.cos(fa) * fs; o.fsn = Math.sin(fa) * fs;
+    return o;
+}
+
+/**
+ * Where a point fixed to a part (lx, ly: picture px from its pivot, e.g. the pivot of a part that
+ * hangs on it) is this frame, and the part's in-plane angle there: o.{x, y, a}. A child part
+ * (spec `parent`) is posed at that point and turned by that angle, so a head rides on its neck.
+ */
+export function carryPoint(card, part, m, at, lx, ly, turn, o) {
+    const q = motion(card, part, m, MOTION), [ax, ay] = part.axis;
+    aboutAxis(lx * q.fc - ly * q.fsn, lx * q.fsn + ly * q.fc, 0, ax, ay, q.swing, P);
+    const a = q.sweep + turn + q.R.wave * q.effort * Math.sin(q.ph - q.R.k);
+    const ca = Math.cos(a), sa = Math.sin(a);
+    o.x = at[0] + P[0] * ca - P[1] * sa; o.y = at[1] + P[0] * sa + P[1] * ca; o.a = a;
+    return o;
 }
 
 /** Arrays a posed card is written into. */

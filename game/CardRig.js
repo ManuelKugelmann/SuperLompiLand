@@ -1,7 +1,7 @@
 import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
-import { CARDS, makeCard, posedBuffers, poseBody, posePart, project, turnPose } from './rig/cards.js';
+import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose } from './rig/cards.js';
 
 /** Where the part cards come from (scripts/parts/bake.py). */
 export const PARTS = { json: 'parts', url: 'img/parts/', texture: key => `parts_${key}` };
@@ -89,7 +89,7 @@ export default class CardRig {
             const card = makeCard({ rect: p.rect, pivot: p.pivot, size: R.size, cols: long ? a : b, rows: long ? b : a });
             const part = { role: p.role, axis: hingeAxis(p), amp: p.amp ?? 1, phase: p.phase ?? 0, z: (p.z ?? 0) * bulgePx };
             const fr = frame(p.name || `p${i}`, p.frame);
-            add(card, fr, { part, order: p.front ? 1 + i * 0.01 : -1 + (p.z ?? 0) * 0.1 + i * 0.001 });
+            add(card, fr, { part, name: p.name, parent: p.parent, order: p.front ? 1 + i * 0.01 : -1 + (p.z ?? 0) * 0.1 + i * 0.001 });
             if (p.pair) {
                 const t = CARDS.twin;
                 const twin = { ...part, z: Math.abs(part.z) * -t.z, phase: part.phase + 0.08 };
@@ -97,10 +97,13 @@ export default class CardRig {
             }
         });
         entries.sort((a, b) => a.order - b.order);
+        // A part with a `parent` (spec) is posed after it, at the point of the parent it hangs on.
+        for (const e of entries) if (e.parent) e.parentEntry = entries.find(o => o.name === e.parent && !o.mirror);
+        const poseOrder = [...entries].sort((a, b) => depthOf(a) - depthOf(b));
         const view = new CardView(scene, st.key, R.size, st.width / W);
         view.wiggle = st.wiggle;
         this.views[Object.keys(this.char.states).find(k => this.char.states[k] === st)] = view;
-        return { entries, size: R.size, view };
+        return { entries, poseOrder, size: R.size, view };
     }
 
     /** Switch the look (e.g. 'inflated'); unknown states fall back to 'normal'. */
@@ -181,14 +184,22 @@ export default class CardRig {
         const m = { phase: ph, drive, fold: 1 - this.spread };
         const pv = { yaw, facing: flip, rotation, sx, sy, x: 0, y: 0, dist: CARDS.persp * W, fade: false, dark: 1 };   // vertices are relative to the rope
         const at = [0, 0];
-        for (const e of set.entries) {
-            if (e.body) poseBody(e.card, bend, set.size, e.posed);
-            else {
-                const [px, py] = e.card.pivot;
+        for (const e of set.poseOrder) {
+            if (e.body) { poseBody(e.card, bend, set.size, e.posed); continue; }
+            const [px, py] = e.card.pivot, p = e.parentEntry;
+            let turn = 0;
+            if (p) {
+                // On its parent: where the parent's card carries this part's pivot, turned with it.
+                carryPoint(p.card, p.part, m, p.at, px - p.card.pivot[0], py - p.card.pivot[1], p.turn, CARRY);
+                at[0] = CARRY.x; at[1] = CARRY.y; turn = CARRY.a;
+            } else {
                 bend(px / W + 0.5, py / H + 0.5, BEND);
                 at[0] = px + BEND.x + (e.shift?.[0] || 0); at[1] = py + BEND.y + (e.shift?.[1] || 0);
-                posePart(e.card, e.part, m, at, !!e.mirror, e.posed);
             }
+            e.at = e.at || [0, 0]; e.at[0] = at[0]; e.at[1] = at[1]; e.turn = turn;
+            posePart(e.card, e.part, m, at, !!e.mirror, e.posed, turn);
+        }
+        for (const e of set.entries) {
             pv.fade = !e.body; pv.dark = e.dark ?? 1;
             const r = e.rope;
             project(e.card, e.posed, pv, r.vertices, e.bright, r.alphas, e.hue);
@@ -203,6 +214,15 @@ export default class CardRig {
     destroy() {
         for (const set of Object.values(this.sets)) for (const e of set.entries) e.rope.destroy();
     }
+}
+
+const CARRY = { x: 0, y: 0, a: 0 };
+
+/** How many parents a part hangs below (the body and free parts: 0), so parents are posed first. */
+function depthOf(e) {
+    let d = 0;
+    for (let p = e.parentEntry; p; p = p.parentEntry) d++;
+    return d;
 }
 
 /** The hinge of a part: along its root line, or (a part without one) across the line from its pivot to its middle. */
