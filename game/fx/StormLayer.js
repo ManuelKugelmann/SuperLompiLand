@@ -190,15 +190,20 @@ export default class StormLayer {
         this.bands.setTileScale(H / 256, H / 256);   // one tile tall (stretched over the view), so it only repeats sideways
         this.cols = downwelling();
         // Everything else exists only while its feature is within about a screen (object budget):
-        this.stormSet = null;     // buildStorm()
+        this.stormSet = null;     // buildStorm(), once every step of it has run
+        this.stormJob = null;     // ... while it is being built: { set, todo }
         this.currentSet = null;   // buildCurrent()
         this.nextBubbles = 0;
         this.rand = rnd(9);
     }
 
-    /** The storm's own things: walls of dark water at its ends, the churned underside, rain, torn foam and debris. */
+    /**
+     * The storm's own things: walls of dark water at its ends, the churned underside, rain, torn foam and debris.
+     * Returns { set, todo }: the set to be, and the steps that make it, one per frame (update): its tile sprites each
+     * have a canvas of their own, and all of them at once were one very long frame where the storm first comes near.
+     */
     buildStorm() {
-        const scene = this.scene, W = scene.scale.width, L = STORM_LOOK, R = this.rand, o = {};
+        const scene = this.scene, W = scene.scale.width, L = STORM_LOOK, R = this.rand, o = { walls: [], under: [], rain: null, clouds: null, torn: [], debris: [] }, todo = [];
         const sw = L.wall, rampEnd = WEATHER.storm.ramp, C = L.churn;
         const stops = [[0, 0], [0.22, 0.2], [0.4, 0.85], [0.6, 1], [1, 0.38]];   // across: share of the width, alpha
         // A wall of darker water at each end of the storm (world space): its edge is a place you see
@@ -216,28 +221,37 @@ export default class StormLayer {
             g.span = [Math.min(x0, x0 + dir * width), Math.max(x0, x0 + dir * width)];
             return g;
         };
-        o.walls = [wall(this.span.x0 - sw.out, 1), wall(this.span.x1 + sw.out, -1)];
-        o.under = L.underside.map(u => scene.add.tileSprite(0, u.y, W + 400, u.h, SURF_ART.line.key).setOrigin(0, 0.5)
-            .setDepth(6.4).setTint(u.tint).setVisible(false));
-        o.rain = scene.add.tileSprite(0, -L.rain, W, L.rain, TEX.rain).setOrigin(0).setScrollFactor(0, 1).setDepth(-28.2).setVisible(false);
+        todo.push(() => o.walls.push(wall(this.span.x0 - sw.out, 1)), () => o.walls.push(wall(this.span.x1 + sw.out, -1)));
+        for (const u of L.underside) todo.push(() => o.under.push(scene.add.tileSprite(0, u.y, W + 400, u.h, SURF_ART.line.key).setOrigin(0, 0.5)
+            .setDepth(6.4).setTint(u.tint).setVisible(false)));
+        todo.push(() => { o.rain = scene.add.tileSprite(0, -L.rain, W, L.rain, TEX.rain).setOrigin(0).setScrollFactor(0, 1).setDepth(-28.2).setVisible(false); });
         // The storm's cloud bank on the horizon: it stands over the storm and rises on the side of
         // the view toward it, so the storm is seen coming from the water's surface too.
         const cl = L.clouds;
-        if (scene.textures.exists(cl.key)) {
+        if (scene.textures.exists(cl.key)) todo.push(() => {
             const ch = scene.textures.get(cl.key).getSourceImage().height * cl.scale;
             o.clouds = scene.add.tileSprite(0, cl.foot, W, ch, cl.key).setOrigin(0, 1).setScrollFactor(0, 1).setTileScale(cl.scale, cl.scale)
                 .setDepth(-28.25).setVisible(false);
-        }
+        });
         const flyer = (key, frame) => {
             const f = scene.add.image(0, 0, key, frame).setDepth(6.3).setVisible(false);
             f.life = -R() * 2; f.vx = 0; f.spin = 0;
             return f;
         };
         const puffFrames = scene.textures.get(SURF_ART.puffs.key).frameTotal > 2;
-        o.torn = Array.from({ length: L.torn }, (_, i) => flyer(SURF_ART.puffs.key, puffFrames ? i % 4 : undefined));
-        o.debris = Array.from({ length: L.debris }, (_, i) => flyer(i % 2 ? TEX.weed : TEX.plank));
-        o.all = [...o.walls, ...o.under, o.rain, ...o.torn, ...o.debris, ...(o.clouds ? [o.clouds] : [])];
-        return o;
+        todo.push(() => {
+            o.torn = Array.from({ length: L.torn }, (_, i) => flyer(SURF_ART.puffs.key, puffFrames ? i % 4 : undefined));
+            o.debris = Array.from({ length: L.debris }, (_, i) => flyer(i % 2 ? TEX.weed : TEX.plank));
+        });
+        return { set: o, todo };
+    }
+
+    /** The storm's own things go, whole or half built. */
+    dropStorm() {
+        const o = this.stormSet || this.stormJob?.set;
+        if (!o) return;
+        for (const part of [...o.walls, ...o.under, ...o.torn, ...o.debris, ...(o.rain ? [o.rain] : []), ...(o.clouds ? [o.clouds] : [])]) part.destroy();
+        this.stormSet = null; this.stormJob = null;
     }
 
     /** The downwelling's two columns: streaks at three depths, a whirl at the top of the one going down. */
@@ -280,8 +294,13 @@ export default class StormLayer {
         this.edge.setVisible(diff > 0.01).setAlpha(Math.min(1, diff * L.edge)).setFlipX(behind - kr > ahead - kl);
         // The storm's own objects exist only within about a screen of it (built and dropped here).
         const nearStorm = camX + 2 * W > this.span.x0 - L.wall.out && camX - W < this.span.x1 + L.wall.out;
-        if (nearStorm && !this.stormSet) this.stormSet = this.buildStorm();
-        if (!nearStorm && this.stormSet) { for (const o of this.stormSet.all) o.destroy(); this.stormSet = null; }
+        // Built a step per frame; it shows once it is whole. Left behind, whatever exists of it goes.
+        if (nearStorm && !this.stormSet && !this.stormJob) this.stormJob = this.buildStorm();
+        if (this.stormJob) {
+            this.stormJob.todo.shift()();
+            if (!this.stormJob.todo.length) { this.stormSet = this.stormJob.set; this.stormJob = null; }
+        }
+        if (!nearStorm) this.dropStorm();
         const set = this.stormSet;
         if (set) {
             for (const w of set.walls) w.setVisible(w.span[1] > camX - 200 && w.span[0] < camX + W + 200 && camY < L.wall.depth);

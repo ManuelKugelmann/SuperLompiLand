@@ -762,7 +762,7 @@ export default class MainScene extends Phaser.Scene {
             this.speedLines.destroy(); this.speedLines = new SpeedLines(this);
             if (this.storm) {      // built again by itself when the storm or a current is near
                 for (const o of this.storm.made) o.destroy();
-                for (const set of [this.storm.stormSet, this.storm.currentSet]) if (set) for (const o of set.all) o.destroy();
+                this.storm.dropStorm(); if (this.storm.currentSet) for (const o of this.storm.currentSet.all) o.destroy();
                 this.storm = null;
             }
             this.controller.destroy();
