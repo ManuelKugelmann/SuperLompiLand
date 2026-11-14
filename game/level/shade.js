@@ -2,7 +2,8 @@
 //   rock  the rock itself: matte albedo running from the rim into the core, lit
 //         from the surface (soft key light from above, teal fill from the water,
 //         warm bounce from below), fine grain, sand settling on upward faces
-//   back  what lies behind: cave back walls and soft occlusion in the water
+//   back  what lies behind: back rock under overhangs (backRock.js) and soft occlusion
+//         in the water next to rock (by distance, so it never ends in a hard line)
 //         next to rock
 // Everything is a smooth function of the density field, so there are no steps,
 // facets or chunk seams. Pure maths (no Phaser, no DOM): it runs in the terrain
@@ -33,13 +34,11 @@ export const SHADE = {
     deepMix: 0.5,         // how far the albedo moves to deepTint at the deepest regular seabed
     sand: [0xf4, 0xe3, 0xb4],
     sandReach: 60,        // world px into the rock that sand covers on upward faces
-    wallMix: [0x0a, 0x2a, 0x44],
-    wallAlpha: 0.62,
     backRockAlpha: 0.8,   // back rock under overhangs (backRock.js): how solid at its fullest
     backRockDark: 0.66,   // its stone colour is darkened to this at full cover (unlit, far)
     backRockFog: 0.38,    // and moved this far toward the biome's water colour
     occlusion: 0.36,      // darkest shade in the water right at the rock
-    occlusionReach: 0.085 // density range in the water over which it fades out
+    occlusionReach: 110   // world px into the water over which it fades out
 };
 
 const TILE = 256;
@@ -86,14 +85,13 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
     const ws = span / M;                       // world px per density sample
     const T = FIELD.threshold;
 
-    // Density, its slope and the cave-wall mask on the sample grid.
-    const D = new Float32Array(W * W), mask = new Float32Array(W * W), mask2 = new Float32Array(W * W);
+    // Density and its slope on the sample grid.
+    const D = new Float32Array(W * W), mask2 = new Float32Array(W * W);
     for (let j = 0; j < W; j++) {
         const y = oy + (j - 1) * ws;
         for (let i = 0; i < W; i++) {
             const x = ox + (i - 1) * ws;
             D[j * W + i] = field.density(x, y);
-            mask[j * W + i] = y > 600 ? smooth(0.53, 0.58, vnoise(x / 1500, y / 1500, seed + 31)) : 0;
         }
     }
     const GX = new Float32Array(W * W), GY = new Float32Array(W * W);
@@ -226,7 +224,7 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
     // shade that gathers next to rock. Back rock is unlit, darker and fogged toward the
     // biome's water, so it never reads as something to bump into.
     const B = cfg.backSize, bn = S / B, back = new Uint8ClampedArray(B * B * 4);
-    const br = backRockCover(field, T, ox, oy, span), bc = br.cov, BN = br.N, bk = span / B / br.C, b0 = br.m - 0.5;
+    const br = backRockCover(field, T, ox, oy, span), bc = br.cov, BN = br.N, bk = span / B / br.C, b0 = br.m - 0.5;   // also the distance to rock
     const fogCol = new Float32Array(B * 3);
     if (br.any) {
         for (let px = 0; px < B; px++) {
@@ -247,37 +245,30 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             const i00 = j * W + i, i10 = i00 + 1, i01 = i00 + W, i11 = i01 + 1;
             const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
             const d = D[i00] * w00 + D[i10] * w10 + D[i01] * w01 + D[i11] * w11;
-            const m = mask[i00] * w00 + mask[i10] * w10 + mask[i01] * w01 + mask[i11] * w11;
-            const caveA = cfg.wallAlpha * m * smooth(T - 0.17, T - 0.1, d);
-            let rockA = 0;
-            if (br.any) {
-                const cx = (px + 0.5) * bk + b0, ci = Math.min(BN - 2, Math.max(0, Math.floor(cx))), cu = Math.min(1, Math.max(0, cx - ci));
-                const k = cj * BN + ci;
-                rockA = cfg.backRockAlpha * ((bc[k] * (1 - cu) + bc[k + 1] * cu) * (1 - cv) + (bc[k + BN] * (1 - cu) + bc[k + BN + 1] * cu) * cv);
-            }
-            const wallA = caveA + rockA * (1 - caveA);
-            const occ = smooth(T - cfg.occlusionReach, T, d);
+            const cx = (px + 0.5) * bk + b0, ci = Math.min(BN - 2, Math.max(0, Math.floor(cx))), cu = Math.min(1, Math.max(0, cx - ci));
+            const k = cj * BN + ci;
+            const grid = q => (q[k] * (1 - cu) + q[k + 1] * cu) * (1 - cv) + (q[k + BN] * (1 - cu) + q[k + BN + 1] * cu) * cv;
+            const rockA = br.any ? cfg.backRockAlpha * grid(bc) : 0;
+            // By the distance to real rock (backRock.js), not by the density value: where the field
+            // lies flat or steps just below the threshold, a density-based shade ends in hard lines.
+            const occ = d >= T ? 1 : 1 - smooth(0, cfg.occlusionReach, grid(br.dist));
             const occA = cfg.occlusion * occ * occ;
-            const a = occA + wallA * (1 - occA);
+            const a = occA + rockA * (1 - occA);
             if (a <= 0.004) continue;
-            const grain = g.h[(((ty0 >> 1) + py) & 255) * TILE + (((tx0 >> 1) + px) & 255)];
             const p = Math.min(S - 1, Math.floor((px + 0.5) * bn)) * 15 + 6;       // the middle rock colour
             const o = (py * B + px) * 4;
             // Back rock takes the stone's own texture (the biome's main material) when loaded.
-            let tone = 0.8 + 0.4 * grain;
+            let tone = 0.8 + 0.4 * g.h[(((ty0 >> 1) + py) & 255) * TILE + (((tx0 >> 1) + px) & 255)];
             if (rockA > 0 && mats) {
                 const t = mats[colA[Math.floor((px + 0.5) * bn) * 4]], X = (tx0 + px * bn) & MM, Y = (ty0 + py * bn) & MM, q = (Y * MS + X) * 4;
                 const l = (t[q] + t[q + 1] + t[q + 2]) / 384; tone = l * Math.sqrt(l);              // a little more contrast: rock, not haze
             }
             for (let c = 0; c < 3; c++) {
-                let wall = pal[p + c] + (cfg.wallMix[c] - pal[p + c]) * 0.45;
-                wall += (cfg.deepTint[c] - wall) * tintK;
-                const cave = wall * (0.8 + 0.4 * grain);
                 // Darkest deep inside, lighter toward the openings (low coverage): inviting, not a dungeon.
                 let far = pal[p + c] * tone * (1 - (1 - cfg.backRockDark) * rockA / cfg.backRockAlpha);
+                far += (cfg.deepTint[c] - far) * tintK;
                 far += (fogCol[px * 3 + c] - far) * cfg.backRockFog;
-                const w = wallA > 0 ? (cave * caveA + far * rockA * (1 - caveA)) / wallA : 0;
-                back[o + c] = (DARK[c] * occA + w * wallA * (1 - occA)) / a;
+                back[o + c] = (DARK[c] * occA + far * rockA * (1 - occA)) / a;
             }
             back[o + 3] = a * 255;
         }
