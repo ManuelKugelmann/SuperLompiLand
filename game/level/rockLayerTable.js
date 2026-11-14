@@ -13,7 +13,7 @@ import { vnoise } from './terrain.js';
 import { softenLayer } from './layerMath.js';
 import { biomeBlendAt, seaShare, waterTone, WORLD_END } from './biomes.js';
 import { descentStart } from './setPieces.js';
-import { SHADE } from './shade.js';
+import { SHADE, shadeChunk } from './shade.js';
 import { FIELD, ROUTE } from './density.js';
 
 const T = FIELD.threshold;
@@ -419,4 +419,23 @@ function trenchSpecks(rgba, size, ox, oy, span, cfg = TRENCH_WALL) {
             }
         }
     }
+}
+
+/**
+ * Bake margin (texels, a multiple of LAYER_SHADE.node so the samples stay on the same world grid):
+ * a layer chunk is shaded with this much of its neighbours' rock all round, and its middle kept.
+ * Everything that looks across texels (the top skin's search for the rock's top and its smoothing
+ * across columns, its shade, the soften pass) then sees the real neighbours: no seam at chunk edges.
+ */
+export const LAYER_MARGIN = 40;
+
+/** One layer chunk's picture (RGBA, LAYER_SHADE.rockSize squared), baked with LAYER_MARGIN. */
+export function layerPicture(field, seed, layer, cx, cy, M = LAYER_MARGIN) {
+    const S = LAYER_SHADE.rockSize, B = S + 2 * M, { ox, oy, span } = layerChunkRect(layer, cx, cy), step = span / S;
+    const bx = ox - M * step, by = oy - M * step, bspan = span * B / S;
+    const { rock } = shadeChunk(field, seed, bx, by, bspan, { ...LAYER_SHADE, rockSize: B, grainAt: [cx * S - M, cy * S - M] });
+    fogLayer(rock, B, bx, by, bspan, layer);
+    const out = new Uint8ClampedArray(S * S * 4);
+    for (let y = 0; y < S; y++) out.set(rock.subarray(((y + M) * B + M) * 4, ((y + M) * B + M + S) * 4), y * S * 4);
+    return out;
 }

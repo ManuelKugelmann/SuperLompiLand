@@ -162,3 +162,22 @@ test('the trench wall stands behind the descent below its rim, has windows, and 
     let x = x0; while (trenchWallAt(x, route(x) + 600, route) < 0.99) x += 97;
     assert.ok(f.density(x, route(x) + 600) > T);
 });
+
+test('layer chunks meet without a seam: baked with their neighbours\' rock, edge columns continue', async () => {
+    const { layerPicture, LAYER_SHADE } = await import('../game/level/rockLayerTable.js');
+    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L), S = LAYER_SHADE.rockSize;
+    // A chunk of the lagoon's back rock (x about 37 000) and its right and lower neighbours: without the margin its borders stepped by 25.
+    const cx = 23, cy = 0, a = layerPicture(f, 1337 + L.seed, L, cx, cy), r = layerPicture(f, 1337 + L.seed, L, cx + 1, cy), d = layerPicture(f, 1337 + L.seed, L, cx, cy + 1);
+    const px = (img, x, y) => [0, 1, 2, 3].map(c => img[(y * S + x) * 4 + c]);
+    let worst = 0, n = 0;
+    for (let i = 0; i < S; i++) {
+        for (const [p, q, p2] of [[px(a, S - 1, i), px(r, 0, i), px(a, S - 2, i)], [px(a, i, S - 1), px(d, i, 0), px(a, i, S - 2)]]) {
+            if (p[3] < 255 || q[3] < 255 || p2[3] < 255) continue;
+            // The step across the border is no bigger than a step inside the chunk (plus a little).
+            for (let c = 0; c < 3; c++) worst = Math.max(worst, Math.abs(p[c] - q[c]) - Math.abs(p[c] - p2[c]));
+            n++;
+        }
+    }
+    assert.ok(n > 40, `border texels with rock (${n})`);
+    assert.ok(worst < 14, `largest extra step at a chunk border: ${worst}`);
+});

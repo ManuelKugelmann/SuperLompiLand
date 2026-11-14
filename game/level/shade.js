@@ -180,7 +180,8 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE, take = null) 
     };
 
     const g = grainTile(), gh = g.h, gdx = g.dx, gdy = g.dy;
-    const tx0 = Math.round(ox / span) * S, ty0 = Math.round(oy / span) * S;   // grain stays put across chunks
+    // Grain stays put across chunks; a caller baking a chunk with a margin passes the origin of its middle (cfg.grainAt).
+    const tx0 = cfg.grainAt ? cfg.grainAt[0] : Math.round(ox / span) * S, ty0 = cfg.grainAt ? cfg.grainAt[1] : Math.round(oy / span) * S;
     const L = cfg.light, ll = Math.sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
     const lx = L[0] / ll, ly = L[1] / ll, lz = L[2] / ll;
     const pxWorld = span / S, aa = 1 / (pxWorld * 1.4);
