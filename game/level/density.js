@@ -140,13 +140,6 @@ export function createField(seed) {
         }
         // Keep the abyss shaft swimmable all the way down.
         if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;
-        // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.
-        if (Math.abs(x - SHIP_X) < 2600) {
-            // Broad lumps on its flanks (none under the keel, which must lie in its hollow) and small knobs everywhere.
-            const P = SET_PIECES.ship, flank = Math.min(1, Math.max(0, (Math.abs(x - SHIP_X) - P.pinnacleHalf * 0.6) / 300));
-            const top = pinnacleTop(x) + P.lump * flank * (vnoise(x / 400, 5.3, seed + 31) * 2 - 1) + P.knobs * (vnoise(x / 90, 2.9, seed + 32) * 2 - 1);
-            if (y > top) n += (FIELD.crestRock - n) * smooth01((y - top) / 140);
-        }
         // The reef crest: solid coral from just under the surface down, whatever the noise says.
         // Its upper face is lumpy, slopes away to both sides and has grooves: no flat top, no cut faces.
         const crestTop = Math.abs(x - CREST_X) > CREST_REACH ? Infinity      // nowhere near it: nothing to work out
@@ -186,6 +179,17 @@ export function createField(seed) {
                     n += (FIELD.threshold + (y - ground) / 320 - n) * w;
                 }
             }
+        }
+        // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.
+        // Laid down last, after the calm route's lane is carved: under the ship the lane ends at the
+        // keel's bed (the ship's hole is the way through), so the ship stands on rock.
+        if (Math.abs(x - SHIP_X) < SET_PIECES.ship.pinnacleHalf + 2600) {
+            // Broad lumps on its flanks (none under the keel, which must lie in its hollow) and small knobs everywhere.
+            // Lumps and knobs on its flanks; under the keel only small dips (the bed never rises into the lane).
+            const P = SET_PIECES.ship, flank = Math.min(1, Math.max(0, (Math.abs(x - SHIP_X) - P.pinnacleHalf) / 300));
+            const top = pinnacleTop(x) + P.lump * flank * (vnoise(x / 400, 5.3, seed + 31) * 2 - 1)
+                + P.knobs * (flank * (vnoise(x / 90, 2.9, seed + 32) * 2 - 1) + (1 - flank) * 0.5 * vnoise(x / 90, 2.9, seed + 32));
+            if (y > top) n += (FIELD.crestRock - n) * smooth01((y - top) / 80);
         }
         return n;
     };

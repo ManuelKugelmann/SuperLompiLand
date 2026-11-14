@@ -110,7 +110,7 @@ test('the open sea is clear water: no rock hangs between the surface and just ab
             // From just past the island's edge to just before the next; not at the abyss, whose shaft is narrower than its floor.
             for (let x = b.from + 320; x < b.from + b.width - 920; x += 170) {
                 if (Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 3) continue;
-                if (Math.abs(x - ghostShip().x) < 2700) continue;      // the ghost ship's pinnacle is the one deliberate rock out here
+                if (Math.abs(x - ghostShip().x) < 3500) continue;      // the ghost ship's pinnacle is the one deliberate rock out here
                 const fy = floorY(x);
                 for (let y = 60; y < fy - FIELD.seaBottom; y += 90) {
                     assert.ok(f.density(x, y) < FIELD.threshold, `seed ${seed}: rock in the ${b.id} sea at ${x}, ${y} (bottom ${Math.round(fy)})`);

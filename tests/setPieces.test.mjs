@@ -10,14 +10,14 @@ test('the ghost ship stands in the middle of the storm, on the calm route', () =
     assert.ok(s.x > x0 && s.x < x1 && isSea(s.x));
     assert.equal(stormShare(s.x), 1);
     assert.ok(Math.abs(f.routeY(s.x) - s.y) < 5, 'the route goes through it');
-    assert.ok(s.keelY > s.y + ROUTE.halfWidth, 'its keel lies under the lane');
+    assert.ok(s.keelY > s.y + ROUTE.halfWidth * 0.75, 'its keel lies under the part of the lane that is always open');
 });
 
 test('a pinnacle of rock carries it: solid from just under the keel down to the deep floor, a spire, with open sea around', () => {
     const s = ghostShip(), f = createField(1337);
     assert.ok(f.density(s.x, s.y) < FIELD.threshold, 'the lane through the hull is open water');
     for (let y = s.keelY + 120; y < floorY(s.x); y += 200) assert.ok(f.density(s.x, y) > FIELD.threshold, `rock under the ship at ${y}`);
-    assert.ok(pinnacleTop(s.x + 800) > pinnacleTop(s.x) + 900, 'it falls away steeply');
+    assert.ok(pinnacleTop(s.x + SET_PIECES.ship.pinnacleHalf + 800) > pinnacleTop(s.x) + 900, 'it falls away steeply');
     assert.equal(pinnacleTop(s.x + 4000), Infinity);
     // Beside the spire the sea is open again down to near the bottom.
     for (const dx of [-3200, 3200]) for (let y = 300; y < floorY(s.x + dx) - FIELD.seaBottom; y += 300) assert.ok(f.density(s.x + dx, y) < FIELD.threshold, `open at ${dx}, ${y}`);
@@ -40,9 +40,9 @@ test('in the trench the calm route goes down from the trench\'s start all the wa
     assert.ok(SET_PIECES.descent.beacon[1] > 3000, 'the beacon is seen from far above');
 });
 
-test('the pinnacle is no table: a hollow for the keel, rounded shoulders, ledges on its flanks, two different sides', () => {
+test('the pinnacle is no table: a level bed for the keel, then cliffs and ledges on its flanks, two different sides', () => {
     const s = ghostShip(), P = SET_PIECES.ship;
-    assert.ok(pinnacleTop(s.x) > pinnacleTop(s.x + P.pinnacleHalf * 0.9) + 30, 'the middle lies lower than the shoulders');
+    assert.equal(pinnacleTop(s.x), pinnacleTop(s.x + P.pinnacleHalf * 0.9), 'a level bed under the whole keel');
     const drops = [];
     for (let x = s.x + P.pinnacleHalf; x < s.x + P.pinnacleHalf + 1500; x += 20) drops.push(pinnacleTop(x + 20) - pinnacleTop(x));
     assert.ok(Math.max(...drops) > Math.min(...drops) * 1.8, 'its face is steeper in places: cliffs between gentler slopes');

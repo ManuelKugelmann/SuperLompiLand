@@ -1274,7 +1274,7 @@ export default class MainScene extends Phaser.Scene {
         this.surf?.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
         if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = new StormLayer(this);
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
-        this.setPieces.update(time / 1000);
+        this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
