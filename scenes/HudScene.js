@@ -15,6 +15,7 @@ export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
 export const HUD = {
     switcherFirstMs: 14000,   // the control-scheme row stays this long on the very first run
     switcherMenuMs: 12000,    // ... and this long when called from the menu
+    depthHz: 4,               // how often the depth line may change per second
     rowGap: 28,               // px between the groups of the top line
     coinSlot: 74,             // px kept for the coin count, so the hearts never move as it grows
     bannerAlpha: 0.85         // announcements never cover the picture fully (spec 5.0j: faint and minimal)
@@ -193,10 +194,17 @@ export default class HudScene extends Phaser.Scene {
         const m = this.main;
         if (!m?.fish) return;
         // Playing together the counter is the team's: everything the room has collected.
-        this.coinText.setText(String(m.mp ? m.teamCoins() : m.coins));
-        // Where am I (tester: 'it used to say where I am'): the place stays next to the depth.
-        const place = BIOMES[m.biomeIndex]?.name?.[m.lang] || BIOMES[m.biomeIndex]?.name?.en || '';
-        this.depthText.setText(place ? `${this.depthLabel} ${m.depthMeters()} m · ${place}` : `${this.depthLabel} ${m.depthMeters()} m`);
+        // A text that changes is painted and sent to the graphics card again: the coin count only when it
+        // changes, the depth line at most HUD.depthHz times a second (it cost 17 ms in one jump on a slow phone).
+        const coins = m.mp ? m.teamCoins() : m.coins, tick = performance.now();
+        if (coins !== this.shownCoins) { this.shownCoins = coins; this.coinText.setText(String(coins)); }
+        if (tick - (this.depthAt || 0) > 1000 / HUD.depthHz) {
+            this.depthAt = tick;
+            // Where am I (tester: 'it used to say where I am'): the place stays next to the depth.
+            const place = BIOMES[m.biomeIndex]?.name?.[m.lang] || BIOMES[m.biomeIndex]?.name?.en || '';
+            const line = place ? `${this.depthLabel} ${m.depthMeters()} m · ${place}` : `${this.depthLabel} ${m.depthMeters()} m`;
+            if (line !== this.shownDepth) { this.shownDepth = line; this.depthText.setText(line); }
+        }
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
         const now = performance.now();
