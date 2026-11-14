@@ -709,6 +709,7 @@ export default class LevelGenerator {
                     plant.bend = 0;
                     keep(plant);
                     this.animated.push(plant);
+                    yield 'props'; if (chunk.dead) return;
                     continue;
                 }
                 const img = keep(s.add.image(spot.x, spot.y, key).setOrigin(0.5, 1 - p.sink));
@@ -717,6 +718,7 @@ export default class LevelGenerator {
                 if (p.tint) img.setTint(p.tint);
                 // Passable things read as behind the play plane: hazed toward the biome's water.
                 else if (p.back) img.setTint(mix(0xffffff, waterTone(biome, 170), PROP_BACK_HAZE));
+                yield 'props'; if (chunk.dead) return;      // a prop a step: finding its spot probes the rock under it
             }
         }
 
