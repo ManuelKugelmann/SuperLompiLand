@@ -85,7 +85,7 @@ test('named spots for screenshots: biome ids, the abyss, plain coordinates', () 
     for (const b of BIOMES) {
         const p = spotFor(b.id);
         assert.equal(biomeIndexAt(p.x), BIOMES.indexOf(b), b.id);
-        assert.ok(p.y >= 300 && p.y < floorY(p.x), `${b.id}: under water, above the seabed`);
+        assert.ok(p.y >= 200 && p.y < floorY(p.x), `${b.id}: under water, above the seabed`);
     }
     const deep = spotFor('abyss');
     assert.ok(Math.abs(deep.x - ABYSS.x) < 1 && deep.y > 6000);

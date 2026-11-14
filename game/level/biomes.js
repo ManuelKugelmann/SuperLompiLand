@@ -177,7 +177,7 @@ export function spotFor(spec) {
     const x = b.from + b.width / 2;
     // Where the biome shows what it is: under the roots at the surface, beside its landmark
     // on the seabed, otherwise in mid-water.
-    if (b.spot === 'surface') return { x, y: Math.min(380, floorY(x) * 0.5) };
+    if (b.spot === 'surface') return { x, y: Math.min(250, floorY(x) * 0.5) };
     if (b.landmark) return { x, y: floorY(x) - LANDMARK.above };
     return { x, y: Math.max(400, floorY(x) * 0.55) };
 }

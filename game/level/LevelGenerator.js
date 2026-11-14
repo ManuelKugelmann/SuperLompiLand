@@ -423,6 +423,12 @@ export default class LevelGenerator {
                     .setDepth(front ? 7.5 : -7).setAlpha(front ? 0.9 : 0.8));
                 if (rng.frac() < 0.5) root.setFlipX(true);
                 if (!front) root.setTint(0x6f8f86);
+                // Roots belong to a tree: its trunk and canopy stand above the waterline
+                // (painted art `root_top_1..2` when loaded, else the procedural one).
+                const tree = s.textures.exists('root_top_1') ? `root_top_${1 + (k % 2)}` : 'root_top';
+                const top = keep(s.add.image(x, -34, tree).setOrigin(0.5, 1)
+                    .setScale(root.scaleX * 1.25).setDepth(front ? 7.4 : -7.1).setFlipX(root.flipX));
+                if (!front) top.setTint(0xa9c4b4);
             }
         }
 
@@ -690,6 +696,32 @@ export default class LevelGenerator {
                 }
             };
             branch(w / 2, 0, (rnd() - 0.5) * 0.2, 150, 26, 4);
+            tex.refresh();
+        }
+        // The tree above the water: prop roots gathering into a trunk, and a canopy of leaf clumps.
+        if (!s.textures.exists('root_top')) {
+            const w = 420, h = 440, tex = s.textures.createCanvas('root_top', w, h), ctx = tex.getContext();
+            let seed = 4177;
+            const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+            ctx.lineCap = 'round';
+            for (let i = -2; i <= 2; i++) {                        // prop roots arching into the trunk
+                const g = ctx.createLinearGradient(0, h, 0, h - 220);
+                g.addColorStop(0, '#6d5136'); g.addColorStop(1, '#8a6a48');
+                ctx.strokeStyle = g; ctx.lineWidth = 15 - Math.abs(i) * 2;
+                ctx.beginPath(); ctx.moveTo(w / 2 + i * 34, h);
+                ctx.quadraticCurveTo(w / 2 + i * 30, h - 110, w / 2 + i * 5, h - 200); ctx.stroke();
+            }
+            ctx.strokeStyle = '#7d5f40'; ctx.lineWidth = 30;
+            ctx.beginPath(); ctx.moveTo(w / 2, h - 180); ctx.quadraticCurveTo(w / 2 + 14, h - 250, w / 2 - 6, h - 310); ctx.stroke();
+            for (let i = 0; i < 46; i++) {                         // leaf clumps, dark below, sunlit above
+                const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd());
+                const x = w / 2 + Math.cos(a) * r * 170, y = 150 + Math.sin(a) * r * 110, size = 34 + rnd() * 30;
+                const light = 1 - (y - 40) / 220;
+                const g = ctx.createRadialGradient(x - size * 0.3, y - size * 0.4, 2, x, y, size);
+                g.addColorStop(0, `rgb(${90 + light * 80 | 0},${150 + light * 60 | 0},${70 + light * 30 | 0})`);
+                g.addColorStop(1, `rgb(${30 + light * 30 | 0},${88 + light * 40 | 0},${52 + light * 14 | 0})`);
+                ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, size, size * 0.72, rnd() - 0.5, 0, Math.PI * 2); ctx.fill();
+            }
             tex.refresh();
         }
     }
