@@ -128,6 +128,8 @@ export const PROPS = {
     kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, reach: 0.2, flat: 0.5, depth: -1, max: 2, sway: 0.7 }
 };
 
+const PILE_TALL = 'pier_pile_tall', PILE_STACK = 6;   // the pier's wood strip stacked this many times (drawPier)
+
 /** Painted kelp stalks (generated art, public/img/plants/); the procedural 'kelp' strip is the fallback. */
 export const KELP_STALKS = ['kelp_stalk_1', 'kelp_stalk_2', 'kelp_stalk_3'];
 const KELP_BACK_TINT = 0x5f8f86;   // stalks behind the play plane: hazier, toward the water colour
@@ -840,6 +842,21 @@ export default class LevelGenerator {
         this.tethers.push(line);
     }
 
+    /**
+     * The first creature of a kind costs several ms (its rig is set up once per kind); inside a
+     * chunk build that makes the build slow. So each kind is made once ahead of time, away from
+     * any build: one kind per call. Returns false when every kind is warm.
+     */
+    prewarm() {
+        this.cold ??= Object.keys(FRIENDS);
+        const key = this.cold.pop();
+        if (!key) return false;
+        const c = new Creature(this.scene, key, FRIENDS[key], 0, -9000, this.crawlEnv, 0, 0);
+        c.addOverlay(this.scene, 4.05)?.destroy();
+        c.destroy();
+        return true;
+    }
+
     addFriend(chunk, key, x, y, rng, angle = 0) {
         const s = this.scene, f = FRIENDS[key];
         // A Rig body with a mind of its own (game/Creature.js): it roams, crawls or guards, per its row.
@@ -1039,7 +1056,14 @@ export default class LevelGenerator {
         const frame = key => s.textures.getFrame(key);
         // The pile art is wider than its wood (growth sticks out): size it so the wood
         // matches the deck's own posts, which fade into the piles at their bottom.
-        const fw = frame('pier_pile_mid').width, fh = frame('pier_pile_mid').height, pw = pier.w * p.pileWidth / p.pileWood, k = pw / fw, th = fh * k;
+        // The seamless wood strip, stacked a few times into one tall picture (made once): a pile
+        // through a chunk is then one or two pictures instead of a tile sprite or many tiles.
+        if (!s.textures.exists(PILE_TALL)) {
+            const src = s.textures.get('pier_pile_mid').getSourceImage(), tall = s.textures.createCanvas(PILE_TALL, src.width, src.height * PILE_STACK), c = tall.getContext();
+            for (let i = 0; i < PILE_STACK; i++) c.drawImage(src, 0, i * src.height);
+            tall.refresh();
+        }
+        const fw = frame(PILE_TALL).width, fh = frame(PILE_TALL).height, pw = pier.w * p.pileWidth / p.pileWood, k = pw / fw, th = fh * k;
         const piece = (key, x, y, h) => keep(s.add.image(x, y, key).setOrigin(0.5, 0)
             .setDisplaySize(pw, h).setDepth(p.depth).setTint(p.tint));
         if (Math.max(0, pier.deckTop) >= oy && Math.max(0, pier.deckTop) < y1) {      // the deck pokes above the surface
@@ -1052,10 +1076,10 @@ export default class LevelGenerator {
             if (foot >= oy && foot < y1) piece('pier_foot', q.x, foot, footH);
             // Seamless wood strip, tiled by world y; one pixel of overlap at chunk joins.
             const m0 = Math.max(oy, top), m1 = Math.min(y1 + 1, foot + 2);
-            // Plain pictures stacked on a grid of world y and cropped at the ends (a tile sprite costs
-            // milliseconds to make; four per chunk were most of a pier chunk's build time).
+            // Plain pictures on a grid of world y, cropped at the ends (a tile sprite costs milliseconds
+            // to make; four per chunk were most of a pier chunk's build time).
             for (let y = Math.floor(m0 / th) * th; y < m1; y += th) {
-                const img = keep(s.add.image(q.x, y, 'pier_pile_mid').setOrigin(0.5, 0).setScale(k).setDepth(p.depth - 0.01).setTint(p.tint));
+                const img = keep(s.add.image(q.x, y, PILE_TALL).setOrigin(0.5, 0).setScale(k).setDepth(p.depth - 0.01).setTint(p.tint));
                 const c0 = Math.max(0, (m0 - y) / k), c1 = Math.min(fh, (m1 - y) / k);
                 if (c0 > 0 || c1 < fh) img.setCrop(0, c0, fw, c1 - c0);
             }
