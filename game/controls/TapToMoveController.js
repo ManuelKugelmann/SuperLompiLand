@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
-import { slideDir, holdLift } from './assist.js';
+import { slideDir, climbForce, holdLift } from './assist.js';
 
 const BAND_FULL = 520; // finger distance at which the pull is at full strength
 
@@ -47,7 +47,9 @@ export default class TapToMoveController extends ControllerBase {
         if (dist > this.fish.radius * 0.6) {
             // Toward the finger; a step or ledge straight in the way is climbed along its face.
             const d = slideDir(this.fish.pos, to.normalize(), (x, y) => this.scene.level.isOpen(x, y, 0), this.pull);
-            this.fish.thrust(to.set(d.x, d.y).scale(Phaser.Math.Clamp(dist / BAND_FULL, d.climbing ? 0.6 : 0, 1) * 1.35));
+            // A climb is a steady pull, not a launch: once the fish rises fast enough it gets no more.
+            const pull = d.climbing ? climbForce(this.fish.body.velocity.y) : Phaser.Math.Clamp(dist / BAND_FULL, 0, 1);
+            this.fish.thrust(to.set(d.x, d.y).scale(pull * 1.35));
         } else {
             this.fish.brake();
         }

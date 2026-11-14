@@ -85,6 +85,8 @@ export default class StoryScene extends Phaser.Scene {
         const skip = this.add.text(W - 32, H - 28, de ? 'Überspringen  ›' : 'Skip  ›', {
             fontFamily: 'Arial', fontSize: '42px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0a3f6ecc', padding: { x: 26, y: 14 }
         }).setOrigin(1, 1).setScrollFactor(0).setDepth(60).setInteractive({ useHandCursor: true });
+        this.fixed = [this.caption, skip];
+        for (const o of this.fixed) { o.home = { x: o.x, y: o.y }; o.grow = 1; }
         skip.on('pointerdown', (p, x, y, ev) => { ev?.stopPropagation(); this.skipped = true; this.finish(); });
         this.skipped = false;
         this.input.on('pointerdown', () => { if (!this.skipped && !this.done) this.timeline.next(); });
@@ -93,14 +95,18 @@ export default class StoryScene extends Phaser.Scene {
 
     update(time, delta) {
         if (!this.done) this.timeline.step(delta);
+        // The camera zooms in on the hero at the end; the words and the button keep their place and size on the screen.
+        const cam = this.cameras.main, z = cam.zoom, cx = cam.width / 2, cy = cam.height / 2;
+        for (const o of this.fixed) o.setPosition(cx + (o.home.x - cx) / z, cy + (o.home.y - cy) / z).setScale(o.grow / z);
     }
 
     /** Show the caption of a beat: the old one fades, the new one pops in. */
     say(i) {
         const c = this.caption;
         this.tweens.killTweensOf(c);
-        c.setText(this.lines[i]).setAlpha(0).setScale(0.85);
-        this.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 260, ease: 'Back.easeOut' });
+        c.setText(this.lines[i]).setAlpha(0);
+        c.grow = 0.85;
+        this.tweens.add({ targets: c, alpha: 1, grow: 1, duration: 260, ease: 'Back.easeOut' });
     }
 
     /** The painted stage: one picture of the volcano island above and below the water, cover on the sand, corals. */
@@ -181,8 +187,12 @@ export default class StoryScene extends Phaser.Scene {
         ['mine', 'hazard_net', 'hazard_buoy', 'spikes', 'mine', 'hazard_net'].filter(k => this.textures.exists(k)).forEach((k, i) => {
             const img = this.add.image(W * 0.78 - i * 30, 420 + i * 40, k).setScale(0.3).setAlpha(0);
             if (this.painted) img.setTint(0x8a8088); else img.setTintFill(0x1c1820);
+            // Never across the hero: what would come to rest on Lompi lands above or below instead.
+            const tx = W * (0.74 - i * 0.09);
+            let ty = Phaser.Math.Between(H * 0.5, H * 0.86);
+            if (Math.abs(tx - this.lompi.x) < 340 && Math.abs(ty - this.lompi.y) < 250) ty = this.lompi.y + (i % 2 ? -270 : 260);
             this.tweens.add({
-                targets: img, alpha: 0.95, x: W * (0.74 - i * 0.09), y: Phaser.Math.Between(H * 0.5, H * 0.86),
+                targets: img, alpha: 0.95, x: tx, y: ty,
                 angle: Phaser.Math.Between(-40, 40), duration: 1500, delay: i * 130, ease: 'Sine.easeOut'
             });
         });

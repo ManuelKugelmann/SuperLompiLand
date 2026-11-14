@@ -10,7 +10,9 @@ export const ASSIST = {
         step: 300,       // px above that point within which open water is looked for: steps up to this height are climbed
         scan: 40,        // px between two looks on the way up
         climb: 0.85,     // share of the pull that goes upward while climbing (the rest keeps going the way it was)
-        surface: 220     // px under the surface above which nothing is climbed: the help never throws the fish out of the water
+        surface: 220,    // px under the surface above which nothing is climbed: the help never throws the fish out of the water
+        force: 0.7,      // strength of the pull while climbing, as a share of a full pull (a climb, not a launch)
+        maxRise: 5       // px per step: a fish already rising this fast gets no more lift from the climb
     },
     hold: {
         slack: 50,       // px the fish may sink below where it was let go before the hold begins to lift it
@@ -46,4 +48,9 @@ export function slideDir(pos, dir, isOpen, out = { x: 0, y: 0, climbing: false }
 export function holdLift(y, restY, cfg = ASSIST.hold) {
     const sunk = y - restY - cfg.slack;
     return sunk <= 0 ? 0 : cfg.lift * Math.min(1, sunk / cfg.full);
+}
+
+/** How hard to pull while climbing (0..1 of a full pull) for a fish moving at `vy` px per step (negative = rising): nothing once it rises fast enough. */
+export function climbForce(vy, cfg = ASSIST.slide) {
+    return vy <= -cfg.maxRise ? 0 : cfg.force;
 }

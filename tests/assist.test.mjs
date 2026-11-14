@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSIST, slideDir, holdLift } from '../game/controls/assist.js';
+import { ASSIST, slideDir, climbForce, holdLift } from '../game/controls/assist.js';
 
 // A seabed step: rock below y 1000 west of x 500, and below y 800 east of it (a 200 px step up).
 const step = (x, y) => y < (x < 500 ? 1000 : 800);
@@ -51,4 +51,13 @@ test('nothing is climbed right under the surface: the help never throws the fish
     const shallow = (x, y) => y < (x < 500 ? 400 : 200);      // a step whose top lies 200 px under the surface
     assert.equal(slideDir({ x: 400, y: 350 }, east, shallow).climbing, false);
     assert.ok(ASSIST.slide.surface > 100);
+});
+
+test('a climb is a steady pull, not a launch: a fish that already rises fast gets no more lift', () => {
+    const S = ASSIST.slide;
+    assert.equal(climbForce(0), S.force);
+    assert.equal(climbForce(3), S.force, 'sinking: full climbing pull');
+    assert.equal(climbForce(-S.maxRise), 0);
+    assert.equal(climbForce(-12), 0);
+    assert.ok(S.force < 1);
 });
