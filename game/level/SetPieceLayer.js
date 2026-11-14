@@ -21,6 +21,8 @@ export const SET_LOOK = {
     debrisFall: 38,         // px per second
     debrisSpan: [380, 1500],   // from just under the churned layer down to the ship's keel line (below it is rock), then again from the top
     debrisWithin: 2600,     // px from the ship within which they are shown
+    sway: 0.004,            // radians the ship leans to either side about its keel (about 8 px at the mast tops) ...
+    swayRate: 0.35,         // ... this many radians of the cycle per second
     hullThin: 0.62,         // the hull's alpha while the fish is behind its planking (it stays a solid ship)
     portSize: 170,          // the painted ship's lit portholes: size and brightness of their flicker
     portAlpha: 0.5,
@@ -80,7 +82,8 @@ export default class SetPieceLayer {
         const [ix, iy, iw, ih] = art.inside;
         s.add.image(...at(ix, iy), this.softInside(art)).setOrigin(0).setDisplaySize(iw * k, ih * k).setDepth(2.6);
         // In front of the fish, but below the band of foreground things the scene thins on its own (7 to 8): this one decides for itself.
-        this.front = s.add.image(x0, y0, 'ghost_ship').setOrigin(0).setScale(k).setDepth(6.9);
+        // It turns about the middle of its keel (where it rests), so it can sway a little in the storm's surge.
+        this.front = s.add.image(ship.x, ship.keelY, 'ghost_ship').setOrigin(keelX / art.front[0], keelY / art.front[1]).setScale(k).setDepth(6.9);
         // The hull proper (portholes down to the keel, stern to bow) and the hole in it, in the world.
         const portY = Math.min(...art.lanterns.map(l => l[1])) - 60;
         this.hull = { x0: x0 + art.keel[0] * k - 120, y0: y0 + portY * k, x1: x0 + art.keel[2] * k + 160, y1: y0 + keelY * k };
@@ -139,6 +142,8 @@ export default class SetPieceLayer {
             const hidden = boxHitsCircle(this.hull, fish.x, fish.y, radius) && ((fish.x - this.hole.x) / this.hole.rx) ** 2 + ((fish.y - this.hole.y) / this.hole.ry) ** 2 > 1;
             const want = hidden ? SET_LOOK.hullThin : 1, k = 1 - Math.exp(-dt * 9);
             this.front.setAlpha(this.front.alpha + (want - this.front.alpha) * k);
+            // Masts and torn sails lean a few pixels to and fro; at the hole, just above the keel, nothing moves.
+            this.front.setRotation(Math.sin(t * SET_LOOK.swayRate) * SET_LOOK.sway + Math.sin(t * SET_LOOK.swayRate * 2.7 + 1) * SET_LOOK.sway * 0.3);
         }
         this.sink(t, fish);
     }
