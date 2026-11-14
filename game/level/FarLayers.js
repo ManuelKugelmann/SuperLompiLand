@@ -52,8 +52,9 @@ export default class FarLayers {
                 if (this.live.has(id)) continue;
                 this.live.set(id, farCell(di, ci, W, 1337, has).map(o => {
                     const look = farLook(s, o.biome);
-                    const y = farBaseY(worldXFor(o.lx, s, W), s, H, o.rise);
-                    const img = scene.add.image(o.lx, y, this.baked(o.key)).setOrigin(0.5, 1)
+                    // Hanging things (mangrove roots) start at the surface: world y 0 is layer y 0.
+                    const y = o.hang ? -20 * s : farBaseY(worldXFor(o.lx, s, W), s, H, o.rise);
+                    const img = scene.add.image(o.lx, y, this.baked(o.key)).setOrigin(0.5, o.hang ? 0 : 1)
                         .setScrollFactor(s).setDepth(depthFor(s)).setAlpha(look.alpha).setTint(look.tint).setFlipX(o.flip);
                     img.setScale(o.w / img.width);
                     return img;

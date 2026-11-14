@@ -17,21 +17,28 @@ export const FAR = {
     horizon: 0.74       // screen height share of the infinitely far seabed (low: far bases hide behind the near seabed)
 };
 
-// What stands far away per biome: [texture key, weight, width range in px at depth 1].
+// What stands far away per biome: [texture key, weight, width range in px at depth 1, hangs
+// from the surface (mangrove roots) instead of standing on the seabed].
 const K = {
+    roots: [['root_1', 1, [380, 620], true], ['root_2', 1, [420, 680], true], ['root_3', 1, [300, 480], true]],
+    grass: [['seagrass_1', 1, [260, 420]]],
     kelp: [['kelp_stalk_1', 3, [700, 1300]], ['kelp_stalk_2', 3, [700, 1300]], ['kelp_stalk_3', 2, [600, 1100]]],
     corals: [['coral_1', 3, [300, 520]], ['coral_2', 3, [300, 520]], ['coral_3', 2, [260, 460]], ['seafan_1', 2, [280, 440]]],
     boulders: [['boulder_1', 1, [320, 700]], ['boulder_2', 1, [320, 700]], ['boulder_4', 1, [320, 700]], ['boulder_5', 1, [320, 700]]],
     hulls: [['wreck_1', 2, [1300, 2000]], ['wreck_2', 2, [1300, 2000]], ['trawler_1', 1, [900, 1300]], ['cutter_1', 1, [800, 1100]]]
 };
-const pick = (...groups) => groups.flatMap(([g, w]) => K[g].map(([key, kw, size]) => [key, kw * w, size]));
+const pick = (...groups) => groups.flatMap(([g, w]) => K[g].map(([key, kw, size, hang]) => [key, kw * w, size, !!hang]));
 
-/** Per biome: objects per cell (at the nearest depth; far depths get fewer) and what they are. */
+/**
+ * Per biome: objects per cell (at the nearest depth; far depths get fewer), what they are,
+ * and `haze` (more fog and less colour than the default 1, for busy scenery that must stay
+ * clearly behind the play plane).
+ */
 export const FAR_KINDS = {
     beach: { per: 0.8, kinds: pick(['boulders', 2], ['kelp', 0.3]) },
     reef: { per: 1, kinds: pick(['corals', 2], ['boulders', 1], ['kelp', 0.3]) },
-    mangrove: { per: 1, kinds: pick(['kelp', 1], ['boulders', 1]) },
-    kelp: { per: 2.4, kinds: pick(['kelp', 4], ['boulders', 0.5]) },
+    mangrove: { per: 0.6, haze: 1.4, kinds: pick(['roots', 2], ['grass', 1], ['boulders', 0.4]) },
+    kelp: { per: 1.2, haze: 1.4, kinds: pick(['kelp', 4], ['boulders', 0.5]) },
     blue: { per: 0, kinds: [] },
     wreck: { per: 1, kinds: pick(['hulls', 1], ['boulders', 1], ['kelp', 0.3]) },
     harbour: { per: 0.9, kinds: pick(['hulls', 1], ['boulders', 1]) },
@@ -43,7 +50,7 @@ export const worldXFor = (lx, s, W) => (lx - W / 2) / s + W / 2;
 
 /**
  * The objects of placement cell `ci` at depth index `di` (deterministic).
- * @returns [{ key, lx, w, flip, rise, biome }]  lx in layer px, w = display width
+ * @returns [{ key, lx, w, flip, rise, hang, biome }]  lx in layer px, w = display width
  */
 export function farCell(di, ci, W, seed = 1337, has = () => true) {
     const s = FAR.depths[di], r = rng(((seed * 31 + di) * 977 + ci) >>> 0);
@@ -58,9 +65,9 @@ export function farCell(di, ci, W, seed = 1337, has = () => true) {
     for (let k = 0; k < n && total > 0; k++) {
         let roll = r() * total, kind = kinds[0];
         for (const e of kinds) { roll -= e[1]; if (roll <= 0) { kind = e; break; } }
-        const [key, , [w0, w1]] = kind;
+        const [key, , [w0, w1], hang] = kind;
         const scale = 1 - FAR.shrink * (1 - s);
-        out.push({ key, lx: (ci + 0.1 + r() * 0.8) * FAR.cell, w: (w0 + r() * (w1 - w0)) * scale, flip: r() < 0.5, rise: r() * FAR.rise * (1 - s), biome });
+        out.push({ key, lx: (ci + 0.1 + r() * 0.8) * FAR.cell, w: (w0 + r() * (w1 - w0)) * scale, flip: r() < 0.5, rise: r() * FAR.rise * (1 - s), hang, biome });
     }
     return out;
 }
@@ -76,7 +83,8 @@ export function farBaseY(worldX, s, H, rise = 0) {
 
 /** Alpha and tint of an object at depth s in a biome (fades into the water with distance). */
 export function farLook(s, biome) {
-    const far = 1 - s;
+    const far = 1 - s, haze = FAR_KINDS[biome.id]?.haze ?? 1, extra = haze - 1;
     const water = mix(biome.water[0], 0x2a9fc8, 0.5);
-    return { alpha: 1 - FAR.fog * far, tint: mix(0xffffff, water, FAR.tint * far) };
+    const fog = Math.min(0.97, FAR.fog * far * haze + extra * 0.3);
+    return { alpha: 1 - fog, tint: mix(0xffffff, water, Math.min(1, FAR.tint * far * haze + extra * 0.4)) };
 }

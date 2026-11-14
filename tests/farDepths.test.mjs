@@ -48,3 +48,14 @@ test('rng is deterministic and mix blends colours', () => {
     assert.equal(mix(0x000000, 0xffffff, 0.5), 0x808080);
     assert.equal(mix(0x123456, 0xabcdef, 0), 0x123456);
 });
+
+test('no kelp far away in the mangroves; roots hang from the surface there', () => {
+    const keys = FAR_KINDS.mangrove.kinds.map(k => k[0]);
+    assert.ok(!keys.some(k => k.startsWith('kelp')));
+    assert.ok(FAR_KINDS.mangrove.kinds.filter(k => k[0].startsWith('root_')).every(k => k[3] === true));
+});
+
+test('busy biomes are hazier at every depth', () => {
+    const kelp = BIOMES.find(b => b.id === 'kelp'), reef = BIOMES.find(b => b.id === 'reef');
+    for (const s of FAR.depths) assert.ok(farLook(s, kelp).alpha < farLook(s, reef).alpha, `depth ${s}`);
+});
