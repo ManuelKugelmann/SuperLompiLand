@@ -1,5 +1,6 @@
 // Chains: linking moves (a jump through the surface, a clean landing, a skip off a wave, a
-// loop in the air, a special, riding a current, finishing a coin melody) within a generous
+// flip in the air, a special, riding a current, a cannon shot, a pad bounce, finishing a
+// coin melody) within a generous
 // window builds a chain. It is a soft counter, never a pressure timer: nothing is lost when
 // it ends, and it ends with a few bonus coins. From CHAIN.flowAt on the run is "in flow".
 //
@@ -16,7 +17,7 @@ export const CHAIN = {
     // (up, over, down); 3.9 (225 degrees) needs real steering and fits into one jump.
     flipTurn: 3.9,
     // The moves, and how long before the same move counts again (so holding one does not farm it).
-    verbs: { leap: 600, landing: 600, skim: 150, flip: 0, special: 700, stream: 3000, trail: 0 }
+    verbs: { leap: 600, landing: 600, skim: 150, flip: 0, special: 700, stream: 3000, trail: 0, cannon: 300, pad: 300 }
 };
 
 /** Bonus coins for a finished chain of this length. */

@@ -18,7 +18,7 @@ export const FLOW = {
     streamChance: 0.7,     // ... which holds a stream this often
     streamLength: [1500, 2600],
     streamWidth: 150,      // distance from the middle at which the pull has dropped to about a third
-    streamSpeed: 11,       // speed of the water in the middle of a stream (the player's own top speed is 12)
+    streamSpeed: 19,       // speed of the water in the middle of a stream: above the swimmers' own top speed (Lompi ~17); was 11
     streamWave: 170,       // how far a stream's path swings up and down
     carry: 0.045           // how quickly the water takes a body up to its own speed (per step)
 };

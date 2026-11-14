@@ -19,6 +19,7 @@ import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
 import { CHAIN, createChain, createSpin } from '../game/chain.js';
+import BoosterLayer from '../game/level/BoosterLayer.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
@@ -195,6 +196,9 @@ export default class MainScene extends Phaser.Scene {
             }
         });
 
+        // Bubble cannons and bounce pads along the streams (game/level/boosters.js).
+        this.boosters = new BoosterLayer(this, this.flow, (x, y) => y > 60 && this.density(x, y) <= LEVEL.threshold);
+
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
         this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.chainMove('special'); });
 
@@ -250,6 +254,7 @@ export default class MainScene extends Phaser.Scene {
             saveNow();
             this.particles.destroy();
             this.swarms.destroy();
+            this.boosters.destroy();
             this.events.off('fish-special');
             document.removeEventListener('visibilitychange', saveNow);
             window.removeEventListener('pagehide', saveNow);
@@ -825,6 +830,13 @@ export default class MainScene extends Phaser.Scene {
                 }
             }
             this.streamBubbles %= 1;
+        }
+        const shot = this.boosters.update(this.cameras.main.worldView, this.fish, this.time.now);
+        if (shot) {
+            play(shot === 'cannon' ? 'cannon' : 'boing');
+            this.chainMove(shot);
+            this.fish.squash = shot === 'cannon' ? 0.3 : -0.3;
+            this.particles.spawn('bubble', this.fish.sprite.x, this.fish.sprite.y, shot === 'cannon' ? 14 : 6, { radius: 10, spread: 60 });
         }
         this.particles.update(delta / 1000);
         const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step

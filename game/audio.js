@@ -176,6 +176,9 @@ const SOUNDS = {
     shell() { tone({ f: 150, to: 90, type: 'square', dur: 0.16, vol: 0.2 }); tone({ f: 300, to: 180, type: 'triangle', at: 0.03, dur: 0.14, vol: 0.14 }); },
     pulse() { tone({ f: 240, to: 720, type: 'sine', dur: 0.32, vol: 0.18 }); tone({ f: 480, to: 1440, type: 'sine', at: 0.05, dur: 0.3, vol: 0.07 }); },
     grab() { tone({ f: 700, to: 500, type: 'triangle', dur: 0.08, vol: 0.16 }); tone({ f: 500, to: 520, type: 'sine', at: 0.07, dur: 0.1, vol: 0.12 }); },
+    // Water elements: a bubble cannon's deep pop with a rush of air, a pad's rubbery boing.
+    cannon() { tone({ f: 110, to: 320, type: 'sine', dur: 0.22, vol: 0.24 }); noise({ dur: 0.34, vol: 0.2, from: 400, to: 3200, q: 0.7 }); },
+    boing() { tone({ f: 190, to: 560, type: 'triangle', dur: 0.2, vol: 0.2 }); tone({ f: 380, to: 300, type: 'sine', at: 0.16, dur: 0.14, vol: 0.1 }); },
     hop() { tone({ f: 400, to: 800, type: 'sine', dur: 0.12, vol: 0.16 }); },
     splash(strength = 1) {
         // Soft and airy; a hard dive is only a little louder than a gentle one.
