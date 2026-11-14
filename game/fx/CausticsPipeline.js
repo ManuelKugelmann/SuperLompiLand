@@ -49,6 +49,7 @@ uniform float uTime;
 uniform float uStrength;
 uniform float uSide;        // pictures a side in this texture: 1 for a picture of its own, more for an atlas of equal places
 uniform float uAll;         // 1: a thing in the water (catches the net on its sides too), 0: the ground (causticGround: top skin only)
+uniform float uGain;        // share of the net on this thing (creatures take less)
 uniform vec3 uTint;
 varying vec2 outTexCoord;
 varying float outTintEffect;
@@ -107,7 +108,7 @@ void main () {
         // Only the top skin of a surface: where the picture is opaque well above this texel too, the light is gone
         // (on the ground; a thing in the water keeps the net on its sides, softer).
         float cover = near(vec2(0.0, ${f(-C.skin[0])})).a * near(vec2(0.0, ${f(-C.skin[1])})).a;
-        catching *= (1.0 - 0.9 * cover * mix(1.0, ${f(C.sides.skin)}, uAll)) * mix(1.0, ${f(C.sides.gain)}, uAll);
+        catching *= (1.0 - 0.9 * cover * mix(1.0, ${f(C.sides.skin)}, uAll)) * mix(1.0, ${f(C.sides.gain)}, uAll) * uGain;
         color.rgb += uTint * (light * shaft * depth * catching * uStrength * color.a);
     }
     gl_FragColor = color;
@@ -126,11 +127,12 @@ class CausticsPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
      * batched for the other kind is drawn first.
      */
     onBind(gameObject) {
-        const side = gameObject?.causticSide || 1, all = gameObject?.causticGround ? 0 : 1;
-        if (side === this.side && all === this.all) return;
+        const side = gameObject?.causticSide || 1, all = gameObject?.causticGround ? 0 : 1, gain = gameObject?.type === 'Rope' ? C.sides.creature : 1;
+        if (side === this.side && all === this.all && gain === this.gain) return;
         this.flush();
         this.set1f('uSide', side); this.side = side;
         this.set1f('uAll', all); this.all = all;
+        this.set1f('uGain', gain); this.gain = gain;
     }
 
     onPreRender() {
@@ -141,6 +143,7 @@ class CausticsPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
         this.set3f('uTint', v.r, v.g, v.b);
         this.set1f('uSide', 1); this.side = 1;
         this.set1f('uAll', 0); this.all = 0;
+        this.set1f('uGain', 1); this.gain = 1;
     }
 }
 
@@ -155,6 +158,8 @@ export function installCaustics(game) {
 
 /** Phaser's own pipelines for what may take the net of light (anything else keeps its own: glows, effects). */
 const PLAIN = { Image: 'MultiPipeline', Sprite: 'MultiPipeline', Rope: 'RopePipeline' };
+/** Soft pictures of light and shade (halos, glows, shadows, murk, rays, haze): not surfaces, the net drawn on them floats in open water (QA: a web around a follower's halo). */
+const SOFT = /glow|halo|light|shadow|murk|ray|fog|haze|sheen/i;
 /** The depths that take it: from the props just behind the play plane to the front plants (not the water's fills and far layers, not effects; game/depths.js). */
 const CATCH = [DEPTH.bands.find(b => b.id === 'backProps').from, DEPTH.bands.find(b => b.id === 'front').to];
 
@@ -173,7 +178,7 @@ export function catchCaustics(scene, on) {
         const plain = PLAIN[o.type];
         if (!plain) continue;
         if (o.caustic) { if (!on) { o.setPipeline(plain); o.caustic = false; } continue; }
-        if (!on || o.noCaustics || o.pipeline?.name !== plain || o.blendMode !== 0 || o.depth < CATCH[0] || o.depth >= CATCH[1] || o.scrollFactorX !== 1 || o.scrollFactorY !== 1) continue;
+        if (!on || o.noCaustics || SOFT.test(o.texture?.key || '') || o.pipeline?.name !== plain || o.blendMode !== 0 || o.depth < CATCH[0] || o.depth >= CATCH[1] || o.scrollFactorX !== 1 || o.scrollFactorY !== 1) continue;
         o.setPipeline(o.type === 'Rope' ? CAUSTICS_ROPE : CAUSTICS);
         o.caustic = true;
     }

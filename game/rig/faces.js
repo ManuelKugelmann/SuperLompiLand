@@ -18,7 +18,11 @@ export const FACES = {
     friend_jellyfish: { eyes: { iris: 0x2a6fd0, lid: 0xf3d8ef, pupil: 1.15, at: [{ x: 70, y: 158, rx: 21, ry: 23 }, { x: 151, y: 117, rx: 25, ry: 27 }] }, mouth: { x: 125, y: 170 } },
     friend_seahorse: { eyes: { iris: 0x2a90c0, lid: 0xf7c23a, pupil: 1.1, at: [{ x: 192, y: 138, rx: 30, ry: 32 }] }, mouth: { x: 300, y: 158 } },
     friend_starfish: { eyes: { bead: 0x1c120e, lid: 0xff9a2a, at: [{ x: 190, y: 175, rx: 26, ry: 26 }, { x: 300, y: 147, rx: 26, ry: 26 }] } },
-    urchin: { eyes: { bead: 0x16101c, lid: 0xb898e0, at: [{ x: 196, y: 211, rx: 27, ry: 27 }, { x: 316, y: 211, rx: 27, ry: 27 }] } }
+    urchin: { eyes: { bead: 0x16101c, lid: 0xb898e0, at: [{ x: 196, y: 211, rx: 27, ry: 27 }, { x: 316, y: 211, rx: 27, ry: 27 }] } },
+    // The big animals: small real eyes, kept as glossy beads that blink and look.
+    whale: { eyes: { bead: 0x21170f, lid: 0x5c6168, at: [{ x: 940, y: 128, rx: 17, ry: 12 }] } },
+    whale_shark: { eyes: { bead: 0x0e0d0d, lid: 0x2c3548, at: [{ x: 855, y: 108, rx: 9, ry: 9 }] } },
+    manta: { eyes: { iris: 0x1e2430, lid: 0x2a3040, at: [{ x: 718, y: 135, rx: 13, ry: 14 }] }, mouth: { x: 735, y: 205 } }
 };
 
 /** The face of a look: its own (`face` in a profile's state) or its picture's. */
