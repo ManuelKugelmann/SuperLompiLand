@@ -569,12 +569,15 @@ export default class MainScene extends Phaser.Scene {
         for (const f of this.level.friends) if (f.key && near(f)) ids.push(f.key);
         for (const h of this.level.hazards) if (h.key && near(h)) ids.push(h.key);
         for (const s of this.swarms.near(p.x, p.y, BOOK.seePx)) ids.push(`school_${s}`);
-        for (const id of ids) {
-            const e = this.reefBook.discover(id);
-            if (!e) continue;
-            this.progression.set?.('reefbook', this.reefBook.toJSON());
-            this.bookToast(e);
-        }
+        for (const id of ids) this.bookEntry(id);
+    }
+
+    /** Fill in one reef book entry; the first time, a small card pops up. */
+    bookEntry(id) {
+        const e = this.reefBook.discover(id);
+        if (!e) return;
+        this.progression.set?.('reefbook', this.reefBook.toJSON());
+        this.bookToast(e);
     }
 
     /** A small card in the corner: "New in the reef book" + picture + name. */
@@ -836,6 +839,7 @@ export default class MainScene extends Phaser.Scene {
         if (shot) {
             play(shot === 'cannon' ? 'cannon' : 'boing');
             this.chainMove(shot);
+            if (shot === 'pad') this.bookEntry('friend_jellyfish');     // the pad is a big moon jelly
             this.fish.squash = shot === 'cannon' ? 0.3 : -0.3;
             this.particles.spawn('bubble', this.fish.sprite.x, this.fish.sprite.y, shot === 'cannon' ? 14 : 6, { radius: 10, spread: 60 });
         }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BOOST, boostersFor, touches, cannonShot, padBounce } from './boosters.js';
+import { musicClock, nowSeconds } from '../audio.js';
 
 // Draws the bubble cannons and bounce pads near the view and fires them (rules and
 // placement: boosters.js). Textures are painted once; idle motion is a sine in update,
@@ -27,7 +28,8 @@ function makeTextures(scene) {
     }
     for (const [x, r] of [[150, 9], [176, 12], [206, 15]]) { bubble(x, 120 - r * 1.6, r * 0.7); bubble(x, 120 + r * 1.6, r * 0.7); }
     c.refresh();
-    // Bounce pad: a soft anemone cushion, dome up, with a fringe of short arms.
+    // Bounce pad: a pad in open water is a big friendly moon jelly. Painted art is `bo_pad_jelly`;
+    // this soft bell with a fringe of short arms is the fallback.
     const p = scene.textures.createCanvas('bo_pad', 280, 150), q = p.getContext();
     for (let i = 0; i < 15; i++) {
         const x = 30 + i * 15.7, h = 26 + (i % 4) * 7;
@@ -73,12 +75,15 @@ export default class BoosterLayer {
         for (const s of this.flow.streamsIn(x0, x1)) {
             for (const b of boostersFor(s)) {
                 if (this.live.has(b.id) || b.x < x0 || b.x > x1 || !this.hasRoom(b)) continue;
-                const img = this.scene.add.image(b.x, b.y, b.kind === 'cannon' ? 'bo_cannon' : 'bo_pad').setDepth(DEPTH);
+                const pad = this.scene.textures.exists('bo_pad_jelly') ? 'bo_pad_jelly' : 'bo_pad';
+                const img = this.scene.add.image(b.x, b.y, b.kind === 'cannon' ? 'bo_cannon' : pad).setDepth(DEPTH);
+                if (b.kind === 'pad') img.base = BOOST.padRadius * 2.6 / img.width;      // shown about as wide as its reach
                 if (b.kind === 'cannon') img.setRotation(Math.atan2(b.dy, b.dx)).setBlendMode(Phaser.BlendModes.SCREEN);
                 this.live.set(b.id, { b, img, firedAt: -Infinity });
             }
         }
         let fired = null;
+        const beat = musicClock.pulse(nowSeconds(), 4);      // the jelly's bell pulses on the music's beat
         const sp = fish.sprite, v = sp.body.velocity;
         for (const [id, e] of this.live) {
             const { b, img } = e;
@@ -87,7 +92,7 @@ export default class BoosterLayer {
             const punch = Math.max(0, 1 - (now - e.firedAt) / 380);
             const idle = Math.sin(now / 420 + b.x) * 0.04;
             if (b.kind === 'cannon') img.setScale(1 + idle + punch * 0.45).setAlpha(0.85 + punch * 0.15);
-            else img.setScale(1 + idle * 0.5 + punch * 0.12, 1 - idle * 0.5 - punch * 0.3);
+            else img.setScale(img.base * (1 + idle * 0.5 - beat * 0.05 + punch * 0.12), img.base * (1 - idle * 0.5 + beat * 0.08 - punch * 0.3));
             if (fired || fish.inAir || now - e.firedAt < (b.kind === 'cannon' ? BOOST.cannonRearm : BOOST.padRearm)) continue;
             if (!touches(b, sp.x, sp.y, fish.radius)) continue;
             const out = b.kind === 'cannon' ? cannonShot(v.x, v.y, b, BOOST, this.out) : padBounce(v.x, v.y, b, BOOST, this.out);
