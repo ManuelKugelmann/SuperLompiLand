@@ -3,6 +3,7 @@ import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import { createSwimmer, stepSwimmer } from '../ai/swimmer.js';
 import { createCrawler, stepCrawler } from '../ai/crawler.js';
+import { createReach } from './reach.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
@@ -129,6 +130,8 @@ export default class LevelGenerator {
         makeNestTextures(scene);
         makeLineTexture(scene);
         this.field = createField(LEVEL.seed);
+        // Never out of reach: coins and friends are not placed in sealed pockets of water (reach.js).
+        this.reachable = createReach(this.field.density, LEVEL.threshold, this.field.routeY, ROUTE.halfWidth * 0.75);
         this.nests = this.field.nests.map(n => ({ ...n, biome: BIOMES[Math.min(n.index + 1, BIOMES.length - 1)] }));
         // Density grids are computed in a Web Worker when available; the chunk is
         // then drawn on the main thread, one per frame.
@@ -550,7 +553,7 @@ export default class LevelGenerator {
         const openSpot = (span = 0) => {
             for (let tries = 6; tries > 0; tries--) {
                 const x = ox + rng.between(120, CH - 120), y = oy + rng.between(120, CH - 120);
-                if (this.isOpen(x, y, 0.1) && this.isOpen(x - span, y, 0.08) && this.isOpen(x + span, y, 0.08)) return { x, y };
+                if (this.isOpen(x, y, 0.1) && this.isOpen(x - span, y, 0.08) && this.isOpen(x + span, y, 0.08) && this.reachable(x, y)) return { x, y };
             }
             return null;
         };
@@ -579,6 +582,7 @@ export default class LevelGenerator {
     }
 
     addCoin(chunk, x, y, chunkKey, index) {
+        if (!this.reachable(x, y)) return;      // its number stays taken, so the others keep theirs
         const s = this.scene;
         const img = s.textures.exists('coin')
             ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)
