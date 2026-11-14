@@ -13,6 +13,9 @@
 import { sheenHue } from './sheen.js';
 
 export const CARDS = {
+    steerBend: 2.4,         // how far the tail lags in a turn: picture widths per radian per frame of turning
+    steerMax: 0.07,         // the turn rate (rad per frame) at which the bend is at its most
+    steerEase: 0.2,         // how quickly the bend follows the turning (share per frame)
     offView: 200,           // px beyond the view (plus its own size) at which a rig is no longer posed
     bodyGrid: [12, 9],      // body card grid (columns x rows of cells)
     partGrid: [6, 4],       // fin card grid along its longer side x across

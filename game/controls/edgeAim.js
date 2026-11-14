@@ -5,7 +5,7 @@
 export const EDGE = {
     level: 0.14,      // share of the half height round the middle that swims dead level (a coin line is easy to follow)
     curve: 1.3,       // > 1: the turn grows slowly near the middle and quickly toward the corners
-    gauge: 0.06,      // share of the screen width each edge gauge takes on screen
+    gauge: 0.12,      // share of the screen width each edge gauge takes on screen (user: wider edges)
     top: 0.2          // share of the height kept for the HUD line: the edges steer below it, its bottom is "fully up"
 };
 

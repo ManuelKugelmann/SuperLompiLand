@@ -168,6 +168,12 @@ export default class CardRig {
         this.phase += (CARDS.cycle[0] + raw * (CARDS.cycle[1] - CARDS.cycle[0])) * frames;
         const ph = this.phase, sq = Phaser.Math.Clamp(squash, -0.35, 0.35), sc = view.baseScale * this.zoom;
         let sx = sc * (1 + sq), sy = sc * (1 - sq), rotation = Phaser.Math.Angle.Wrap(this.angle - level) + lean;
+        // Steering shows in the body (user: 'creatures should bend tail fin or body when steering'): while the
+        // nose turns, the tail lags behind and the body curves into the turn; it straightens when the turn ends.
+        const turned = Phaser.Math.Angle.Wrap(rotation - lean - (this.lastRot ?? rotation - lean)) / Math.max(0.25, frames);
+        this.lastRot = rotation - lean;
+        this.steer = Phaser.Math.Clamp((this.steer || 0) + (turned - (this.steer || 0)) * Math.min(1, CARDS.steerEase * frames), -CARDS.steerMax, CARDS.steerMax);
+        const steerBend = flip * this.steer * CARDS.steerBend * W;
         // Idle rocking about the vertical axis keeps the volume visible, not only in turns.
         if (!this.turning) yaw = (CARDS.sway + CARDS.swayMore * drive) * Math.sin(ph * 0.31);
 
@@ -187,7 +193,7 @@ export default class CardRig {
             sy *= 1 - stroke * 0.025 * (0.1 + drive);
             bend = (u, v, o) => { o.x = 0; o.y = 0; };
         } else {
-            bend = (u, v, o) => { const t = 1 - u; o.x = 0; o.y = Math.sin(ph - t * 2.6) * amp * 0.35 * t * t; };
+            bend = (u, v, o) => { const t = 1 - u; o.x = 0; o.y = (Math.sin(ph - t * 2.6) * amp * 0.35 + steerBend) * t * t; };
         }
 
         // Wings open in the air and fold back in the water, over a few frames (CARDS.spreadRate).
