@@ -31,6 +31,7 @@ export const LEVEL = {
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
+    cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     rippleMax: 8,         // strips of rippled sand per chunk, at most
     rippleWidth: 220,     // px: a strip is at least this wide (or as wide as its piece of floor)
@@ -132,6 +133,7 @@ export const PROPS = {
     kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, reach: 0.2, flat: 0.5, depth: -1, max: 2, sway: 0.7 }
 };
 
+const CULLED = new Set(['Image', 'TileSprite', 'Sprite']);   // the kinds of chunk object that cull() may hide (plain pictures at their own x, y)
 const PILE_UNDER_FOOT = 0.4;   // share of the foot's height that the wood strip runs on behind it
 const PILE_TALL = 'pier_pile_tall', PILE_STACK = 6;   // the pier's wood strip stacked this many times (drawPier)
 
@@ -312,6 +314,24 @@ export default class LevelGenerator {
         for (const key of this.early.keys()) {
             const [cx, cy] = key.split(',').map(Number);
             if (!wanted(cx, cy)) this.dropEarly(key);
+        }
+        this.cull(camX + W / 2, camY + H / 2, W / 2 + LEVEL.cullPad, H / 2 + LEVEL.cullPad);
+    }
+
+    /**
+     * Off-screen culling: chunks are loaded a whole chunk beyond the view, so most of what exists
+     * is off screen, and the renderer would still work through all of it. Plain pictures further
+     * than their own size outside the view (plus a pad) are not drawn. Each is measured once: its
+     * full diagonal covers any origin, turn or sway.
+     */
+    cull(vx, vy, hw, hh) {
+        for (const chunk of this.chunks.values()) {
+            for (const o of chunk.objects) {
+                if (o.cullR === undefined) o.cullR = CULLED.has(o.type) ? Math.hypot(o.displayWidth, o.displayHeight) : -1;
+                if (o.cullR < 0) continue;
+                const on = Math.abs(o.x - vx) < hw + o.cullR && Math.abs(o.y - vy) < hh + o.cullR;
+                if (on !== o.visible) o.setVisible(on);
+            }
         }
     }
 

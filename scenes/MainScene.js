@@ -1404,6 +1404,8 @@ export default class MainScene extends Phaser.Scene {
         this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
 
         this.level.update(this.camX, this.camY);
+        // A frame that built a chunk has spent its build budget: no layer builds its scene in the same frame.
+        if (this.level.buildMs.count !== this.chunkBuilds) { this.chunkBuilds = this.level.buildMs.count; this.lastBuildFrame = this.game.loop.frame; }
         this.level.animate(time / 1000, view, speed, this.mp?.others(this.roomPlayers || (this.roomPlayers = [])), this.wavePhase());
         this.revealPlayers(delta / 1000, view);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
