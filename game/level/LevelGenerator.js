@@ -128,6 +128,7 @@ export const PROPS = {
     kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, reach: 0.2, flat: 0.5, depth: -1, max: 2, sway: 0.7 }
 };
 
+const PILE_UNDER_FOOT = 0.4;   // share of the foot's height that the wood strip runs on behind it
 const PILE_TALL = 'pier_pile_tall', PILE_STACK = 6;   // the pier's wood strip stacked this many times (drawPier)
 
 /** Painted kelp stalks (generated art, public/img/plants/); the procedural 'kelp' strip is the fallback. */
@@ -1075,7 +1076,8 @@ export default class LevelGenerator {
             const footH = frame('pier_foot').height * k, foot = q.ground + pw * 0.5 - footH;
             if (foot >= oy && foot < y1) piece('pier_foot', q.x, foot, footH);
             // Seamless wood strip, tiled by world y; one pixel of overlap at chunk joins.
-            const m0 = Math.max(oy, top), m1 = Math.min(y1 + 1, foot + 2);
+            // The wood runs on behind the foot's soft upper edge (the foot's picture fades in from clear), so no cut end shows.
+            const m0 = Math.max(oy, top), m1 = Math.min(y1 + 1, foot + footH * PILE_UNDER_FOOT);
             // Plain pictures on a grid of world y, cropped at the ends (a tile sprite costs milliseconds
             // to make; four per chunk were most of a pier chunk's build time).
             for (let y = Math.floor(m0 / th) * th; y < m1; y += th) {
