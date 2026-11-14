@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOW, createFlow, streamInSlot, streamY, carry } from '../game/level/flow.js';
+import { FLOW, createFlow, streamInSlot, streamY, carry, eddyOf } from '../game/level/flow.js';
 import { createField, FIELD } from '../game/level/density.js';
 import { WORLD_WEST, WORLD_END } from '../game/level/biomes.js';
 
@@ -92,4 +92,31 @@ test('streams lose their pull at the calm route and keep it away from it', () =>
     assert.deepEqual(farRoute, plain, 'a route far away changes nothing');
     const edge = createFlow(SEED, FLOW, () => y + (FLOW.calm[0] + FLOW.calm[1]) / 2).at(x, y, 3, { x: 0, y: 0 });
     assert.ok(Math.hypot(edge.x, edge.y) > 2 && Math.hypot(edge.x, edge.y) < Math.hypot(plain.x, plain.y) - 2, 'a soft edge');
+});
+
+test('some streams run out into an eddy: the water turns round its middle, fastest at its radius', () => {
+    const all = flow.streamsIn(WORLD_WEST, WORLD_END), eddies = all.map(s => eddyOf(s, SEED)).filter(Boolean);
+    assert.ok(eddies.length >= 2 && eddies.length < all.length, `${eddies.length} of ${all.length}`);
+    assert.deepEqual(flow.eddiesIn(WORLD_WEST, WORLD_END).length, eddies.length);
+    const calm = { ...FLOW, swell: 0, streamSpeed: 0 }, f = createFlow(SEED, calm);
+    for (const e of eddies.slice(0, 3)) {
+        const R = FLOW.eddyRadius, at = (dx, dy) => f.at(e.x + dx, e.y + dy, 0, { x: 0, y: 0 });
+        const right = at(R, 0), below = at(0, R), left = at(-R, 0);
+        // On the ring the water moves along it: clockwise for turn = 1.
+        assert.ok(right.y * e.turn > FLOW.eddySpeed * 0.8, `right of the middle: ${right.y}`);
+        assert.ok(below.x * e.turn < -FLOW.eddySpeed * 0.8);
+        assert.ok(left.y * e.turn < -FLOW.eddySpeed * 0.8);
+        assert.ok(Math.hypot(right.x, right.y) <= FLOW.eddySpeed * 1.05, 'never faster than its top speed');
+        assert.ok(right.x < 0, 'a little inward');
+        assert.ok(Math.hypot(...Object.values(at(R * 0.2, 0))) < FLOW.eddySpeed * 0.5, 'nearly still in the middle');
+        assert.deepEqual(at(R * 4, 0), { x: 0, y: 0 }, 'nothing far away');
+        assert.ok(e.y > FLOW.eddyRadius, 'under water');
+    }
+    assert.ok(FLOW.eddySpeed < 12, 'slower than a swimmer: it carries, it never traps');
+});
+
+test('eddies too are still at the calm route', () => {
+    const e = flow.eddiesIn(WORLD_WEST, WORLD_END)[0], cfg = { ...FLOW, swell: 0, streamSpeed: 0 };
+    const v = createFlow(SEED, cfg, () => e.y).at(e.x + FLOW.eddyRadius, e.y, 0, { x: 0, y: 0 });
+    assert.ok(Math.hypot(v.x, v.y) < 0.01);
 });

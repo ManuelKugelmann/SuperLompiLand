@@ -959,6 +959,13 @@ export default class MainScene extends Phaser.Scene {
                     if (y > 40 && this.level.isOpen(x, y) && this.flow.at(x, y, 0, this.bubbleProbe || (this.bubbleProbe = { x: 0, y: 0 })).x > FLOW.streamSpeed * 0.3) this.particles.spawn('bubble', x, y, 1, { radius: 9, spread: 6 });
                 }
             }
+            // Eddies show themselves the same way: a few bubbles ride round the ring.
+            for (const e of this.flow.eddiesIn(wv.x - 200, wv.right + 200)) {
+                const ang = Math.random() * Math.PI * 2, r = FLOW.eddyRadius * (0.6 + Math.random() * 0.7);
+                const x = e.x + Math.cos(ang) * r, y = e.y + Math.sin(ang) * r, probe = this.bubbleProbe || (this.bubbleProbe = { x: 0, y: 0 });
+                this.flow.at(x, y, 0, probe);
+                if (y > 40 && this.level.isOpen(x, y) && Math.hypot(probe.x, probe.y) > FLOW.eddySpeed * 0.4) this.particles.spawn('bubble', x, y, 1, { radius: 8, spread: 4 });
+            }
             this.streamBubbles %= 1;
         }
         this.speedLines.update(delta, v.x, v.y, !this.relaxed && this.chain.flow);

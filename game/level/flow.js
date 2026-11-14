@@ -21,7 +21,11 @@ export const FLOW = {
     streamSpeed: 19,       // speed of the water in the middle of a stream: above the swimmers' own top speed (Lompi ~17); was 11
     streamWave: 170,       // how far a stream's path swings up and down
     carry: 0.045,          // how quickly the water takes a body up to its own speed (per step)
-    calm: [200, 420]       // px from the calm route's middle: no stream pull inside the first, full pull beyond the second
+    calm: [200, 420],      // px from the calm route's middle: no stream pull inside the first, full pull beyond the second
+    eddyChance: 0.6,       // share of streams that end in an eddy
+    eddyRadius: 220,       // distance from the eddy's middle at which the water turns fastest
+    eddySpeed: 7,          // ... and how fast (px per step): slower than a swimmer, it carries but never traps
+    eddyPull: 0.15         // share of that speed drawing gently inward
 };
 
 /**
@@ -39,6 +43,16 @@ export function streamInSlot(i, seed, cfg = FLOW) {
     return { index: i, x0, x1: x0 + length, y0, phase: hash(i, 15, seed) * 6.28, wave: cfg.streamWave * (0.5 + 0.5 * hash(i, 16, seed)) };
 }
 
+/**
+ * The eddy a stream runs out into, or null: a slow whirl of water just past its end, turning
+ * one way or the other. { x, y, turn: 1 | -1 }
+ */
+export function eddyOf(s, seed, cfg = FLOW) {
+    if (!s || hash(s.index, 21, seed) > cfg.eddyChance) return null;
+    const x = s.x1 + cfg.eddyRadius * 1.6, side = hash(s.index, 22, seed) < 0.5 ? -1 : 1;
+    return { x, y: Math.max(cfg.eddyRadius * 1.5, streamY(s, s.x1) + side * cfg.eddyRadius * 0.9), turn: hash(s.index, 23, seed) < 0.5 ? -1 : 1 };
+}
+
 /** Height of a stream's middle line at world x. */
 export function streamY(s, x) {
     return s.y0 + Math.sin((x - s.x0) / 520 + s.phase) * s.wave;
@@ -51,6 +65,14 @@ export function streamY(s, x) {
 export function createFlow(seed, cfg = FLOW, calmY = null) {
     const slots = new Map();
     const slot = i => { if (!slots.has(i)) slots.set(i, streamInSlot(i, seed, cfg)); return slots.get(i); };
+    const eddies = new Map();
+    const eddy = i => { if (!eddies.has(i)) eddies.set(i, eddyOf(slot(i), seed, cfg)); return eddies.get(i); };
+    // How much pull is left at (x, y): none inside the calm route, all of it away from it.
+    const pull = (x, y) => {
+        if (!calmY) return 1;
+        const k = Math.min(1, Math.max(0, (Math.abs(y - calmY(x)) - cfg.calm[0]) / (cfg.calm[1] - cfg.calm[0])));
+        return k * k * (3 - 2 * k);
+    };
 
     /** Streams that touch the range x0..x1 (for drawing them and for placing things along them). */
     const streamsIn = (x0, x1) => {
@@ -78,19 +100,36 @@ export function createFlow(seed, cfg = FLOW, calmY = null) {
             const cy = streamY(s, x), d = (y - cy) / cfg.streamWidth;
             if (Math.abs(d) > 2.6) continue;
             const ends = Math.min(1, (x - s.x0) / 260, (s.x1 - x) / 260);          // fades in and out
-            let speed = cfg.streamSpeed * Math.exp(-d * d) * ends * ends * (3 - 2 * ends);
-            if (calmY) {
-                const k = Math.min(1, Math.max(0, (Math.abs(y - calmY(x)) - cfg.calm[0]) / (cfg.calm[1] - cfg.calm[0])));
-                speed *= k * k * (3 - 2 * k);
-            }
+            const speed = cfg.streamSpeed * Math.exp(-d * d) * ends * ends * (3 - 2 * ends) * pull(x, y);
             const slope = Math.cos((x - s.x0) / 520 + s.phase) * s.wave / 520;     // the lane's direction
             const len = Math.hypot(1, slope);
             out.x += speed / len; out.y += speed * slope / len;
         }
+        // Eddies: the water turns round a middle, fastest at eddyRadius, fading out beyond.
+        for (let k = i - 1; k <= i; k++) {
+            const e = eddy(k);
+            if (!e) continue;
+            const dx = x - e.x, dy = y - e.y, r = Math.hypot(dx, dy), u = r / cfg.eddyRadius;
+            if (u > 3.2 || r < 1) continue;
+            const speed = cfg.eddySpeed * u * Math.exp(1 - u) * pull(x, y);
+            // Round the middle (turn = 1: clockwise on screen), and a little inward.
+            out.x += (-dy / r * e.turn - dx / r * cfg.eddyPull) * speed;
+            out.y += (dx / r * e.turn - dy / r * cfg.eddyPull) * speed;
+        }
         return out;
     };
 
-    return { at, streamsIn };
+    /** Eddies whose water reaches into x0..x1. */
+    const eddiesIn = (x0, x1) => {
+        const found = [];
+        for (let i = Math.floor(x0 / cfg.streamEvery) - 2; i <= Math.floor(x1 / cfg.streamEvery); i++) {
+            const e = eddy(i);
+            if (e && e.x + cfg.eddyRadius * 3.2 > x0 && e.x - cfg.eddyRadius * 3.2 < x1) found.push(e);
+        }
+        return found;
+    };
+
+    return { at, streamsIn, eddiesIn };
 }
 
 /**
