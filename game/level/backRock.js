@@ -79,7 +79,7 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
         return w < cfg.island[0];
     };
 
-    const cov = new Float32Array(N * N);
+    const cov = new Float32Array(N * N), pil = new Float32Array(N * N);   // pil: pillar under an island
     let any = false;
     for (let i = 0; i < N; i++) {
         const x = ox + at(i), R = backRockReach(x);
@@ -114,13 +114,13 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
                 cov[k] = 1;
                 continue;
             }
-            if (island && below[j] - rockY <= cfg.pillar) { cov[k] = 1; continue; }
+            if (island && below[j] - rockY <= cfg.pillar) { cov[k] = 1; pil[k] = 1; continue; }
             if (y - rockY > R) { cov[k] = 0; continue; }
             const u = (y - rockY) / R;
             cov[j * N + i] = u >= 1 ? 0 : (1 - u) * (1 - u);
         }
     }
-    if (!any) return { cov, dist, N, C, m, any };
+    if (!any) return { cov, pil, dist, N, C, m, any };
     const tmp = new Float32Array(N * N), r = cfg.blur, w = 1 / (2 * r + 1);
     const pass = (src, dst, dx, dy) => {
         for (let j = 0; j < N; j++) {
@@ -135,5 +135,7 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
         }
     };
     pass(cov, tmp, 1, 0); pass(tmp, cov, 1, 0); pass(cov, tmp, 0, 1);
-    return { cov: tmp, dist, N, C, m, any };
+    const tp = new Float32Array(N * N);
+    pass(pil, tp, 1, 0); pass(tp, pil, 1, 0); pass(pil, tp, 0, 1);
+    return { cov: tmp, pil: tp, dist, N, C, m, any };
 }

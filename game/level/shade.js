@@ -37,6 +37,7 @@ export const SHADE = {
     backRockAlpha: 0.95,  // back rock under overhangs (backRock.js): how solid at its fullest
     backRockDark: 0.66,   // its stone colour is darkened to this at full cover (unlit, far)
     backRockFog: 0.38,    // and moved this far toward the biome's water colour
+    pillarClear: 0.65,    // pillars under islands are this much less fogged: close behind, clearly rock
     occlusion: 0.36,      // darkest shade in the water right at the rock
     occlusionReach: 110   // world px into the water over which it fades out
 };
@@ -249,7 +250,7 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             const cx = (px + 0.5) * bk + b0, ci = Math.min(BN - 2, Math.max(0, Math.floor(cx))), cu = Math.min(1, Math.max(0, cx - ci));
             const k = cj * BN + ci;
             const grid = q => (q[k] * (1 - cu) + q[k + 1] * cu) * (1 - cv) + (q[k + BN] * (1 - cu) + q[k + BN + 1] * cu) * cv;
-            const rockA = br.any ? cfg.backRockAlpha * grid(bc) : 0;
+            const rockA = br.any ? cfg.backRockAlpha * grid(bc) : 0, pillar = br.any ? grid(br.pil) : 0;
             // By the distance to real rock (backRock.js), not by the density value: where the field
             // lies flat or steps just below the threshold, a density-based shade ends in hard lines.
             const occ = d >= T ? 1 : 1 - smooth(0, cfg.occlusionReach, grid(br.dist));
@@ -268,7 +269,7 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
                 // Darkest deep inside, lighter toward the openings (low coverage): inviting, not a dungeon.
                 let far = pal[p + c] * tone * (1 - (1 - cfg.backRockDark) * rockA / cfg.backRockAlpha);
                 far += (cfg.deepTint[c] - far) * tintK;
-                far += (fogCol[px * 3 + c] - far) * cfg.backRockFog;
+                far += (fogCol[px * 3 + c] - far) * cfg.backRockFog * (1 - cfg.pillarClear * pillar);   // pillars read as rock
                 back[o + c] = (DARK[c] * occA + far * rockA * (1 - occA)) / a;
             }
             back[o + 3] = a * 255;
