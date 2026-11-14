@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## New sights that act: a ferry's wash in the harbour, a sea lion pup, an otter, a sleeping seal, gannets and a surge channel
+
+[`4c5fc77`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/4c5fc77) · 2026-11-14 19:59
+
+![New sights that act: a ferry's wash in the harbour, a sea lion pup, an otter, a sleeping seal, gannets and a surge channel](28-new-sights-that-act-a-ferry-s-wash-in-the-harbou.jpg)
+
 ## The finale: down the vent staircase to the grand nest, where the freed friends wait
 
 [`51d8537`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/51d8537) · 2026-11-14 18:39
