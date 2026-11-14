@@ -1,4 +1,4 @@
-import Rig from './Rig.js';
+import { createRig } from './CardRig.js';
 import { WHALE, createWhale, stepWhale, bodySpot, whaleCarry } from './ai/whale.js';
 
 export const WHALE_SCENE = {
@@ -98,8 +98,8 @@ export default class Whale {
         const s = this.scene, [dw, dh] = WHALE_SCENE.drape;
         this.mind = createWhale(this.startX, this.endX);
         this.mind.y = this.routeY(this.startX);
-        this.body = new Rig(s, profile(WHALE.length), this.startX, this.mind.y, 3.4);
-        this.calf = new Rig(s, profile(WHALE.length * WHALE_SCENE.calf), this.startX, this.mind.y, 3.3);
+        this.body = createRig(s, profile(WHALE.length), this.startX, this.mind.y, 3.4);
+        this.calf = createRig(s, profile(WHALE.length * WHALE_SCENE.calf), this.startX, this.mind.y, 3.3);
         this.calfAt = { x: this.startX, y: this.mind.y };
         // Hung from the top: each piece lies over her back and trails below her belly.
         this.nets = WHALE.nets.map(() => s.add.image(0, 0, DRAPE_KEY).setOrigin(0.5, 0.32).setDepth(3.6).setDisplaySize(dw, dh));

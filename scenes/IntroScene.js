@@ -58,7 +58,9 @@ const IMAGES = {
     player_shark: 'player_shark.png', player_firefish: 'player_firefish.png', player_flyingfish: 'player_flyingfish.png',
     // Lompi split into body + side fin so the fin can flap (see fins.json for the pivots).
     puffer_normal_body: 'puffer_normal_body.png', puffer_normal_fin: 'puffer_normal_fin.png',
-    puffer_inflated_body: 'puffer_inflated_body.png', puffer_inflated_fin: 'puffer_inflated_fin.png'
+    puffer_inflated_body: 'puffer_inflated_body.png', puffer_inflated_fin: 'puffer_inflated_fin.png',
+    whale: 'whale.webp',   // the humpback (game/Whale.js; part cards in img/parts)
+    whale_net: 'whale_net.webp'   // the ghost net over her (scripts/fx/net.py)
 };
 
 export default class IntroScene extends Phaser.Scene {
