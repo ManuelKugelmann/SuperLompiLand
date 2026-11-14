@@ -26,6 +26,7 @@ import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
 import { BOOK_KEY } from './ReefBookScene.js';
+import { STYLE_KEY } from './PlayStyleScene.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
 import { fitToWindow } from '../game/orientation.js';
@@ -39,6 +40,7 @@ const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.
 const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 /** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
 const OPEN_SLACK = 0.04;
+const STYLE_ASK_MS = 1600;   // after the nest cheer, ask how to play (once)
 /** Fin-tip contrails: from this speed (px per step), at these tips (× body radius, nose = +x). */
 const CONTRAIL = { speed: 11, tips: [[-0.35, -0.55], [-0.35, 0.55]] };
 /** Reef book: how often to look around, and how close counts as seen up close (px). */
@@ -342,6 +344,15 @@ export default class MainScene extends Phaser.Scene {
             this.announce(de ? 'Das große Nest!' : 'The Grand Nest!', de ? 'Du hast es geschafft!' : 'You made it!');
         } else if (first) {
             this.announce(de ? 'Nest erreicht!' : 'Nest reached!', de ? 'Münzen gesichert · hier geht es weiter' : 'Coins saved · you restart here');
+            // The first nest asks once how to play (spec 1.4): relaxed or adventure.
+            if (!this.mp && !this.ambientMode && !this.progression.get?.('style_asked', false)) {
+                this.progression.set?.('style_asked', true);
+                this.time.delayedCall(STYLE_ASK_MS, () => {
+                    this.scene.pause();
+                    this.scene.launch(STYLE_KEY, { main: this });
+                    this.scene.bringToTop(STYLE_KEY);
+                });
+            }
         }
         for (let i = 0; i < 14; i++) {
             const a = (i / 14) * Math.PI * 2;
