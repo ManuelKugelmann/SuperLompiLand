@@ -3,6 +3,7 @@ import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import Creature from '../Creature.js';
 import { docksSpot } from './docks.js';
+import { coinTooNear } from './coinClear.js';
 import { SET_PIECES, ghostShip } from './setPieces.js';
 import { MICRO, microAt, microKey } from './microScatter.js';
 import { makeMicroTextures, MICRO_ORIGIN_Y } from './MicroArt.js';
@@ -22,7 +23,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 22,
+    version: 23,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -712,6 +713,8 @@ export default class LevelGenerator {
         if (!this.reachable(x, y)) return;      // its number stays taken, so the others keep theirs
         // The story's net scenes stand free: no coins in front of a friend who waits for help.
         for (const c of this.storySpots) if ((c.x - x) ** 2 + (c.y - y) ** 2 < JOURNEY.clear ** 2) return;
+        // Coins never lead into harm: none within reach of a hazard or along its chain (coinClear.js).
+        for (const h of this.hazards) if (h.img.active && coinTooNear(x, y, h.x, h.y, h.chain)) return;
         const s = this.scene;
         const img = s.textures.exists('coin')
             ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)
@@ -727,6 +730,9 @@ export default class LevelGenerator {
         // tunnel is narrow, and a second hazard would close the way.
         const cave = this.field.cave;
         if (!placed && x > cave.x0 - 600 && x < cave.x1 + 600 && y > cave.top - 80) return null;
+        // The same under the docks: one net, nothing else (a chain hanging there counts too, wherever its anchor is).
+        const dk = this.docks;
+        if (!placed && x > dk.x0 - 200 && x < dk.x1 + 200 && (y < dk.bottom + 200 || h.chain)) return null;
         // Danger is optional (spec 5.2c): nothing harmful on or near the calm main route.
         if (Math.abs(y - this.field.routeY(x)) < ROUTE.clear + h.r) return null;
         // Wonder first: nothing harmful along the stretch where a big story event passes (the whale and her ride).
@@ -786,7 +792,11 @@ export default class LevelGenerator {
         } else if (h.bob) {
             s.tweens.add({ targets: img, y: y - h.bob, duration: rng.between(1700, 2600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         }
-        this.hazards.push({ img, r: h.r * LEVEL.hitSlack, key });
+        this.hazards.push({ img, r: h.r * LEVEL.hitSlack, key, x, y, chain: !!h.chain });
+        // ... and coins that were already there make way (the chunk beside this one may have been built first).
+        for (const c of this.coins) {
+            if (c.img.active && coinTooNear(c.x, c.y, x, y, !!h.chain)) { this.scene.tweens.killTweensOf(c.img); c.img.destroy(); }
+        }
         return img;
     }
 

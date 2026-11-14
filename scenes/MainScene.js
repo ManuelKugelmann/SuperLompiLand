@@ -36,6 +36,7 @@ import StoryBeats from '../game/StoryBeats.js';
 import SetPieceLayer from '../game/level/SetPieceLayer.js';
 import BranchLayer from '../game/level/BranchLayer.js';
 import DocksLayer from '../game/level/DocksLayer.js';
+import MantaLayer from '../game/ai/MantaLayer.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
@@ -199,6 +200,8 @@ export default class MainScene extends Phaser.Scene {
         this.branch = new BranchLayer(this, this.level.field.cave, this.pearls.includes('kelp_cave'), (x, y) => this.takePearl('kelp_cave', x, y));
         // ... and the docks under the harbour's pier, with the hermit crab stuck in a bottle cap.
         this.docks = new DocksLayer(this, docksSpot(), this.pearls.includes('docks_crab'), (x, y) => this.freeCrab(x, y));
+        // The reef's wonder beat (spec 9.1): a manta glides to and fro high over the reef.
+        this.manta = new MantaLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('manta'));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -1355,6 +1358,7 @@ export default class MainScene extends Phaser.Scene {
         this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
         this.branch.update(sp, time / 1000, delta, this.particles);
         this.docks.update(sp, time / 1000);
+        this.manta.update(sp, time / 1000, delta);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
