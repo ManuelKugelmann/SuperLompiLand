@@ -9,10 +9,9 @@ import { biomeBlendAt, mixColor } from './biomes.js';
 /** Far fish schools are placed again once this far outside the picture (px). */
 const SCHOOL_MARGIN = { x: 700, y: 500 };
 /**
- * Where far schools swim, matched to the back layers (backLayersTable.js) so a school
- * moves like the layer it is drawn between: scroll = horizontal parallax, vscroll =
- * vertical (the back layers use 0.6 x scroll, the mid layer its own), depth = draw
- * order, size/alpha shrink and fade with distance.
+ * Where far schools swim, among the far scenery (farDepths.js: an object at parallax s
+ * draws at depth FarLayers.depthFor(s)): scroll = horizontal parallax, vscroll =
+ * vertical, depth = draw order, size/alpha shrink and fade with distance.
  */
 const SCHOOL_SLOTS = [
     { scroll: 0.3, vscroll: 0.18, depth: -18.5, size: 0.6, alpha: 0.32 },    // between far reef and back floor

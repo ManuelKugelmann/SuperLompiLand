@@ -34,7 +34,7 @@ export const SHADE = {
     deepMix: 0.5,         // how far the albedo moves to deepTint at the deepest regular seabed
     sand: [0xf4, 0xe3, 0xb4],
     sandReach: 60,        // world px into the rock that sand covers on upward faces
-    backRockAlpha: 0.8,   // back rock under overhangs (backRock.js): how solid at its fullest
+    backRockAlpha: 0.95,  // back rock under overhangs (backRock.js): how solid at its fullest
     backRockDark: 0.66,   // its stone colour is darkened to this at full cover (unlit, far)
     backRockFog: 0.38,    // and moved this far toward the biome's water colour
     occlusion: 0.36,      // darkest shade in the water right at the rock

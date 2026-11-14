@@ -7,7 +7,7 @@ import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
-import { mix } from './backLayersMath.js';
+import { mix } from './layerMath.js';
 import {
     BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup } from './biomes.js';
 
