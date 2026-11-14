@@ -35,13 +35,12 @@ test('the volcano is in sight from the west end and reaches the middle, full siz
     assert.ok(a.x > mid.x && mid.x > b.x, 'it comes closer steadily');
 });
 
-test('every island biome has its own near coast, inside the biome, with variety', () => {
+test('every island biome has its own near coast, once, inside the biome', () => {
     const items = nearCoastItems();
     for (const id of NEAR_COAST.biomes) {
         const b = BIOMES.find(x => x.id === id), mine = items.filter(i => i.kind === `coast_${id}`);
-        assert.ok(mine.length >= 2, id);
+        assert.equal(mine.length, 1, `${id}: an island is one place, never repeated`);
         for (const i of mine) assert.ok(i.x > b.from && i.x < b.from + b.width, id);
-        assert.ok(new Set(mine.map(i => i.flip)).size === 2 || mine.length < 3, `${id}: some mirrored`);
     }
     assert.deepEqual(nearCoastItems(), items, 'the same every time');
 });

@@ -38,8 +38,8 @@ export function skyItems(biomes = BIOMES) {
 /**
  * The island's own coast close by (spec 5.0c "above water: that island's coast"): painted
  * pieces standing on the waterline behind the play plane, nearer than the horizon. Per island
- * biome its picture (img/coast/<id>.webp as sky_coast_<id>), set along the biome with gaps, a
- * little bigger or smaller and mirrored now and then so it never repeats exactly.
+ * biome its picture (img/coast/<id>.webp as sky_coast_<id>), standing ONCE in the biome (user
+ * 2026-11-14: "not repeated harbour islands"): an island is one place, not a pattern.
  */
 export const NEAR_COAST = {
     scroll: 0.5,           // share of the camera's movement (nearer than the far skyline, but a coast on the horizon)
@@ -47,8 +47,7 @@ export const NEAR_COAST = {
     size: [0.4, 0.56],     // (playtest: "no foreground islands": a coast sits on the horizon behind the sea, never big and dark over the swimmer)
     alpha: 0.94,           // the air between is baked into the pictures (scripts/fx/coast_haze.py) ...
     tint: 0xf2fbff,        // ... a tint only multiplies, so it just cools them a touch
-    gap: [0.5, 1.6],       // gap after a piece, in piece widths (small: the island shows on most jumps)
-    edge: 0.08,            // share of the biome left free at both ends (its neighbours' coasts take over)
+    at: 0.5,               // where in its biome the island stands (share of the width)
     biomes: ['reef', 'kelp', 'harbour', 'shore']
 };
 
@@ -59,16 +58,8 @@ export function nearCoastItems(biomes = BIOMES, cfg = NEAR_COAST) {
         if (!cfg.biomes.includes(b.id)) continue;
         let seed = (b.from | 0) ^ 0x5bd1e995;
         const r = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-        // A piece of on-screen width w covers w / scroll of world x (it moves slower than the camera).
-        const x1 = b.from + b.width * (1 - cfg.edge);
-        let x = b.from + b.width * cfg.edge, flip = r() < 0.5;
-        while (true) {
-            const size = cfg.size[0] + r() * (cfg.size[1] - cfg.size[0]), span = cfg.width * size / cfg.scroll;
-            if (x + span > x1) break;
-            flip = r() < 0.75 ? !flip : flip;      // mostly alternating: neighbours never all face the same way
-            out.push({ kind: `coast_${b.id}`, x: x + span / 2, scroll: cfg.scroll, size, flip });
-            x += span * (1 + cfg.gap[0] + r() * (cfg.gap[1] - cfg.gap[0]));
-        }
+        const size = cfg.size[0] + r() * (cfg.size[1] - cfg.size[0]);
+        out.push({ kind: `coast_${b.id}`, x: b.from + b.width * cfg.at, scroll: cfg.scroll, size, flip: r() < 0.5 });
     }
     return out;
 }
