@@ -8,7 +8,7 @@ export const SEA_FAR_LOOK = {
     snow: 44,            // flakes of marine snow
     snowFall: 22,        // px per second
     snowAlpha: 0.75,
-    snowScale: [1.2, 3.2],   // the nearest flakes are big and bright
+    snowSizes: [18, 32, 50], // px across of a far, a middle and a near flake (the nearest are big and bright)
     passAlpha: 0.22,
     passSize: 900        // px length of a big shape at scale 1
 };
@@ -76,7 +76,19 @@ function ensureTextures(scene) {
             c.beginPath(); c.moveTo(x - 13, y); c.lineTo(x - 22, y - 6); c.lineTo(x - 22, y + 6); c.fill();
         }
     });
-    soft('seafar_snow', 16, 16, 1.5, (c, w) => { c.beginPath(); c.arc(w / 2, w / 2, 3.5, 0, 7); c.fill(); });
+    // Marine snow: one picture holding a flake in three sizes (frames 0..2), so all flakes are one object.
+    if (!scene.textures.exists('seafar_snow')) {
+        const sizes = SEA_FAR_LOOK.snowSizes, tex = scene.textures.createCanvas('seafar_snow', sizes.reduce((a, b) => a + b, 0), Math.max(...sizes)), ctx = tex.getContext();
+        let x = 0;
+        sizes.forEach((d, i) => {
+            const g = ctx.createRadialGradient(x + d / 2, d / 2, 0, x + d / 2, d / 2, d / 2);
+            g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = g; ctx.fillRect(x, 0, d, d);
+            tex.add(i, 0, x, 0, d, d);
+            x += d;
+        });
+        tex.refresh();
+    }
 }
 
 /**
@@ -98,9 +110,11 @@ export default class SeaFarLayer {
 
     makeSnow() {
         const scene = this.scene, W = scene.scale.width, H = scene.scale.height, L = SEA_FAR_LOOK;
+        this.snowLayer = scene.add.blitter(0, 0, 'seafar_snow').setScrollFactor(0).setDepth(-9);
         this.snow = Array.from({ length: L.snow }, (_, i) => {
-            const f = scene.add.image(((i * 0.618) % 1) * W, ((i * 0.381) % 1) * H, 'seafar_snow').setScrollFactor(0).setDepth(-9).setVisible(false);
-            f.drift = 0.5 + ((i * 0.27) % 1); f.setScale(L.snowScale[0] + (L.snowScale[1] - L.snowScale[0]) * (f.drift - 0.5));      // near flakes are bigger and move more
+            const drift = 0.5 + ((i * 0.27) % 1);      // near flakes are bigger and move more
+            const f = this.snowLayer.create(((i * 0.618) % 1) * W, ((i * 0.381) % 1) * H, Math.min(L.snowSizes.length - 1, Math.floor((drift - 0.5) * L.snowSizes.length)));
+            f.drift = drift;
             return f;
         });
     }
@@ -118,9 +132,9 @@ export default class SeaFarLayer {
         // Marine snow: sinks slowly, slides against the camera's movement, wraps round the screen.
         const show = sea > 0.05 && camY > 60;
         if (show && !this.snow.length) this.makeSnow();
+        this.snowLayer?.setVisible(show);
         for (const f of this.snow) {
-            f.setVisible(show);
-            if (!show) continue;
+            if (!show) break;
             f.x = ((f.x - dx * 0.6 * f.drift) % W + W) % W;
             f.y = ((f.y + (L.snowFall * dt - dy * 0.6) * f.drift) % H + H) % H;
             f.setAlpha(L.snowAlpha * sea * (0.35 + 0.65 * (f.drift - 0.5)));
