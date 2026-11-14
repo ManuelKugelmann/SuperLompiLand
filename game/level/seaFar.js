@@ -6,10 +6,10 @@
 import { BIOMES, biomeIndexAt, seaShare } from './biomes.js';
 
 export const SEA_FAR = {
-    socketScroll: 0.22,   // the socket passes at this share of the camera's movement (far away)
-    socketFrom: 11000,    // px before an island at which its socket begins to show ...
-    socketFull: 3500,     // ... and from which it shows fully
-    socketAlpha: 0.5,     // how solid it gets: it stays a shape in the haze
+    socketFrom: 11000,    // px before an island at which its socket begins to show
+    socketX: [0.92, 0.12],   // where its foot stands on the screen (share of the width): when it first shows, and at the island's edge
+    socketAlpha: [0.35, 0.7],   // how solid it is: when it first shows, and at the island's edge
+    firstPass: 4,         // s after reaching open sea before the first big shape passes: everyone sees one
     passEvery: [16, 34],  // s between two big shapes passing
     passTime: [22, 34],   // s one takes to cross the view
     passScale: [0.5, 1],  // how big (near) or small (far) it is
@@ -25,17 +25,17 @@ export function nextIslandX(x) {
 /**
  * The socket of the island ahead as seen from a camera whose middle is at world x `cam` on a
  * screen `width` wide: { x (screen), alpha } or null out of the open sea or with no island ahead.
- * It shows faintly from far away, grows clearer, and reaches the middle of the screen as the
- * camera reaches the island's edge.
+ * It comes in from the right as a clear dark shoulder, and has grown across most of the view
+ * and darker by the time the camera reaches the island's edge.
  */
 export function socketView(cam, width, cfg = SEA_FAR, out = { x: 0, alpha: 0 }) {
     const sea = seaShare(cam), at = nextIslandX(cam);
     if (sea <= 0 || at === null) return null;
     const away = at - cam;
     if (away > cfg.socketFrom) return null;
-    const near = Math.max(0, Math.min(1, (cfg.socketFrom - away) / (cfg.socketFrom - cfg.socketFull)));
-    out.x = width / 2 + away * cfg.socketScroll;
-    out.alpha = cfg.socketAlpha * near * sea;
+    const near = Math.max(0, Math.min(1, 1 - away / cfg.socketFrom));
+    out.x = width * (cfg.socketX[0] + (cfg.socketX[1] - cfg.socketX[0]) * near);
+    out.alpha = (cfg.socketAlpha[0] + (cfg.socketAlpha[1] - cfg.socketAlpha[0]) * near) * sea;
     return out;
 }
 
@@ -52,7 +52,7 @@ function rnd(seed) {
 export function passing(n, cfg = SEA_FAR) {
     const r = rnd(n * 7919 + 13), between = ([a, b]) => a + r() * (b - a);
     return {
-        kind: cfg.kinds[Math.floor(r() * cfg.kinds.length)], wait: between(cfg.passEvery), time: between(cfg.passTime),
+        kind: cfg.kinds[Math.floor(r() * cfg.kinds.length)], wait: n === 0 ? (r(), cfg.firstPass) : between(cfg.passEvery), time: between(cfg.passTime),
         dir: r() < 0.5 ? 1 : -1, depth: 0.25 + r() * 0.55, scale: between(cfg.passScale)
     };
 }

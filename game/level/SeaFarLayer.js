@@ -4,9 +4,11 @@ import { socketView, passing } from './seaFar.js';
 export const SEA_FAR_LOOK = {
     depth: -21,          // behind every other far layer
     tint: 0x0b3350,      // the colour of things seen through a lot of water
+    socketTint: 0x04192c, // the island's socket: darker than the water around it, so it reads as rock
     snow: 44,            // flakes of marine snow
     snowFall: 22,        // px per second
-    snowAlpha: 0.35,
+    snowAlpha: 0.75,
+    snowScale: [1.2, 3.2],   // the nearest flakes are big and bright
     passAlpha: 0.22,
     passSize: 900        // px length of a big shape at scale 1
 };
@@ -66,11 +68,11 @@ export default class SeaFarLayer {
         ensureTextures(scene);
         const W = scene.scale.width, H = scene.scale.height, L = SEA_FAR_LOOK;
         const img = key => scene.add.image(0, 0, key).setScrollFactor(0).setDepth(L.depth).setTint(L.tint).setVisible(false);
-        this.socket = img('seafar_socket').setOrigin(0, 1).setDisplaySize(W * 0.9, H * 1.05);
+        this.socket = img('seafar_socket').setOrigin(0, 1).setDisplaySize(W * 0.95, H * 1.05).setTint(L.socketTint);
         this.pass = { img: img('seafar_manta'), n: 0, t: 0, spec: passing(0), waiting: true };
         this.snow = Array.from({ length: L.snow }, (_, i) => {
             const f = scene.add.image(((i * 0.618) % 1) * W, ((i * 0.381) % 1) * H, 'seafar_snow').setScrollFactor(0).setDepth(-9).setVisible(false);
-            f.drift = 0.6 + ((i * 0.27) % 1) * 0.8; f.setScale(0.6 + ((i * 0.43) % 1));
+            f.drift = 0.5 + ((i * 0.27) % 1); f.setScale(L.snowScale[0] + (L.snowScale[1] - L.snowScale[0]) * (f.drift - 0.5));      // near flakes are bigger and move more
             return f;
         });
         this.out = { x: 0, alpha: 0 };
@@ -93,7 +95,7 @@ export default class SeaFarLayer {
             if (!show) continue;
             f.x = ((f.x - dx * 0.6 * f.drift) % W + W) % W;
             f.y = ((f.y + (L.snowFall * dt - dy * 0.6) * f.drift) % H + H) % H;
-            f.setAlpha(L.snowAlpha * sea * f.drift * 0.7);
+            f.setAlpha(L.snowAlpha * sea * (0.35 + 0.65 * (f.drift - 0.5)));
         }
 
         // One big shape at a time, far away: it waits out of sight, crosses, and the next one is drawn.
