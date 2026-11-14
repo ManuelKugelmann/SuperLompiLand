@@ -220,6 +220,7 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
         }
     }
 
+    if (!cfg.backSize) return { rock, back: null };         // rock layers behind the play plane need no back picture
     // Back picture: cave walls behind the water, back rock under overhangs (backRock.js) and
     // shade that gathers next to rock. Back rock is unlit, darker and fogged toward the
     // biome's water, so it never reads as something to bump into.

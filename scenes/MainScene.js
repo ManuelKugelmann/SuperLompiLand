@@ -11,6 +11,7 @@ import WaterLight from '../game/fx/WaterLight.js';
 import ParticleLayer from '../game/fx/ParticleLayer.js';
 import SwarmLayer from '../game/ai/SwarmLayer.js';
 import FarLayers from '../game/level/FarLayers.js';
+import RockLayers from '../game/level/RockLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
@@ -107,6 +108,7 @@ export default class MainScene extends Phaser.Scene {
         // Playing together, the room has its own memory, separate from the solo journey.
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
         this.level = new LevelGenerator(this, this.world);
+        this.rockLayers = new RockLayers(this);   // near and mid-range rock behind the play plane (needs the level's materials)
         this.density = (x, y) => this.level.density(x, y);
         // Currents and swell: one field for player and particles. Streams lose their pull at the calm route.
         this.flow = createFlow(LEVEL.seed, FLOW, x => this.level.field.routeY(x));
@@ -282,6 +284,7 @@ export default class MainScene extends Phaser.Scene {
             window.removeEventListener('pagehide', saveNow);
             this.scene.stop(HUD_KEY);
             this.level.worker?.terminate();
+            this.rockLayers.destroy();
             this.input.manager.globalTopOnly = this.prevTopOnly;
             this.controller?.destroy();
             kb?.removeAllListeners('keydown-SPACE');
@@ -1024,6 +1027,7 @@ export default class MainScene extends Phaser.Scene {
         this.revealPlayers(delta / 1000, view);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.farLayers.update(this.camX);
+        this.rockLayers.update(this.camX, this.camY);
         this.waterLight.update();
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
