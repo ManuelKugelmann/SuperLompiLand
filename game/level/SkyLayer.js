@@ -13,6 +13,9 @@ export const SKY = {
     smoke: 5            // puffs in the volcano's plume
 };
 
+/** Painted coasts (img/sky/<kind>.webp, loaded by the title screen as sky_<kind>); the shapes below draw them while missing. */
+export const SKY_ART = ['palms', 'canopy', 'light', 'stacks', 'ship', 'port', 'volcano'];
+
 // Every shape is painted once on a canvas, blurred, and reused. Sizes in px.
 const SHAPES = {
     palms: [640, 300, (c, w, h) => {

@@ -24,6 +24,7 @@ import { fitToWindow, fitsWindow } from '../game/orientation.js';
 import { SPECIES, schoolArt } from '../game/ai/SwarmLayer.js';
 import { PAD_ART } from '../game/level/BoosterLayer.js';
 import { SURF_ART } from '../game/fx/SurfLayer.js';
+import { SKY_ART } from '../game/level/SkyLayer.js';
 import { SEABIRD_ART } from '../game/ai/SeabirdLayer.js';
 
 export const gameMeta = {
@@ -94,6 +95,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);
         if (!this.textures.exists(SURF_ART.puffs.key)) this.load.spritesheet(SURF_ART.puffs.key, SURF_ART.puffs.file, { frameWidth: SURF_ART.puffs.frame, frameHeight: SURF_ART.puffs.frame });
         for (const key of SEABIRD_ART) if (!this.textures.exists(key)) this.load.image(key, `img/${key}.webp`);
+        for (const kind of SKY_ART) if (!this.textures.exists(`sky_${kind}`)) this.load.image(`sky_${kind}`, `img/sky/${kind}.webp`);
         // Painted shoal fish (game/ai/SwarmLayer.js); drawn procedurally while missing.
         for (const id of Object.keys(SPECIES)) {
             const { key, file } = schoolArt(id);
