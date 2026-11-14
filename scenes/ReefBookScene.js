@@ -70,7 +70,11 @@ export default class ReefBookScene extends Phaser.Scene {
         if (e.image && this.textures.exists(e.image)) {
             const img = this.add.image(cx, cy - 18, e.image);
             img.setScale(Math.min(140 / img.width, 110 / img.height));
-            if (!e.found) img.setTintFill(0x0a1f30).setAlpha(0.8);   // a silhouette until found
+            if (!e.found) {                                           // a silhouette until found
+                // Phaser 4 has no setTintFill: there the fill is a tint mode.
+                if (Phaser.TintModes) img.setTint(0x0a1f30).setTintMode(Phaser.TintModes.FILL); else img.setTintFill(0x0a1f30);
+                img.setAlpha(0.8);
+            }
         } else {
             // Places have no picture: a badge in the biome's own colours.
             const b = BIOMES.find(x => x.id === e.id);
