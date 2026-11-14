@@ -5,9 +5,9 @@
 <!-- devlog:start -->
 ## Dev log
 
-**Chains of jumps, flips and specials; bird-like flight; a special of its own for every character** — [`56b92fc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/56b92fc) · 2026-11-14 01:23
+**A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive** — [`3c01d46`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/3c01d46) · 2026-11-14 03:12
 
-![Chains of jumps, flips and specials; bird-like flight; a special of its own for every character](docs/devlog/17-chains-of-jumps-flips-and-specials-bird-like-fli.jpg)
+![A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive](docs/devlog/19-a-wreck-greets-you-in-the-ship-graveyard-every-b.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->

@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive
+
+[`3c01d46`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/3c01d46) · 2026-11-14 03:12
+
+![A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive](19-a-wreck-greets-you-in-the-ship-graveyard-every-b.jpg)
+
 ## A world that holds together: harbour pier, painted mangrove roots, caves with back walls, a glowing main route
 
 [`578708a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/578708a) · 2026-11-14
