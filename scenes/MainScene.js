@@ -25,6 +25,7 @@ import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
+import { ROUTE } from '../game/level/density.js';
 import { BOOK_KEY } from './ReefBookScene.js';
 import { STYLE_KEY } from './PlayStyleScene.js';
 import { HUD_KEY } from './HudScene.js';
@@ -61,6 +62,7 @@ const WORLD = {
     schoolRadius: 420,    // friends (other players) this close swim as a school ...
     schoolBoost: 0.1,     // ... each of up to two makes you this much faster
     streamBubbles: 45,    // bubbles per second that mark each stream in view
+    laneGlints: 22,       // light motes per second along the calm main route in view (spec 5.2c)
     roomReach: 320,       // a pose that needs more room may move the player this far to find it
     downedMs: 5000,       // playing together: how long friends have to revive you before the nest respawn
     reviveHealth: 2
@@ -653,6 +655,19 @@ export default class MainScene extends Phaser.Scene {
         this.scene.bringToTop(BOOK_KEY);
     }
 
+    /** The calm main route shows itself: warm motes of light drift along it (spec 5.2c, 1.4). */
+    laneGlints(delta) {
+        this.glintAcc = (this.glintAcc || 0) + delta * WORLD.laneGlints / 1000;
+        if (this.glintAcc < 1) return;
+        const wv = this.cameras.main.worldView, field = this.level.field;
+        for (let n = Math.floor(this.glintAcc); n > 0; n--) {
+            const x = wv.x - 100 + Math.random() * (wv.width + 200);
+            const y = field.routeY(x) + (Math.random() - 0.5) * ROUTE.halfWidth * 0.8;
+            if (y > 40 && this.level.isOpen(x, y)) this.particles.spawn('glint', x, y, 1, { spread: 10 });
+        }
+        this.glintAcc %= 1;
+    }
+
     /** Coins hop on the music's beat, all together (spec ch.12, music-synced world). */
     /**
      * The player is never hidden (spec 10.10a): foreground objects (FOREGROUND depth band)
@@ -904,6 +919,7 @@ export default class MainScene extends Phaser.Scene {
         this.leakOil(delta);
         this.ventPlumes(delta);
         // Streams show themselves: bubbles are born along the lanes in view and ride them.
+        this.laneGlints(delta);
         this.streamBubbles = (this.streamBubbles || 0) + delta * WORLD.streamBubbles / 1000;
         if (this.streamBubbles >= 1) {
             const wv = this.cameras.main.worldView;
