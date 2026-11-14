@@ -11,6 +11,9 @@ export const CONTAINER_LOOK = {
 
 const key = i => `container_${i}`;
 
+/** The painted containers (loaded by the title screen; container_2's doors hang open); drawn procedurally while missing. */
+export const CONTAINER_ART = Object.fromEntries([0, 1, 2].map(i => [key(i), `img/container_${i}.webp`]));
+
 /** Fallback pictures, one per paint: a corrugated steel box seen from the side, both ends open, weed along its lower edge. */
 function ensureTextures(scene) {
     CONTAINER_LOOK.paints.forEach(([side, shade], i) => {
