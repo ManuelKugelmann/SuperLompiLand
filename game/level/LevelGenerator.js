@@ -50,7 +50,8 @@ export const LEVEL = {
     coinBatch: 1,         // coins of a trail made per build step
     rockStrips: 4,        // the rock picture of a chunk is painted (or sent to its atlas) in this many strips, a build step each
     atlas: true,          // chunk pictures share two atlas textures (one draw call for all of a kind, no canvas); false = a canvas texture per picture, as before
-    atlasChunks: 36,      // chunks an atlas holds (a full one falls back to canvases)
+    atlasChunks: 36,      // chunks an atlas holds (a full one falls back to canvases) ...
+    atlasSpare: 6,        // ... of which this many stay free for the ring kept round the wanted set
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
     nestClear: 320,       // px to either side of a nest kept free of props and ground cover: the painted nest's own rim of grass and shells shows, its hollow stays open
@@ -366,9 +367,20 @@ export default class LevelGenerator {
         }
         vel.at = { x: camX, y: camY };
         const lead = v => Math.min(LEVEL.leadMax, Math.ceil(Math.abs(v) * LEVEL.leadS / CH));
-        const ax = lead(vel.x), ay = lead(vel.y);
-        const x0 = Math.floor(camX / CH) - LEVEL.margin - (vel.x < 0 ? ax : 0), x1 = Math.floor((camX + W) / CH) + LEVEL.margin + (vel.x > 0 ? ax : 0);
-        const y0 = Math.max(0, Math.floor(camY / CH) - LEVEL.margin - (vel.y < 0 ? ay : 0)), y1 = Math.floor((camY + H) / CH) + LEVEL.margin + (vel.y > 0 ? ay : 0);
+        let ax = lead(vel.x), ay = lead(vel.y);
+        // Ahead the view gets its margin and its lead; behind it, while it leads, no margin (it is moving away from there). The
+        // whole set must fit the chunk atlases (else chunks fall back to a canvas each, a long step on a phone): the lead gives way first.
+        const vx0 = Math.floor(camX / CH), vx1 = Math.floor((camX + W) / CH), vy0 = Math.floor(camY / CH), vy1 = Math.floor((camY + H) / CH);
+        const span = () => {
+            const x0 = vx0 - (vel.x < 0 ? LEVEL.margin + ax : ax ? 0 : LEVEL.margin), x1 = vx1 + (vel.x > 0 ? LEVEL.margin + ax : ax ? 0 : LEVEL.margin);
+            const y0 = Math.max(0, vy0 - (vel.y < 0 ? LEVEL.margin + ay : ay ? 0 : LEVEL.margin)), y1 = vy1 + (vel.y > 0 ? LEVEL.margin + ay : ay ? 0 : LEVEL.margin);
+            return [x0, x1, y0, y1];
+        };
+        let [x0, x1, y0, y1] = span();
+        while ((x1 - x0 + 1) * (y1 - y0 + 1) > LEVEL.atlasChunks - LEVEL.atlasSpare && (ax || ay)) {
+            if (ax >= ay) ax--; else ay--;
+            [x0, x1, y0, y1] = span();
+        }
         const wanted = (cx, cy) => cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
         const missing = [];
         for (let cy = y0; cy <= y1; cy++) {
@@ -430,7 +442,9 @@ export default class LevelGenerator {
         }
         for (const key of [...this.chunks.keys()]) {
             const [cx, cy] = key.split(',').map(Number);
-            if (cx < x0 - 1 || cx > x1 + 1 || cy < y0 - 1 || cy > y1 + 1) this.drop(key);
+            // A ring of one is kept on the sides the view is not leading away from (turning back does not rebuild at once); behind a lead nothing is.
+            const kx0 = ax && vel.x > 0 ? 0 : 1, kx1 = ax && vel.x < 0 ? 0 : 1, ky0 = ay && vel.y > 0 ? 0 : 1, ky1 = ay && vel.y < 0 ? 0 : 1;
+            if (cx < x0 - kx0 || cx > x1 + kx1 || cy < y0 - ky0 || cy > y1 + ky1) this.drop(key);
         }
         // Early collision of chunks nobody waits for any more goes at once, not only when the
         // worker gets round to them: after a long fast trip its queue is long, and hundreds of
