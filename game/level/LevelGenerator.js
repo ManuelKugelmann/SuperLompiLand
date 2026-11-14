@@ -40,7 +40,7 @@ export const LEVEL = {
     earlyPerFrame: 3,     // chunks that get their early collision per frame
     edgeBatch: 2,         // collision strips made per build step
     coinBatch: 1,         // coins of a trail made per build step
-    rockParts: 4,         // the rock picture of a chunk is this many textures, one under the other
+    rockStrips: 4,        // the rock picture of a chunk is painted in this many strips, a build step each
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
@@ -149,7 +149,7 @@ export const PROPS = {
     kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, reach: 0.2, flat: 0.5, depth: -1, max: 2, sway: 0.7 }
 };
 
-const CULLED = new Set(['Image', 'TileSprite', 'Sprite']);   // the kinds of chunk object that cull() may hide (plain pictures at their own x, y)
+const CULLED = new Set(['Image', 'TileSprite', 'Sprite', 'Rope']);   // the kinds of chunk object that cull() may hide (pictures at their own x, y; a swaying stalk is a draw call of its own)
 const BIG_CORALS = ['coral_table', 'coral_brain', 'coral_fan', 'coral_staghorn'];      // painted to stand on their own foot (their picture's bottom edge)
 const CORAL_KEYS = ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5', ...BIG_CORALS];   // the reef's corals, each at any size (coralSizes.js)
 const PILE_UNDER_FOOT = 0.4;   // share of the foot's height that the wood strip runs on behind it
@@ -247,7 +247,7 @@ export default class LevelGenerator {
     /** Fills the pool of chunk canvases (canvasFor) up to LEVEL.canvasWarm chunks' worth: making a canvas uploads it once, a long step on a phone. */
     warmCanvasPool() {
         const t = this.scene.textures, pool = this.canvasPool();
-        const need = [[SHADE.backSize, SHADE.backSize, LEVEL.canvasWarm], [SHADE.rockSize, SHADE.rockSize / LEVEL.rockParts, LEVEL.canvasWarm * LEVEL.rockParts]];
+        const need = [[SHADE.backSize, SHADE.backSize, LEVEL.canvasWarm], [SHADE.rockSize, SHADE.rockSize, LEVEL.canvasWarm]];
         for (const [w, h, count] of need) {
             const list = pool[`${w}x${h}`] || (pool[`${w}x${h}`] = []);
             while (list.length < count) { const key = `chunkpool:${w}x${h}:${pool.made = (pool.made || 0) + 1}`; t.createCanvas(key, w, h); list.push(key); }
@@ -513,31 +513,31 @@ export default class LevelGenerator {
         // terrain is redrawn while playing.
         const pics = baked || { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, ...shadeChunk(this.field, LEVEL.seed, ox, oy, CH) };
         // Each picture in two steps (painting it, then handing it to the graphics card): together they are the build's biggest cost.
-        // `part` = which of `parts` equal strips of the picture (top to bottom) this texture holds: the big rock
-        // picture is two textures, so no step paints or uploads more than half of it.
-        const paint = (name, data, size, part = 0, parts = 1) => {
-            const key = `chunk:${chunk.key}:${name}`, h = size / parts;
-            if (s.textures.exists(key)) s.textures.remove(key);
-            const tex = this.canvasFor(key, size, h);
-            tex.context.putImageData(new ImageData(data.subarray(part * h * size * 4, (part + 1) * h * size * 4), size, h), 0, 0);
-            chunk.textures.push(key);
+        // A picture is one texture (each is a draw call of its own under the caustics shader), painted in
+        // `strips` equal strips from top to bottom, a build step each, and then handed to the graphics card.
+        const paint = (name, data, size, strip = 0, strips = 1) => {
+            const key = `chunk:${chunk.key}:${name}`, h = size / strips;
+            if (strip === 0) { if (s.textures.exists(key)) s.textures.remove(key); chunk.textures.push(key); }
+            const tex = strip === 0 ? this.canvasFor(key, size) : s.textures.get(key);
+            tex.context.putImageData(new ImageData(data.subarray(strip * h * size * 4, (strip + 1) * h * size * 4), size, h), 0, strip * h);
             return tex;
         };
-        const show = (tex, size, depth, part = 0, parts = 1) => {
+        const show = (tex, size, depth) => {
             tex.refresh();
-            keep(s.add.image(ox, oy + part * CH / parts, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
+            keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
         };
         if (!baked) { yield 'shade'; if (chunk.dead) return; }
         const back = paint('back', pics.back, SHADE.backSize);
         yield 'paint back'; if (chunk.dead) return;
         show(back, SHADE.backSize, -6);
         yield 'upload back'; if (chunk.dead) return;
-        for (let part = 0; part < LEVEL.rockParts; part++) {
-            const rock = paint(`rock${part}`, pics.rock, SHADE.rockSize, part, LEVEL.rockParts);
+        let rock = null;
+        for (let strip = 0; strip < LEVEL.rockStrips; strip++) {
+            rock = paint('rock', pics.rock, SHADE.rockSize, strip, LEVEL.rockStrips);
             yield 'paint rock'; if (chunk.dead) return;
-            show(rock, SHADE.rockSize, -2, part, LEVEL.rockParts);
-            yield 'upload rock'; if (chunk.dead) return;
         }
+        show(rock, SHADE.rockSize, -2);
+        yield 'upload rock'; if (chunk.dead) return;
 
         // Collision strips and floor spots come from the coarse grid (corners
         // shared with the neighbours -> seamless).
@@ -860,7 +860,7 @@ export default class LevelGenerator {
     /** A dropped chunk's canvas texture goes back to the pool (up to LEVEL.canvasPool per size), else it is removed. */
     poolCanvas(key) {
         const t = this.scene.textures, pool = this.canvasPool(), src = t.get(key).source[0], size = `${src.width}x${src.height}`, list = pool[size] || (pool[size] = []);
-        if (list.length >= LEVEL.canvasPool * (src.height < src.width ? LEVEL.rockParts : 1)) { t.remove(key); return; }
+        if (list.length >= LEVEL.canvasPool) { t.remove(key); return; }
         const spare = `chunkpool:${size}:${pool.made = (pool.made || 0) + 1}`;
         t.renameTexture(key, spare);
         list.push(spare);
