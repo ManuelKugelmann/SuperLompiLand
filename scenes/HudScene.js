@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import GameMenu, { MENU } from '../game/ui/GameMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
-import { heartRow, textStyle } from '../game/ui/kit.js';
+import { heartRow, textStyle, pillImage } from '../game/ui/kit.js';
+import { CONTROL_SCHEMES } from '../game/controls/index.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { feedbackMenuItems } from '../game/feedback.js';
@@ -67,6 +68,7 @@ export default class HudScene extends Phaser.Scene {
         this.hearts = heartRow(this, rowX, rowY, main.maxHealth, heartSize);
         rowX += main.maxHealth * heartSize * 1.08 + HUD.rowGap;
         this.depthText = hudText(rowX, rowY, '30px').setOrigin(0, 0.5);
+        this.quickIcons(rowY);
         this.depthLabel = de ? 'Tiefe' : 'Depth';
 
         // Chain: a soft counter that names the last move; no timer, it simply fades when the chain ends.
@@ -125,6 +127,40 @@ export default class HudScene extends Phaser.Scene {
         ]);
     }
 
+    /**
+     * Quick icons at the top right (user: 'quick menu icons at top of screen: reef book, cycle
+     * through steering modes'), and a small fps readout left of them.
+     */
+    quickIcons(y) {
+        const m = this.main, W = this.scale.width, s = Math.round(this.scale.height * MENU.button * 0.9), gap = 14;
+        const button = (x, draw, onTap) => {
+            const img = pillImage(this, x, y, s, s, { radius: s / 2, alpha: 0.75 }).setInteractive({ useHandCursor: true });
+            const face = draw(x);
+            img.on('pointerdown', () => { this.tweens.add({ targets: [img, face], scale: '*=0.92', yoyo: true, duration: 70 }); onTap(); });
+            return face;
+        };
+        let x = W - 24 - s / 2;
+        // Steering: shows the mode in use; a tap goes to the next one.
+        const steerFace = x0 => this.add.text(x0, y, '', textStyle(Math.round(s * 0.26))).setOrigin(0.5);
+        this.steerFace = button(x, steerFace, () => {
+            const i = CONTROL_SCHEMES.findIndex(c => c.id === m.activeScheme), next = CONTROL_SCHEMES[(i + 1) % CONTROL_SCHEMES.length];
+            m.switchScheme(next.id); this.switcher.setActive(next.id); this.showSteer();
+        });
+        this.showSteer();
+        x -= s + gap;
+        // The reef book.
+        button(x, x0 => this.add.text(x0, y + 2, '📖', { fontSize: `${Math.round(s * 0.5)}px` }).setOrigin(0.5), () => m.openBook());
+        x -= s / 2 + gap;
+        this.fpsText = this.add.text(x, y, '', textStyle(22)).setOrigin(1, 0.5).setAlpha(0.8);
+        this.fpsAt = 0;
+    }
+
+    /** The steering icon's face: the name of the mode in use. */
+    showSteer() {
+        const de = this.main.lang === 'de', c = CONTROL_SCHEMES.find(q => q.id === this.main.activeScheme) || CONTROL_SCHEMES[0];
+        this.steerFace.setText(c.label[de ? 'de' : 'en']);
+    }
+
     updatePerf(m) {
         const now = performance.now();
         if (now - this.perfAt < 500) return;
@@ -163,5 +199,7 @@ export default class HudScene extends Phaser.Scene {
         this.depthText.setText(place ? `${this.depthLabel} ${m.depthMeters()} m · ${place}` : `${this.depthLabel} ${m.depthMeters()} m`);
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
+        const now = performance.now();
+        if (this.fpsText && now - this.fpsAt > 500) { this.fpsAt = now; this.fpsText.setText(`${Math.round(this.game.loop.actualFps)} fps`); }
     }
 }

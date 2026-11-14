@@ -4,7 +4,7 @@ import { pillButton } from './kit.js';
 export const SWITCHER = {
     icon: 84,            // px across of one scheme's icon
     gap: 18,             // px between two icons
-    margin: [40, 64],    // px from the right edge of the picture to the row, and the row's height from the top
+    margin: [40, 190],   // px from the right edge of the picture to the row, and the row's height from the top (under the quick icons)
     ring: 0xffd54a,      // the ring round the scheme in use
     idle: 0.7            // how solid the other icons are
 };

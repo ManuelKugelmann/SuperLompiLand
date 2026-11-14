@@ -45,6 +45,15 @@ export const DEMOS = {
         { d: 0.5, at: [0, 0], taps: 1 },
         { d: 0.6, at: [0, 0], fade: 'out' }
     ],
+    // Edges (relative to the right edge's middle): hold the edge, slide up to swim up, down to swim down.
+    edge: [
+        { d: 0.5, move: [[-60, 40], [0, 0]], fade: 'in' },
+        { d: 0.4, at: [0, 0], down: true, ring: true },
+        { d: 1.0, move: [[0, 0], [0, -160]], down: true },
+        { d: 1.2, move: [[0, -160], [0, 160]], down: true },
+        { d: 0.6, move: [[0, 160], [0, 0]], down: true },
+        { d: 0.6, at: [0, 0], fade: 'out' }
+    ],
     // Tilt: the hand (the phone) rocks to show steering; taps give speed; long press = special.
     tilt: [
         { d: 0.5, at: H, fade: 'in' },
