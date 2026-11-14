@@ -951,7 +951,8 @@ export default class MainScene extends Phaser.Scene {
                 for (let n = Math.floor(this.streamBubbles); n > 0; n--) {
                     const x = Phaser.Math.Between(Math.max(st.x0, wv.x - 200), Math.min(st.x1, wv.right + 200));
                     const y = streamY(st, x) + Phaser.Math.Between(-FLOW.streamWidth, FLOW.streamWidth) * 0.8;
-                    if (y > 40 && this.level.isOpen(x, y)) this.particles.spawn('bubble', x, y, 1, { radius: 9, spread: 6 });
+                    // Only where the water really moves (a stream is muted where it meets the calm route).
+                    if (y > 40 && this.level.isOpen(x, y) && this.flow.at(x, y, 0, this.bubbleProbe || (this.bubbleProbe = { x: 0, y: 0 })).x > FLOW.streamSpeed * 0.3) this.particles.spawn('bubble', x, y, 1, { radius: 9, spread: 6 });
                 }
             }
             this.streamBubbles %= 1;

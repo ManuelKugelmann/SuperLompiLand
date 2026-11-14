@@ -297,7 +297,12 @@ export default class LevelGenerator {
         }
         // Chains swing as ropes; the hazard on the end hangs from the last link and turns with it.
         this.chainBody.active = !!fish;
-        if (fish) { this.chainBody.vx = fish.x - this.chainBody.x; this.chainBody.vy = fish.y - this.chainBody.y; this.chainBody.x = fish.x; this.chainBody.y = fish.y; }
+        if (fish) {
+            // A jump of more than a body length in one frame is a respawn or a teleport, not a rush.
+            const jx = fish.x - this.chainBody.x, jy = fish.y - this.chainBody.y, moved = Math.hypot(jx, jy) < 90;
+            this.chainBody.vx = moved ? jx : 0; this.chainBody.vy = moved ? jy : 0;
+            this.chainBody.x = fish.x; this.chainBody.y = fish.y;
+        }
         for (const c of this.chains) {
             if (!c.active) continue;
             const r = stepRope(c.sim, t, this.chainBody.active ? this.chainBody : null), last = r.n - 1, pts = c.points;
