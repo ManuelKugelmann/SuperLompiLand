@@ -34,13 +34,31 @@ export const SHADE = {
     deepTint: [0x1a, 0x3a, 0x62],
     deepMix: 0.5,         // how far the albedo moves to deepTint at the deepest regular seabed
     sand: [0xf4, 0xe3, 0xb4],
-    sandReach: 60,        // world px into the rock that sand covers on upward faces
+    sandReach: 60,        // world px into the rock that sand covers on upward faces (biomes without a SAND_SKIN entry; 0 = none)
     backRockAlpha: 0.95,  // back rock under overhangs (backRock.js): how solid at its fullest
     backRockDark: 0.66,   // its stone colour is darkened to this at full cover (unlit, far)
     backRockFog: 0.38,    // and moved this far toward the biome's water colour
     pillarClear: 0.65,    // pillars under islands are this much less fogged: close behind, clearly rock
     occlusion: 0.36,      // darkest shade in the water right at the rock
     occlusionReach: 110   // world px into the water over which it fades out
+};
+
+/**
+ * The sand skin on upward faces per biome (lookdev1: "seabed ground ... top lip, value variation"):
+ * [colour, world px deep, cover 0..1]. The lagoon lies under a thick bright skin of sand, the reef
+ * and the coasts under a thinner one; elsewhere SHADE.sand / sandReach. Ripples run across it
+ * (`ripple`: brightness share, world px apart), and a soft shade lies under its lower edge
+ * (`under`: world px, how much darker) so the skin reads as a layer lying on the rock. Depths stay
+ * near 100 px: deeper in, the field flattens out and the distance to the rim can no longer be told.
+ */
+export const SAND_SKIN = {
+    beach: [0xf6e4b0, 110, 0.95], mangrove: [0xd8c690, 80, 0.75], reef: [0xf4e3b4, 90, 0.85],
+    shore: [0xe6dcc0, 70, 0.7], kelp: [0xd8cc9a, 65, 0.7],
+    ripple: [0.07, 46], under: [36, 0.16],
+    minSlope: 1.2e-3,   // density per world px: the skin measures its depth with at least this slope, so where the field flattens out inside the rock its depth grows smoothly instead of jumping
+    warm: 0.6,          // how far the sand's light moves from the teal water fill toward a warm neutral
+    lift: 0.28,         // and how much brighter it is lit: pale sand is the brightest ground under water
+    flat: [1.5e-4, 6e-4] // slopes over which the skin fades out deep inside, where the field is flat and its direction flips
 };
 
 const TILE = 256;
@@ -117,6 +135,18 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
         }
     }
 
+    // The sand skin per column (SAND_SKIN), blended across biome borders like the palette.
+    const sandCol = new Float32Array(S * 5);           // r, g, b, reach, cover
+    for (let px = 0; px < S; px++) {
+        const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * span / S);
+        const skin = bm => SAND_SKIN[bm.id] || [(cfg.sand[0] << 16) | (cfg.sand[1] << 8) | cfg.sand[2], cfg.sandReach, 0.8];
+        const sa = skin(a), sb = skin(b);
+        for (let c = 0; c < 3; c++) { const sh = 16 - c * 8; sandCol[px * 5 + c] = ((sa[0] >> sh) & 255) * (1 - t) + ((sb[0] >> sh) & 255) * t; }
+        sandCol[px * 5 + 3] = cfg.sandReach ? sa[1] * (1 - t) + sb[1] * t : 0;
+        sandCol[px * 5 + 4] = sa[2] * (1 - t) + sb[2] * t;
+    }
+    const [ripK, ripGap] = SAND_SKIN.ripple, [underPx, underK] = SAND_SKIN.under, ripW = Math.PI * 2 / ripGap;
+
     // Real stone per column: each side of the biome blend brings its two materials;
     // a large soft mask decides where the second one shows.
     const mats = materialTiles();
@@ -156,8 +186,8 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
     const pxWorld = span / S, aa = 1 / (pxWorld * 1.4);
     // Plain locals: this loop runs for every pixel of every chunk.
     const bevel = cfg.bevel, relief = cfg.relief, bump = cfg.bump * 9, coreDist = cfg.coreDist, core = cfg.coreShade * 3.9999;
-    const sandReach = cfg.sandReach, grainLo = 1 - cfg.grain / 2, grainK = cfg.grain;
-    const [sandR, sandG, sandB] = cfg.sand, [deepR, deepG, deepB] = cfg.deepTint;
+    const grainLo = 1 - cfg.grain / 2, grainK = cfg.grain;
+    const [deepR, deepG, deepB] = cfg.deepTint;
     const [bncR, bncG, bncB] = cfg.bounce, [keyR, keyG, keyB] = cfg.key;
     const skyR = cfg.sky[0] - bncR, skyG = cfg.sky[1] - bncG, skyB = cfg.sky[2] - bncB;
     const rock = new Uint8ClampedArray(S * S * 4);
@@ -210,14 +240,34 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             const r = inside >= coreDist ? 1 : inside / coreDist;
             const depthIn = Math.sqrt(r * Math.sqrt(r)) * core;        // r^0.75: quick at the rim, slow in the core
             const k = depthIn | 0, kt = depthIn - k, p = px * 15 + k * 3;
-            const sandy = inside >= sandReach || outY > -0.3 ? 0 : smooth(0.3, 0.8, -outY) * (1 - inside / sandReach) * 0.8;
+            // Sand on upward faces: full cover most of the way in, thinning at its lower edge,
+            // with ripples across it; under that edge a soft shade (the skin lies on the rock).
+            // Where the field flattens out deep inside, its direction is meaningless (it flips across the
+            // middle of a slab): the skin fades with the slope there, so no flip can show.
+            const sc = px * 5, reach = sandCol[sc + 3], faceUp = outY > -0.25 ? 0 : smooth(0.25, 0.65, -outY) * smooth(SAND_SKIN.flat[0], SAND_SKIN.flat[1], gl);
+            let sandy = 0, under = 1;
+            if (reach > 0 && faceUp > 0) {
+                const deep = Math.max(0, d - T) / Math.max(gl, SAND_SKIN.minSlope), f = deep / reach;
+                if (f < 1) sandy = faceUp * sandCol[sc + 4] * (1 - smooth(0.3, 1, f));
+                else if (deep < reach + underPx) under = 1 - underK * faceUp * Math.sin(Math.PI * (deep - reach) / underPx);   // rises and fades: no step
+            }
             const o = (py * S + px) * 4;
             let cr = pal[p] + (pal[p + 3] - pal[p]) * kt, cg = pal[p + 1] + (pal[p + 4] - pal[p + 1]) * kt, cb = pal[p + 2] + (pal[p + 5] - pal[p + 2]) * kt;
-            cr += (sandR - cr) * sandy; cg += (sandG - cg) * sandy; cb += (sandB - cb) * sandy;
+            if (sandy > 0) {
+                const wx = ox + (px + 0.5) * pxWorld, wy = oy + (py + 0.5) * pxWorld;
+                const rip = 1 + ripK * Math.sin(wx * ripW + wy * ripW * 0.35 + 2.5 * gh[gi]);
+                cr += (sandCol[sc] * rip - cr) * sandy; cg += (sandCol[sc + 1] * rip - cg) * sandy; cb += (sandCol[sc + 2] * rip - cb) * sandy;
+            }
+            cr *= under; cg *= under; cb *= under;
             cr += (deepR - cr) * tintK; cg += (deepG - cg) * tintK; cb += (deepB - cb) * tintK;
-            rock[o] = cr * tr * (bncR + skyR * up + keyR * lambert);
-            rock[o + 1] = cg * tg * (bncG + skyG * up + keyG * lambert);
-            rock[o + 2] = cb * tb * (bncB + skyB * up + keyB * lambert);
+            let lr = bncR + skyR * up + keyR * lambert, lg = bncG + skyG * up + keyG * lambert, lb = bncB + skyB * up + keyB * lambert;
+            if (sandy > 0) {        // sunlit sand throws back warm light: its fill is less teal (SAND_SKIN.warm)
+                const lm = (lr + lg + lb) / 3, k = sandy * SAND_SKIN.warm, lift = 1 + sandy * SAND_SKIN.lift;
+                lr = (lr + (lm * 1.06 - lr) * k) * lift; lg = (lg + (lm - lg) * k) * lift; lb = (lb + (lm * 0.92 - lb) * k) * lift;
+            }
+            rock[o] = cr * tr * lr;
+            rock[o + 1] = cg * tg * lg;
+            rock[o + 2] = cb * tb * lb;
             rock[o + 3] = alpha >= 1 ? 255 : alpha * 255;
         }
     }

@@ -110,3 +110,22 @@ test('the water next to rock is shaded, open water (far from rock, no back rock)
     }
     assert.ok(nearN > 3 && near / nearN > 40, `shade next to rock: ${near / nearN}`);
 });
+
+test('the lagoon lies under a bright sand skin: its upward rim is lighter and warmer than the rock further in', async () => {
+    const { SAND_SKIN } = await import('../game/level/shade.js');
+    assert.ok(SAND_SKIN.beach[1] > SAND_SKIN.reef[1] && SAND_SKIN.beach[2] > 0.9);
+    let rim = [0, 0, 0], core = [0, 0, 0], n = 0;
+    for (let px = 20; px < S - 20; px += 12) {
+        let top = -1;
+        for (let py = 1; py < S; py++) if (pic.rock[(py * S + px) * 4 + 3] === 255 && pic.rock[((py - 1) * S + px) * 4 + 3] < 128) { top = py; break; }
+        const deep = top + Math.round(180 * S / SPAN);
+        if (top < 0 || deep >= S || pic.rock[(deep * S + px) * 4 + 3] < 255) continue;
+        const r = at(pic.rock, S, px, top + Math.round(30 * S / SPAN)), c = at(pic.rock, S, px, deep);
+        for (let k = 0; k < 3; k++) { rim[k] += r[k]; core[k] += c[k]; }
+        n++;
+    }
+    assert.ok(n > 5, `columns with a rim (${n})`);
+    const lum = v => 0.3 * v[0] + 0.59 * v[1] + 0.11 * v[2];
+    assert.ok(lum(rim) > lum(core) * 1.1, `rim ${lum(rim) / n} vs core ${lum(core) / n}`);
+    assert.ok(rim[0] - rim[2] > 0, 'warm sand');
+});
