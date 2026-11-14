@@ -14,7 +14,7 @@ export const GARDEN_LOOK = {
     near: 3000, far: 4500,   // px from the garden at which it is built, and beyond which it is removed
     depth: 3.2,              // on the mud, in front of the pebbles and props, just behind the fish
     squeeze: 0.22,           // how much a bell flattens and widens at the squeeze
-    perFrame: 6              // jellies laid down per frame once the garden is built (a phone never pays for all at once)
+    perFrame: 2              // jellies laid down per frame once the garden is built (a phone never pays for all at once)
 };
 
 const KEY = 'cassiopea';
@@ -84,8 +84,9 @@ export default class JellyGardenLayer {
         if (!this.live) {
             if (fish.x < sp.x0 - L.near || fish.x > sp.x1 + L.near || !this.scene.buildSlot()) return;
             this.live = this.build();
+            return;      // the coins were this frame's work; the jellies follow, a few per frame (each needs its ground looked up)
         }
-        for (let k = 0; k < L.perFrame && this.next < this.jellies.length; k++) this.place(this.jellies[this.next++]);
+        if (this.next < this.jellies.length && this.scene.buildSlot()) for (let k = 0; k < L.perFrame && this.next < this.jellies.length; k++) this.place(this.jellies[this.next++]);
         for (const j of this.jellies) {
             if (!j.img) continue;
             const p = pulseAt(j, t);
