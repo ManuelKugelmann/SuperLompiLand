@@ -16,7 +16,7 @@ export const SEA_FAR = {
     kinds: ['manta', 'shark', 'school'],
     // Sunken ships far off on the graveyard sea's floor: something to hold the eye in the empty
     // sea (at night above all). One every `every` px of the sea, seen at parallax `scroll`.
-    wrecks: { biome: 'wreck', every: 5200, scroll: 0.15, size: [900, 1300], keys: ['wreck_1', 'wreck_2', 'wreck_3'] }
+    wrecks: { biome: 'wreck', every: 9000, scroll: 0.15, size: [900, 1300], keys: ['wreck_1', 'wreck_2', 'wreck_3'] }
 };
 
 /** World x where the next island east of x begins, or null when only sea is left. */
@@ -52,7 +52,7 @@ export function farWrecks(cam, width, cfg = SEA_FAR) {
     for (let i = 0; i * F.every < b.width; i++) {
         const r = rnd(i * 4111 + 7), at = b.from + (i + 0.2 + r() * 0.6) * F.every;
         const size = F.size[0] + r() * (F.size[1] - F.size[0]), x = width / 2 + (at - cam) * F.scroll;
-        if (x < -size || x > width + size) continue;
+        if (x < -size / 2 || x > width + size / 2) continue;      // x is its middle
         out.push({ id: i, key: F.keys[Math.floor(r() * F.keys.length)], x, size, flip: r() < 0.5 });
     }
     return out;
