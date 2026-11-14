@@ -13,7 +13,9 @@ import ParticleLayer from '../game/fx/ParticleLayer.js';
 import SwarmLayer from '../game/ai/SwarmLayer.js';
 import SeabirdLayer from '../game/ai/SeabirdLayer.js';
 import { ghostShip } from '../game/level/setPieces.js';
+import { CLEANER } from '../game/ai/cleaner.js';
 import DeepGlowLayer from '../game/level/DeepGlowLayer.js';
+import CleanerLayer from '../game/ai/CleanerLayer.js';
 import { glowShare } from '../game/level/deepGlow.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
@@ -171,6 +173,8 @@ export default class MainScene extends Phaser.Scene {
         // Gannets over the island coasts dive after shoals and after a fish near the surface (spec 5.0d).
         // Light of its own in the deep: glowing jellies, strings and plankton sparks (spec 5.0e).
         this.deepGlow = new DeepGlowLayer(this, (x, y) => this.level.isOpen(x, y, OPEN_SLACK));
+        // The cleaner station on the reef: float in calmly to be cleaned (spec 5.0f).
+        this.cleaner = new CleanerLayer(this, x => this.level.field.routeY(x), (x, y) => this.level.isOpen(x, y, OPEN_SLACK), (ev, x, y) => this.cleanerEvent(ev, x, y));
         this.seabirds = new SeabirdLayer(this, {
             surfaceY: x => this.surface.heightAt(x, this.time.now / 1000),
             // Rock between the fish and the surface hides it (the air above is not "open" water).
@@ -353,6 +357,7 @@ export default class MainScene extends Phaser.Scene {
             this.swarms.destroy();
             this.seabirds.destroy();
             this.deepGlow.destroy();
+            this.cleaner.destroy();
             this.boosters.destroy();
             this.speedLines.destroy();
             this.events.off('fish-special');
@@ -440,6 +445,17 @@ export default class MainScene extends Phaser.Scene {
     softHit(x, y) {
         if (this.relaxed || this.health <= GRUMPY_HIT) { this.fish.hit(new Phaser.Math.Vector2(x, y)); return; }
         this.hurt(x, y, GRUMPY_HIT);
+    }
+
+    /** The cleaner station (spec 5.0f): the wrasse come over, clean, and give half a heart back. */
+    cleanerEvent(ev, x, y) {
+        const p = this.fish.sprite;
+        if (ev === 'clean') { play('tap'); this.particles.spawn('bubble', p.x, p.y, 6, { radius: 10, spread: 40 }); }
+        else if (ev === 'heal') {
+            this.health = Math.min(this.maxHealth, this.health + CLEANER.heal);
+            play('friend'); this.particles.spawn('glint', p.x, p.y, 14, { radius: 12, spread: 60 });
+            this.bookEntry('cleaner_station');
+        } else if (ev === 'scatter') this.swarms.startle(x, y);
     }
 
     /** A seabird's hunt, as it happens (game/ai/SeabirdLayer.js, spec 5.0d). */
@@ -1259,6 +1275,8 @@ export default class MainScene extends Phaser.Scene {
         const local = this.ambientMode ? null : bird;
         this.seabirds.update(delta / 1000, view.x, local, local ? [local, ...players.slice(1)] : [], shoals);
         this.deepGlow.update(this.cameras.main.worldView, this.time.now / 1000);
+        const fv = this.fish.sprite.body.velocity;
+        this.cleaner.update(delta / 1000, this.time.now / 1000, this.ambientMode ? null : { x: view.x, y: view.y, speed: Math.hypot(fv.x, fv.y) * 60 });
         // The ghost ship groans now and then when you are near it (spec 5.0e).
         const ship = ghostShip(), shipD = Math.hypot(view.x - ship.x, view.y - ship.y);
         if (shipD < WORLD.creakR && this.time.now > (this.creakAt || 0)) {
