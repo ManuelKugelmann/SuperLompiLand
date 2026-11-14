@@ -27,7 +27,9 @@ export const CONTAINERS = {
     underGap: 130,       // ... this far under its bottom
     trail: 6,            // coins that lead up from the calm route to the field's west end
     rock: 0.05,          // radians each rocks in the swell
-    shadow: 0.3          // darkness of the shadow in the water under each
+    shadow: 0.3,         // darkness of the shadow in the water under each
+    // A leap that comes down on a floating container's roof bounces off it (only from above: never a wall from the side or below).
+    roof: { reach: 0.46, band: 70, spring: 1.1, least: 10, again: 0.35 }   // share of the length that counts as roof; px above and below the roof line that catch a falling fish; speed returned; the least speed up (px per step); s before it can bounce again
 };
 
 let SPAN = null;
@@ -74,4 +76,20 @@ export function containerCoins(routeY, cfg = CONTAINERS) {
         }
     }
     return out;
+}
+
+/**
+ * Does a fish at (fx, fy), moving down at `vy` px per step (positive = falling), land on this
+ * container's roof? `surface` = the water surface's height under the container's middle.
+ * Only a floating container has a roof to land on, and only a fish that comes from above does.
+ */
+export function landsOnRoof(box, surface, fx, fy, vy, cfg = CONTAINERS) {
+    if (box.stacked || vy <= 0) return false;
+    const [len, h] = cfg.size, roof = surface + box.y - h / 2 + Math.tan(box.tilt) * (fx - box.x);
+    return Math.abs(fx - box.x) < len * cfg.roof.reach && Math.abs(fy - roof) < cfg.roof.band;
+}
+
+/** The speed up (negative, px per step) a fish leaves the roof with when it came down at `vy`: a springy bounce, never a feeble one. */
+export function roofBounce(vy, cfg = CONTAINERS) {
+    return -Math.max(cfg.roof.least, Math.abs(vy) * cfg.roof.spring);
 }

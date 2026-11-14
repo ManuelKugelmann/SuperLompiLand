@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CONTAINERS, containerSpan, containerField, containerCoins } from '../game/level/containers.js';
+import { CONTAINERS, containerSpan, containerField, containerCoins, landsOnRoof, roofBounce } from '../game/level/containers.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { FIELD, createField } from '../game/level/density.js';
 import { rescueSpots } from '../game/rescues.js';
@@ -40,4 +40,16 @@ test('coins lead up from the calm route, hang in a row under each floating conta
     const through = coins.filter(c => Math.abs(c.x - open.x) <= len / 2 && c.y < open.y + h / 2);
     assert.equal(through.length, CONTAINERS.through, 'a line through the open one\'s sunken half');
     for (const b of floating) assert.equal(coins.filter(c => Math.abs(c.x - b.x) < len / 2 && Math.abs(c.y - (b.y + h / 2 + CONTAINERS.underGap)) < 1).length, CONTAINERS.under);
+});
+
+test('a leap that comes down on a floating container\'s roof bounces off; from the side, from below or on the stacked one nothing happens', () => {
+    const b = boxes.find(o => !o.stacked && !o.open), roof = b.y - h / 2, R = CONTAINERS.roof;
+    assert.ok(landsOnRoof(b, 0, b.x, roof, 8), 'falling onto the middle of the roof');
+    assert.ok(landsOnRoof(b, 25, b.x, roof + 25, 8), 'the roof rides on the swell');
+    assert.ok(!landsOnRoof(b, 0, b.x, roof, -8), 'rising through it from below: no');
+    assert.ok(!landsOnRoof(b, 0, b.x + len * 0.6, roof, 8), 'beside it: no');
+    assert.ok(!landsOnRoof(b, 0, b.x, roof + 200, 8), 'in the water beside its wall: no');
+    assert.ok(!landsOnRoof(boxes.find(o => o.stacked), 0, b.x, roof, 8), 'the stacked one has no roof to land on');
+    assert.equal(roofBounce(20), -20 * R.spring);
+    assert.equal(roofBounce(2), -R.least, 'never a feeble bounce');
 });

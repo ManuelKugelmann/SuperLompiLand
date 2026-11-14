@@ -1,4 +1,4 @@
-import { CONTAINERS, containerSpan, containerField, containerCoins } from './containers.js';
+import { CONTAINERS, containerSpan, containerField, containerCoins, landsOnRoof, roofBounce } from './containers.js';
 import BonusCoins from './BonusCoins.js';
 
 export const CONTAINER_LOOK = {
@@ -37,11 +37,13 @@ function ensureTextures(scene) {
  * What the container field looks like (level/containers.js says where the containers float):
  * one picture each, lying in the water's surface and rocking with it, a soft shadow under each,
  * and the field's coins. Built only while the fish is near. `surfaceY(x)` = height of the water
- * surface, `onCoin(x, y)` for every coin taken, `onSeen()` once at first sight.
+ * surface, `onCoin(x, y)` for every coin taken, `onSeen()` once at first sight, `onBounce(x, y)`
+ * when a leaping fish bounces off a container's roof.
  */
 export default class ContainerLayer {
-    constructor(scene, routeY, surfaceY, onCoin, onSeen) {
-        this.scene = scene; this.surfaceY = surfaceY; this.onCoin = onCoin; this.onSeen = onSeen; this.seen = false;
+    constructor(scene, routeY, surfaceY, onCoin, onSeen, onBounce) {
+        this.scene = scene; this.surfaceY = surfaceY; this.onCoin = onCoin; this.onSeen = onSeen; this.onBounce = onBounce; this.seen = false;
+        this.bouncedAt = -Infinity;
         this.span = containerSpan();
         this.boxes = containerField();
         this.coinSpots = containerCoins(routeY);
@@ -60,8 +62,8 @@ export default class ContainerLayer {
         return { imgs, shadows, coins };
     }
 
-    /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s. */
-    update(fish, radius, t) {
+    /** Per frame. `fish` = the fish's body sprite (x, y, body.velocity, setVelocity), `radius` its radius, `t` s, `inAir` = it is above the water. */
+    update(fish, radius, t, inAir) {
         const L = CONTAINER_LOOK, sp = this.span;
         if (this.live && (fish.x < sp.x0 - L.far || fish.x > sp.x1 + L.far)) {
             for (const o of [...this.live.imgs, ...this.live.shadows]) o?.destroy();
@@ -79,6 +81,13 @@ export default class ContainerLayer {
             img.setY(mid + b.y).setRotation(b.tilt + slope * 0.6 + Math.sin(t * 0.5 + i * 2.3) * CONTAINERS.rock);
             this.live.shadows[i]?.setY(mid + b.y + CONTAINERS.size[1] * 0.75);
             if (!this.seen && Math.hypot(fish.x - b.x, fish.y - (mid + b.y)) < L.seen) { this.seen = true; this.onSeen(); }
+            // A leap that comes down on its roof bounces off, like off a pad.
+            const v = fish.body.velocity;
+            if (inAir && t - this.bouncedAt > CONTAINERS.roof.again && landsOnRoof(b, mid, fish.x, fish.y + radius, v.y)) {
+                this.bouncedAt = t;
+                fish.setVelocity(v.x, roofBounce(v.y));
+                this.onBounce(fish.x, fish.y + radius);
+            }
         });
         this.live.coins.update(fish, radius, t);
     }

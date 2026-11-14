@@ -249,7 +249,7 @@ export default class MainScene extends Phaser.Scene {
         this.octopus = new OctopusLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         this.meadow = new MeadowLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         // Lost shipping containers floating half sunk at the surface off the harbour; coins lead up to them from the route.
-        this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'));
+        this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'), (x, y) => this.roofBounce(x, y));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -652,6 +652,13 @@ export default class MainScene extends Phaser.Scene {
         if (this.lastBuildFrame === frame) return false;
         this.lastBuildFrame = frame;
         return true;
+    }
+
+    /** A leap came down on a floating container's roof: a thud, a splash of spray, and it counts like a bounce pad in a chain. */
+    roofBounce(x, y) {
+        play('boing');
+        this.chainMove('pad');
+        this.particles.spawn('bubble', x, y, 6, { radius: 8, spread: 60, vy: -200 });
     }
 
     /** Through the sea arch: a chain move, the first time an entry in the reef book; flown through, a cheer. */
@@ -1540,7 +1547,7 @@ export default class MainScene extends Phaser.Scene {
         this.ventField.update({ x: sp.x, y: sp.y, radius: this.fish.radius }, time / 1000, delta);
         this.dolphins.update(sp, time / 1000, delta);
         { const fv = this.fish.sprite.body.velocity; this.octopus.update(sp, Math.hypot(fv.x, fv.y), time / 1000, delta); }
-        this.containers.update(sp, this.fish.radius, time / 1000);
+        this.containers.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
             const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);
