@@ -15,7 +15,7 @@ export const THINK = {
         check: 4,       // small tests near the swimmer: coin pull, reveal and fade
         idle: 30        // a set piece that is not live: is the swimmer near yet?
     },
-    tier: { low: 1.5, medium: 1.25, high: 1 }      // a lower tier decides more slowly
+    tier: { basic: 3, low: 1.5, medium: 1.25, high: 1 }      // a lower tier decides more slowly
 };
 
 /** Frames between two decisions of a kind at a quality tier (a whole number, at least 1). */

@@ -38,7 +38,8 @@ test('under 30 frames a second for three seconds: a tier down; a good frame rate
     assert.ok(Math.abs(t.fps - 24) < 1);
     assert.equal(run(t, 24, 2), null, 'right after a change nothing is judged');
     assert.equal(run(t, 24, 8), 'low');
-    assert.equal(run(t, 12, 30), null, 'there is nothing under the lowest tier');
+    assert.equal(run(t, 12, 12), 'basic', 'the tier for very slow phones');
+    assert.equal(run(t, 6, 30), null, 'there is nothing under the lowest tier');
 });
 
 test('over 50 for ten seconds: a tier up; and a tier that had to be left again at once is not tried again', () => {
@@ -75,5 +76,7 @@ test('the start probes: the frame rate of the first seconds puts it on the fitti
     assert.equal(run('medium', 60), 'high', 'a strong phone goes up');
     assert.equal(run('low', 60), 'medium', 'a saved low tier is tried upward again at every start');
     assert.equal(run('medium', 45), null, 'fitting: it stays');
-    assert.equal(run('low', 14), null);
+    assert.equal(run('low', 14), 'basic');
+    assert.equal(run('high', 7), 'basic', 'a very slow phone: three tiers down at once');
+    assert.equal(run('basic', 7), null);
 });

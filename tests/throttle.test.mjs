@@ -4,7 +4,7 @@ import { THINK, everyOf, due, createStagger, createTurns } from '../game/throttl
 
 test('a lower tier decides more slowly, never faster than every frame', () => {
     for (const kind of Object.keys(THINK.every)) {
-        assert.ok(everyOf(kind, 'low') >= everyOf(kind, 'medium') && everyOf(kind, 'medium') >= everyOf(kind, 'high'));
+        assert.ok(everyOf(kind, 'basic') >= everyOf(kind, 'low') && everyOf(kind, 'low') >= everyOf(kind, 'medium') && everyOf(kind, 'medium') >= everyOf(kind, 'high'));
         assert.ok(everyOf(kind, 'high') >= 1 && Number.isInteger(everyOf(kind, 'low')));
     }
     assert.equal(everyOf('idle'), THINK.every.idle);

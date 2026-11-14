@@ -4,16 +4,18 @@
 // them (MainScene.applyQuality).
 
 export const QUALITY = {
-    tiers: ['low', 'medium', 'high'],
+    tiers: ['basic', 'low', 'medium', 'high'],      // basic: for phones many times slower than a good one (playtest: "some mobiles might be 100x slower")
     // caustics: strength of the net of light on the ground (0 = its shader is not used at all);
     // particles: share of every burst that is spawned; shoals: share of a shoal's fish;
     // simEvery / midEvery: a shoal in sight is simulated every so many frames (near the middle / further out);
     // glow: share of the soft glow pictures that are drawn (fish light, deep glow, coin glows); far: share of the far scenery's single objects.
+    // shoalsAround: how many roaming shoals are kept about the view; sheen: share of the rainbow sheen on the fish's rigs (0 = not worked out);
     // resolution: share of the game's px the picture is drawn at, each way (renderScale.js): the graphics chip's work goes with its square.
     // (A layer reads its share as QUALITY[scene.quality.tier].glow and the like, when it builds or each frame.)
-    low: { caustics: 0, particles: 0.35, shoals: 0.45, simEvery: 3, midEvery: 5, glow: 0, far: 0.4, resolution: 0.67 },
-    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, simEvery: 2, midEvery: 4, glow: 1, far: 0.7, resolution: 0.8 },
-    high: { caustics: 1, particles: 1, shoals: 1, simEvery: 2, midEvery: 3, glow: 1, far: 1, resolution: 1 },
+    basic: { caustics: 0, particles: 0.18, shoals: 0.25, shoalsAround: 1, simEvery: 4, midEvery: 8, glow: 0, far: 0.2, sheen: 0, resolution: 0.5 },
+    low: { caustics: 0, particles: 0.35, shoals: 0.45, shoalsAround: 2, simEvery: 3, midEvery: 5, glow: 0, far: 0.4, sheen: 1, resolution: 0.67 },
+    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, shoalsAround: 2, simEvery: 2, midEvery: 4, glow: 1, far: 0.7, sheen: 1, resolution: 0.8 },
+    high: { caustics: 1, particles: 1, shoals: 1, shoalsAround: 2, simEvery: 2, midEvery: 3, glow: 1, far: 1, sheen: 1, resolution: 1 },
     tune: {
         windowS: 2,       // the frame rate is the average over this many seconds
         lowFps: 30,       // under this for `lowS` seconds: a tier down
@@ -24,6 +26,7 @@ export const QUALITY = {
         startS: 2,        // ... and this long after the start (the start fade)
         probeS: 3,        // then the frame rate of this many seconds decides the tier at once: phones differ a lot, and a weak one must not wait for one step at a time
         probeFar: 20,     // under this in the probe: two tiers down at once (under lowFps: one down; over highFps: one up)
+        probeFloor: 10,   // ... and under this: three
         regretS: 30,      // a drop this soon after a rise means the higher tier is too much: it is not tried again
         skipMs: 250       // a frame longer than this is a pause (the tab was away), not a slow frame
     }
@@ -73,7 +76,7 @@ export function createAutotune(start, cfg = QUALITY) {
                 if (probe.s < T.probeS) return null;
                 const fps = probe.n * 1000 / probe.ms, was = at;
                 probe = null;
-                at = Math.max(0, Math.min(cfg.tiers.length - 1, at + (fps < T.probeFar ? -2 : fps < T.lowFps ? -1 : fps > T.highFps ? 1 : 0)));
+                at = Math.max(0, Math.min(cfg.tiers.length - 1, at + (fps < T.probeFloor ? -3 : fps < T.probeFar ? -2 : fps < T.lowFps ? -1 : fps > T.highFps ? 1 : 0)));
                 if (at === was) return null;
                 if (at > was) sinceRise = 0;
                 low = 0; high = 0; settle = T.settleS; frames.length = 0; sum = 0;
