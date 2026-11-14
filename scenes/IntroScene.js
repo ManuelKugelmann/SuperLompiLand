@@ -70,6 +70,8 @@ export default class IntroScene extends Phaser.Scene {
             if (!this.textures.exists(key)) this.load.image(key, `img/${file}`);
         }
         for (const key of KELP_STALKS) if (!this.textures.exists(key)) this.load.image(key, `img/plants/${key}.webp`);
+        // Painted mangrove roots; LevelGenerator draws procedural ones when these are missing.
+        for (const n of [1, 2, 3]) if (!this.textures.exists(`root_${n}`)) this.load.image(`root_${n}`, `img/root_${n}.webp`);
         for (const p of Object.values(PROPS)) {
             for (const key of p.keys) if (!this.textures.exists(key)) this.load.image(key, `img/props/${key}.webp`);
         }

@@ -418,9 +418,12 @@ export default class LevelGenerator {
             for (let k = 0; k < biome.roots; k++) {
                 const x = ox + rng.between(40, CH - 40);
                 const front = rng.frac() < 0.25;
-                const root = keep(s.add.image(x, -40, `root_${rng.between(1, 3)}`).setOrigin(0.5, 0)
-                    .setScale(rng.realInRange(1.1, 2.1) * (front ? 1.25 : 1), rng.realInRange(1.2, 2.4))
-                    .setDepth(front ? 7.5 : -7).setAlpha(front ? 0.9 : 0.8));
+                // Sized by height (615-1230 px) with only a slight stretch, so painted roots keep
+                // their proportions. Two draws, as before: the coins after them keep their numbers.
+                const root = keep(s.add.image(x, -40, `root_${rng.between(1, 3)}`).setOrigin(0.5, 0));
+                const stretch = 0.9 + (rng.realInRange(1.1, 2.1) - 1.1) * 0.2;
+                const scale = rng.realInRange(1.2, 2.4) * 512 * (front ? 1.15 : 1) / root.height;
+                root.setScale(scale * stretch, scale).setDepth(front ? 7.5 : -7).setAlpha(front ? 0.9 : 0.8);
                 if (rng.frac() < 0.5) root.setFlipX(true);
                 if (!front) root.setTint(0x6f8f86);
                 // Roots belong to a tree: its trunk and canopy stand above the waterline
