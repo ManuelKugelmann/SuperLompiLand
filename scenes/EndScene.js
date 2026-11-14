@@ -23,7 +23,7 @@ export default class EndScene extends Phaser.Scene {
             stroke: '#0a5c7a', strokeThickness: 14
         }).setOrigin(0.5);
         this.add.text(W / 2, H * 0.6,
-            `${de ? 'Münzen' : 'Coins'}: ${score}     ${de ? 'Strecke' : 'Distance'}: ${distance} m`, {
+            `${de ? 'Münzen' : 'Coins'}: ${score}     ${de ? 'Tiefster Tauchgang' : 'Deepest dive'}: ${distance} m`, {
                 fontFamily: 'Arial', fontSize: '60px', color: '#ffe08a', fontStyle: 'bold',
                 stroke: '#0a3f6e', strokeThickness: 8
             }).setOrigin(0.5);
