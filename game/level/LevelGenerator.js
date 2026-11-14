@@ -54,7 +54,6 @@ export const LEVEL = {
     rootBury: 30,         // px a root goes into the ground
     rootTries: 4,         // places tried for each root of a chunk
     frontAlpha: 0.75,     // trees and kelp that stand in front of the fish are this see-through, decided when they are built and never changed
-    cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     rippleMax: 8,         // strips of rippled sand per chunk, at most
     rippleWidth: 220,     // px: a strip is at least this wide (or as wide as its piece of floor)
@@ -159,7 +158,6 @@ export const PROPS = {
     kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, reach: 0.2, flat: 0.5, depth: -1, max: 2, sway: 0.7 }
 };
 
-const CULLED = new Set(['Image', 'TileSprite', 'Sprite', 'Rope']);   // the kinds of chunk object that cull() may hide (pictures at their own x, y; a swaying stalk is a draw call of its own)
 const BIG_CORALS = ['coral_table', 'coral_brain', 'coral_fan', 'coral_staghorn'];      // painted to stand on their own foot (their picture's bottom edge)
 const CORAL_KEYS = ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5', ...BIG_CORALS];   // the reef's corals, each at any size (coralSizes.js)
 const PILE_UNDER_FOOT = 0.4;   // share of the foot's height that the wood strip runs on behind it
@@ -421,24 +419,6 @@ export default class LevelGenerator {
         this.viewReady = true;
         for (let cy = Math.max(0, Math.floor(camY / CH)); cy <= Math.floor((camY + H) / CH) && this.viewReady; cy++) {
             for (let cx = Math.floor(camX / CH); cx <= Math.floor((camX + W) / CH); cx++) if (!this.chunks.get(`${cx},${cy}`)?.done) { this.viewReady = false; break; }
-        }
-        this.cull(camX + W / 2, camY + H / 2, W / 2 + LEVEL.cullPad, H / 2 + LEVEL.cullPad);
-    }
-
-    /**
-     * Off-screen culling: chunks are loaded a whole chunk beyond the view, so most of what exists
-     * is off screen, and the renderer would still work through all of it. Plain pictures further
-     * than their own size outside the view (plus a pad) are not drawn. Each is measured once: its
-     * full diagonal covers any origin, turn or sway.
-     */
-    cull(vx, vy, hw, hh) {
-        for (const chunk of this.chunks.values()) {
-            for (const o of chunk.objects) {
-                if (o.cullR === undefined) o.cullR = !CULLED.has(o.type) ? -1 : o.points ? ropeReach(o) : Math.hypot(o.displayWidth, o.displayHeight);
-                if (o.cullR < 0) continue;
-                const on = Math.abs(o.x - vx) < hw + o.cullR && Math.abs(o.y - vy) < hh + o.cullR;
-                if (on !== o.visible) o.setVisible(on);
-            }
         }
     }
 
@@ -1447,13 +1427,6 @@ export default class LevelGenerator {
         this.chains = this.chains.filter(o => o.active);
         this.vents = this.vents.filter(v => v.chunk !== key);
     }
-}
-
-/** How far a rope (a swaying stalk) reaches from its own x, y: the farthest of its points, plus its strip's width and room for its sway. */
-function ropeReach(o) {
-    let far = 0;
-    for (const q of o.points) far = Math.max(far, Math.hypot(q.x * o.scaleX, q.y * o.scaleY));
-    return far * 1.3 + (o.frame?.height || 0) * Math.abs(o.scaleY);
 }
 
 /** Nest pictures, made once: a disc of raked sand as a shaded relief, and a little shell. */

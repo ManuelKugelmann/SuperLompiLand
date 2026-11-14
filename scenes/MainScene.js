@@ -61,6 +61,7 @@ import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
+import { cullToView } from '../game/viewCull.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
 import FriendSchool from '../game/FriendSchool.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
@@ -1734,6 +1735,8 @@ export default class MainScene extends Phaser.Scene {
         this.waterLight.update(sun);
         // The net of light on rock, sand and props: in world space, as strong as the sun, in the water's hue.
         updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun * QUALITY[this.quality.tier].caustics, biomeBlendAt(view.x).a.water[0]);
+        // Nothing outside the picture is drawn (viewCull.js): after every layer has set its things where they are for this frame.
+        cullToView(this.children.list, this.cameras.main.worldView, this.cameras.main.id);
         // Quality: the frame rate decides (quality.js); a fixed tier (?quality=...) and the perf tour are left alone.
         this.quality.fps = this.autotune.fps;
         if (this.quality.auto) { const tier = this.autotune.step(delta); if (tier) this.applyQuality(tier, true); }
