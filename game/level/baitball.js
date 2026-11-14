@@ -1,7 +1,8 @@
 // The bait ball's place (pure, no Phaser; spec 5.0i open sea, 5.0j world map): near the end of
 // the open blue the calm route passes through a great ball of small fish. This module only
-// reserves the slot: where it is and how big; the ball itself (its fish, its hunters) is built
-// by whoever draws it, around `baitballSlot()`.
+// reserves the slot (where it is and how big) and moves the ball in it: a swirl of silver
+// sardines that hides Lompi, and gannets that plunge in from the sky, each plunge leaving a short
+// coin trail (open-sea idea #1, 5.0k). BaitBallLayer.js only draws.
 
 import { BIOMES } from './biomes.js';
 
@@ -29,4 +30,78 @@ export function baitballSlot(cfg = BAITBALL) {
 export function inBaitball(x, y, routeY, cfg = BAITBALL) {
     const s = baitballSlot(cfg);
     return Math.hypot(x - s.x, y - routeY(s.x)) < s.radius;
+}
+
+/** The ball inside the slot: its swirl and the gannets' plunges. */
+export const SWIRL = {
+    radius: 500,         // px: the ball's size (it breathes a little; slot radius minus drift and a margin)
+    squash: 0.72,        // height / width of the swirl
+    below: 0,            // px under the calm route its middle lies (the route runs through it)
+    drift: 160,          // px it wanders to and fro
+    count: 560,          // fish in the ball (a dense, filled sphere)
+    spin: 0.9,           // radians per second at the rim (faster inside)
+    hide: 0.7,           // share of the radius within which Lompi is hidden in it
+    plunge: {
+        every: 3.4,      // s between gannet plunges
+        fall: 1.1,       // s from the sky to the ball
+        sky: 420,        // px above the surface a dive starts
+        reach: 0.6,      // share of the ball's width over which plunges spread
+        coins: 3,        // coins left in each bubble trail
+        life: 9          // s the coins stay before they fade
+    }
+};
+
+const hash = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+
+/** The ball's middle at time t (s): it wanders a little inside its slot. `routeY(x)` = depth of the calm route. */
+export function ballCentre(t, routeY, out = {}, cfg = SWIRL) {
+    const x = baitballSlot().x;
+    out.x = x + Math.sin(t * 0.11) * cfg.drift;
+    out.y = routeY(x) + cfg.below + Math.sin(t * 0.17) * cfg.drift * 0.3;
+    return out;
+}
+
+/**
+ * Fish i of a ball at time t, relative to the ball's middle: { x, y, dir (-1 / 1, the way it
+ * swims), front (drawn in front of Lompi), turn (0..1, how edge-on: its flank flashes), core (0 rim .. 1 middle) }.
+ */
+export function fishAt(i, t, out = {}, cfg = SWIRL) {
+    // A filled ball: shells from the core to the rim (even cover: r ~ sqrt), the inner ones
+    // swirling faster; `core` is how deep inside a fish is (the core reads darker and bluer).
+    const u = hash(i, 1), r = cfg.radius * Math.sqrt(0.02 + 0.98 * u) * (1 + 0.05 * Math.sin(t * 1.3 + i));
+    const a = hash(i, 2) * Math.PI * 2 + t * cfg.spin * (0.6 + 0.9 * (1 - u));
+    out.x = Math.cos(a) * r;
+    out.y = Math.sin(a) * r * cfg.squash;
+    out.dir = Math.sin(a) > 0 ? -1 : 1;           // the swirl turns one way: along the top east, along the bottom west
+    out.front = hash(i, 4) < 0.5;
+    out.turn = 1 - Math.min(1, Math.abs(Math.sin(a)) * 3);
+    out.core = 1 - r / cfg.radius;
+    return out;
+}
+
+/** Is a point (relative to the ball's middle) hidden in the swirl? */
+export function hiddenIn(dx, dy, cfg = SWIRL) {
+    return Math.hypot(dx, dy / cfg.squash) < cfg.radius * cfg.hide;
+}
+
+/**
+ * The gannet plunge going on at time t: { n (which plunge), dx (from the ball's middle), u (0..1
+ * of its fall; > 1 once it has reached the ball) }.
+ */
+export function plungeAt(t, out = {}, cfg = SWIRL) {
+    const P = cfg.plunge, n = Math.floor(t / P.every);
+    out.n = n;
+    out.dx = (hash(n, 7) - 0.5) * cfg.radius * 2 * P.reach;
+    out.u = (t - n * P.every) / P.fall;
+    return out;
+}
+
+/** Where a plunge leaves its coins (relative to the ball's middle; `surface` = the surface's y minus the middle's). */
+export function plungeCoins(p, surface, cfg = SWIRL) {
+    const top = -cfg.radius * cfg.squash, out = [];
+    for (let k = 0; k < cfg.plunge.coins; k++) {
+        const s = (k + 1) / (cfg.plunge.coins + 1);
+        out.push({ x: p.dx + Math.sin(k * 2.1 + p.n) * 26, y: surface + (top - surface) * s });
+    }
+    return out;
 }

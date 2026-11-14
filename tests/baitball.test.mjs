@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BAITBALL, baitballSlot, inBaitball } from '../game/level/baitball.js';
+import { BAITBALL, SWIRL, baitballSlot, inBaitball, ballCentre, fishAt, hiddenIn, plungeAt, plungeCoins } from '../game/level/baitball.js';
 import { isSea } from '../game/level/biomes.js';
 import { FIELD, createField } from '../game/level/density.js';
 import { rescueSpots } from '../game/rescues.js';
@@ -27,4 +27,28 @@ test('nothing else stands in the slot: no rescue, bloom, current, storm, friend 
     clear(w.storm[0], w.storm[1], 'storm');
     for (const d of w.downs) clear(d[0], d[1], 'current');
     for (const c of chapters()) { if (c.friend) clear(c.x, c.x, c.id); if (c.event) clear(c.event.x, c.event.endX, c.event.id); }
+});
+
+test('the swirl stays inside its slot, its fish go one way round', () => {
+    const slot = baitballSlot(), routeY = () => 470, c = {}, o = {};
+    for (const t of [0, 7, 31]) {
+        ballCentre(t, routeY, c);
+        assert.ok(Math.hypot(c.x - slot.x, c.y - 470) + SWIRL.radius * 1.07 < slot.radius);
+    }
+    for (let i = 0; i < SWIRL.count; i++) {
+        fishAt(i, 3.3, o);
+        assert.ok(Math.hypot(o.x, o.y / SWIRL.squash) <= SWIRL.radius * 1.07);
+        if (o.y < -SWIRL.radius * 0.3) assert.equal(o.dir, 1);
+        if (o.y > SWIRL.radius * 0.3) assert.equal(o.dir, -1);
+    }
+    assert.ok(hiddenIn(0, 0) && !hiddenIn(SWIRL.radius, 0));
+});
+
+test('a plunge falls into the ball and leaves its coins between surface and ball', () => {
+    const p = plungeAt(SWIRL.plunge.every * 2 + 0.1);
+    assert.equal(p.n, 2);
+    assert.ok(p.u > 0 && p.u < 1 && Math.abs(p.dx) <= SWIRL.radius * SWIRL.plunge.reach);
+    const coins = plungeCoins(p, -470);
+    assert.equal(coins.length, SWIRL.plunge.coins);
+    for (const k of coins) assert.ok(k.y > -470 && k.y < -SWIRL.radius * SWIRL.squash + 1);
 });

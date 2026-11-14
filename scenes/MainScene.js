@@ -221,9 +221,10 @@ export default class MainScene extends Phaser.Scene {
         this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), (x, y) => this.seabedBelow(x, y), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y), (x, y) => this.coinTaken(x, y));
         // Moon jelly blooms drift across the route in the open seas (spec 5.0i).
         this.blooms = new BloomLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('friend_jellyfish'));
-        // Bait balls in the open blue: hide in the swirl, gannets plunge and leave coins (5.0k).
+        // The bait ball in the open blue: hide in the swirl, gannets plunge and leave coins (5.0k).
         this.baitBalls = new BaitBallLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000),
-            (x, y) => this.coinTaken(x, y), x => this.seabirdEvent('splash', x, this.surface.heightAt(x, this.time.now / 1000)));
+            (x, y) => this.coinTaken(x, y), x => this.seabirdEvent('splash', x, this.surface.heightAt(x, this.time.now / 1000)),
+            () => this.bookEntry('school_silverside'));
         // ... and at their surface float sargassum rafts; a skip off a wave sends flying fish out of the water.
         this.rafts = new RaftLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('sargassum'));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)

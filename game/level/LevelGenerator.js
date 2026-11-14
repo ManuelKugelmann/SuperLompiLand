@@ -20,6 +20,7 @@ import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import { SIZES } from '../scale.js';
+import { inBaitball } from './baitball.js';
 import {
     BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare, waterTone, zonedBiomeAt } from './biomes.js';
 
@@ -897,6 +898,8 @@ export default class LevelGenerator {
     addFriend(chunk, key, x, y, rng, angle = 0) {
         // No friend that looks like the fish you are playing (a child must always know which one is theirs); its number stays taken.
         if (key === this.playerKey) { chunk.friendCount = (chunk.friendCount ?? -1) + 1; return; }
+        // None inside the bait ball's slot (its swirl and a margin): the ball stands on its own.
+        if (inBaitball(x, y, this.field.routeY)) { chunk.friendCount = (chunk.friendCount ?? -1) + 1; return; }
         const s = this.scene, f = FRIENDS[key];
         // A Rig body with a mind of its own (game/Creature.js): it roams, crawls or guards, per its row.
         const img = new Creature(s, key, f, x, y, this.crawlEnv, rng.frac() * 1000, angle);
