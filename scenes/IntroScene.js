@@ -163,14 +163,18 @@ export default class IntroScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.lang = lang;
 
+        // "There are more fish": a round button in each gap beside the chosen character, on a
+        // dark backing so it reads against water and fish alike; it nudges gently toward its side.
         const arrow = (x, label, step) => {
-            const t = this.add.text(x, cy, label, {
-                fontFamily: 'Arial', fontSize: '110px', color: '#ffffff', fontStyle: 'bold', stroke: '#0a5c7a', strokeThickness: 10
-            }).setOrigin(0.5).setAlpha(0.85).setInteractive({ useHandCursor: true });
-            t.on('pointerdown', () => this.select(this.index + step));
+            const back = this.add.circle(x, cy, 50, 0x06343a, 0.62).setStrokeStyle(4, 0xffffff, 0.85).setDepth(20)
+                .setInteractive({ useHandCursor: true });
+            const t = this.add.text(x, cy - 8, label, { fontFamily: 'Arial', fontSize: '84px', color: '#ffffff', fontStyle: 'bold' })
+                .setOrigin(0.5).setDepth(21);
+            back.on('pointerdown', () => this.select(this.index + step));
+            this.tweens.add({ targets: [back, t], x: x + step * 8, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         };
-        arrow(110, '‹', -1);
-        arrow(W - 110, '›', 1);
+        arrow(W / 2 - SPACING / 2, '‹', -1);
+        arrow(W / 2 + SPACING / 2, '›', 1);
 
         const go = this.add.text(W / 2, H * 0.905, lang === 'de' ? 'Los geht\u2019s!' : 'Let\u2019s go!', {
             fontFamily: 'Arial', fontSize: '52px', color: '#06343a', fontStyle: 'bold',
