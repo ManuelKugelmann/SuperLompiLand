@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Bubble cannons along the currents: a shot counts as a move in the chain
+
+[`850be96`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/850be96) · 2026-11-14 05:10
+
+![Bubble cannons along the currents: a shot counts as a move in the chain](20-bubble-cannons-along-the-currents-a-shot-counts-.jpg)
+
 ## A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive
 
 [`3c01d46`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/3c01d46) · 2026-11-14 03:12

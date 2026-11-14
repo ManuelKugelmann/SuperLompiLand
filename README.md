@@ -5,9 +5,17 @@
 <!-- devlog:start -->
 ## Dev log
 
+**Bubble cannons along the currents: a shot counts as a move in the chain** — [`850be96`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/850be96) · 2026-11-14 05:10
+
+![Bubble cannons along the currents: a shot counts as a move in the chain](docs/devlog/20-bubble-cannons-along-the-currents-a-shot-counts-.jpg)
+
 **A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive** — [`3c01d46`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/3c01d46) · 2026-11-14 03:12
 
 ![A wreck greets you in the ship graveyard: every biome shows its landmark where you arrive](docs/devlog/19-a-wreck-greets-you-in-the-ship-graveyard-every-b.jpg)
+
+**A world that holds together: harbour pier, painted mangrove roots, caves with back walls, a glowing main route** — [`578708a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/578708a) · 2026-11-14
+
+![A world that holds together: harbour pier, painted mangrove roots, caves with back walls, a glowing main route](docs/devlog/18-harbour-pier.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
