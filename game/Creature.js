@@ -75,7 +75,7 @@ export default class Creature {
         if (!seen) return event;
         this.size += (p.size - this.size) * CREATURE.grow;
         this.rig.zoom = this.size;
-        const pl = water.player;
+        const pl = water?.player;
         this.rig.lookAt?.(pl && Math.hypot(pl.x - p.x, pl.y - p.y) < CREATURE.lookWithin ? pl : null);
         this.rig.draw({
             x: p.x, y: p.y, vx: p.vx, vy: p.vy, frames: dt > 0 ? dt * 60 : 1, effort: p.effort,

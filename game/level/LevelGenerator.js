@@ -162,9 +162,10 @@ export const PROPS = {
     // Pier (generated art): stands at the surface, not on a floor spot (pierAt / drawPier).
     // `piles` = pile positions across the deck (under its own posts), `pileWidth` = post width (share of the deck),
     // `pileWood` = share of the pile art that is wood (band, seamless wood strip and foot are cut from one
-    // generated pile, soft-edged), `above` = share of the deck above the waterline.
+    // generated pile, soft-edged), `above` = share of the deck above the waterline, `joint` = share of the deck's
+    // height where its own posts end in the piles (a mussel band sits over each joint).
     pier: { keys: ['pier_deck', 'pier_pile_mid', 'pier_band', 'pier_foot'], width: [1300, 1600], surface: true, every: 4, chance: 0.5, max: 1,
-        piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileWood: 0.7, above: 0.2, depth: -3, tint: 0xc4d0d4 },
+        piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileWood: 0.7, above: 0.2, joint: 0.93, depth: -3, tint: 0xc4d0d4 },
     rowboat: { keys: ['rowboat_1'], width: SIZES.rowboat, sink: 0.3, reach: 0.2, flat: 0.35, depth: -3, back: true, max: 1, every: 2 },
     // Generated art (FLUX.2 klein, Replicate): plants between the kelp stalks.
     seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, reach: 0.2, flat: 0.6, depth: -1, max: 2, sway: 0.6 },
@@ -1395,10 +1396,11 @@ export default class LevelGenerator {
                 const c0 = Math.max(0, (m0 - y) / k), c1 = Math.min(fh, (m1 - y) / k);
                 if (c0 > 0 || c1 < fh) img.setCrop(0, c0, fw, c1 - c0);
             }
-            // Barnacle and mussel band in the tidal zone: its own height, size and side per pile.
+            // Barnacle and mussel band over the joint where the deck's own post ends and the pile goes on
+            // (user: no visible cut in the posts): its own height, size and side per pile.
             const r = Math.abs(Math.sin(q.x * 12.9898) * 43758.5453) % 1, r2 = (r * 7.31) % 1;
             const bandH = frame('pier_band').height * k * (0.75 + 0.5 * r2);
-            const by = pier.deckTop + pier.deckH * (1.05 + 0.6 * r);
+            const by = pier.deckTop + pier.deckH * (p.joint + 0.03 * (r - 0.5)) - bandH / 2;
             if (by >= oy && by < y1 && by + bandH < foot) piece('pier_band', q.x, by, bandH).setFlipX(r2 < 0.5);
         }
     }

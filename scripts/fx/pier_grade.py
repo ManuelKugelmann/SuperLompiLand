@@ -19,8 +19,29 @@ def ramp(l):
     f = (t - i)[..., None]
     return RAMP[i] * (1 - f) + RAMP[i + 1] * f
 
+# The deck's left end was a straight cut through planks and beams (user: no straight cuts). It ends
+# at its first post instead: the beams stop behind the post, the planks and the fascia board run a
+# little past it with staggered, darkened end grain, and the stub at the picture's edge goes.
+DECK_END = {'post': 47, 'over': [8, 22], 'top': 95, 'grain': 5, 'planks': 7}     # px: the post's left edge, planks reach past it by, plank zone height, end-grain width, plank count
+
+def deck_end(a):
+    E = DECK_END
+    H = a.shape[0]
+    rng = np.random.default_rng(5)
+    over = rng.uniform(E['over'][0], E['over'][1], E['planks'])
+    for y in range(H):
+        if y < E['top']:                     # planks and fascia: staggered ends just past the post
+            k = min(E['planks'] - 1, int(y / E['top'] * E['planks']))
+            cut = int(E['post'] - over[k])
+            a[y, :max(cut, 0), 3] = 0
+            a[y, cut:cut + E['grain'], :3] *= np.linspace(0.55, 1, E['grain'])[:, None]   # end grain: darker at the cut
+        else:                                # beams end behind the post; nothing left of it
+            a[y, :E['post'] + 3, 3] = 0
+    return a
+
 def grade(name, round_across=False, gain=1.0):
     a = np.asarray(Image.open(os.path.join(SRC, name + '.webp')).convert('RGBA')).astype(np.float32) / 255
+    if name == 'pier_deck': a = deck_end(a)
     rgb = a[..., :3]
     mx, mn = rgb.max(-1), rgb.min(-1)
     sat = (mx - mn) / np.maximum(mx, 1e-4)
