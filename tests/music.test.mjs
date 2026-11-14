@@ -144,3 +144,22 @@ test('creak: a groan of jittered slips, normalised, silent at both ends', async 
     let tail = 0; for (let i = d.length - 80; i < d.length; i++) tail = Math.max(tail, Math.abs(d[i]));
     assert.ok(tail < 0.2, `fades out (${tail})`);
 });
+
+test('where two biomes blend, the pads cross from one key into the next: gains add up to 1, never a hard switch (spec 5.0h)', async () => {
+    const { chordAt, chordMix } = await import('../game/music/score.js');
+    const sum = notes => notes.reduce((s, n) => s + n.gain, 0) / 3;
+    for (const bar of [0, 2, 7]) {
+        assert.deepEqual(chordMix('reef', 'reef', 0.4, bar), chordAt('reef', bar).hz.map(hz => ({ hz, gain: 1 })), 'inside one biome: its chord, full');
+        assert.deepEqual(chordMix('reef', 'blue', 0, bar).map(n => n.hz), chordAt('reef', bar).hz, 'at the blend\'s start only the first key');
+        const end = chordMix('reef', 'blue', 1, bar);
+        assert.deepEqual(end.map(n => n.hz), chordAt('blue', bar).hz, 'at its end only the second');
+        let prev = 1;
+        for (let t = 0.1; t < 1; t += 0.1) {
+            const mix = chordMix('reef', 'blue', t, bar), from = mix.slice(0, 3), to = mix.slice(3);
+            assert.equal(mix.length, 6);
+            assert.ok(Math.abs(sum(mix) - 1) < 1e-9, 'the two chords together are as loud as one');
+            assert.ok(from[0].gain < prev && Math.abs(to[0].gain - t) < 1e-9, 'the first fades as the second comes');
+            prev = from[0].gain;
+        }
+    }
+});
