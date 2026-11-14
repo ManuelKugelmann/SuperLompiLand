@@ -16,6 +16,9 @@ export const DOLPHIN_LOOK = {
 // Texture keys: a painted 'dolphin' loaded under this key replaces the drawn one.
 const DOLPHIN = 'dolphin', RING = 'bubble_ring';
 
+/** The painted dolphin (loaded by the title screen); drawn procedurally while missing. */
+export const DOLPHIN_ART = { [DOLPHIN]: 'img/dolphin.webp' };
+
 function ensureTextures(scene) {
     const tex = scene.textures;
     if (!tex.exists(DOLPHIN)) {
