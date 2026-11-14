@@ -35,6 +35,8 @@ export const PRESETS = {
     glint:  { life: [2.5, 4], size: [9, 18], grow: 1.2, drag: 2.0, rise: 8, coldRise: 1, cool: 0, alpha: 0.7, color: 0xffe08a, colorEnd: 0xffd36b, surface: 'pop', blend: 'normal' },
     // Glowing plankton stirred up by a swimmer at night and in the deep (spec 5.0k, open sea #2).
     plankton: { life: [0.9, 1.8], size: [5, 11], grow: 0.5, drag: 2.5, rise: 0, coldRise: 1, cool: 0, alpha: 0.85, color: 0xb8fff6, colorEnd: 0x2fd6c0, surface: 'pop', blend: 'glow' },
+    // An octopus's ink: a dark, soft cloud that hangs and spreads (spec 5.0k).
+    ink:    { life: [2.5, 4], size: [24, 44], grow: 3, drag: 1.4, rise: 0, coldRise: 1, cool: 0, alpha: 0.7, color: 0x1c1a26, colorEnd: 0x2c2a36, surface: 'pass', blend: 'normal', soft: 'wisp' },
     smoke:  { life: [4, 7], size: [20, 40], grow: 3.2, drag: 0.7, rise: 60, coldRise: 0.7, cool: 0.2, alpha: 0.4, color: 0x9a9ea4, colorEnd: 0xd5d8dc, surface: 'pass', blend: 'normal', soft: 'wisp' }
 };
 export const PRESET_IDS = Object.keys(PRESETS);

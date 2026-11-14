@@ -20,6 +20,7 @@ import { baitballSlot } from './baitball.js';
 import { meadowSpot } from './meadow.js';
 import { ventSpot } from './ventField.js';
 import { dolphinSpot } from './dolphinRings.js';
+import { OCTOPUS } from '../ai/octopus.js';
 import { containerSpan } from './containers.js';
 import { whaleSharkSlot } from './whaleShark.js';
 
@@ -62,6 +63,7 @@ export function worldMap() {
     span('meadow', meadowSpot().x0, meadowSpot().x1);
     span('vents', ventSpot().x0, ventSpot().x1);
     span('dolphins', dolphinSpot().x0, dolphinSpot().x1);
+    span('octopus', OCTOPUS.x - OCTOPUS.roam, OCTOPUS.x + OCTOPUS.roam);
     span('containers', containerSpan().x0, containerSpan().x1);
     span('whaleshark', whaleSharkSlot().x0, whaleSharkSlot().x1);
     for (const d of downwellings()) span('current', d.down, d.up);

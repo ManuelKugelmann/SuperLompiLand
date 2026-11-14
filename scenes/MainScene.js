@@ -45,6 +45,7 @@ import RaftLayer from '../game/level/RaftLayer.js';
 import MeadowLayer from '../game/level/MeadowLayer.js';
 import VentFieldLayer from '../game/level/VentFieldLayer.js';
 import DolphinLayer from '../game/level/DolphinLayer.js';
+import OctopusLayer from '../game/ai/OctopusLayer.js';
 import ContainerLayer from '../game/level/ContainerLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
@@ -244,6 +245,8 @@ export default class MainScene extends Phaser.Scene {
         this.ventField = new VentFieldLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), x => this.level.field.routeY(x), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         // Two dolphins early in the lagoon blow bubble rings to swim through (a coin and a chain move each).
         this.dolphins = new DolphinLayer(this, x => this.level.field.routeY(x), (x, y) => { this.coinTaken(x, y); this.chainMove('ring'); }, kind => this.bookEntry(kind));
+        // An octopus on the lagoon floor: it hides from a visitor, inks at a dash, and gives coins to a calm one.
+        this.octopus = new OctopusLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         this.meadow = new MeadowLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
         // Lost shipping containers floating half sunk at the surface off the harbour; coins lead up to them from the route.
         this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'));
@@ -1536,6 +1539,7 @@ export default class MainScene extends Phaser.Scene {
         this.meadow.update(sp, this.fish.radius, time / 1000, delta);
         this.ventField.update({ x: sp.x, y: sp.y, radius: this.fish.radius }, time / 1000, delta);
         this.dolphins.update(sp, time / 1000, delta);
+        { const fv = this.fish.sprite.body.velocity; this.octopus.update(sp, Math.hypot(fv.x, fv.y), time / 1000, delta); }
         this.containers.update(sp, this.fish.radius, time / 1000);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
