@@ -98,7 +98,9 @@ test('a biome with a landmark shows it where the player arrives: at its entry an
         const spot = spotFor(b.id);
         assert.equal(landmarkGroup(Math.floor(spot.x / CH), CH), b.landmark, `${b.id}: spot`);
         assert.equal(landmarkGroup(Math.floor((b.from + LANDMARK.entry) / CH), CH), b.landmark, `${b.id}: entry`);
-        assert.ok(Math.abs(spot.y - (floorY(spot.x) - LANDMARK.above)) < 1e-9, `${b.id}: the spot is beside the seabed`);
+        // A seabed landmark (wreck) is met beside the seabed; a surface one (pier) at the waterline.
+        if (b.spot === 'surface') assert.ok(spot.y > 0 && spot.y <= 380, `${b.id}: the spot is just under the surface`);
+        else assert.ok(Math.abs(spot.y - (floorY(spot.x) - LANDMARK.above)) < 1e-9, `${b.id}: the spot is beside the seabed`);
     }
     assert.equal(landmarkGroup(Math.floor(BIOMES.find(b => b.id === 'reef').from / CH) + 2, CH), null);
     let columns = 0;
