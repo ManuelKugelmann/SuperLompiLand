@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import Creature from '../Creature.js';
+import { docksSpot } from './docks.js';
 import { SET_PIECES, ghostShip } from './setPieces.js';
 import { MICRO, microAt, microKey } from './microScatter.js';
 import { makeMicroTextures, MICRO_ORIGIN_Y } from './MicroArt.js';
@@ -156,6 +157,7 @@ export default class LevelGenerator {
         makeLineTexture(scene);
         makeMicroTextures(scene);
         this.field = createField(LEVEL.seed);
+        this.docks = docksSpot();
         this.storySpots = chapters().filter(c => c.friend).map(c => ({ x: c.x, y: this.field.routeY(c.x) }));
         this.storyStretches = chapters().filter(c => c.event).map(c => ({ x0: c.event.x - JOURNEY.eventClear, x1: c.event.endX + JOURNEY.eventClear }));
         this.storyStretches.push({ x0: ghostShip().x - SET_PIECES.ship.clear, x1: ghostShip().x + SET_PIECES.ship.clear });      // nothing harmful around the ghost ship
@@ -576,6 +578,14 @@ export default class LevelGenerator {
             const net = this.field.cave.net;
             if (net.x >= ox && net.x < ox + CH && net.y >= oy && net.y < oy + CH) {
                 this.addHazard(chunk, 'hazard_net', net.x, net.y, new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:cave`]), 0, true);
+            }
+        }
+
+        // --- The docks' net tangle (docks.js): a hazard under the pier, far off the calm route
+        {
+            const net = this.docks.net;
+            if (net.x >= ox && net.x < ox + CH && net.y >= oy && net.y < oy + CH) {
+                this.addHazard(chunk, 'hazard_net', net.x, net.y, new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:docks`]), 0, true);
             }
         }
 

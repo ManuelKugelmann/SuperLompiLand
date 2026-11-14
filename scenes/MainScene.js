@@ -33,6 +33,8 @@ import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
 import SetPieceLayer from '../game/level/SetPieceLayer.js';
 import BranchLayer from '../game/level/BranchLayer.js';
+import DocksLayer from '../game/level/DocksLayer.js';
+import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
@@ -191,6 +193,8 @@ export default class MainScene extends Phaser.Scene {
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
         this.pearls = this.progression.get?.('pearls', []) || [];
         this.branch = new BranchLayer(this, this.level.field.cave, this.pearls.includes('kelp_cave'), (x, y) => this.takePearl('kelp_cave', x, y));
+        // ... and the docks under the harbour's pier, with the hermit crab stuck in a bottle cap.
+        this.docks = new DocksLayer(this, docksSpot(), this.pearls.includes('docks_crab'), (x, y) => this.freeCrab(x, y));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -293,7 +297,7 @@ export default class MainScene extends Phaser.Scene {
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
         // A grumpy's shove (ai/grumpy.js, spec 7.1): half a heart, never the last half; relaxed play only gets the push.
         this.events.on('grumpy-hit', ({ x, y }) => this.softHit(x, y));
-        this.events.on('fish-special', ({ x, y }) => { this.beats?.special(x, y); this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
+        this.events.on('fish-special', ({ x, y }) => { this.docks.special(x, y); this.beats?.special(x, y); this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
@@ -505,6 +509,18 @@ export default class MainScene extends Phaser.Scene {
         console.log(text);
         this.add.text(40, 120, text, { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
             .setScrollFactor(0).setDepth(99);
+    }
+
+    /** The hermit crab under the docks is out of its bottle cap: coins, a cheer, an entry in the reef book. Once per save. */
+    freeCrab(x, y) {
+        const de = this.lang === 'de';
+        this.pearls.push('docks_crab');
+        this.progression.set?.('pearls', this.pearls);
+        this.coins += DOCKS.coins;
+        play('friend');
+        this.bookEntry('hermit_crab');
+        this.announce(de ? 'Der Krebs ist frei!' : 'The crab is free!', `+${DOCKS.coins}`);
+        this.particles.spawn('bubble', x, y, 10, { radius: 10, spread: 50 });
     }
 
     /** The pearl of a giant clam at the end of a side way: coins, a cheer, an entry in the reef book. Once per save. */
@@ -1320,6 +1336,7 @@ export default class MainScene extends Phaser.Scene {
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
         this.branch.update(sp, time / 1000, delta, this.particles);
+        this.docks.update(sp, time / 1000);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
