@@ -634,7 +634,10 @@ export default class LevelGenerator {
                 chunk.objects.push(s.add.ellipse(x, rock.y - 2, 34, 22, 0x3b3a3d).setStrokeStyle(4, 0x23222a).setDepth(2.92));
             } else if (!rock && top > 40) {
                 this.addChain(chunk, x, 16, top, img, h.size * 0.46);
-                chunk.objects.push(s.add.image(x, 6, s.textures.exists('hull_bottom') ? 'hull_bottom' : 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
+                // The painted hull hangs with its keel (where the chain is made fast) at the fallback's depth.
+                chunk.objects.push(s.textures.exists('hull_bottom')
+                    ? s.add.image(x, 104, 'hull_bottom').setOrigin(0.5, 330 / 364).setDepth(2.95)
+                    : s.add.image(x, 6, 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
             }
         } else if (h.tether || h.drift) {
             const ground = h.tether ? this.groundBelow(x, y, h.tether) : null;

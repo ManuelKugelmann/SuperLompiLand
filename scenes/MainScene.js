@@ -27,6 +27,8 @@ import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
+import { surgeAt, breakerAt } from '../game/level/surf.js';
+import SurfLayer from '../game/fx/SurfLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
 import { ROUTE } from '../game/level/density.js';
@@ -101,6 +103,7 @@ export default class MainScene extends Phaser.Scene {
         this.maxDepth = 0;
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
+        this.surf = new SurfLayer(this, this.surface);     // surge foam on the beach, breakers on the reef's edge (spec 5.0d)
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
         this.chain = createChain();          // linked moves (game/chain.js); shown by the HUD, not in relaxed play
         this.spin = createSpin();            // loops flown in the air
@@ -391,6 +394,11 @@ export default class MainScene extends Phaser.Scene {
         } else if (ev === 'ride') {
             play('whale');
         }
+    }
+
+    /** Time counted in waves: the sea breathes with the music, one wave every two bars. */
+    wavePhase() {
+        return musicClock.phase(nowSeconds()).beat / (musicClock.beatsPerBar * 2);
     }
 
     /** Swam into a nest: coins are safe, this is the new restart point. */
@@ -958,6 +966,10 @@ export default class MainScene extends Phaser.Scene {
         // Currents: the water takes the player up to its own speed and never brakes it,
         // so a stream entered fast is left faster (flow.js).
         const water = this.flow.at(fsp.x, fsp.y, this.time.now / 1000, this.flowAt);
+        // The coast's own forces ride on top: the surge in the surf zone, the breakers on the reef's edge.
+        const waves = this.wavePhase(), coast = this.coastPush || (this.coastPush = { x: 0, y: 0 });
+        surgeAt(fsp.x, fsp.y, waves, coast); water.x += coast.x; water.y += coast.y;
+        breakerAt(fsp.x, fsp.y, waves, coast); water.x += coast.x; water.y += coast.y;
         if (!this.fish.inAir && !this.fish.hold && (water.x || water.y)) {
             const push = carry(water.x, water.y, fsp.body.velocity.x, fsp.body.velocity.y, FLOW, this.flowPush || (this.flowPush = { x: 0, y: 0 }));
             const sail = this.fish.mode?.flow ?? 1;      // a spread fan catches the current
@@ -1106,6 +1118,7 @@ export default class MainScene extends Phaser.Scene {
         this.farLayers.update(this.camX);
         this.rockLayers.update(this.camX, this.camY);
         this.waterLight.update();
+        this.surf.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
