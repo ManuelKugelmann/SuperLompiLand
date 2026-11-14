@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHARACTERS, getCharacter } from '../game/characters.js';
 import { SPECIALS as SPECIAL_TABLE } from '../game/specials.js';
-import { rotatedPageToGame, sizeFor, gameInsets, safeView, PICTURE } from '../game/orientationMath.js';
+import { rotatedPageToGame, sizeFor, gameInsets, safeView, shapeOff, PICTURE } from '../game/orientationMath.js';
 
 const SPECIALS = Object.keys(SPECIAL_TABLE);
 
@@ -79,4 +79,11 @@ test('the heads-up display fits whole and centred inside the safe area', () => {
     assert.equal(v.width, 2140);
     assert.ok(v.zoom < 1 && v.width / v.zoom >= 2340 - 1e-6 && v.height / v.zoom >= 1080 - 1e-6, 'the whole layout is in view');
     assert.equal(v.scrollX + v.width / 2, 2340 / 2, 'centred on the layout');
+});
+
+test('shape difference: the same ratio is 0, an address bar is a little, a reshaped window is a lot', () => {
+    assert.equal(shapeOff(1920, 1080, 960, 540), 0);
+    assert.ok(shapeOff(812, 375, 812, 412) < 0.12);
+    assert.ok(shapeOff(1920, 1080, 1000, 1000) > 0.5);
+    assert.ok(Math.abs(shapeOff(1600, 900, 900, 1600) - shapeOff(900, 1600, 1600, 900)) < 1e-12);
 });

@@ -53,3 +53,9 @@ export function safeView(w, h, inset) {
     const vw = w - inset.left - inset.right, vh = h - inset.top - inset.bottom;
     return { x: inset.left, y: inset.top, width: vw, height: vh, zoom: Math.min(vw / w, vh / h), scrollX: (w - vw) / 2, scrollY: (h - vh) / 2 };
 }
+
+/** How far apart two shapes are: 0 = the same width to height ratio, 0.1 = one is 10 % wider than the other. */
+export function shapeOff(w1, h1, w2, h2) {
+    const a = w1 / h1, b = w2 / h2;
+    return Math.max(a, b) / Math.min(a, b) - 1;
+}

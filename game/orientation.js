@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { rotatedPageToGame, sizeFor, gameInsets, safeView } from './orientationMath.js';
+import { rotatedPageToGame, sizeFor, gameInsets, safeView, shapeOff } from './orientationMath.js';
 
 /**
  * Always-landscape display.
@@ -128,6 +128,12 @@ export function fitToWindow(game) {
 export function fitsWindow(game) {
     const { width, height } = wanted(game);
     return width === game.scale.width && height === game.scale.height;
+}
+
+/** Is the picture's shape off from the screen's by more than `share` (0.1 = 10 %)? */
+export function misfit(game, share) {
+    const { width, height } = wanted(game);
+    return shapeOff(game.scale.width, game.scale.height, width, height) > share;
 }
 
 /** Keep a heads-up scene clear of notch and rounded corners: its camera shows the whole layout inside the safe area. */

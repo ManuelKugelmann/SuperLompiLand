@@ -40,7 +40,7 @@ import { BOOK_KEY, placeBadge } from './ReefBookScene.js';
 import { STYLE_KEY } from './PlayStyleScene.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
-import { fitToWindow } from '../game/orientation.js';
+import { fitToWindow, misfit } from '../game/orientation.js';
 
 const STEP_MS = 1000 / 60;
 
@@ -65,6 +65,7 @@ const WORLD = {
     gravity: 0.12,         // gentle sink
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
     lookAhead: 9,         // camera leads the fish by velocity * this
+    refitAt: 0.12,        // the window's shape must change by this share before a running game is laid out again
     wallLook: 0.26,       // at a drop-off the camera looks down by this share of the screen height
     doubleTapMs: 320,
     doubleTapDist: 110,
@@ -90,8 +91,22 @@ export default class MainScene extends Phaser.Scene {
         super({ key: SCENE_KEYS.MAIN });
     }
 
-    create() {
+    create(data) {
         fitToWindow(this.game);     // the picture fills the screen, whatever its shape
+        // The window got a clearly different shape while playing: lay everything out again for it
+        // and carry on where the fish was (small changes, like a phone's address bar, just crop).
+        this.resume = data?.resume || null;
+        const refit = () => {
+            if (this.refitting || this.mp || !misfit(this.game, WORLD.refitAt)) return;
+            this.refitting = this.time.delayedCall(450, () => {
+                this.refitting = null;
+                if (!misfit(this.game, WORLD.refitAt)) return;
+                const sp = this.fish.sprite;
+                this.scene.restart({ resume: { x: sp.x, y: sp.y, coins: this.coins, health: this.health } });
+            });
+        };
+        this.scale.on('resize', refit);
+        this.events.once('shutdown', () => this.scale.off('resize', refit));
         const W = this.scale.width, H = this.scale.height;
         this.lang = this.registry.get('currentLanguage') || 'de';
 
@@ -211,6 +226,7 @@ export default class MainScene extends Phaser.Scene {
         this.controller = makeController(this.activeScheme, this, this.fish);
 
         this.coins = this.banked;
+        if (this.resume) { this.coins = this.resume.coins; this.health = this.resume.health; this.resume = null; }      // once: a respawn goes to the nest as always
         this.biomeIndex = -1;
         this.best = this.progression.get?.('best_coins', 0) || 0;
 
@@ -342,6 +358,7 @@ export default class MainScene extends Phaser.Scene {
 
     /** Where a (re)start puts the fish: above the current nest, or the start pool. */
     startPoint() {
+        if (this.resume) return this.safeSpot(this.resume.x, this.resume.y);      // carrying on after the window changed shape
         // ?at=kelp | abyss | x,y : start at a named place (repeatable screenshots, reviews).
         const spot = spotFor(new URLSearchParams(window.location.search).get('at'));
         if (spot) {
