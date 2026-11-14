@@ -11,14 +11,15 @@ import { GHOST, fingerAt, shouldShow } from './ghostDemo.js';
  *   input:     this.demo?.stop()
  */
 export default class GhostFinger {
-    static maybe(scene, ui) {
+    static maybe(scene, ui, scheme = 'tap') {
         let runs = 0;
-        try { runs = Number(window.localStorage.getItem(GHOST.key)) || 0; window.localStorage.setItem(GHOST.key, String(runs + 1)); } catch { /* storage blocked */ }
-        return shouldShow(runs) ? new GhostFinger(scene, ui) : null;
+        const key = `${GHOST.key}_${scheme}`;     // each scheme is shown on its own first starts
+        try { runs = Number(window.localStorage.getItem(key)) || 0; window.localStorage.setItem(key, String(runs + 1)); } catch { /* storage blocked */ }
+        return shouldShow(runs) ? new GhostFinger(scene, ui, scheme) : null;
     }
 
-    constructor(scene, ui) {
-        this.scene = scene; this.t = 0; this.done = false;
+    constructor(scene, ui, scheme = 'tap') {
+        this.scene = scene; this.scheme = scheme; this.t = 0; this.done = false;
         bake(scene);
         this.band = scene.add.image(0, 0, 'ghost_band').setOrigin(0, 0.5).setAlpha(0);
         this.ring = scene.add.image(0, 0, 'ghost_ring').setAlpha(0);
@@ -29,15 +30,15 @@ export default class GhostFinger {
     update(dt, fx, fy) {
         if (this.done) return;
         this.t += dt;
-        const f = fingerAt(this.t);
+        const f = fingerAt(this.t, this.scheme);
         if (f.done) { this.stop(); return; }
         const x = fx + f.x, y = fy + f.y;
-        this.finger.setPosition(x, y).setAlpha(f.alpha * 0.9).setScale(f.down ? 1.2 : 1.35);
+        this.finger.setPosition(x, y).setAlpha(f.alpha * 0.9).setScale(f.down ? 1.2 : 1.35).setRotation(f.rot);
         if (f.ring >= 0) this.ring.setPosition(x, y).setScale(0.4 + f.ring * 0.9).setAlpha((1 - f.ring) * 0.8 * f.alpha);
         else this.ring.setAlpha(0);
         if (f.band > 0) {
-            const dx = x - fx, dy = y - fy, len = Math.hypot(dx, dy);
-            this.band.setPosition(fx, fy).setRotation(Math.atan2(dy, dx)).setScale(len / 64, 1).setAlpha(0.7 * f.band * f.alpha);
+            const bx = fx + f.bandFrom[0], by = fy + f.bandFrom[1], dx = x - bx, dy = y - by, len = Math.hypot(dx, dy);
+            this.band.setPosition(bx, by).setRotation(Math.atan2(dy, dx)).setScale(len / 64, 1).setAlpha(0.7 * f.band * f.alpha);
         } else this.band.setAlpha(0);
     }
 

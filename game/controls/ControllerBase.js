@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SPECIALS } from '../specials.js';
+import GhostFinger from '../ui/GhostFinger.js';
 
 /**
  * Base for a swappable control scheme. Each scheme owns its input listeners and
@@ -45,7 +46,13 @@ export default class ControllerBase {
         return new Phaser.Math.Vector2(p.x, p.y);
     }
 
+    /**
+     * How to play: on the first starts of a scheme a ghost finger shows it without words (spec 9.1),
+     * gone at the first touch; later the line of text below.
+     */
     hint(text) {
+        this.demo = GhostFinger.maybe(this.scene, this.ui, this.schemeId);
+        if (this.demo) { this.listen(this.scene.input, 'pointerdown', () => this.demo.stop()); return null; }
         const t = this.scene.add.text(this.scene.scale.width / 2, this.scene.scale.height - 60, text, {
             fontFamily: 'Arial', fontSize: '28px', color: '#ffffff'
         }).setOrigin(0.5).setAlpha(0.5);
@@ -58,7 +65,20 @@ export default class ControllerBase {
     /** Per physics step (fixed 60 Hz): apply forces. */
     update(/* dt */) {}
     /** Per rendered frame: move overlay graphics (optional). */
-    draw() {}
+    draw() { this.drawDemo(); }
+
+    /** Moves the ghost finger along with the fish (schemes that override draw() call this). */
+    drawDemo() {
+        if (!this.demo || this.demo.done) return;
+        const [x, y] = this.demoAnchor();
+        this.demo.update(this.scene.game.loop.delta / 1000, x, y);
+    }
+
+    /** Where on screen the ghost finger's script is anchored: the fish (a scheme may say otherwise). */
+    demoAnchor() {
+        const view = this.scene.cameras.main.worldView, sp = this.fish.sprite;
+        return [sp.x - view.x, sp.y - view.y];
+    }
 
     destroy() {
         for (const [t, e, f] of this._listeners) t.off(e, f, this);

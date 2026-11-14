@@ -165,6 +165,7 @@ export default class TiltController extends ControllerBase {
     }
 
     draw() {
+        this.drawDemo();
         if (this.debug) {
             const r = this.raw, f = v => (typeof v === 'number' ? v.toFixed(1) : String(v));
             this.status.setText(`src ${this.source}\nγ ${f(r.gamma)} β ${f(r.beta)}\nangle ${f(r.angle)} rot ${r.rotated}\ndir ${f(this.dir.x)} ${f(this.dir.y)}`);

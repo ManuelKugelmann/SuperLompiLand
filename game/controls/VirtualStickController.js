@@ -30,6 +30,9 @@ export default class VirtualStickController extends ControllerBase {
         this.listen(this.scene.game.events, 'blur', this.recenter);
     }
 
+    /** The ghost finger shows the stick at its resting ring. */
+    demoAnchor() { return [this.base.x, this.base.y]; }
+
     onDown(pointer) {
         if (this.active || this.overHud(pointer)) return;
         this.active = true;
