@@ -95,6 +95,9 @@ export const MORE_FACTS = {
     dolphin: [
         f('Jeder Delfin hat seinen eigenen Pfiff, wie einen Namen.', 'Every dolphin has its own whistle, like a name.'),
         f('Beim Schlafen ruht immer nur eine Hälfte seines Gehirns.', 'When it sleeps, only one half of its brain rests at a time.')],
+    barracuda: [
+        f('Alles, was glitzert, macht ihn neugierig, weil es wie ein silberner Fisch aussieht.', 'Anything that glitters makes it curious, because it looks like a silver fish.'),
+        f('Hinter Felsen und Korallen verliert er seine Beute schnell aus den Augen.', 'Behind rocks and corals it soon loses sight of its prey.')],
     dugong: [
         f('Seine nächsten Verwandten an Land sind die Elefanten.', 'Its closest relatives on land are the elephants.'),
         f('Wo ein Dugong gegrast hat, bleibt eine Spur im Seegras.', 'Where a dugong has grazed it leaves a trail in the seagrass.')],
