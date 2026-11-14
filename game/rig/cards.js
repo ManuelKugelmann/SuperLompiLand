@@ -55,7 +55,10 @@ export const ROLES = {
     fan:       { swing: 0.05, sweep: 0.02, wave: 0.06, k: 3.0, speed: 0.9, idle: 0.25 },
     tentacles: { swing: 0.05, sweep: 0.03, wave: 0.14, k: 3.4, speed: 0.9, idle: 0.5 },
     curl:      { swing: 0.03, sweep: 0.04, wave: 0.1, k: 2.0, speed: 0.7, idle: 0.3 },
-    flap:      { swing: 0.42, sweep: 0.04, wave: 0.16, k: 1.4, speed: 0.6, idle: 0.35 }   // ray wings: slow, wide beats up and down
+    // Ray wings seen from the side beat up and down in the picture plane (sweep), bending from root to
+    // tip so the tips lag (wave); a manta glides at a steady effort, so most of the beat stays when idle
+    // (user: the manta glides stiffly; about 0.4 Hz at its effort).
+    flap:      { swing: 0.12, sweep: 0.34, wave: 0.26, k: 1.1, speed: 0.32, idle: 0.85 }
 };
 
 /** Triangle strip over a (cols x rows)-cell grid (rows joined by degenerate triangles): node index per strip vertex. */
