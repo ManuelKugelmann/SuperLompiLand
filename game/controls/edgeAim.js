@@ -22,3 +22,8 @@ export function edgeAim(x, y, W, H, cfg = EDGE) {
     const angle = Math.sign(v) * t * Math.PI / 2;
     return { x: side * Math.cos(angle), y: Math.sin(angle) };
 }
+
+/** Does a touch starting at (x, y) belong to an edge strip (below the HUD line)? Else it is a rubber-band touch. */
+export function inEdge(x, y, W, H, cfg = EDGE) {
+    return y >= H * cfg.top && (x <= W * cfg.gauge || x >= W * (1 - cfg.gauge));
+}

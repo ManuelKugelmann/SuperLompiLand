@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { edgeAim } from '../game/controls/edgeAim.js';
+import { EDGE, edgeAim, inEdge } from '../game/controls/edgeAim.js';
 
 const W = 1600, H = 900, MID = (H * 0.2 + H) / 2, near = (a, b) => Math.abs(a - b) < 1e-9;
 
@@ -29,4 +29,12 @@ test('the turn grows steadily from the middle to the corner, and the direction h
         assert.ok(-a.y >= last - 1e-12);
         last = -a.y;
     }
+});
+
+test('a touch belongs to an edge only inside the strips and below the HUD line', () => {
+    assert.equal(inEdge(10, H / 2, W, H), true);
+    assert.equal(inEdge(W - 10, H * 0.9, W, H), true);
+    assert.equal(inEdge(W / 2, H / 2, W, H), false, 'the picture is rubber band');
+    assert.equal(inEdge(W * EDGE.gauge + 5, H / 2, W, H), false);
+    assert.equal(inEdge(10, H * EDGE.top - 5, W, H), false, 'the HUD line is not an edge');
 });
