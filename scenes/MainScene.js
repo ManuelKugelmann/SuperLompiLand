@@ -49,6 +49,8 @@ import OctopusLayer from '../game/ai/OctopusLayer.js';
 import ContainerLayer from '../game/level/ContainerLayer.js';
 import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
+import { createLostCue, nextGoal } from '../game/lostCue.js';
+import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
@@ -261,6 +263,7 @@ export default class MainScene extends Phaser.Scene {
         this.sandbar = new SandbarLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.overSandbar());
         // The journey's even rhythm (spec 5.0l): coin figures on the route, huge coral colonies behind it, adult sharks passing out at sea.
         this.rhythm = new RhythmLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), id => this.bookEntry(id));
+        this.lostCue = createLostCue();      // no map: one soft arrow toward the next friend or nest when the child seems lost (spec 5.0l)
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -656,6 +659,33 @@ export default class MainScene extends Phaser.Scene {
             console.warn('relayout failed', e);
             return false;
         }
+    }
+
+    /**
+     * The lost cue (game/lostCue.js): after a while of standing still or swimming west, a soft
+     * glowing arrow at the edge of the picture points to the next friend in a net or the next
+     * nest; it fades once the fish heads that way.
+     */
+    updateLostCue(dt) {
+        const f = this.fish.sprite, v = f.body.velocity;
+        const goals = [...this.journey.list.filter(c => c.friend && !this.journey.has(c.friend.id)).map(c => c.x), ...this.level.nests.filter(n => n.index > this.nestIndex).map(n => n.x)];
+        const gx = nextGoal(f.x, goals), alpha = this.lostCue.step(dt, v.x, Math.hypot(v.x, v.y), gx === null ? null : gx - f.x);
+        if (alpha <= 0) { this.lostArrow?.setVisible(false); return; }
+        if (!this.textures.exists('lost_arrow')) {
+            // A soft chevron of light, pointing right.
+            const S = 128, tex = this.textures.createCanvas('lost_arrow', S, S), c = tex.getContext();
+            c.lineCap = 'round'; c.lineJoin = 'round';
+            for (const [w, a] of [[34, 0.12], [22, 0.25], [11, 0.9]]) {
+                c.strokeStyle = `rgba(255,243,176,${a})`; c.lineWidth = w;
+                c.beginPath(); c.moveTo(44, 26); c.lineTo(86, 64); c.lineTo(44, 102); c.stroke();
+            }
+            tex.refresh();
+        }
+        if (!this.lostArrow) this.lostArrow = this.add.image(0, 0, 'lost_arrow').setScrollFactor(0).setDepth(50).setBlendMode(Phaser.BlendModes.ADD);
+        const at = edgeMarker(this.cameras.main.worldView, { x: gx, y: this.level.field.routeY(gx) });
+        if (!at) { this.lostArrow.setVisible(false); return; }
+        const beat = 1 + 0.1 * Math.sin(this.time.now / 260);
+        this.lostArrow.setVisible(true).setPosition(at.x, at.y).setRotation(at.angle).setAlpha(alpha * 0.85).setScale(1.3 * beat);
     }
 
     /**
@@ -1466,6 +1496,7 @@ export default class MainScene extends Phaser.Scene {
         this.bobCoins();
         this.discover(delta);
         if (!this.ambientMode) this.updateGuide(delta / 1000);
+        if (!this.ambientMode && !this.perfTour) this.updateLostCue(delta / 1000);
 
         // Bubble trail when moving fast.
         const speed = Math.hypot(v.x, v.y);
