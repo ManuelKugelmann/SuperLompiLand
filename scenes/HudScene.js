@@ -14,6 +14,8 @@ export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
 export const HUD = {
     switcherFirstMs: 14000,   // the control-scheme row stays this long on the very first run
     switcherMenuMs: 12000,    // ... and this long when called from the menu
+    rowGap: 28,               // px between the groups of the top line
+    coinSlot: 74,             // px kept for the coin count, so the hearts never move as it grows
     bannerAlpha: 0.85         // announcements never cover the picture fully (spec 5.0j: faint and minimal)
 };
 
@@ -54,13 +56,21 @@ export default class HudScene extends Phaser.Scene {
         else { main.progression.set?.('controls_shown', true); showSwitcher(HUD.switcherFirstMs); }
 
         const hudText = (x, y, size) => this.add.text(x, y, '', textStyle(parseInt(size, 10)));
-        if (this.textures.exists('coin')) this.add.image(70, 190, 'coin').setDisplaySize(64, 64);
-        this.coinText = hudText(116, 162, '50px');
-        this.depthText = hudText(40, 232, '34px');
+        // One line along the top (user: 'HUD in top line'): menu, coins, hearts, depth and place. The
+        // left side of a landscape phone stays free for the picture.
+        const rowY = Math.round(this.scale.height * MENU.button * 0.6);
+        let rowX = Math.round(this.scale.height * MENU.button * 1.2) + HUD.rowGap;
+        if (this.textures.exists('coin')) this.add.image(rowX + 26, rowY, 'coin').setDisplaySize(52, 52);
+        this.coinText = hudText(rowX + 58, rowY, '42px').setOrigin(0, 0.5);
+        rowX += 58 + HUD.coinSlot;
+        const heartSize = 40;
+        this.hearts = heartRow(this, rowX, rowY, main.maxHealth, heartSize);
+        rowX += main.maxHealth * heartSize * 1.08 + HUD.rowGap;
+        this.depthText = hudText(rowX, rowY, '30px').setOrigin(0, 0.5);
         this.depthLabel = de ? 'Tiefe' : 'Depth';
 
         // Chain: a soft counter that names the last move; no timer, it simply fades when the chain ends.
-        this.chainText = hudText(40, 356, '38px').setAlpha(0);
+        this.chainText = hudText(Math.round(this.scale.height * MENU.button * 1.2) + HUD.rowGap, rowY + 56, '34px').setAlpha(0);
         const moves = de
             ? { leap: 'Sprung', landing: 'Landung', skim: 'Wellenhüpfer', flip: 'Salto', special: 'Spezial', stream: 'Strömung', trail: 'Melodie', cannon: 'Blubberkanone', pad: 'Hüpfkissen', arch: 'Felsentor', ring: 'Blasenring' }
             : { leap: 'Jump', landing: 'Landing', skim: 'Wave skip', flip: 'Flip', special: 'Special', stream: 'Current', trail: 'Melody', cannon: 'Bubble cannon', pad: 'Bounce pad', arch: 'Sea arch', ring: 'Bubble ring' };
@@ -74,8 +84,6 @@ export default class HudScene extends Phaser.Scene {
         main.events.on('chain-end', onEnd);
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { main.events.off('chain-move', onMove); main.events.off('chain-end', onEnd); });
 
-        // Health: a row of hearts (readable at a glance, half hearts for sturdy characters).
-        this.hearts = heartRow(this, 36, 300, main.maxHealth);
 
         this.add.text(this.scale.width - 16, this.scale.height - 12, VERSION_TAG, {
             fontFamily: 'Arial', fontSize: '20px', color: '#ffffff'
@@ -150,7 +158,9 @@ export default class HudScene extends Phaser.Scene {
         if (!m?.fish) return;
         // Playing together the counter is the team's: everything the room has collected.
         this.coinText.setText(String(m.mp ? m.teamCoins() : m.coins));
-        this.depthText.setText(`${this.depthLabel} ${m.depthMeters()} m`);
+        // Where am I (tester: 'it used to say where I am'): the place stays next to the depth.
+        const place = BIOMES[m.biomeIndex]?.name?.[m.lang] || BIOMES[m.biomeIndex]?.name?.en || '';
+        this.depthText.setText(place ? `${this.depthLabel} ${m.depthMeters()} m · ${place}` : `${this.depthLabel} ${m.depthMeters()} m`);
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
     }
