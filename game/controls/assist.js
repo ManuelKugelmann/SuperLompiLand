@@ -25,6 +25,8 @@ export const ASSIST = {
     lane: {
         below: 250,      // px under the calm lane's lower edge from which a depth the player did not choose is eased back up
         stop: 0,         // ... and px under that edge at which the easing, once started, ends
+        above: 400,      // the mirror: px over the lane's upper edge from which a depth the player did not choose is eased back down ...
+        sink: 40,        // ... by this many px per second, to the upper edge itself
         rise: 40,        // px per second by which the held depth then rises toward that edge
         level: 0.15      // the pull counts as level (the hold keeps working during it) while its up or down part is below this share
     },
@@ -107,4 +109,18 @@ export function easing(rest, laneBottom, chosen, was, cfg = ASSIST.lane) {
 /** The held depth a moment later while it is eased: up by `rise` px per second, no higher than `stop` px under the lane's lower edge. `dt` s. */
 export function easeRest(rest, laneBottom, dt, cfg = ASSIST.lane) {
     return Math.max(laneBottom + cfg.stop, rest - cfg.rise * dt);
+}
+
+/**
+ * The mirror of easing(): whether a held depth far above the calm lane is being eased down to
+ * it. It starts once a depth the player did not choose lies more than `above` px over the lane's
+ * upper edge (`laneTop`, world y), and goes on until it has reached that edge.
+ */
+export function easingDown(rest, laneTop, chosen, was, cfg = ASSIST.lane) {
+    return !chosen && rest !== null && rest < laneTop - (was ? cfg.stop : cfg.above);
+}
+
+/** The held depth a moment later while it is eased down: by `sink` px per second, no deeper than the lane's upper edge. `dt` s. */
+export function easeRestDown(rest, laneTop, dt, cfg = ASSIST.lane) {
+    return Math.min(laneTop - cfg.stop, rest + cfg.sink * dt);
 }

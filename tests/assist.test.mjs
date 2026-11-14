@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust, easing, easeRest } from '../game/controls/assist.js';
+import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust, easing, easeRest, easingDown, easeRestDown } from '../game/controls/assist.js';
 
 // A seabed step: rock below y 1000 west of x 500, and below y 800 east of it (a 200 px step up).
 const step = (x, y) => y < (x < 500 ? 1000 : 800);
@@ -99,4 +99,16 @@ test('a depth the player did not choose, far below the lane, is eased back to th
     }
     assert.equal(rest, laneBottom + A.stop, 'once started it goes on to the lane edge, not only back within the start distance');
     assert.equal(on, false, 'and then it is over');
+});
+
+test('the mirror: a depth far above the lane that the player did not choose sinks gently to the upper edge of the lane', () => {
+    const A = ASSIST.lane, laneTop = 900;
+    assert.equal(easingDown(200, laneTop, true, false), false, 'chosen by steering up: kept');
+    assert.equal(easingDown(laneTop - A.above + 50, laneTop, false, false), false, 'near the lane anyway: left alone');
+    assert.equal(easingDown(null, laneTop, false, true), false);
+    assert.equal(easeRestDown(200, laneTop, 1), 200 + A.sink);
+    let rest = 150, on = false;
+    for (let i = 0; i < 60 * 60; i++) { on = easingDown(rest, laneTop, false, on); if (on) rest = easeRestDown(rest, laneTop, 1 / 60); }
+    assert.equal(rest, laneTop - A.stop, 'once started it goes on to the lane edge');
+    assert.equal(on, false);
 });

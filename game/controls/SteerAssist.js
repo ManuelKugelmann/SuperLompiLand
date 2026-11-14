@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { ASSIST, slideDir, climbForce, holdLift, restDepth, levelThrust, easing, easeRest } from './assist.js';
+import { ASSIST, slideDir, climbForce, holdLift, restDepth, levelThrust, easing, easeRest, easingDown, easeRestDown } from './assist.js';
 import { ROUTE } from '../level/density.js';
 
 /**
@@ -17,6 +17,8 @@ export default class SteerAssist {
         this.dived = false;     // during this pull the player steered down on purpose
         this.chosen = false;    // the depth held now was chosen by a dive (kept; any other eases back toward the lane)
         this.easing = false;    // the held depth is on its way back up to the lane
+        this.sinking = false;   // ... or back down to it
+        this.rose = false;      // during this pull the player steered up on purpose
         this.dir = { x: 0, y: 0, climbing: false };
         this.v = new Phaser.Math.Vector2();
         this.isOpen = (x, y) => this.scene.level.isOpen(x, y, 0);
@@ -28,6 +30,10 @@ export default class SteerAssist {
         const laneBottom = this.scene.level.field.routeY(pos.x) + ROUTE.halfWidth;
         this.easing = easing(this.restY, laneBottom, this.chosen, this.easing);
         if (this.easing) this.restY = easeRest(this.restY, laneBottom, dt / 1000);
+        // ... and one far above it (the fish drifted up along the surface while the lane went deeper) sinks gently to its upper edge.
+        const laneTop = laneBottom - ROUTE.halfWidth * 2;
+        this.sinking = easingDown(this.restY, laneTop, this.chosen, this.sinking);
+        if (this.sinking) this.restY = easeRestDown(this.restY, laneTop, dt / 1000);
     }
 
     /** The direction to kick or pull in: `dir` (unit vector) turned up along a step that is in the way. Returns { x, y, climbing }. */
@@ -43,6 +49,7 @@ export default class SteerAssist {
         const fish = this.fish, vy = fish.body.velocity.y;
         this.resting = false;
         if (dive) this.dived = true;
+        if (dir.y < -ASSIST.hold.diveDir) this.rose = true;
         const d = this.aim(dir);
         // A climb is a steady pull, not a launch: once the fish rises fast enough it gets no more.
         fish.thrust(this.v.set(d.x, d.y).scale((d.climbing ? climbForce(vy) : strength) * gain));
@@ -59,7 +66,7 @@ export default class SteerAssist {
     rest(brake) {
         const fish = this.fish;
         if (brake) fish.brake();
-        if (!this.resting) { this.resting = true; this.chosen = this.dived; this.restY = restDepth(fish.pos.y, this.restY, this.dived); this.dived = false; }
+        if (!this.resting) { this.resting = true; this.chosen = this.dived || this.rose; this.restY = restDepth(fish.pos.y, this.restY, this.dived); this.dived = false; this.rose = false; }
         const lift = fish.inAir ? 0 : holdLift(fish.pos.y, this.restY);
         if (lift > 0) fish.thrust(this.v.set(0, -lift));
     }
