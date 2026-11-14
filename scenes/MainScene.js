@@ -555,6 +555,8 @@ export default class MainScene extends Phaser.Scene {
         const tier = fixed ? asked : this.perfTour ? 'high' : startTier(this.progression.get?.('quality', null), this.sys.game.device.input.touch);
         this.quality = { tier, fps: 60, auto: !fixed && !this.perfTour };
         this.autotune = createAutotune(tier);
+        this.game.events.on('visible', this.autotune.pause);      // the frame after a hidden page is the time away, not the phone's speed
+        this.events.once('shutdown', () => this.game.events.off('visible', this.autotune.pause));
         this.applyQuality(tier);
 
         this.mp = Multiplayer.create(this); // null unless a room code was chosen on the title
@@ -1796,8 +1798,10 @@ export default class MainScene extends Phaser.Scene {
         if (jumped || due(frame, checkEvery)) cullToView(this.children.list, this.cameras.main.worldView, this.cameras.main.id, { ...VIEW_CULL, pad: VIEW_CULL.pad + this.viewLead });
         // Quality: the frame rate decides (quality.js); a fixed tier (?quality=...) and the perf tour are left alone.
         this.quality.fps = this.autotune.fps;
-        if (this.quality.auto) { const tier = this.autotune.step(delta); if (tier) this.applyQuality(tier, true); }
-        else this.autotune.step(delta);
+        // The frame's real length (the engine's own delta is held under 200 ms: a phone slower than that would look faster than it is).
+        const frameMs = this.game.loop.rawDelta || delta;
+        if (this.quality.auto) { const tier = this.autotune.step(frameMs); if (tier) this.applyQuality(tier, true); }
+        else this.autotune.step(frameMs);
         if (!this.surf) {
             const z = surfZones();
             if (sp.x < z.surge[1] + WORLD.weatherRange || (sp.x > z.reef[0] - WORLD.weatherRange && sp.x < z.reef[1] + WORLD.weatherRange)) this.surf = new SurfLayer(this, this.surface);

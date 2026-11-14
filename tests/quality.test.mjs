@@ -28,38 +28,38 @@ test('a share of a burst: the whole part, and the rest as a chance', () => {
     assert.ok(Math.abs(sum / 1000 - 1.05) < 0.05, 'on average exactly the share');
 });
 
-test('under 30 frames a second for three seconds: a tier down; a good frame rate: nothing', () => {
+test('under 30 frames a second for two seconds: a tier down, with a pause between steps; a good frame rate: nothing', () => {
     const t = createAutotune('high');
     assert.equal(run(t, 60, 20), null, 'at 60 on the highest tier nothing changes');
-    assert.equal(run(t, 24, 1.5), null, 'a short dip is not enough');
+    assert.equal(run(t, 24, 1), null, 'a short dip is not enough');
     assert.equal(run(t, 60, 3), null);
     assert.equal(run(t, 24, 6), 'medium');
     assert.equal(t.tier, 'medium');
     assert.ok(Math.abs(t.fps - 24) < 1);
-    assert.equal(run(t, 24, 2), null, 'right after a change nothing is judged');
-    assert.equal(run(t, 24, 8), 'low');
+    assert.equal(run(t, 24, 1), null, 'right after a change nothing is judged');
+    assert.equal(run(t, 24, 3.5), 'low', 'the next step a few seconds later');
     assert.equal(run(t, 12, 12), 'basic', 'the tier for very slow phones');
     assert.equal(run(t, 6, 30), null, 'there is nothing under the lowest tier');
 });
 
-test('over 50 for ten seconds: a tier up; and a tier that had to be left again at once is not tried again', () => {
+test('after the start it never goes up again within a session', () => {
     const t = createAutotune('low');
     assert.equal(run(t, 40, 6), null, 'the start probe finds it fitting');
-    assert.equal(run(t, 58, 8), null, 'not yet');
-    assert.equal(run(t, 58, 8), 'medium');
-    assert.equal(run(t, 40, 30), null, 'between 30 and 50: it stays');
-    assert.equal(run(t, 58, 16), 'high');
-    assert.equal(run(t, 22, 9), 'medium', 'too much: down again');
-    assert.equal(run(t, 58, 120), null, 'and high is not tried again in this run');
-    assert.equal(t.tier, 'medium');
+    assert.equal(run(t, 58, 120), null, 'a fast stretch later does not raise it');
+    assert.equal(run(t, 22, 6), 'basic');
+    assert.equal(run(t, 60, 120), null);
+    assert.equal(t.tier, 'basic');
 });
 
-test('a pause is not a slow frame', () => {
+test('the frame after a hidden page is not counted; a phone whose every frame is long steps down to the lowest tier', () => {
     const t = createAutotune('high');
     run(t, 60, 5);
-    for (let i = 0; i < 40; i++) assert.equal(t.step(5000), null);
-    assert.equal(t.tier, 'high');
-    assert.ok(t.fps > 55);
+    for (let i = 0; i < 40; i++) { t.pause(); assert.equal(t.step(5000), null); run(t, 60, 0.2); }
+    assert.equal(t.tier, 'high', 'pauses between good frames');
+    const slow = createAutotune('high');
+    let last = null;
+    for (let i = 0; i < 120; i++) last = slow.step(450) || last;      // a 20x slower phone: every frame about half a second
+    assert.equal(slow.tier, 'basic');
 });
 
 test('shareOf reads the scene\'s tier, and the high tier while there is none yet', async () => {
