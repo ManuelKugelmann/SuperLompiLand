@@ -1349,7 +1349,7 @@ export default class MainScene extends Phaser.Scene {
         this.ambient.setFillStyle(lit, 1);
         // Inside the side cave the score closes in: it is played as if much deeper down.
         const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
-        updateMusic(this.biomeId(), inCave ? Math.max(depth01, WORLD.caveDepth01) : depth01);   // background score + sea hum (spec ch.12)
+        updateMusic(biomeBlendAt(this.fish.sprite.x), inCave ? Math.max(depth01, WORLD.caveDepth01) : depth01);   // background score + sea hum (spec ch.12)
         // The storm rumbles overhead (loudest near the surface); strong moving water rushes past the fish.
         const p = this.soundProbe || (this.soundProbe = { x: 0, y: 0 }), waves = this.waves ?? this.wavePhase();
         let moving = Math.hypot(surgeAt(view.x, view.y, waves, p).x, p.y);

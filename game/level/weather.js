@@ -8,7 +8,7 @@ import { BIOMES } from './biomes.js';
 
 export const WEATHER = {
     storm: {
-        biome: 'wreck', from: 0.25, to: 0.7,   // which sea, and the share of it the storm lies over
+        biome: 'wreck', at: 0.475, length: 6300,   // which sea, where in it the storm's middle lies (share of its width), and how long it is (px)
         ramp: 1300,        // px over which it builds up and dies down at its edges
         routeY: 1300,      // the calm route passes this deep underneath
         depth: 340,        // the top layer of water the storm churns
@@ -36,7 +36,7 @@ let STORM_SPAN = null, COLUMNS = null;      // the shipped storm and current: wo
 /** The storm's stretch of the world: { x0, x1 }. */
 export function stormSpan(cfg = WEATHER.storm) {
     if (cfg === WEATHER.storm && STORM_SPAN) return STORM_SPAN;
-    const b = biome(cfg.biome), span = { x0: b.from + b.width * cfg.from, x1: b.from + b.width * cfg.to };
+    const b = biome(cfg.biome), mid = b.from + b.width * cfg.at, span = { x0: mid - cfg.length / 2, x1: mid + cfg.length / 2 };
     if (cfg === WEATHER.storm) STORM_SPAN = span;
     return span;
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ROCK_LAYERS, SUPPORT, enclosure, wallShare, layerField, lowPass, layerChunkRect, fogLayer, LAYER_CHUNK } from '../game/level/rockLayerTable.js';
-import { BIOMES } from '../game/level/biomes.js';
+import { BIOMES, BLEND } from '../game/level/biomes.js';
 import { FIELD, createField } from '../game/level/density.js';
 
 const T = FIELD.threshold;
@@ -28,7 +28,7 @@ test('closed share per biome: islands stand in front of their rock socket, the o
     const closed = id => {
         const b = biome(id);
         let n = 0, k = 0;
-        for (let x = b.from + 600; x < b.from + b.width - 600; x += 97) { if (enclosure(x, ROCK_LAYERS[0]) > 0) k++; n++; }
+        for (let x = b.from + BLEND + 600; x < b.from + b.width - BLEND - 600; x += 97) { if (enclosure(x, ROCK_LAYERS[0]) > 0) k++; n++; }
         return k / n;
     };
     for (const id of ['beach', 'mangrove', 'reef']) assert.ok(closed(id) > 0.6, `${id} ${closed(id)}`);

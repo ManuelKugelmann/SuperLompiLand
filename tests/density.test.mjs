@@ -1,7 +1,7 @@
 import test from 'node:test';
 import { SEA_ARCH, seaArch } from '../game/level/seaArch.js';
 import assert from 'node:assert/strict';
-import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY, nestReached } from '../game/level/density.js';
+import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY, nestReached, nestSpots } from '../game/level/density.js';
 import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS, REEF_CREST, reefCrest, reefCrestX } from '../game/level/biomes.js';
 import { detour } from '../game/level/weather.js';
 import { ghostShip } from '../game/level/setPieces.js';
@@ -100,7 +100,7 @@ test('the calm route crosses the open sea just under the surface and runs half w
         else assert.ok(y > 800 && y < 1300, `${b.id}: ${Math.round(y)}`);
     }
     assert.ok(f.nests.every(n => n.grand || BIOMES[n.biome].zone === 'island'), 'nests lie on the coasts (and the grand nest at the end)');
-    assert.equal(f.nests.length, BIOMES.filter(b => b.zone === 'island').length + 1);
+    assert.equal(f.nests.length, nestSpots().length);
 });
 
 test('the open sea is clear water: no rock hangs between the surface and just above the bottom', () => {
@@ -158,19 +158,28 @@ test('following the calm route reaches every nest: anywhere in the lane over it 
     }
 });
 
-test('the sea arch: the calm route runs through its opening and tunnels through its legs, which are rock around it', () => {
-    const f = createField(1337), a = seaArch(), mid = (a.open.x0 + a.open.x1) / 2;
+test('the sea arch: the calm route climbs gently to it and runs through its opening in open water (its legs are a picture, not rock)', () => {
+    const f = createField(1337), a = seaArch();
     assert.ok(SEA_ARCH.swim + ROUTE.halfWidth <= SEA_ARCH.under, 'the lane fits into the opening');
     for (let x = a.x0; x <= a.x1; x += 50) {
         const ry = f.routeY(x);
         assert.ok(Math.abs(ry - SEA_ARCH.swim) < 30, `route at ${x}: ${Math.round(ry)}`);
-        for (let dy = -ROUTE.halfWidth + 20; dy <= ROUTE.halfWidth - 20; dy += 40) assert.ok(f.density(x, ry + dy) < FIELD.threshold, `lane open at ${x}, ${Math.round(ry + dy)}`);
+        for (let y = 40; y <= ry + ROUTE.halfWidth - 20; y += 40) assert.ok(f.density(x, y) < FIELD.threshold, `open water at ${x}, ${y}`);
     }
-    for (const x of [a.x0 + 400, a.x1 - 400]) {
-        for (const y of [30, 150, 270]) assert.ok(f.density(x, y) > FIELD.threshold, 'the leg is solid from the surface down to the tunnel');
-        assert.ok(f.density(x, 1100) > FIELD.threshold && f.density(x, 1800) > FIELD.threshold, 'and goes down into the seabed');
-    }
-    assert.ok(f.density(mid, 60) < FIELD.threshold, 'the opening is water up to the surface');
-    // The climb to it is gentle, and it does not disturb the friend's net or the way into the trench.
     for (let x = a.x0 - SEA_ARCH.approach - 400; x < a.x1 + SEA_ARCH.approach + 400; x += 32) assert.ok(Math.abs(f.routeY(x + 32) - f.routeY(x)) / 32 < 1, `slope at ${x}`);
+});
+
+test('along every island a nest lies every so often, none in the open sea, none on a set piece (spec 5.0h)', () => {
+    const f = createField(1337), xs = f.nests.map(n => n.x);
+    for (let i = 1; i < xs.length; i++) assert.ok(xs[i] > xs[i - 1], 'west to east');
+    for (const b of BIOMES) {
+        const mine = f.nests.filter(n => !n.grand && n.x >= b.from && n.x < b.from + b.width);
+        if (b.zone !== 'island') { assert.equal(mine.length, 0, `${b.id} has none`); continue; }
+        assert.ok(mine.length >= Math.floor(b.width / FIELD.nestEvery) - 2, `${b.id}: ${mine.length}`);
+        for (let i = 1; i < mine.length; i++) assert.ok(mine[i].x - mine[i - 1].x < FIELD.nestEvery * 1.8 && mine[i].x - mine[i - 1].x > 4000, `${b.id}: gap ${Math.round(mine[i].x - mine[i - 1].x)}`);
+    }
+    const a = seaArch();
+    for (const n of f.nests) assert.ok(n.x < a.x0 - 2000 || n.x > a.x1 + 2000, 'none at the sea arch');
+    // Every nest is on the route: the lane passes right over it.
+    for (const n of f.nests) assert.ok(Math.abs(f.routeY(n.x) - (n.y - ROUTE.aboveNest)) < 60, `route over the nest at ${Math.round(n.x)}`);
 });

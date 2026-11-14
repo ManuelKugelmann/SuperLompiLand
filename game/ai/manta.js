@@ -6,7 +6,8 @@ import { BIOMES } from '../level/biomes.js';
 
 export const MANTA = {
     biome: 'reef',
-    margin: 1400,       // px it stays away from the biome's ends
+    at: 0.5,            // where in the biome the middle of its stretch lies (share of its width)
+    reach: 5200,        // px its stretch is long
     above: 430,         // px over the calm route it glides
     swell: 90,          // px it rises and falls on its way
     speed: 85,          // px per second
@@ -18,7 +19,8 @@ export const MANTA = {
 /** The stretch it patrols: { x0, x1 }. */
 export function mantaSpan(cfg = MANTA) {
     const b = BIOMES.find(bi => bi.id === cfg.biome);
-    return { x0: b.from + cfg.margin, x1: b.from + b.width - cfg.margin };
+    const mid = b.from + b.width * cfg.at;
+    return { x0: mid - cfg.reach / 2, x1: mid + cfg.reach / 2 };
 }
 
 /**

@@ -127,7 +127,9 @@ test('a biome with a landmark shows it where the player arrives: at its entry an
     assert.equal(landmarkGroup(Math.floor(BIOMES.find(b => b.id === 'reef').from / CH) + 2, CH), null);
     let columns = 0;
     for (let cx = 0; cx < WORLD_END / CH; cx++) if (landmarkGroup(cx, CH)) columns++;
-    assert.equal(columns, 4, 'two columns per landmark biome, no more');
+    // Along a long biome it stands again and again (spec 5.0h), but never column after column.
+    assert.ok(columns >= 8 && columns < WORLD_END / CH / LANDMARK.every, `${columns} landmark columns`);
+    for (let cx = 0; cx < WORLD_END / CH; cx++) assert.ok(!(landmarkGroup(cx, CH) && landmarkGroup(cx + 1, CH) && landmarkGroup(cx + 2, CH)), 'no row of three');
 });
 
 test('the mangrove spot is under the roots at the surface', () => {

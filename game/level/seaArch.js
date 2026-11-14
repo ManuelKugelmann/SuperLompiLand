@@ -1,7 +1,8 @@
 // The rocky shore's sea arch (pure, no Phaser; spec gamedesign §5.0g). A huge natural arch stands
 // in the surf late on the rocky shore. Its painted upper half (img/coast/sea_arch.webp,
 // sea_arch.json: the picture's bottom edge is the waterline) shows the opening above the water;
-// below the water the rock goes on down to the seabed with the opening continuing under the
+// below the water its legs go on down to the seabed as a picture behind the fish (no rock to
+// bump into: in a side view a solid leg would be a wall), with the opening continuing under the
 // surface, so the calm route swims through it and a jump flies through its top half.
 // Tested in tests/seaArch.test.mjs.
 import { BIOMES } from './biomes.js';
@@ -9,13 +10,12 @@ import { BIOMES } from './biomes.js';
 export const SEA_ARCH = {
     biome: 'shore',
     at: 0.74,             // where in the biome (share of its width): past the friend's net, before the trench
-    swim: 620,            // depth at which the calm route runs through it (its lane ends at the opening's floor)
+    swim: 420,            // depth at which the calm route runs through it, in open water: under the water its legs are a picture behind the fish
     approach: 1200,       // px to either side over which the route climbs up to it and sinks back
-    edge: 150,            // px over which the legs' outer faces lean out of the water around them
     scale: 1.25,          // picture px -> world px
     art: { size: [1800, 600], opening: [570, 250, 689, 350] },   // from sea_arch.json
     under: 900,           // px the opening reaches under the surface
-    footDepth: 1700,      // px down to which the arch's legs are solid rock (they join the seabed)
+    footDepth: 1700,      // px down to which the arch's legs reach (they join the seabed)
     wear: 40,             // px the under-water opening's edge wanders
     coins: 9              // coins in the arc through the opening's top half
 };
@@ -34,7 +34,7 @@ export function seaArch(cfg = SEA_ARCH) {
     };
 }
 
-/** Is (x, y) the arch's rock (1), its opening (-1), or none of its business (0)? Under the water only (the picture is the part above). */
+/** Is (x, y) the arch's leg (1), its opening (-1), or none of its business (0)? Under the water only; this shapes the picture of the legs. */
 export function archRock(arch, x, y, cfg = SEA_ARCH) {
     if (y < 0 || y > cfg.footDepth || x < arch.x0 || x > arch.x1) return 0;
     const o = arch.open, wob = Math.sin(y / 97 + x / 211) * cfg.wear * 0.6 + Math.sin(y / 41) * cfg.wear * 0.4;

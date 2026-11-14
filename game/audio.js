@@ -4,7 +4,7 @@
 // first play() that follows user input.
 
 import { createClock } from './music/clock.js';
-import { SCORE, chordAt, arpAt } from './music/score.js';
+import { SCORE, chordMix, arpAt } from './music/score.js';
 import { creakSamples } from './music/creak.js';
 
 /**
@@ -310,15 +310,15 @@ export function updateWeatherSound(storm01, rush01) {
 }
 
 /** A soft pad voice: two slightly detuned triangles, slow attack and release. */
-function pad(hz, t, dur) {
+function pad(hz, t, dur, gain = 1) {
     for (const cents of [-5, 5]) {
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = 'triangle';
         o.frequency.value = hz;
         o.detune.value = cents;
         g.gain.setValueAtTime(0.0001, t);
-        g.gain.linearRampToValueAtTime(MUSIC.padVol, t + Math.min(1.5, dur * 0.3));
-        g.gain.setValueAtTime(MUSIC.padVol, t + dur * 0.7);
+        g.gain.linearRampToValueAtTime(MUSIC.padVol * gain, t + Math.min(1.5, dur * 0.3));
+        g.gain.setValueAtTime(MUSIC.padVol * gain, t + dur * 0.7);
         g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.6);
         o.connect(g).connect(bus);
         o.start(t);
@@ -341,8 +341,13 @@ function bellNote(hz, t) {
     });
 }
 
-/** Call every frame: biome id of the current place and depth 0 (surface) .. 1 (abyss). */
-export function updateMusic(biomeId, depth01) {
+/**
+ * Call every frame: depth 0 (surface) .. 1 (abyss) and the biome blend of the current place
+ * ({ a, b, t } of biomeBlendAt): the pads cross from a's key into b's over the blend, the bells
+ * follow the nearer one.
+ */
+export function updateMusic(blend, depth01) {
+    const biomeId = (blend.t < 0.5 ? blend.a : blend.b).id;
     if (!ctx || muted || ctx.state !== 'running') return;
     musicNodes();
     const now = nowSeconds(), beatS = 60 / musicClock.bpm;
@@ -353,7 +358,7 @@ export function updateMusic(biomeId, depth01) {
     while (nextBeat < ctx.currentTime + MUSIC.lookahead) {
         const bar = Math.floor(beatIdx / musicClock.beatsPerBar), inBar = beatIdx % musicClock.beatsPerBar;
         if (inBar === 0 && bar % SCORE.barsPerChord === 0) {
-            for (const hz of chordAt(biomeId, bar).hz) pad(hz, nextBeat, beatS * musicClock.beatsPerBar * SCORE.barsPerChord);
+            for (const n of chordMix(blend.a.id, blend.b.id, blend.t, bar)) pad(n.hz, nextBeat, beatS * musicClock.beatsPerBar * SCORE.barsPerChord, n.gain);
         }
         for (const half of [0, 1]) {
             const hz = arpAt(biomeId, bar, inBar * 2 + half, depth01);

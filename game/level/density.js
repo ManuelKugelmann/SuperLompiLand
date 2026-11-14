@@ -5,8 +5,8 @@ import { vnoise } from './terrain.js';
 import { detour } from './weather.js';
 import { SET_PIECES, ghostShip, pinnacleTop, descentStart } from './setPieces.js';
 import { BRANCH, sideCave, ridgeTop, caveAt } from './branches.js';
-import { SEA_ARCH, seaArch, archRock } from './seaArch.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
+import { SEA_ARCH, seaArch } from './seaArch.js';
+import { BIOMES, BLEND, LANDMARK, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
@@ -19,7 +19,10 @@ export const FIELD = {
     footReach: 460,               // ... fading out this far above it
     seaClear: 1.3,                // how much rock the open sea takes away above its bottom (more than the noise can add)
     seaBottom: 300,               // px above the sea's bottom over which rock comes back
-    nestSearch: 16                // a nest may move up to this many steps of 120 px east to find real seabed
+    nestSearch: 16,               // a nest may move up to this many steps of 120 px east to find real seabed
+    nestEvery: 15000,             // along an island a nest lies every so many px (spec 5.0h) ...
+    nestKeep: 2600,               // ... but this far away from the set pieces and the friends' nets
+    nestBucket: 4096              // px: nests are looked up by stretches of this length
 };
 
 // The calm main route (spec 5.2c): one lane of open water through the whole journey, from
@@ -79,8 +82,39 @@ const CAVE_REACH = BRANCH.mouth + BRANCH.rim + BRANCH.ends * 4;      // how far 
 // Where the reef crest is and how far its slopes can reach (worked out once).
 const CREST_X = reefCrestX(), CREST_REACH = REEF_CREST.inset + REEF_CREST.half + 3000 / REEF_CREST.lagoonSlope;
 
+/** Stretches where no nest may lie: [x0, x1] around the reef crest, the side cave, the docks, the sea arch and every chapter's net. */
+function nestKeepOuts() {
+    const k = FIELD.nestKeep, by = id => BIOMES.find(b => b.id === id), cave = by(BRANCH.biome).from + by(BRANCH.biome).width * BRANCH.at;
+    const out = [[CREST_X - CREST_REACH, Infinity === CREST_REACH ? CREST_X : CREST_X + REEF_CREST.inset], [cave - CAVE_REACH, cave + BRANCH.length + CAVE_REACH],
+        [ARCH.x0 - SEA_ARCH.approach, ARCH.x1 + SEA_ARCH.approach]];
+    for (const b of BIOMES) {
+        out.push([b.from + b.width * 0.55 - 400, b.from + b.width * 0.55 + 400]);      // the chapter's net (journey.js JOURNEY.at)
+        if (b.landmark) out.push([b.from + LANDMARK.entry - 1200, b.from + LANDMARK.entry + 1200]);
+    }
+    return out.map(([x0, x1]) => [x0 - k, x1 + k]);
+}
+
+/** Where the nests go (world x, before each finds its seabed): the start pool, then every `nestEvery` px along each island, the grand nest at the end. */
+export function nestSpots() {
+    const keep = nestKeepOuts(), xs = [FIELD.spawn.x];
+    for (const b of BIOMES) {
+        if (b.zone !== 'island') continue;
+        for (let x = b === BIOMES[0] ? FIELD.spawn.x + FIELD.nestEvery : b.from + 260; x < b.from + b.width - BLEND; x += FIELD.nestEvery) {
+            let at = x;
+            for (const [x0, x1] of keep) if (at > x0 && at < x1) at = x1;
+            xs.push(at);
+        }
+    }
+    xs.push(WORLD_END - 300);
+    return xs;
+}
+
+const NO_NESTS = [];
+
 export function createField(seed) {
     let nests = null;
+    // The nests whose dip or basin can reach x: looked up by stretch, so a long world with many nests costs nothing per sample.
+    const nearBy = new Map(), nestsNear = x => nearBy.get(Math.floor(x / FIELD.nestBucket)) || NO_NESTS;
 
     /**
      * Height of the calm route's middle at world x. Worked out on a grid of x and joined by
@@ -93,7 +127,7 @@ export function createField(seed) {
         if (y !== undefined) return y;
         const x = i * ROUTE.grid;
         y = cruiseY(x);
-        for (const nest of nests) {
+        for (const nest of nestsNear(x)) {
             const dx = Math.abs(x - nest.x);
             if (dx < nest.reach) y += (nest.y - ROUTE.aboveNest - y) * smooth01(1 - dx / nest.reach);
         }
@@ -178,7 +212,7 @@ export function createField(seed) {
             // there over a stretch, so it never ends in a cut face in the sand.
             const ends = Math.min(smooth01((x - (FIELD.spawn.x - ROUTE.fadeIn[0])) / ROUTE.fadeIn[1]), smooth01((WORLD_END - x) / ROUTE.fadeOut));
             if (off < 2 && ends > 0) n -= 0.95 * smooth01(2 - off) * ends;
-            for (const nest of nests) {
+            for (const nest of nestsNear(x)) {
                 const dx = Math.abs(x - nest.x);
                 if (dx > 520) continue;
                 if (y <= nest.y - 30) {                                  // open water above every nest
@@ -213,19 +247,6 @@ export function createField(seed) {
                 }
             }
         }
-        // The sea arch (seaArch.js): two legs of solid rock from the surface down into the seabed, the
-        // opening between them, and the calm route's lane as a tunnel through each leg.
-        if (withNests && nests && y >= 0 && x > ARCH.x0 && x < ARCH.x1) {
-            const a = y >= SEA_ARCH.footDepth ? 1 : archRock(ARCH, x, y);
-            if (a < 0) n = Math.min(n, FIELD.threshold - 0.5);
-            else {
-                const wide = ROUTE.halfWidth + ROUTE.wander[1] * vnoise(x / 85, y / 85, seed + 52);
-                const lean = SEA_ARCH.edge * (0.6 + 0.8 * vnoise(y / 240, 6.3, seed + 61));
-                const w = smooth01((Math.abs(y - routeY(x)) / wide - 1) / 0.3) * smooth01(Math.min(x - ARCH.x0, ARCH.x1 - x) / lean);
-                const open = Math.min(n, FIELD.threshold - 0.5);
-                n = Math.max(n, open + (FIELD.crestRock - open) * w);
-            }
-        }
         // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.
         // Laid down last, after the calm route's lane is carved: under the ship the lane ends at the
         // keel's bed (the ship's hole is the way through), so the ship stands on rock.
@@ -240,11 +261,10 @@ export function createField(seed) {
         return n;
     };
 
-    // The first nest right under the start pool (in the lagoon), one where every later coast
-    // biome begins (the open sea has none: its bottom is far below the way across), the grand
+    // The first nest right under the start pool (in the lagoon), then one every so often along
+    // every island (the open sea has none: its bottom is far below the way across), the grand
     // nest at the end; each on the real seabed: start inside it and walk up.
-    const xs = [FIELD.spawn.x, ...BIOMES.slice(1).filter(b => b.zone === 'island').map(b => b.from + 260)];
-    xs.push(WORLD_END - 300);
+    const xs = nestSpots();
     const groundAt = x => { let y = floorY(x) + 260; while (y > 400 && density(x, y, false) > FIELD.threshold) y -= 12; return y; };
     nests = xs.map((at, index) => {
         // On the seabed, not on top of a rock that happens to stand there: of the columns
@@ -260,6 +280,11 @@ export function createField(seed) {
         if (index === xs.length - 1) reach = Math.max(reach, x - descentStart());
         return { x, y: y + 12, index, grand: index === xs.length - 1, reach, biome: biomeIndexAt(x) };
     });
+
+    for (const n of nests) {
+        const r = Math.max(n.reach, 520);
+        for (let i = Math.floor((n.x - r) / FIELD.nestBucket); i <= Math.floor((n.x + r) / FIELD.nestBucket); i++) { if (!nearBy.has(i)) nearBy.set(i, []); nearBy.get(i).push(n); }
+    }
 
     return { density, nests, routeY, cave: caveOf() };
 }

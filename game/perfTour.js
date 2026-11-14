@@ -3,7 +3,7 @@
 // chunk build and the most objects and tweens seen. The budgets are the ones in CLAUDE.md (mid-range phone).
 
 export const PERF_TOUR = {
-    hop: 2400,        // px between two stops
+    hop: 12000,       // px between two stops (about 80 stops along the whole journey)
     stayMs: 1800,     // ms at each stop (chunks load, things settle)
     skipMs: 500,      // ms after a hop that do not count (the jump itself builds many chunks at once)
     budget: { logicMs: 4, chunkMs: 15, objects: 600, tweens: 300 }

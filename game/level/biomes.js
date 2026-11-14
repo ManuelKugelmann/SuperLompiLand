@@ -28,7 +28,8 @@
 //   props    scenery on the seabed (groups in LevelGenerator PROPS)   propRate: props per chunk
 // How wide each biome is (world px). The lagoon starts 6500 px west of the start
 // pool at x = 0; everything else follows from these widths.
-const WIDTHS = { beach: 11500, mangrove: 9000, reef: 8000, blue: 16000, kelp: 9000, harbour: 9000, wreck: 14000, shore: 10000, trench: 12000 };
+// Spec 5.0h: long zones, about a million px for the whole journey.
+const WIDTHS = { beach: 115000, mangrove: 90000, reef: 80000, blue: 160000, kelp: 90000, harbour: 90000, wreck: 140000, shore: 100000, trench: 120000 };
 export const WORLD_WEST = -6500;
 
 // Living reef rock: warm limestone with pink coralline tones running deep, so its faces read as reef, not concrete.
@@ -149,7 +150,7 @@ export const BIOMES = [
 
 /** x of the grand nest = end of the journey. */
 export const WORLD_END = BIOMES[BIOMES.length - 1].from + BIOMES[BIOMES.length - 1].width;
-const BLEND = 700; // px over which neighbouring biomes fade into each other
+export const BLEND = 6000; // px to either side of a border over which neighbouring biomes fade into each other (spec 5.0h)
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -205,12 +206,12 @@ export function mixColor(c1, c2, t) {
     return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
-const BEACH_END = BIOMES[1].from;          // where the lagoon hands over to the mangroves
 export const SHORE = WORLD_WEST + 1500;   // west of this the sand is above the water
+const LAGOON_RISE = SHORE + 10000;        // east of this the lagoon's sand has reached its full depth
 
 /** How much higher the waves run here: surf builds up over the shallow beach. */
 export function surfAt(x) {
-    return 1 + 1.4 * clamp((BEACH_END - x) / (BEACH_END - SHORE), 0, 1);
+    return 1 + 1.4 * clamp((LAGOON_RISE - x) / (LAGOON_RISE - SHORE), 0, 1);
 }
 
 /** The abyss: a narrow chasm in the deep-sea biome that drops far below everything else. */
@@ -343,8 +344,8 @@ export function floorY(x, cfg = SEABED) {
         base = b.floor + (next.floor - b.floor) * smooth(0.5 + (x - next.from) / cfg.coast);
     }
     // The lagoon: the sand rises gently toward the west until it leaves the water.
-    if (x < BEACH_END) {
-        const t = clamp((x - SHORE) / (BEACH_END - SHORE), 0, 1);
+    if (x < LAGOON_RISE) {
+        const t = clamp((x - SHORE) / (LAGOON_RISE - SHORE), 0, 1);
         base = -70 + (base + 70) * Math.pow(t, 1.15);
     }
     const d = (x - ABYSS.x) / ABYSS.halfWidth;
@@ -382,14 +383,15 @@ export function spotFor(spec) {
 
 // A biome's landmark (`landmark` = a prop group: the wreck in the ship graveyard, the trawler
 // in the harbour) is guaranteed where the player arrives: in the chunk column of the biome's
-// entry and in the one of its `?at=` spot.
-export const LANDMARK = { entry: 1500, above: 360 };
+// entry and in the one of its `?at=` spot, and it stands again and again along the biome (spec 5.0h).
+export const LANDMARK = { entry: 1500, above: 360, every: 12 };   // every: it stands again every so many chunk columns along the biome
 
 /** The landmark prop group that the chunk column `cx` must show, or null. */
 export function landmarkGroup(cx, chunk, cfg = LANDMARK) {
     for (const b of BIOMES) {
         if (!b.landmark) continue;
-        if (cx === Math.floor((b.from + cfg.entry) / chunk) || cx === Math.floor((b.from + b.width / 2) / chunk)) return b.landmark;
+        const first = Math.floor((b.from + cfg.entry) / chunk), last = Math.floor((b.from + b.width - cfg.entry) / chunk);
+        if (cx >= first && cx <= last && (cx - first) % cfg.every === 0 || cx === Math.floor((b.from + b.width / 2) / chunk)) return b.landmark;
     }
     return null;
 }

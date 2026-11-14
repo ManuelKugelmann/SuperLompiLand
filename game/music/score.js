@@ -36,6 +36,17 @@ export function chordAt(biomeId, bar) {
 }
 
 /**
+ * The pad notes of a bar where two biomes blend (spec 5.0h: the chords cross into the next key
+ * over the blend, never a hard switch): [{ hz, gain }] with the gains of both chords adding up
+ * to 1. `t` = how far into the second biome (0..1).
+ */
+export function chordMix(fromId, toId, t, bar) {
+    const k = Math.max(0, Math.min(1, t)), a = chordAt(fromId, bar).hz;
+    if (k === 0 || biomeOf(fromId) === biomeOf(toId)) return a.map(hz => ({ hz, gain: 1 }));
+    return [...a.map(hz => ({ hz, gain: 1 - k })), ...chordAt(toId, bar).hz.map(hz => ({ hz, gain: k }))].filter(n => n.gain > 0);
+}
+
+/**
  * One arpeggio step (8 steps per bar, eighth notes): a frequency or null (rest).
  * Deterministic from bar and step, so every player in a room hears the same tune.
  * depth01 (0 surface .. 1 deep) leaves more steps silent.

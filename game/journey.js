@@ -24,7 +24,7 @@ const CHAPTERS = {
     mangrove: { friend: 'seahorse', goal: { de: 'Jemand hängt zwischen den Wurzeln fest', en: 'Someone is stuck among the roots' } },
     reef: { friend: 'jellyfish', goal: { de: 'Am Riff zappelt etwas im Netz', en: 'Something wriggles in a net on the reef' } },
     kelp: { friend: 'turtle', goal: { de: 'Im Tangwald ruft jemand um Hilfe', en: 'Someone calls for help in the kelp' } },
-    blue: { friend: 'flyingfish', event: { id: 'whale', from: 0.68, to: 0.9 }, goal: { de: 'Draußen im Blau treibt ein Netz', en: 'A net drifts out in the blue' } },
+    blue: { friend: 'flyingfish', event: { id: 'whale', from: 0.68, length: 3520 }, goal: { de: 'Draußen im Blau treibt ein Netz', en: 'A net drifts out in the blue' } },
     wreck: { goal: { de: 'Oben tobt ein Sturm! Tauch unten durch das alte Geisterschiff', en: 'A storm rages up top! Dive under it, through the old ghost ship' } },
     shore: { friend: 'firefish', goal: { de: 'An der Felsenküste leuchtet es schwach', en: 'A faint light on the rocky shore' } },
     harbour: { friend: 'shark', goal: { de: 'Im Hafen steckt ein großer Freund fest', en: 'A big friend is caught in the harbour' } },
@@ -41,7 +41,7 @@ export function chapters(biomes = BIOMES, cfg = JOURNEY) {
             index, id: b.id, name: b.name, goal: c.goal || ONWARD,
             friend: CHARACTERS.find(ch => ch.id === c.friend) || null,
             x: b.from + b.width * cfg.at,
-            event: c.event ? { id: c.event.id, x: b.from + b.width * c.event.from, endX: b.from + b.width * c.event.to } : null
+            event: c.event ? { id: c.event.id, x: b.from + b.width * c.event.from, endX: b.from + b.width * c.event.from + c.event.length } : null
         };
     });
 }

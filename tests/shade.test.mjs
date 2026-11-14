@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { SHADE, shadeChunk } from '../game/level/shade.js';
 import { FIELD, createField } from '../game/level/density.js';
 import { backRockCover } from '../game/level/backRock.js';
+import { BIOMES } from '../game/level/biomes.js';
 
 const field = createField(1337);
 const SPAN = 960, S = SHADE.rockSize;
@@ -60,7 +61,8 @@ test('faces looking up are brighter than faces looking down', () => {
     // overhang by probing the field (cheap), then shade that one too.
     const T = FIELD.threshold, isCeiling = (x, y) => field.density(x, y) > T && field.density(x, y + 40) < T - 0.02;
     let cave = null;
-    for (let cx = 0; cx < 30 && !cave; cx++) {
+    const c0 = Math.floor(BIOMES.find(b => b.id === 'reef').from / SPAN) + 2;      // the reef is rich in caves
+    for (let cx = c0; cx < c0 + 30 && !cave; cx++) {
         for (let cy = 1; cy < 5 && !cave; cy++) {
             let n = 0;
             for (let x = 30; x < SPAN; x += 60) for (let y = 30; y < SPAN; y += 40) if (isCeiling(cx * SPAN + x, cy * SPAN + y)) n++;
