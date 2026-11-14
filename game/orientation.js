@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { isStandalone } from './pwa.js';
 import { rotatedPageToGame, sizeFor, gameInsets, safeView, shapeOff } from './orientationMath.js';
 
 /**
@@ -99,6 +100,20 @@ function install(game) {
             app.style.transform = 'translate(-50%, -50%)';
         }
         scale.refresh();
+    }
+
+    // A phone browser's address bar comes and goes and reshapes the window (spec 5.0k: fill and fit).
+    // On a handheld the first tap asks for fullscreen, and for landscape where the browser allows it;
+    // an installed app is fullscreen already. Leaving fullscreen is fine: the next tap asks again.
+    if (handheld && !isStandalone()) {
+        const goFull = () => {
+            const el = document.documentElement;
+            if (document.fullscreenElement || !el.requestFullscreen) return;
+            el.requestFullscreen({ navigationUI: 'hide' })
+                .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
+                .catch(() => {});
+        };
+        window.addEventListener('pointerup', goFull);
     }
 
     layout();
