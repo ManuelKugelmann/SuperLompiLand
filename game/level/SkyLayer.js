@@ -1,3 +1,4 @@
+import { DEPTH } from '../depths.js';
 import { NEAR_COAST, skyItems, nearCoastItems, screenX, onScreen, volcanoAt } from './skyline.js';
 
 export const SKY = {
@@ -16,7 +17,7 @@ export const SKY = {
     // into the water over `deep` px. Drawn just over the sea sheet, behind everything that plays.
     // It stands as far off as the island (on the horizon): hazy, water-tinted, soft-edged, `deep` x the
     // piece's size tall, gone in the blue below.
-    socket: { deep: 700, depth: -27.9, tint: 0x6fb0bb, alpha: 0.34, top: 0.62, fit: 0.78 }      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
+    socket: { deep: 700, depth: DEPTH.socket, tint: 0x6fb0bb, alpha: 0.34, top: 0.62, fit: 0.78 }      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
 };
 
 /** The rock socket under an island (drawn once, procedural): a dark rock mass with a jagged outline and ledges, fading downward. */
@@ -177,7 +178,7 @@ export default class SkyLayer {
         // are a list of what stands where; the few in view are shown with pictures from a small pool.
         this.items = [
             ...skyItems().map(item => ({ item, key: `sky_${item.kind}`, depth: -28.7 + item.scroll, alpha: SKY.haze * (0.75 + item.scroll * 1.5), flip: false })),
-            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.05, alpha: NEAR_COAST.alpha, tint: NEAR_COAST.tint, flip: item.flip, near: true }))
+            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: DEPTH.coast, alpha: NEAR_COAST.alpha, tint: NEAR_COAST.tint, flip: item.flip, near: true }))
         ];
         for (const d of this.items) d.half = scene.textures.getFrame(d.key).width * d.item.size / 2;
         this.pool = [];      // pictures for the items in view, made as needed

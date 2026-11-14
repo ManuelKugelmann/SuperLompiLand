@@ -1,3 +1,4 @@
+import { DEPTH } from '../depths.js';
 import Phaser from 'phaser';
 import { mixColor, waterHue, atLuma, WATER_LIGHT, surfAt } from './biomes.js';
 import SkyLayer from './SkyLayer.js';
@@ -13,7 +14,7 @@ import SeaFarLayer from './SeaFarLayer.js';
 const WATERLINE = {
     step: 32,      // px between two points of the wave line
     sea: { key: 'waterline_sea', level: 62, fade: 240, tint: 0x9be9ef, colour: '155,233,239' },      // sea colour down to world y `level`, then fading out over `fade` px
-    back: { key: 'waterline_back', width: 6, alpha: 0.85, depth: 4.9 },
+    back: { key: 'waterline_back', width: 6, alpha: 0.85, depth: DEPTH.surfaceLine },
     front: { key: 'waterline_front', width: 2, alpha: 0.4, depth: 6 },
     // The sea look (user: crests, foam, spray, breakers). Foam caps: a lace of foam on the line, thick
     // on the crests and thinning in the troughs (`crest` px of height over the neighbours = full cap);
@@ -122,8 +123,8 @@ export default class Backdrop {
         makeWaterline(scene);
         const along = Array.from({ length: Math.ceil((W + 80) / WATERLINE.step) + 1 }, () => new Phaser.Math.Vector2());
         const band = (key, depth, alpha) => scene.add.rope(0, 0, key, null, along.map(v => v.clone()), true).setDepth(depth).setAlpha(alpha).setVisible(false);
-        this.sea = scene.add.graphics().setDepth(-28);
-        this.seaFade = scene.add.image(0, WATERLINE.sea.level, WATERLINE.sea.key).setOrigin(0, 0).setDepth(-28).setVisible(false);
+        this.sea = scene.add.graphics().setDepth(DEPTH.seaFill);
+        this.seaFade = scene.add.image(0, WATERLINE.sea.level, WATERLINE.sea.key).setOrigin(0, 0).setDepth(DEPTH.seaFill).setVisible(false);
         this.foamBack = band(WATERLINE.back.key, WATERLINE.back.depth, WATERLINE.back.alpha);
         this.foam = band(WATERLINE.front.key, WATERLINE.front.depth, WATERLINE.front.alpha);
         // Foam caps and streaks (WATERLINE.caps / streaks): their own points on a world-anchored grid.
