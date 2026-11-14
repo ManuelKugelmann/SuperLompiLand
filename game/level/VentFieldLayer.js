@@ -21,6 +21,9 @@ export const VENT_LOOK = {
 // Texture keys: painted pictures loaded under these keys replace the drawn ones.
 const CHIMNEY = 'vent_chimney', WORM = 'tube_worms', GLOW = 'vent_glow';
 
+/** The painted chimney and tube worms (loaded by the title screen); drawn procedurally while missing. */
+export const VENT_ART = { [CHIMNEY]: 'img/vent_chimney.webp', [WORM]: 'img/tube_worms.webp' };
+
 function ensureTextures(scene) {
     const tex = scene.textures;
     if (!tex.exists(CHIMNEY)) {
