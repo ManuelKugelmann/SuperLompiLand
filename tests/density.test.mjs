@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FIELD, createField, chunkGrids, gridRows } from '../game/level/density.js';
+import { FIELD, createField, chunkGrids, gridRows, ROUTE } from '../game/level/density.js';
 import { floorY, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
 
 const field = createField(1337);
@@ -62,4 +62,28 @@ test('chunk grids match direct sampling, and neighbouring chunks share their bor
     assert.ok(Math.abs(rowsA[5][7] - field.density(7 * 48, 960 + 5 * 48)) < 1e-6);
     for (let j = 0; j <= n; j++) assert.equal(rowsA[j][n], rowsB[j][0], `seam at row ${j}`);
     assert.equal(a.back.length, (n + 1) * (n + 1));
+});
+
+test('the calm main route is open water from the start pool to the grand nest', () => {
+    for (const seed of [1337, 7, 4242]) {
+        const f = createField(seed);
+        let steepest = 0;
+        for (let x = FIELD.spawn.x; x <= f.nests[f.nests.length - 1].x; x += 40) {
+            const y = f.routeY(x);
+            for (const dy of [-ROUTE.halfWidth * 0.75, 0, ROUTE.halfWidth * 0.75]) {
+                assert.ok(f.density(x, y + dy) < FIELD.threshold, `seed ${seed}: rock on the route at ${x}, ${Math.round(y + dy)}`);
+            }
+            assert.ok(y > 100, 'under water');
+            steepest = Math.max(steepest, Math.abs(f.routeY(x + 40) - y) / 40);
+        }
+        assert.ok(steepest < 1.3, `seed ${seed}: gentle slopes, steepest ${steepest.toFixed(2)}`);
+    }
+});
+
+test('the calm route passes just above every nest', () => {
+    const f = createField(1337);
+    for (const nest of f.nests) {
+        assert.ok(Math.abs(f.routeY(nest.x) - (nest.y - ROUTE.aboveNest)) < 1, `nest ${nest.index}`);
+        assert.ok(f.density(nest.x, nest.y + 60) > FIELD.threshold, `nest ${nest.index} still lies on solid ground`);
+    }
 });

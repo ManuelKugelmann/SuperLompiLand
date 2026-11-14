@@ -456,6 +456,9 @@ export default class MainScene extends Phaser.Scene {
         if (!on || this.flowDrawAt > 0) return;
         this.flowDrawAt = 200;
         const g = this.flowArrows.clear(), wv = this.cameras.main.worldView, t = this.time.now / 1000, out = this.flowProbe || (this.flowProbe = { x: 0, y: 0 });
+        // The calm main route: its middle and the band hazards keep out of.
+        g.lineStyle(4, 0x7dffb0, 0.8);
+        for (let x = Math.floor(wv.x / 60) * 60; x < wv.right; x += 60) g.lineBetween(x, this.level.field.routeY(x), x + 60, this.level.field.routeY(x + 60));
         const cell = 90;
         for (let x = Math.floor(wv.x / cell) * cell; x < wv.right; x += cell) {
             for (let y = Math.max(cell, Math.floor(wv.y / cell) * cell); y < wv.bottom; y += cell) {

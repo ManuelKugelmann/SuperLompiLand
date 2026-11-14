@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import { eachCell as marchGrid } from './terrain.js';
-import { FIELD, createField, chunkGrids, gridRows } from './density.js';
+import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './backLayersMath.js';
@@ -13,7 +13,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 4,           // bump when generation changes what index a coin or friend gets
+    version: 5,           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
@@ -119,6 +119,9 @@ export default class LevelGenerator {
         this.buildMs = { last: 0, max: 0, count: 0 };   // cost of building chunks, shown by ?debug=perf
         this.makeKelpTexture();
         this.makeRootTextures();
+        // Painted once here, at start-up, so no chunk has to pay for them while playing.
+        makeNestTextures(scene);
+        makeLineTexture(scene);
         this.field = createField(LEVEL.seed);
         this.nests = this.field.nests.map(n => ({ ...n, biome: BIOMES[Math.min(n.index + 1, BIOMES.length - 1)] }));
         // Density grids are computed in a Web Worker when available; the chunk is
@@ -539,6 +542,8 @@ export default class LevelGenerator {
 
     addHazard(chunk, key, x, y, rng, angle = 0) {
         const s = this.scene, h = HAZARDS[key];
+        // Danger is optional (spec 5.2c): nothing harmful on or near the calm main route.
+        if (Math.abs(y - this.field.routeY(x)) < ROUTE.clear + h.r) return null;
         const top = y - h.size * 0.46, rock = h.chain ? this.ceilingAbove(x, top) : null;
         if (h.chain && top - (rock ? rock.y : 16) > h.reach) return null;
         const img = makeCritter(s, key, x, y, h.size, h.anim || 'still', { ...h, rotation: angle }).setDepth(3);
