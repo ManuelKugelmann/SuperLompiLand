@@ -243,7 +243,11 @@ const LIFT_LUMA = 128, FOG_LIFT = 0.35;
  * Before the fog, so the skin fades with distance like the rest. Pure; baked once per chunk.
  */
 export const LIP = {
-    texels: 10,         // how deep the skin reaches in from the top edge (layer picture texels)
+    texels: [3, 20],    // how deep the skin reaches in from the top edge (layer texels): thin on steep shoulders, thick on flat tops and in dips
+    slope: 5,           // texels the top may rise or fall over 4 columns before it counts as steep
+    tongues: 0.12,      // share of hollows where the sand pours down further (a tongue up to 1.6x deep)
+    ao: [6, 0.18],      // the shade right under the skin: texels deep, how much darker (the top reads as a ledge in front)
+    strata: [0.1, 300], // soft horizontal bands through the body: how much lighter or darker, world px apart
     strength: 1,        // how much of the top colour at the very edge
     patches: 0.2,       // light and dark patches across the rock (share of brightness)
     patchScale: 520,    // world px of one patch
@@ -263,20 +267,48 @@ const ch = (c, k) => (c >> (16 - 8 * k)) & 255;
 export function lipLayer(rgba, size, ox, oy, span, cfg = LIP) {
     const skin = { k: new Float32Array(size * size), rgb: new Float32Array(size * size * 3) };
     const hashAt = (x, y) => { const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return v - Math.floor(v); };
+    // The top of the rock in each column (first solid texel from the top; -1 where there is none):
+    // its slope says how thick the skin may lie there, its dips are where sand gathers.
+    const top = new Int16Array(size).fill(-1);
+    for (let px = 0; px < size; px++) for (let py = 0; py < size; py++) if (rgba[(py * size + px) * 4 + 3] >= 40) { top[px] = py; break; }
+    const topAt = x => top[Math.min(size - 1, Math.max(0, x))];
+    const [t0, t1] = cfg.texels, [aoDeep, aoDark] = cfg.ao, [stAmp, stGap] = cfg.strata;
+    // How thick the skin lies in each column: flat tops and dips thick, steep shoulders almost bare,
+    // here and there a tongue of sand pouring down into a hollow; smoothed across the columns so
+    // the skin's lower edge never combs.
+    const raw = new Float32Array(size);
+    for (let px = 0; px < size; px++) {
+        if (top[px] < 0) { raw[px] = t1; continue; }
+        const wx = ox + (px + 0.5) * span / size, l = topAt(px - 3), r = topAt(px + 3), lt = l < 0 ? top[px] : l, rt = r < 0 ? top[px] : r;
+        const steep = Math.min(1, Math.abs(lt - rt) / cfg.slope);
+        const dip = Math.max(0, top[px] - (lt + rt) / 2);                                 // lower than both sides
+        const n = 0.65 + 0.35 * vnoise(wx / 260, 3.1, 91);
+        const tongue = 1 + 0.6 * Math.max(0, (vnoise(wx / 140, 5.3, 95) - (1 - cfg.tongues * 3)) / (cfg.tongues * 3)) * Math.min(1, dip);
+        raw[px] = Math.max(t0, Math.min(t1 * 1.6, (t0 + (t1 - t0) * (1 - steep) ** 1.5 * n + dip * 2) * tongue));
+    }
+    const thick = new Float32Array(size);
+    for (let px = 0; px < size; px++) {
+        let s = 0, w = 0;
+        for (let d = -4; d <= 4; d++) { const q = Math.min(size - 1, Math.max(0, px + d)), k = 5 - Math.abs(d); s += raw[q] * k; w += k; }
+        thick[px] = s / w;
+    }
     for (let px = 0; px < size; px++) {
         const wx = ox + (px + 0.5) * span / size, { a, b, t } = biomeBlendAt(wx);
         const ta = cfg.tops[a.id] || LIP_DEFAULT, tb = cfg.tops[b.id] || LIP_DEFAULT;
         const col = [0, 1, 2].map(k => ch(ta[0], k) * (1 - t) + ch(tb[0], k) * t), specks = t < 0.5 ? ta[1] : tb[1];
-        let run = cfg.texels + 1;              // texels since the last open texel above (start: as if deep inside)
+        const depth = thick[px];
+        let run = t1 * 2;                      // texels since the last open texel above (start: as if deep inside)
         for (let py = 0; py < size; py++) {
             const o = (py * size + px) * 4;
             if (rgba[o + 3] < 40) { run = 0; continue; }
             run++;
             const wy = oy + (py + 0.5) * span / size;
             const patch = 1 + cfg.patches * (vnoise(wx / cfg.patchScale, wy / cfg.patchScale, 77) * 2 - 1);
-            for (let c = 0; c < 3; c++) rgba[o + c] = Math.min(255, rgba[o + c] * patch);
-            if (run > cfg.texels) continue;
-            const k = cfg.strength * (1 - (run - 1) / cfg.texels) ** 1.4, q = py * size + px;
+            const band = 1 + stAmp * Math.sin((wy + 120 * vnoise(wx / 900, 1.7, 93)) / stGap * Math.PI * 2);
+            const shade = run > depth && run <= depth + aoDeep ? 1 - aoDark * (1 - (run - depth) / aoDeep) : 1;
+            for (let c = 0; c < 3; c++) rgba[o + c] = Math.min(255, rgba[o + c] * patch * band * shade);
+            if (run > depth) continue;
+            const k = cfg.strength * (1 - (run - 1) / depth) ** 1.4, q = py * size + px;
             for (let c = 0; c < 3; c++) { rgba[o + c] = rgba[o + c] + (col[c] - rgba[o + c]) * k; skin.rgb[q * 3 + c] = col[c]; }
             skin.k[q] = k;
             if (run <= 2 && hashAt(px + ox, py + oy) < cfg.specks) {

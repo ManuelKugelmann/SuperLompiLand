@@ -134,7 +134,7 @@ test('the rock behind the play plane gets a top skin on its upward edges, in the
     const S = 16, rgba = new Uint8ClampedArray(S * S * 4);
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const o = (y * S + x) * 4; if (y >= 6) { rgba[o] = rgba[o + 1] = rgba[o + 2] = 60; rgba[o + 3] = 255; } }
     const reef = BIOMES.find(b => b.id === 'reef');
-    lipLayer(rgba, S, reef.from + reef.width / 2, 0, 160, { ...LIP, texels: 4, specks: 0, patches: 0 });
+    lipLayer(rgba, S, reef.from + reef.width / 2, 0, 160, { ...LIP, texels: [3, 4], ao: [1, 0], strata: [0, 300], specks: 0, patches: 0 });
     const at = (x, y) => rgba[(y * S + x) * 4 + 1];
     assert.ok(at(8, 6) > 120, `edge ${at(8, 6)}`);           // the edge takes on the moss green
     assert.equal(at(8, 15), 60);                               // deep inside unchanged
