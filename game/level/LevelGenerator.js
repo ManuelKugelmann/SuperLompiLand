@@ -16,6 +16,7 @@ import { eachCell as marchGrid, hash } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { CAUSTICS, installCaustics } from '../fx/CausticsPipeline.js';
 import { getCharacter, loadSelectedId } from '../characters.js';
+import { coralSize } from './coralSizes.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
@@ -28,7 +29,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 35,
+    version: 36,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -141,6 +142,8 @@ export const PROPS = {
 };
 
 const CULLED = new Set(['Image', 'TileSprite', 'Sprite']);   // the kinds of chunk object that cull() may hide (plain pictures at their own x, y)
+const BIG_CORALS = ['coral_table', 'coral_brain', 'coral_fan', 'coral_staghorn'];      // painted to stand on their own foot (their picture's bottom edge)
+const CORAL_KEYS = ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5', ...BIG_CORALS];   // the reef's corals, each at any size (coralSizes.js)
 const PILE_UNDER_FOOT = 0.4;   // share of the foot's height that the wood strip runs on behind it
 const PILE_TALL = 'pier_pile_tall', PILE_STACK = 6;   // the pier's wood strip stacked this many times (drawPier)
 
@@ -492,12 +495,14 @@ export default class LevelGenerator {
             if (roll < biome.coral && corals < 5) {
                 // Never the same coral twice within sight of each other (spacing.js). The random
                 // draws are taken either way, so everything placed after stays where it was.
-                const all = ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5'].filter(has), fresh = this.coralSpacing.options(all, f.x, f.y);
-                const at = rng.frac(), scale = rng.realInRange(0.22, 0.42), front = rng.frac() < 0.3, flip = rng.frac() < 0.5;
+                const all = CORAL_KEYS.filter(has), fresh = this.coralSpacing.options(all, f.x, f.y);
+                // Many sizes (coralSizes.js): most are small detail, a few are big growths; only small ones may stand in front of the fish.
+                const at = rng.frac(), size = coralSize(rng.frac()), front = rng.frac() < 0.3 && size.front, flip = rng.frac() < 0.5;
                 if (!fresh.length) continue;
                 const key = fresh[Math.floor(at * fresh.length)];
                 this.coralSpacing.add(key, f.x, f.y);
-                keep(s.add.image(f.x, f.y, key).setOrigin(0.5, 0.92).setScale(scale).setRotation(f.angle).setDepth(front ? 7 : -1)).setFlipX(flip);
+                const coral = keep(s.add.image(f.x, f.y, key).setOrigin(0.5, BIG_CORALS.includes(key) ? 0.97 : 0.92).setRotation(f.angle * (size.cls === 'large' ? 0.4 : 1)).setDepth(front ? 7 : size.cls === 'large' ? -1.5 : -1)).setFlipX(flip);
+                coral.setScale(size.px / Math.max(coral.width, coral.height));
                 corals++;
             } else if (roll < biome.coral + biome.kelp && stalks < 6) {
                 this.addKelp(chunk, f, rng.between(300, 680), rng.frac() < 0.25 ? 7 : -4, rng);

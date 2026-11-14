@@ -10,7 +10,9 @@ export const RHYTHM_LOOK = {
     lompi: 170,          // px: the fish's own length, the measure for "huge"
     treat: { coins: 5, half: 240, rise: 120, depth: 2.6 },      // a coin figure: coins, px to either side of its spot, px it swings up or down
     colony: { scale: [4, 8], depth: -4, tint: 0xa9c6cc, seen: 900 },   // lengths of the fish it is tall; behind the play plane, a little hazy
-    shark: { scale: [4, 6], sharky: 250, roam: 1500, below: 430, depth: -4.5, tint: 0x6f8fa8, alpha: 0.9, pace: 0.045, seen: 800 }   // lengths of Sharky; px it cruises to either side; px under the route; how fast it comes and goes
+    // Lengths of Sharky; px it cruises to either side; px under the route (far below the fish's lane: a big animal at a distance,
+    // never beside the fish); hazy toward the water's colour; how fast it comes and goes; px at which it goes into the reef book.
+    shark: { scale: [4, 6], sharky: 250, roam: 1500, below: 760, depth: -5, tint: 0x4f7fa6, alpha: 0.55, pace: 0.045, seen: 1300 }
 };
 
 /** The painted big corals (loaded by the title screen): a table, a brain, a fan and a staghorn thicket. While one is missing, one of the reef's own corals stands in, grown huge. */
