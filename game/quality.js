@@ -20,6 +20,9 @@ export const QUALITY = {
         highFps: 50,      // over this for `highS` seconds: a tier up
         highS: 10,
         settleS: 4,       // after a change nothing is judged for this long (the change itself costs frames)
+        startS: 2,        // ... and this long after the start (the start fade)
+        probeS: 3,        // then the frame rate of this many seconds decides the tier at once: phones differ a lot, and a weak one must not wait for one step at a time
+        probeFar: 20,     // under this in the probe: two tiers down at once (under lowFps: one down; over highFps: one up)
         regretS: 30,      // a drop this soon after a rise means the higher tier is too much: it is not tried again
         skipMs: 250       // a frame longer than this is a pause (the tab was away), not a slow frame
     }
@@ -43,13 +46,16 @@ export function scaled(n, share, roll) {
 
 /**
  * The autotuner. Returns { tier, fps, step(dtMs) -> the new tier's name when it changed, else null }.
- * It never flips back and forth: after any change it waits, and a tier that had to be left again
- * right after it was tried becomes the ceiling for this run.
+ * It first probes: the frame rate right after the start puts it on the fitting tier at once, up
+ * or down (so a saved low tier is tried upward again at every start). Then it never flips back and
+ * forth: after any change it waits, and a tier that had to be left again right after it was tried
+ * becomes the ceiling for this run.
  */
 export function createAutotune(start, cfg = QUALITY) {
     const T = cfg.tune, frames = [];      // the window: [ms, ...]
-    let at = cfg.tiers.indexOf(start), sum = 0, low = 0, high = 0, settle = T.settleS, sinceRise = Infinity, ceiling = cfg.tiers.length - 1;      // settle: the start's own slow frames are not judged either
+    let at = cfg.tiers.indexOf(start), sum = 0, low = 0, high = 0, settle = T.startS, sinceRise = Infinity, ceiling = cfg.tiers.length - 1;      // settle: the start's own slow frames are not judged either
     if (at < 0) at = cfg.tiers.length - 1;
+    let probe = { s: 0, ms: 0, n: 0 };      // the start's probe, null once it has decided
     const api = {
         get tier() { return cfg.tiers[at]; },
         fps: 60,
@@ -61,6 +67,17 @@ export function createAutotune(start, cfg = QUALITY) {
             const dt = dtMs / 1000;
             sinceRise += dt;
             if (settle > 0) { settle -= dt; low = 0; high = 0; return null; }
+            if (probe) {
+                probe.s += dt; probe.ms += dtMs; probe.n++;
+                if (probe.s < T.probeS) return null;
+                const fps = probe.n * 1000 / probe.ms, was = at;
+                probe = null;
+                at = Math.max(0, Math.min(cfg.tiers.length - 1, at + (fps < T.probeFar ? -2 : fps < T.lowFps ? -1 : fps > T.highFps ? 1 : 0)));
+                if (at === was) return null;
+                if (at > was) sinceRise = 0;
+                low = 0; high = 0; settle = T.settleS; frames.length = 0; sum = 0;
+                return api.tier;
+            }
             if (sum < T.windowS * 500) return null;      // not enough frames in the window yet
             low = api.fps < T.lowFps ? low + dt : 0;
             high = api.fps > T.highFps ? high + dt : 0;

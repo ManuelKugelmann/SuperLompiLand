@@ -43,6 +43,7 @@ test('under 30 frames a second for three seconds: a tier down; a good frame rate
 
 test('over 50 for ten seconds: a tier up; and a tier that had to be left again at once is not tried again', () => {
     const t = createAutotune('low');
+    assert.equal(run(t, 40, 6), null, 'the start probe finds it fitting');
     assert.equal(run(t, 58, 8), null, 'not yet');
     assert.equal(run(t, 58, 8), 'medium');
     assert.equal(run(t, 40, 30), null, 'between 30 and 50: it stays');
@@ -65,4 +66,14 @@ test('shareOf reads the scene\'s tier, and the high tier while there is none yet
     assert.equal(shareOf({}, 'glow'), QUALITY.high.glow);
     assert.equal(shareOf({ quality: { tier: 'low' } }, 'glow'), 0);
     assert.equal(shareOf({ quality: { tier: 'medium' } }, 'far'), QUALITY.medium.far);
+});
+
+test('the start probes: the frame rate of the first seconds puts it on the fitting tier at once, up or down', () => {
+    const run = (start, fps) => { const a = createAutotune(start); let got = null; for (let ms = 0; ms < 5600 && !got; ms += 1000 / fps) got = a.step(1000 / fps); return got; };
+    assert.equal(run('high', 14), 'low', 'a weak phone: two tiers down at once');
+    assert.equal(run('high', 26), 'medium');
+    assert.equal(run('medium', 60), 'high', 'a strong phone goes up');
+    assert.equal(run('low', 60), 'medium', 'a saved low tier is tried upward again at every start');
+    assert.equal(run('medium', 45), null, 'fitting: it stays');
+    assert.equal(run('low', 14), null);
 });
