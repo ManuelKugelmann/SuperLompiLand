@@ -93,3 +93,16 @@ test('every biome has motifs with valid degrees', () => {
         for (const m of b.motifs) for (const d of m) assert.ok(Number.isFinite(degreeHz(id, d)), id);
     }
 });
+
+test('chain notes climb the scale under the coins, cap at the top, sparkle in flow', async () => {
+    const { chainNote, chainChord, degreeHz, CHAIN_MUSIC } = await import('../game/music/melody.js');
+    const notes = [1, 2, 3, 4, 5].map(count => chainNote('reef', { count, flow: false }).hz);
+    for (let i = 1; i < notes.length; i++) assert.ok(notes[i] > notes[i - 1], 'rising');
+    assert.ok(notes[0] < degreeHz('reef', 0), 'an octave under the coin melody');
+    const top = chainNote('reef', { count: CHAIN_MUSIC.top + 1, flow: false }).hz;
+    assert.equal(chainNote('reef', { count: 40, flow: false }).hz, top, 'long chains hold the top note');
+    const f = chainNote('kelp', { count: 6, flow: true });
+    assert.equal(f.sparkleHz, f.hz * 2);
+    assert.equal(chainNote('nowhere', { count: 1 }).hz, chainNote('reef', { count: 1 }).hz, 'unknown biome falls back');
+    assert.equal(chainChord('beach').length, 4);
+});

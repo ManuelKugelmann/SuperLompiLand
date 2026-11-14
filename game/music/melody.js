@@ -92,3 +92,22 @@ export function createStreak(opts = {}) {
         reset() { last = -Infinity; count = 0; note = 0; motif = null; }
     };
 }
+
+/** Chains of moves (game/chain.js) climb the biome's scale, an octave under the coins. */
+export const CHAIN_MUSIC = { top: 9, octave: -1 };
+
+/**
+ * The note of one chain move: move n is scale degree n-1 (capped at CHAIN_MUSIC.top, so a
+ * long chain keeps ringing the top note). In flow a sparkle an octave up joins it.
+ */
+export function chainNote(biomeId, { count, flow }) {
+    const len = SCALES[(BIOME_MUSIC[biomeId] || BIOME_MUSIC[FALLBACK]).scale].length;
+    const degree = Math.min(Math.max(count, 1) - 1, CHAIN_MUSIC.top) + CHAIN_MUSIC.octave * len;
+    const hz = degreeHz(biomeId, degree);
+    return { hz, sparkleHz: flow ? hz * 2 : null };
+}
+
+/** A chain that ends with a bonus resolves: the biome's root triad, root on top. */
+export function chainChord(biomeId) {
+    return [0, 2, 4, 7].map(d => degreeHz(biomeId, d));
+}

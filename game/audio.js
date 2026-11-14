@@ -152,6 +152,17 @@ const SOUNDS = {
             note.flourish.forEach((f, i) => tone({ f, type: 'triangle', at: at + (i + 1) * step, dur: 0.22, vol: 0.16 }));
         }
     },
+    /** A chain move (melody.js chainNote): a soft pluck on the 1/8 grid, a sparkle in flow. */
+    chain(note) {
+        const at = musicClock.untilGrid(nowSeconds(), 2);
+        tone({ f: note.hz, type: 'triangle', at, dur: 0.24, vol: 0.13 });
+        if (note.sparkleHz) bell({ f: note.sparkleHz, at: at + 0.01, dur: 0.4, vol: 0.05 });
+    },
+    /** A chain ends with a bonus: its chord, rolled up on the 1/16 grid. */
+    chainEnd(chord) {
+        const at = musicClock.untilGrid(nowSeconds(), 4), step = 60 / musicClock.bpm / 4;
+        chord.forEach((f, i) => tone({ f, type: 'triangle', at: at + i * step * 0.5, dur: 0.6, vol: 0.1 }));
+    },
     puff() {
         noise({ dur: 0.28, vol: 0.32, from: 500, to: 1800, q: 0.6 });
         tone({ f: 180, to: 420, type: 'sine', dur: 0.22, vol: 0.2 });

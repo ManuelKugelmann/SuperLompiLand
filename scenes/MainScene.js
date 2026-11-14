@@ -17,7 +17,7 @@ import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock } from '../game/audio.js';
-import { createStreak } from '../game/music/melody.js';
+import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
 import { CHAIN, createChain, createSpin } from '../game/chain.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
@@ -606,8 +606,13 @@ export default class MainScene extends Phaser.Scene {
     chainMove(verb) {
         if (this.relaxed) return;
         const r = this.chain.add(verb, this.time.now);
-        if (r) this.events.emit('chain-move', r);
+        if (!r) return;
+        this.events.emit('chain-move', r);
+        // Heard, not only shown: from the second linked move each one climbs the biome's scale.
+        if (r.count >= 2) play('chain', chainNote(this.biomeId(), r));
     }
+
+    biomeId() { return BIOMES[biomeIndexAt(this.fish.sprite.x)].id; }
 
     /** A chain is over: nothing is lost, a few bonus coins drift in. */
     chainEnd(done) {
@@ -615,7 +620,7 @@ export default class MainScene extends Phaser.Scene {
         this.events.emit('chain-end', done);
         if (!done.bonus) return;
         this.coins += done.bonus;
-        play('coin');
+        play('chainEnd', chainChord(this.biomeId()));
         const p = this.fish.sprite;
         const t = this.add.text(p.x, p.y - 90, `+${done.bonus}`, {
             fontFamily: 'Arial', fontSize: '52px', color: '#fff3b0', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 8
