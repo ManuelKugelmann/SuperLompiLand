@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
-import { createRope, stepRope } from './rope.js';
+import { LINE, createRope, stepRope } from './rope.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
@@ -124,6 +124,7 @@ export default class LevelGenerator {
         this.early = new Map();     // chunk key -> collision bodies laid down while the worker is busy
         this.chainBody = { active: false, x: 0, y: 0, vx: 0, vy: 0 };   // the swimmer, as the ropes see it
         this.chains = [];           // hanging chains: verlet ropes (rope.js) with the hazard as the weight at the end
+        this.lineEnd = { x: 0, y: 0 };
         this.tethers = [];          // lines that hold drifting things: stretched between them and their anchor every frame
         this.ready = [];            // grids that came back, waiting to be drawn
         const mats = this.loadMaterials();
@@ -274,11 +275,13 @@ export default class LevelGenerator {
                 c.weight.setPosition(r.x[last] + Math.sin(lean) * c.hang, r.y[last] + Math.cos(lean) * c.hang).setRotation(-lean);
             }
         }
-        for (const line of this.tethers) {
-            if (!line.active || !line.follow.active) continue;
-            const fx = line.follow.x, fy = line.follow.y + line.hang, dx = line.toX - fx, dy = line.toY - fy;
-            line.setPosition(fx, fy).setRotation(-Math.atan2(dx, dy));
-            line.setDisplaySize(7, Math.hypot(dx, dy));
+        // Lines: held at the stone or float, tied to the drifting net at the other end.
+        for (const l of this.tethers) {
+            if (!l.active || !l.follow.active) continue;
+            this.lineEnd.x = l.follow.x; this.lineEnd.y = l.follow.y + l.hang;
+            const r = stepRope(l.sim, t, this.chainBody.active ? this.chainBody : null, LINE, this.lineEnd), pts = l.points;
+            for (let i = 0; i < r.n; i++) { pts[i].x = r.x[i] - l.x; pts[i].y = r.y[i] - l.y; }
+            l.setDirty();
         }
         for (const l of this.lights) {
             if (!l.active || !l.follow.active) continue;
@@ -560,22 +563,16 @@ export default class LevelGenerator {
                 // Caught: a line runs from the net down to a stone on the seabed. The net
                 // tugs at it from side to side and bobs only a little.
                 makeLineTexture(s);
-                const stone = s.add.ellipse(x, ground.y - 4, 46, 26, 0x4d4a48).setDepth(2.8);
-                const line = s.add.image(x, y, 'hz_line').setOrigin(0.5, 0).setDepth(2.9);
-                line.follow = img; line.hang = h.size * 0.32; line.toX = x; line.toY = ground.y - 10;
-                chunk.objects.push(stone, line);
-                this.tethers.push(line);
+                chunk.objects.push(s.add.ellipse(x, ground.y - 4, 46, 26, 0x4d4a48).setDepth(2.8));
+                this.addLine(chunk, x, ground.y - 10, img, h.size * 0.32);
                 img.setX(x - 46);
                 s.tweens.add({ targets: img, x: x + 46, duration: rng.between(2600, 3600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
                 s.tweens.add({ targets: img, y: y - h.bob * 0.4, duration: rng.between(1700, 2400), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
             } else if (h.tether && y < h.tether * 1.6) {
                 // Near the surface: the net hangs on a line from a float that rides on the water.
                 makeLineTexture(s);
-                const float = s.add.ellipse(x, 4, 54, 30, 0xd9642b).setStrokeStyle(4, 0x8f3d17).setDepth(5.9);
-                const line = s.add.image(x, y, 'hz_line').setOrigin(0.5, 0).setDepth(2.9);
-                line.follow = img; line.hang = -h.size * 0.32; line.toX = x; line.toY = 14;
-                chunk.objects.push(float, line);
-                this.tethers.push(line);
+                chunk.objects.push(s.add.ellipse(x, 4, 54, 30, 0xd9642b).setStrokeStyle(4, 0x8f3d17).setDepth(5.9));
+                this.addLine(chunk, x, 14, img, -h.size * 0.32);
                 img.setX(x - 60);
                 s.tweens.add({ targets: img, x: x + 60, duration: rng.between(3200, 4600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
                 s.tweens.add({ targets: img, y: y - h.bob * 0.5, duration: rng.between(1900, 2700), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -608,6 +605,19 @@ export default class LevelGenerator {
         rope.sim = r; rope.weight = weight; rope.hang = hang;
         chunk.objects.push(rope);
         this.chains.push(rope);
+    }
+
+    /**
+     * A line held at (x, y) and tied to `follow` (a drifting net), `hang` px from its middle.
+     * A rope with both ends held (rope.js): it curves, sways and gives way to a swimmer.
+     */
+    addLine(chunk, x, y, follow, hang) {
+        const s = this.scene, r = createRope(x, y, follow.y + hang, LINE), points = [];
+        for (let i = 0; i < r.n; i++) points.push(new Phaser.Math.Vector2(0, r.y[i] - y));
+        const line = s.add.rope(x, y, 'hz_line', null, points, false).setDepth(2.9);
+        line.sim = r; line.follow = follow; line.hang = hang;
+        chunk.objects.push(line);
+        this.tethers.push(line);
     }
 
     addFriend(chunk, key, x, y, rng, angle = 0) {

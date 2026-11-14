@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ROPE, createRope, stepRope } from '../game/level/rope.js';
+import { ROPE, LINE, createRope, stepRope } from '../game/level/rope.js';
 
 const length = r => { let l = 0; for (let i = 1; i < r.n; i++) l += Math.hypot(r.x[i] - r.x[i - 1], r.y[i] - r.y[i - 1]); return l; };
 
@@ -46,4 +46,16 @@ test('the weighted end is moved less by a shove than a link in the middle', () =
     for (let i = 0; i < 10; i++) stepRope(q, 0, { x: 500, y: q.y[tip], vx: 12, vy: 0 });
     assert.ok(Number.isFinite(m) && Number.isFinite(q.x[tip]));
     assert.ok(Math.abs(length(q) - 800) < 800 * 0.08);
+});
+
+test('a line is held at both ends: it follows what it is tied to and hangs in a soft curve', () => {
+    const r = createRope(300, 900, 400, LINE);          // from a stone on the seabed up to a net
+    assert.equal(r.y[0], 900); assert.ok(Math.abs(r.y[r.n - 1] - 400) < 1e-3);
+    assert.ok(r.seg * (r.n - 1) > 500, 'a little slack');
+    const end = { x: 300, y: 400 };
+    for (let i = 0; i < 400; i++) { end.x = 300 + Math.sin(i / 40) * 46; stepRope(r, i / 60, null, LINE, end); }
+    assert.equal(r.x[0], 300); assert.equal(r.y[0], 900);
+    assert.ok(Math.abs(r.x[r.n - 1] - end.x) < 1e-3 && Math.abs(r.y[r.n - 1] - 400) < 1e-3, 'the end stays on the net');
+    assert.ok(length(r) < 500 * LINE.slack * 1.08, `length ${length(r)}`);
+    for (let i = 0; i < r.n; i++) assert.ok(Number.isFinite(r.x[i]) && Number.isFinite(r.y[i]));
 });
