@@ -5,6 +5,70 @@
 const f = (de, en) => ({ de, en });
 
 export const MORE_FACTS = {
+    // Places (2026-11-15): every place gets more than its one fact, like the animals.
+    front: [
+        f("Seevögel und Delfine kommen zu solchen Linien, weil sich dort viele kleine Fische sammeln.", "Seabirds and dolphins come to such lines because many small fish gather there."),
+        f("Man erkennt eine Front oft an einem Streifen aus Schaum und an zwei verschiedenen Wasserfarben.", "You can often spot a front by a strip of foam and two different colours of water.")],
+    nursery: [
+        f("Die Wurzeln bremsen das Wasser. Dadurch bleibt Schlamm liegen, und darin wächst viel Futter.", "The roots slow the water down. Mud settles there, and lots of food grows in it."),
+        f("Junge Zitronenhaie bleiben ein paar Jahre in den Mangroven, bevor sie ins offene Meer ziehen.", "Young lemon sharks stay in the mangroves for a few years before they head out to the open sea.")],
+    ferry: [
+        f("Schiffsschrauben sind laut. Unter Wasser trägt der Schall viel weiter als in der Luft.", "Ship propellers are loud. Under water sound travels much further than in air."),
+        f("Langsamere Schiffe sind leiser und treffen seltener Wale und Schildkröten.", "Slower ships are quieter and hit whales and turtles less often.")],
+    surge_channel: [
+        f("Tiere in der Brandung halten sich gut fest: Seepocken kleben, Muscheln spinnen Fäden.", "Animals in the surf hold on tight: barnacles glue themselves down and mussels spin threads."),
+        f("Das schäumende Wasser bringt viel Sauerstoff und Futter mit.", "The foaming water brings lots of oxygen and food.")],
+    jelly_garden: [
+        f("Auf Englisch heißen sie Kopfüber-Quallen.", "In English they are called upside-down jellyfish."),
+        f("Sie pumpen sanft mit ihrem Schirm, damit frisches Wasser zu ihren Algen kommt.", "They pump gently with their bell so fresh water reaches their algae.")],
+    vent_field: [
+        f("Das Wasser an einem Schlot kann über 350 Grad heiß sein. Der hohe Druck lässt es nicht kochen.", "The water at a vent can be hotter than 350 degrees. The great pressure keeps it from boiling."),
+        f("Die Röhrenwürmer haben keinen Mund. Bakterien in ihrem Körper machen das Futter für sie.", "The tube worms have no mouth. Bacteria inside their body make their food for them.")],
+    cleaner_station: [
+        f("Putzerfische tanzen auf und ab, damit die großen Fische wissen: Hier wird geputzt.", "Cleaner fish dance up and down so the big fish know: cleaning happens here."),
+        f("Sogar Haie und Mantas kommen zur Putzerstation und halten ganz still.", "Even sharks and mantas come to the cleaning station and keep very still.")],
+    coral_colony: [
+        f("Korallen wachsen nur wenige Zentimeter im Jahr.", "Corals grow only a few centimetres a year."),
+        f("Nachts strecken die kleinen Korallentiere ihre Fangarme aus und fangen Plankton.", "At night the tiny coral animals stretch out their arms and catch plankton.")],
+    sandbar: [
+        f("Eine Sandbank wandert langsam mit den Strömungen und sieht jedes Jahr ein bisschen anders aus.", "A sandbar slowly moves with the currents and looks a little different every year."),
+        f("Im Sand darunter leben Muscheln, Würmer und Krebse, die man kaum sieht.", "Clams, worms and crabs you hardly ever see live in the sand below.")],
+    sargassum: [
+        f("Nach diesem Tang ist sogar ein ganzes Meer benannt: die Sargassosee.", "A whole sea is named after this seaweed: the Sargasso Sea."),
+        f("Der Sargassofisch sieht genau aus wie der Tang und versteckt sich darin.", "The sargassum fish looks just like the seaweed and hides in it.")],
+    sea_arch: [
+        f("Sand und Steine in den Wellen schleifen den Fels wie Schmirgelpapier.", "Sand and stones in the waves grind the rock like sandpaper."),
+        f("Unter dem Felsentor ist das Wasser oft voller Fische, die im Schatten stehen.", "Under the arch the water is often full of fish resting in the shade.")],
+    ghost_ship: [
+        f("Holz wird im Meer von Bohrmuscheln langsam aufgefressen. Metall rostet über viele Jahre.", "In the sea wood is slowly eaten by shipworms. Metal rusts away over many years."),
+        f("Für viele Fische ist ein Wrack wie ein großes Haus mit vielen Zimmern zum Verstecken.", "For many fish a wreck is like a big house with many rooms to hide in.")],
+    beach: [
+        f("Meeresschildkröten graben ihre Nester in den warmen Sand am Strand.", "Sea turtles dig their nests in the warm sand of the beach."),
+        f("Mit jeder Welle bringen Strömungen neuen Sand und nehmen alten mit.", "With every wave, currents bring new sand and take old sand away.")],
+    reef: [
+        f("Riffe sind nur ein winziger Teil des Meeres, aber ein Viertel aller Meerestiere lebt dort.", "Reefs are only a tiny part of the sea, but a quarter of all sea animals live there."),
+        f("Korallen brauchen klares, warmes Wasser und viel Licht.", "Corals need clear, warm water and lots of light.")],
+    mangrove: [
+        f("Mangroven können in Salzwasser wachsen. Überschüssiges Salz scheiden sie über die Blätter aus.", "Mangroves can grow in salt water. They get rid of the extra salt through their leaves."),
+        f("Ihre Wurzeln schützen die Küste vor Sturmwellen.", "Their roots protect the coast from storm waves.")],
+    kelp: [
+        f("Tang hat keine Wurzeln. Er hält sich mit einem Haftfuß am Fels fest.", "Kelp has no roots. It holds on to the rock with a holdfast."),
+        f("Kleine Gasblasen an den Blättern halten den Tang aufrecht, zum Licht hin.", "Little gas bladders on the blades keep the kelp standing up, towards the light.")],
+    blue: [
+        f("Im offenen Meer gibt es nichts zum Verstecken. Darum sind viele Fische hier silbern und schwimmen in Schwärmen.", "In the open sea there is nowhere to hide. That is why many fish here are silver and swim in shoals."),
+        f("Winzige Algen im Meer machen mehr als die Hälfte des Sauerstoffs, den wir atmen.", "Tiny algae in the sea make more than half of the oxygen we breathe.")],
+    wreck: [
+        f("Manche Wracks werden absichtlich versenkt, damit dort ein neues Riff wachsen kann.", "Some wrecks are sunk on purpose so a new reef can grow there."),
+        f("In der Tiefe ist es kalt und dunkel. Dort bleiben Wracks oft sehr lange erhalten.", "Deep down it is cold and dark. Wrecks often last a very long time there.")],
+    shore: [
+        f("In Felstümpeln bleibt bei Ebbe Wasser stehen: kleine Aquarien voller Tiere.", "At low tide water stays behind in rock pools: little aquariums full of animals."),
+        f("Seehunde ruhen sich gern auf Felsen in der Sonne aus.", "Seals like to rest on rocks in the sun.")],
+    harbour: [
+        f("An Hafenpfählen wachsen so viele Muscheln, dass sie wie ein Pelz aussehen.", "So many mussels grow on harbour piles that they look like fur."),
+        f("Was hilft: Müll gehört in die Tonne, dann treibt er nicht ins Hafenbecken.", "What helps: rubbish goes in the bin, so it does not drift into the harbour.")],
+    trench: [
+        f("Ganz unten drückt das Wasser so stark wie ein Elefant auf einem Daumennagel.", "At the very bottom the water presses as hard as an elephant standing on a thumbnail."),
+        f("Auch dort unten leben Tiere: kleine Flohkrebse und durchsichtige Fische.", "Even down there animals live: little amphipods and see-through fish.")],
     friend_turtle: [
         f('Zum Eierlegen schwimmt sie zurück an den Strand, an dem sie selbst geschlüpft ist.', 'To lay her eggs she swims back to the beach where she hatched herself.'),
         f('Meeresschildkröten können über 50 Jahre alt werden.', 'Sea turtles can live for more than 50 years.')],

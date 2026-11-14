@@ -19,6 +19,6 @@ test('every creature has several facts, the first is the entry fact', () => {
     }
 });
 
-test('an entry without more facts shows its one', () => {
-    assert.equal(factsOf(entryFor('reef')).length, 1);
+test('every place has several facts too', () => {
+    for (const e of ENTRIES.filter(q => q.kind === 'place')) assert.ok(factsOf(e).length >= 3, e.id);
 });
