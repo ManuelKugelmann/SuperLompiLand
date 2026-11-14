@@ -1,18 +1,28 @@
 // Special moves (double tap / long press / Space). One table, one interface;
-// which character has which special is set in characters.js.
+// which character has which special is set in characters.js. Every special
+// looks, sounds and plays differently — none is "a burst of bubbles from behind".
 //
+//   label        what the move is called in the control hints, per language
 //   cooldown     ms before the next special, counted from the start
 //   endCooldown  ms of cooldown after a pose ends (specials that hold a pose)
 //   air          may be started above the water
-//   start(ctx)   ctx = { vx, vy, facing, inAir } -> the effect, applied by Player:
+//   chain        { max, window, rest }: may be used up to `max` times in a row, each within
+//                `window` ms of the last; after the last one it rests for `rest` ms
+//   reach        px within which the special looks for rock to hold on to (anchor)
+//   start(ctx)   ctx = { vx, vy, facing, inAir, holding, canHold } -> the effect, applied by Player:
 //       vx, vy       new velocity
 //       pose, poseMs switch to this character state (look + collision size) for a
 //                    while; using the special again ends it early
+//       mode         { ms, drag, sink, flow, bounce, tuck }: for `ms` the body behaves differently —
+//                    water drag x drag, extra sinking x sink, carried by currents x flow,
+//                    bounciness, held squash `tuck`
+//       hold / release   grab the rock found within `reach` / let go of it
 //       guard        ms fully protected (not even pushed)
 //       shield       ms hazards cannot hurt
 //       invulnerable ms without damage (still pushed)
 //       shove        push loose things away
-//       squash, sound, color, ring   feedback
+//       burst        what is seen: 'ring' (default), 'spines', 'ripple', 'none'; color, ring = size
+//       squash, sound    feedback
 //
 // Pure data and maths, no Phaser (tests/specials.test.mjs). The numbers are
 // first proposals for everything but the puff, to be tuned by play.
@@ -23,35 +33,78 @@ const ahead = ({ vx, vy, facing }) => {
 };
 
 export const SPECIALS = {
-    // Air brake: puff up, stop where you are, briefly untouchable.
+    // Lompi — air brake: puff up, stop where you are, briefly untouchable.
     puff: {
+        label: { de: 'aufblasen', en: 'puff up' },
         cooldown: 0, endCooldown: 500, air: true,
         start: ({ vx, vy, inAir }) => ({
             pose: 'inflated', poseMs: 2600, guard: 1300, shove: true, squash: -0.3, sound: 'puff', ring: 3.2,
             vx: inAir ? vx : vx * 0.08, vy: inAir ? vy : vy * 0.08
         })
     },
-    // Burst forward.
-    dash: {
-        cooldown: 900, air: false,
-        start: c => { const a = ahead(c); return { vx: c.vx + a.x * 15, vy: c.vy + a.y * 15, invulnerable: 350 }; }
+    // Sharky — sprint: every tap is another burst along the nose, up to five in a row, then a rest.
+    sprint: {
+        label: { de: 'Sprint', en: 'sprint' },
+        cooldown: 110, air: false, chain: { max: 5, window: 900, rest: 1700 },
+        start: c => { const a = ahead(c); return { vx: c.vx + a.x * 7.5, vy: c.vy + a.y * 7.5, invulnerable: 300, squash: 0.22, burst: 'none', sound: 'sprint' }; }
     },
-    // Up and forward, made for breaking the surface.
+    // Flitzi — a flat, fast launch through the surface: more forward than up. The flight
+    // after it is a glide (see `glide` in characters.js), not a high jump.
     leap: {
+        label: { de: 'Sprung', en: 'leap' },
         cooldown: 1100, air: false,
-        start: ({ vx, vy, facing }) => ({ vx: vx + facing * 9, vy: Math.min(vy, 0) - 17 })
+        start: ({ vx, vy, facing }) => ({ vx: vx + facing * 13, vy: Math.min(vy, 0) - 9, burst: 'none', sound: 'leap' })
     },
-    // Jellyfish pump.
-    pulse: {
-        cooldown: 500, air: false,
-        start: ({ vx, vy }) => ({ vx: vx * 0.6, vy: Math.min(vy, 0) - 13 })
+    // Firefish — fan: the fins spread wide. It nearly stops and hangs in the water like a
+    // parachute, a ring of spines nudges others away, hazards cannot hurt, and currents
+    // carry it along three times as strongly.
+    fan: {
+        label: { de: 'Flossenfächer', en: 'fin fan' },
+        cooldown: 3400, air: true,
+        start: ({ vx, vy }) => ({
+            vx: vx * 0.45, vy: vy * 0.45, shield: 2300, shove: true, squash: -0.2,
+            mode: { ms: 2300, drag: 3.5, flow: 3 }, burst: 'spines', color: 0xffd9c2, sound: 'fan'
+        })
     },
-    // Hazards cannot hurt for a while.
-    shield: {
+    // Schildi — shell: tucks in and becomes a heavy, bouncy stone that sinks and rolls;
+    // whatever it touches bounces off.
+    shell: {
+        label: { de: 'Panzer', en: 'shell' },
         cooldown: 4200, air: true,
-        start: ({ vx, vy }) => ({ vx, vy, shield: 2600, color: 0xffe08a })
+        start: ({ vx, vy }) => ({
+            vx, vy, shield: 2800, mode: { ms: 2800, drag: 0.45, sink: 5, bounce: 0.88, tuck: 0.2 }, burst: 'none', sound: 'shell'
+        })
+    },
+    // Quallina — pulse: one squeeze of the bell jets it upward, with a soft ripple of light.
+    pulse: {
+        label: { de: 'Stoß nach oben', en: 'pulse upward' },
+        cooldown: 500, air: false,
+        start: ({ vx, vy }) => ({ vx: vx * 0.6, vy: Math.min(vy, 0) - 13, burst: 'ripple', color: 0xbfe8ff, sound: 'pulse' })
+    },
+    // Hüpfi — anchor: the tail grabs the nearest rock and holds on against any current.
+    // Again lets go with a hop. With nothing to hold in reach it is just the hop.
+    anchor: {
+        label: { de: 'festhalten', en: 'hold on' },
+        cooldown: 250, air: false, reach: 280,
+        start: ({ vx, vy, facing, holding, canHold }) => {
+            if (holding) return { release: true, vx: facing * 9, vy: -5, burst: 'none', sound: 'hop' };
+            if (canHold) return { hold: true, vx: 0, vy: 0, burst: 'none', sound: 'grab' };
+            return { vx: vx + facing * 8, vy: vy - 3, burst: 'none', sound: 'hop' };
+        }
     }
 };
+
+/**
+ * One use of a chained special. `chain` = { count, left } (uses so far, ms left to continue).
+ * Returns the new chain state and the cooldown that applies now.
+ */
+export function chainStep(special, chain) {
+    const rule = special.chain;
+    if (!rule) return { count: 0, left: 0, cooldown: special.cooldown };
+    const count = (chain.left > 0 ? chain.count : 0) + 1;
+    if (count >= rule.max) return { count: 0, left: 0, cooldown: rule.rest };
+    return { count, left: rule.window, cooldown: special.cooldown };
+}
 
 /** May this special start now? */
 export function canUse(special, { cooldown, inAir }) {

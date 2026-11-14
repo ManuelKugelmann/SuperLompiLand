@@ -7,15 +7,47 @@ import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY } from './bi
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
     spawn: { x: 0, y: 700 },      // start pool, kept free of rock
-    maxDepth: 5600                // deepest regular seabed (the abyss goes further)
+    maxDepth: 5600,               // deepest regular seabed (the abyss goes further)
+    nestRadius: 230,              // half width of the sand basin a nest lies in
+    nestRim: 16                   // how far its rim stands above the middle
+};
+
+// The calm main route (spec 5.2c): one lane of open water through the whole journey, from
+// the start pool past every nest to the grand nest. It is carved out of the rock, so it
+// exists by construction, and hazards keep their distance from it (LevelGenerator).
+export const ROUTE = {
+    halfWidth: 260,     // the lane is open at least this far above and below its middle
+    cruise: 0.5,        // between nests it runs at this share of the way down to the seabed ...
+    minY: 320,          // ... but never shallower
+    maxY: 2600,         // ... or deeper than this
+    aboveNest: 240,     // it passes this far above every nest
+    descent: 1.6,       // px along the way per px of depth when it dips to a nest (gentle slopes)
+    clear: 420          // hazards stay at least this far from its middle
 };
 
 /**
  * Build the world's density field for a seed.
- * Returns { density(x, y, withNests = true), nests }.
+ * Returns { density(x, y, withNests = true), nests, routeY(x) }.
  */
+const smooth01 = v => { const t = v <= 0 ? 0 : v >= 1 ? 1 : v; return t * t * (3 - 2 * t); };
+
 export function createField(seed) {
     let nests = null;
+
+    /** Height of the calm route's middle at world x. */
+    const routeCache = new Map();     // grids ask for the same columns again and again
+    const routeY = x => {
+        let y = routeCache.get(x);
+        if (y !== undefined) return y;
+        y = Math.min(ROUTE.maxY, Math.max(ROUTE.minY, floorY(x) * ROUTE.cruise));
+        for (const nest of nests) {
+            const dx = Math.abs(x - nest.x);
+            if (dx < nest.reach) y += (nest.y - ROUTE.aboveNest - y) * smooth01(1 - dx / nest.reach);
+        }
+        if (routeCache.size > 8192) routeCache.clear();
+        routeCache.set(x, y);
+        return y;
+    };
 
     const density = (x, y, withNests = true) => {
         // Two broad octaves only: big soft blobs and winding passages, no jagged detail.
@@ -32,10 +64,30 @@ export function createField(seed) {
         const ds = Math.hypot(x - FIELD.spawn.x, y - FIELD.spawn.y);
         if (ds < 900) n -= (1 - ds / 900) * 0.6;                         // clear start pool
         if (withNests && nests) {
-            for (const nest of nests) {                                  // open water above every nest
-                if (Math.abs(x - nest.x) > 520 || y > nest.y - 30) continue;
-                const d = Math.hypot(x - nest.x, y - (nest.y - 260));
-                if (d < 480) n -= (1 - d / 480) * 0.7;
+            // The calm route: fully open inside its half width, fading back to rock over as much
+            // again (a soft edge: no sharp step in the field). Where the lane runs just under the
+            // open surface water, everything above it is lane too, so no sliver of rock is left between.
+            const ry = routeY(x), shallow = ry - ROUTE.halfWidth * 2 < 620 && y < ry;
+            const off = shallow ? 0 : Math.abs(y - ry) / ROUTE.halfWidth;
+            if (off < 2 && x > FIELD.spawn.x - 600 && x < WORLD_END) n -= 0.95 * smooth01(2 - off);
+            for (const nest of nests) {
+                const dx = Math.abs(x - nest.x);
+                if (dx > 520) continue;
+                if (y <= nest.y - 30) {                                  // open water above every nest
+                    const d = Math.hypot(x - nest.x, y - (nest.y - 260));
+                    if (d < 480) n -= (1 - d / 480) * 0.7;
+                }
+                // The nest lies in a shallow sand basin with a raised rim, levelled into
+                // the seabed, so it sits right on any slope instead of floating or sinking.
+                const R = FIELD.nestRadius, reach = R + 170;
+                if (dx < reach && Math.abs(y - nest.y) < 260) {
+                    const u = dx / R;
+                    const rim = u < 1 ? u * u : Math.max(0, 1 - (dx - R) / 170);       // 0 in the middle, 1 on the rim, back to 0 outside
+                    const ground = nest.y - FIELD.nestRim * rim;
+                    const side = dx <= R ? 1 : smooth01(1 - (dx - R) / 170);
+                    const w = side * smooth01(1 - Math.abs(y - nest.y) / 260);
+                    n += (FIELD.threshold + (y - ground) / 320 - n) * w;
+                }
             }
         }
         return n;
@@ -49,10 +101,13 @@ export function createField(seed) {
     nests = xs.map((x, index) => {
         let y = floorY(x) + 260;
         while (y > 400 && density(x, y, false) > FIELD.threshold) y -= 12;
-        return { x, y: y + 12, index, grand: index === xs.length - 1 };
+        // How far to either side the route's dip to this nest reaches.
+        const cruise = Math.min(ROUTE.maxY, Math.max(ROUTE.minY, floorY(x) * ROUTE.cruise));
+        const reach = Math.max(900, Math.abs(y + 12 - ROUTE.aboveNest - cruise) * ROUTE.descent);
+        return { x, y: y + 12, index, grand: index === xs.length - 1, reach };
     });
 
-    return { density, nests };
+    return { density, nests, routeY };
 }
 
 /**

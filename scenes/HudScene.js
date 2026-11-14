@@ -42,6 +42,21 @@ export default class HudScene extends Phaser.Scene {
         this.depthText = hudText(40, 232, '34px');
         this.depthLabel = de ? 'Tiefe' : 'Depth';
 
+        // Chain: a soft counter that names the last move; no timer, it simply fades when the chain ends.
+        this.chainText = hudText(40, 356, '38px').setAlpha(0);
+        const moves = de
+            ? { leap: 'Sprung', landing: 'Landung', skim: 'Wellenhüpfer', flip: 'Salto', special: 'Spezial', stream: 'Strömung', trail: 'Melodie', cannon: 'Blubberkanone', pad: 'Hüpfkissen' }
+            : { leap: 'Jump', landing: 'Landing', skim: 'Wave skip', flip: 'Flip', special: 'Special', stream: 'Current', trail: 'Melody', cannon: 'Bubble cannon', pad: 'Bounce pad' };
+        const onMove = ({ count, verb, flow }) => {
+            this.tweens.killTweensOf(this.chainText);
+            this.chainText.setText(count > 1 ? `${count} · ${moves[verb]}` : moves[verb]).setColor(flow ? '#ffd54a' : '#ffffff').setAlpha(1).setScale(1.25);
+            this.tweens.add({ targets: this.chainText, scale: 1, duration: 220, ease: 'Back.easeOut' });
+        };
+        const onEnd = () => this.tweens.add({ targets: this.chainText, alpha: 0, duration: 600 });
+        main.events.on('chain-move', onMove);
+        main.events.on('chain-end', onEnd);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { main.events.off('chain-move', onMove); main.events.off('chain-end', onEnd); });
+
         // Health: a row of hearts (readable at a glance, half hearts for sturdy characters).
         this.hearts = heartRow(this, 36, 300, main.maxHealth);
 
@@ -85,6 +100,7 @@ export default class HudScene extends Phaser.Scene {
 
         new BurgerMenu(this, 60, 60, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
+            { label: de ? 'RIFFBUCH' : 'REEF BOOK', color: 0x1d6f9a, callback: () => main.openBook() },
             { label: de ? 'NEU ANFANGEN' : 'START OVER', color: 0x6d4c41, callback: () => main.startOver() },
             main.relaxed
                 ? { label: de ? 'MODUS: ENTSPANNT' : 'MODE: RELAXED', color: 0x00897b, callback: () => main.setRelaxed(false) }

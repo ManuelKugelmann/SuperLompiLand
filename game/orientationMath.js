@@ -15,3 +15,17 @@ export function rotatedPageToGame(pageX, pageY, rect, gameW, gameH) {
         y: -(pageX - cx) / scale + gameH / 2
     };
 }
+
+/** The game picture is always this tall; its width follows the screen so there are no bars. */
+export const PICTURE = { height: 1080, minWidth: 1440, maxWidth: 2640 };
+
+/**
+ * Logical game width for a screen of this shape (as seen in landscape). Between
+ * 4:3 and about 22:9 the picture fills the screen exactly; beyond that it is
+ * capped and the rest is letterboxed.
+ */
+export function widthFor(screenW, screenH, cfg = PICTURE) {
+    if (!(screenW > 0 && screenH > 0)) return 1920;
+    const w = Math.round(cfg.height * screenW / screenH / 2) * 2;      // even numbers centre cleanly
+    return Math.min(cfg.maxWidth, Math.max(cfg.minWidth, w));
+}

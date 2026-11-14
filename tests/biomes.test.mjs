@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor, landmarkGroup, LANDMARK
 } from '../game/level/biomes.js';
 
 test('biomes are ordered west to east and every table is complete', () => {
@@ -85,8 +85,29 @@ test('named spots for screenshots: biome ids, the abyss, plain coordinates', () 
     for (const b of BIOMES) {
         const p = spotFor(b.id);
         assert.equal(biomeIndexAt(p.x), BIOMES.indexOf(b), b.id);
-        assert.ok(p.y >= 400 && p.y < floorY(p.x), `${b.id}: above the seabed`);
+        assert.ok(p.y >= 200 && p.y < floorY(p.x), `${b.id}: under water, above the seabed`);
     }
     const deep = spotFor('abyss');
     assert.ok(Math.abs(deep.x - ABYSS.x) < 1 && deep.y > 6000);
+});
+
+test('a biome with a landmark shows it where the player arrives: at its entry and at its spot', () => {
+    const CH = 960;
+    const wreck = BIOMES.find(b => b.id === 'wreck'), harbour = BIOMES.find(b => b.id === 'harbour');
+    for (const b of [wreck, harbour]) {
+        const spot = spotFor(b.id);
+        assert.equal(landmarkGroup(Math.floor(spot.x / CH), CH), b.landmark, `${b.id}: spot`);
+        assert.equal(landmarkGroup(Math.floor((b.from + LANDMARK.entry) / CH), CH), b.landmark, `${b.id}: entry`);
+        // A seabed landmark (wreck) is met beside the seabed; a surface one (pier) at the waterline.
+        if (b.spot === 'surface') assert.ok(spot.y > 0 && spot.y <= 380, `${b.id}: the spot is just under the surface`);
+        else assert.ok(Math.abs(spot.y - (floorY(spot.x) - LANDMARK.above)) < 1e-9, `${b.id}: the spot is beside the seabed`);
+    }
+    assert.equal(landmarkGroup(Math.floor(BIOMES.find(b => b.id === 'reef').from / CH) + 2, CH), null);
+    let columns = 0;
+    for (let cx = 0; cx < WORLD_END / CH; cx++) if (landmarkGroup(cx, CH)) columns++;
+    assert.equal(columns, 4, 'two columns per landmark biome, no more');
+});
+
+test('the mangrove spot is under the roots at the surface', () => {
+    assert.ok(spotFor('mangrove').y < 500);
 });

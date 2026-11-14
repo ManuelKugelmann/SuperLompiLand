@@ -7,16 +7,48 @@ import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor } from '../game/level/biomes.js';
 import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
+import WaterLight from '../game/fx/WaterLight.js';
+import ParticleLayer from '../game/fx/ParticleLayer.js';
+import SwarmLayer from '../game/ai/SwarmLayer.js';
+import FarLayers from '../game/level/FarLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
-import { play } from '../game/audio.js';
+import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
+import { play, nowSeconds, musicClock } from '../game/audio.js';
+import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
+import { CHAIN, createChain, createSpin } from '../game/chain.js';
+import BoosterLayer from '../game/level/BoosterLayer.js';
+import SpeedLines from '../game/fx/SpeedLines.js';
+import { createAutopilot } from '../game/ambient/autopilot.js';
+import { createGuide } from '../game/guide.js';
+import { createBook } from '../game/reefbook.js';
+import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
+import { ROUTE } from '../game/level/density.js';
+import { BOOK_KEY } from './ReefBookScene.js';
+import { STYLE_KEY } from './PlayStyleScene.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
+import { fitToWindow } from '../game/orientation.js';
 
 const STEP_MS = 1000 / 60;
 
 /** World tunables. */
+/** Leaking oil drums (spec 7.1): how often they puff and how much. */
+const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5 };
+/** Plumes at the trench's vents: how often, how many smoke and steam particles. */
+const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
+/** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
+const OPEN_SLACK = 0.04;
+const GRUMPY_HIT = 0.5;      // hearts a grumpy's shove costs (spec 7.1)
+const STYLE_ASK_MS = 1600;   // after the nest cheer, ask how to play (once)
+/** Fin-tip contrails: from this speed (px per step), at these tips (× body radius, nose = +x). */
+const CONTRAIL = { speed: 11, tips: [[-0.35, -0.55], [-0.35, 0.55]] };
+/** Reef book: how often to look around, and how close counts as seen up close (px). */
+const BOOK = { scanMs: 300, seePx: 420 };
+/** How high coins hop on each beat (px). */
+const COIN_BOB_PX = 12;
+
 const WORLD = {
     gravity: 0.12,         // gentle sink
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
@@ -29,6 +61,8 @@ const WORLD = {
     friendBonus: 5,
     schoolRadius: 420,    // friends (other players) this close swim as a school ...
     schoolBoost: 0.1,     // ... each of up to two makes you this much faster
+    streamBubbles: 45,    // bubbles per second that mark each stream in view
+    laneGlints: 22,       // light motes per second along the calm main route in view (spec 5.2c)
     roomReach: 320,       // a pose that needs more room may move the player this far to find it
     downedMs: 5000,       // playing together: how long friends have to revive you before the nest respawn
     reviveHealth: 2
@@ -40,6 +74,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     create() {
+        fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         const W = this.scale.width, H = this.scale.height;
         this.lang = this.registry.get('currentLanguage') || 'de';
 
@@ -47,6 +82,10 @@ export default class MainScene extends Phaser.Scene {
         this.progression.init?.();
         // Relaxed = just swim and explore: hazards are only scenery and cannot hurt.
         this.relaxed = !!this.progression.get?.('relaxed', false);
+        // Ambient reef (spec ch.12): the game as a meditative background. Lompi swims
+        // on autopilot, no HUD, nothing hurts, any tap returns to the title.
+        this.ambientMode = !!this.registry.get('ambient');
+        if (this.ambientMode) this.relaxed = true;
 
         this.matter.world.setGravity(0, WORLD.gravity);
         this.matter.world.autoUpdate = false; // stepped manually in fixedStep()
@@ -57,12 +96,31 @@ export default class MainScene extends Phaser.Scene {
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.hitStop = 0;                    // ms the action freezes after a hit (impact feel)
+        this.chain = createChain();          // linked moves (game/chain.js); shown by the HUD, not in relaxed play
+        this.spin = createSpin();            // loops flown in the air
+        this.airAt = 0;
+        this.streak = createStreak();        // coins in a row play a melody (game/music/melody.js)
         this.backdrop = new Backdrop(this, LEVEL.maxDepth);
+        this.farLayers = new FarLayers(this);     // far scenery: single objects, each at its own parallax depth
+        this.waterLight = new WaterLight(this);   // light shafts, caustics, depth grade
         // What has been collected stays collected (per chunk bitfields, see worldState.js).
         // Playing together, the room has its own memory, separate from the solo journey.
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
         this.level = new LevelGenerator(this, this.world);
         this.density = (x, y) => this.level.density(x, y);
+        // Currents and swell: one field for player and particles. Streams lose their pull at the calm route.
+        this.flow = createFlow(LEVEL.seed, FLOW, x => this.level.field.routeY(x));
+        this.flowAt = { x: 0, y: 0 };
+        this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
+        this.swarms = new SwarmLayer(this, {   // shoals of small fish around the view (spec 6.2)
+            isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK),
+            flowAt: this.particles.env.flowAt,
+            biomeAt: x => BIOMES[biomeIndexAt(x)].id,
+            waterAt: x => { const bl = biomeBlendAt(x); return mixColor(bl.a.water[0], bl.b.water[0], bl.t); }
+        });
+        this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
+        this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
+        this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
@@ -81,6 +139,19 @@ export default class MainScene extends Phaser.Scene {
             return p && Math.hypot(p.x - sp.x, p.y - sp.y) <= WORLD.roomReach ? p : null;
         };
         this.stillness = new Stillness();
+        // The nearest rock surface within reach, for a character that holds on with its tail.
+        this.fish.findHold = reach => {
+            const sp = this.fish.sprite, r = this.fish.radius;
+            let best = null;
+            for (let i = 0; i < 16; i++) {
+                const a = (i / 16) * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a);
+                for (let d = r; d <= reach && (!best || d < best.d); d += 16) {
+                    if (this.density(sp.x + dx * d, sp.y + dy * d) > LEVEL.threshold) { best = { d, dx, dy }; break; }
+                }
+            }
+            // Sit just off the rock, tail toward it.
+            return best ? { x: sp.x + best.dx * (best.d - r * 0.9), y: sp.y + best.dy * (best.d - r * 0.9) } : null;
+        };
 
         // Lighting layers (screen-fixed): ambient multiply + a soft vignette.
         this.ambient = this.add.rectangle(0, 0, W, H, 0xffffff).setOrigin(0).setScrollFactor(0).setDepth(40)
@@ -108,7 +179,8 @@ export default class MainScene extends Phaser.Scene {
 
         // HUD (menu, scheme switcher, puff button, counters) runs as its own
         // scene on top — see HudScene.
-        this.scene.launch(HUD_KEY, { main: this });
+        if (this.ambientMode) this.startAmbient();
+        else this.scene.launch(HUD_KEY, { main: this });
         // Phaser lets the top scene swallow input for the scenes below, and it
         // also swallows the first tap after a HUD button was touched. Turn that
         // off: this scene always gets every tap and asks isOverHud() itself.
@@ -130,8 +202,32 @@ export default class MainScene extends Phaser.Scene {
             }
         });
 
+        // Bubble cannons and bounce pads along the streams (game/level/boosters.js).
+        // Cannons and pads are optional: none inside the calm route.
+        this.boosters = new BoosterLayer(this, this.flow, (x, y) => y > 60 && this.density(x, y) <= LEVEL.threshold
+            && Math.abs(y - this.level.field.routeY(x)) > ROUTE.halfWidth);
+
+        this.speedLines = new SpeedLines(this);     // streaks rushing past while in flow
+        // ?debug=flow: arrows show where the water moves and how fast (also with the Debug button).
+        this.flowDebug = new URLSearchParams(window.location.search).get('debug') === 'flow';
+        // ?debug=ai: every creature shows what it is doing right now (spec 6.2 readability guard).
+        this.aiDebug = new URLSearchParams(window.location.search).get('debug') === 'ai';
+        this.aiLabels = new Map();
+
+        // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
+        // A grumpy's shove (ai/grumpy.js, spec 7.1): half a heart, never the last half; relaxed play only gets the push.
+        this.events.on('grumpy-hit', ({ x, y }) => {
+            if (this.relaxed || this.health <= GRUMPY_HIT) { this.fish.hit(new Phaser.Math.Vector2(x, y)); return; }
+            this.hurt(x, y, GRUMPY_HIT);
+        });
+        this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.level.startle(x, y); this.chainMove('special'); });
+
         // Splash when the fish breaks the surface in either direction.
-        this.events.on('fish-splash', ({ x, y, speed, entering }) => {
+        this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
+            // Chain moves: a fast jump out, a landing after real air time, a skip off a wave.
+            if (skim) this.chainMove('skim');
+            else if (!entering && speed >= CHAIN.minLeap) { this.airAt = this.time.now; this.chainMove('leap'); }
+            else if (entering && this.airAt && this.time.now - this.airAt >= CHAIN.minAir) { this.airAt = 0; this.chainMove('landing'); }
             if (speed < 2 || this.time.now - (this.lastSplash || -999) < 180) return; // no plop for a gentle bob
             this.lastSplash = this.time.now;
             play('splash', speed);
@@ -176,6 +272,12 @@ export default class MainScene extends Phaser.Scene {
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             saveNow();
+            this.particles.destroy();
+            this.swarms.destroy();
+            this.boosters.destroy();
+            this.speedLines.destroy();
+            this.events.off('fish-special');
+            this.events.off('grumpy-hit');
             document.removeEventListener('visibilitychange', saveNow);
             window.removeEventListener('pagehide', saveNow);
             this.scene.stop(HUD_KEY);
@@ -233,7 +335,7 @@ export default class MainScene extends Phaser.Scene {
 
     /** Big friendly line of text in the middle of the screen (shown by the HUD). */
     announce(title, subtitle = '') {
-        this.scene.get(HUD_KEY)?.banner?.(title, subtitle);
+        if (this.scene.isActive(HUD_KEY)) this.scene.get(HUD_KEY).banner?.(title, subtitle);   // no HUD in ambient mode
     }
 
     /** Swam into a nest: coins are safe, this is the new restart point. */
@@ -255,6 +357,15 @@ export default class MainScene extends Phaser.Scene {
             this.announce(de ? 'Das große Nest!' : 'The Grand Nest!', de ? 'Du hast es geschafft!' : 'You made it!');
         } else if (first) {
             this.announce(de ? 'Nest erreicht!' : 'Nest reached!', de ? 'Münzen gesichert · hier geht es weiter' : 'Coins saved · you restart here');
+            // The first nest asks once how to play (spec 1.4): relaxed or adventure.
+            if (!this.mp && !this.ambientMode && !this.progression.get?.('style_asked', false)) {
+                this.progression.set?.('style_asked', true);
+                this.time.delayedCall(STYLE_ASK_MS, () => {
+                    this.scene.pause();
+                    this.scene.launch(STYLE_KEY, { main: this });
+                    this.scene.bringToTop(STYLE_KEY);
+                });
+            }
         }
         for (let i = 0; i < 14; i++) {
             const a = (i / 14) * Math.PI * 2;
@@ -303,6 +414,7 @@ export default class MainScene extends Phaser.Scene {
             this.fish.guard = 2500;
             this.health = this.maxHealth;
             this.coins = this.banked;
+            this.streak.reset();
             this.camX = p.x - this.scale.width / 2;
             this.camY = p.y - this.scale.height / 2;
             this.respawning = false;
@@ -347,6 +459,49 @@ export default class MainScene extends Phaser.Scene {
         this.progression.set?.('controls', id);
     }
 
+    /** Debug only: a label over every creature with a mind, naming its state. */
+    drawAi() {
+        for (const f of this.level.friends) {
+            const mind = f.img.brain || f.img.crawler;
+            if (!mind || !f.img.active || this.aiLabels.has(f.img)) continue;
+            this.aiLabels.set(f.img, this.add.text(0, 0, '', { fontFamily: 'Arial', fontSize: '26px', color: '#ffffff', stroke: '#0a3f6e', strokeThickness: 6 }).setOrigin(0.5).setDepth(9.6));
+        }
+        for (const [img, label] of this.aiLabels) {
+            if (!img.active) { label.destroy(); this.aiLabels.delete(img); continue; }
+            label.setText((img.brain || img.crawler).state).setPosition(img.x, img.y - img.displayHeight * 0.5 - 24);
+        }
+    }
+
+    /** Debug only: the flow field as arrows on a grid, redrawn a few times a second. */
+    drawFlow(delta) {
+        const on = this.flowDebug || this.debugOn;
+        if (!on && !this.flowArrows) return;
+        if (!this.flowArrows) this.flowArrows = this.add.graphics().setDepth(9.5);
+        this.flowArrows.setVisible(on);
+        this.flowDrawAt = (this.flowDrawAt || 0) - delta;
+        if (!on || this.flowDrawAt > 0) return;
+        this.flowDrawAt = 200;
+        const g = this.flowArrows.clear(), wv = this.cameras.main.worldView, t = this.time.now / 1000, out = this.flowProbe || (this.flowProbe = { x: 0, y: 0 });
+        // The calm main route: its middle and the band hazards keep out of.
+        g.lineStyle(4, 0x7dffb0, 0.8);
+        for (let x = Math.floor(wv.x / 60) * 60; x < wv.right; x += 60) g.lineBetween(x, this.level.field.routeY(x), x + 60, this.level.field.routeY(x + 60));
+        const cell = 90;
+        for (let x = Math.floor(wv.x / cell) * cell; x < wv.right; x += cell) {
+            for (let y = Math.max(cell, Math.floor(wv.y / cell) * cell); y < wv.bottom; y += cell) {
+                this.flow.at(x, y, t, out);
+                const speed = Math.hypot(out.x, out.y);
+                if (speed < 0.15) continue;
+                // Colour by speed: pale = swell, yellow = a stream slower than the player, red = faster.
+                g.lineStyle(3, speed < 2 ? 0xbfe8ff : speed < 14 ? 0xffe066 : 0xff6b4a, 0.85);
+                const len = Math.min(cell * 0.8, 10 + speed * 3.2), ux = out.x / speed, uy = out.y / speed;
+                const x2 = x + ux * len, y2 = y + uy * len;
+                g.lineBetween(x, y, x2, y2);
+                g.lineBetween(x2, y2, x2 - ux * 10 - uy * 6, y2 - uy * 10 + ux * 6);
+                g.lineBetween(x2, y2, x2 - ux * 10 + uy * 6, y2 - uy * 10 - ux * 6);
+            }
+        }
+    }
+
     toggleDebug() {
         this.debugOn = !this.debugOn;
         const world = this.matter.world;
@@ -359,6 +514,265 @@ export default class MainScene extends Phaser.Scene {
         return this.debugOn;
     }
 
+    /**
+     * How the world looks to particles. The rock test is cached on a 32 px grid
+     * (particles cluster, the noise field is not free); flowAt is the hook for the
+     * shared flow field later: for now only bubble columns move the water.
+     */
+    particleEnv() {
+        const cache = new Map();
+        let cacheAt = 0;
+        return {
+            // Particles want px per second; the field speaks px per physics step.
+            flowAt: (x, y, out) => {
+                this.flow.at(x, y, this.time.now / 1000, out);
+                out.x *= 60; out.y = out.y * 60 + (this.level.liftAt(x, y) ? -170 : 0);
+            },
+            isSolid: (x, y) => {
+                const now = this.time.now;
+                if (now - cacheAt > 2000) { cache.clear(); cacheAt = now; }   // chunks come and go
+                const key = ((x >> 5) * 73856093) ^ ((y >> 5) * 19349663);
+                let v = cache.get(key);
+                if (v === undefined) { v = this.density(x, y) > LEVEL.threshold; cache.set(key, v); }
+                return v;
+            },
+            surfaceY: x => this.surface.heightAt(x, this.time.now / 1000)
+        };
+    }
+
+    /** Leaking oil drums near the view puff out pulses of oil that rise and pool at the surface (spec 7.1). */
+    leakOil(delta) {
+        this.leakAt = (this.leakAt || 0) - delta;
+        if (this.leakAt > 0) return;
+        this.leakAt = OIL.pulseMs;
+        const cam = this.cameras.main, m = OIL.margin;
+        for (const h of this.level.hazards) {
+            if (h.key !== 'hazard_buoy' || !h.img.active) continue;
+            const { x, y } = h.img;
+            if (x < cam.scrollX - m || x > cam.scrollX + cam.width + m || y < cam.scrollY - m || y > cam.scrollY + cam.height + m) continue;
+            this.particles.spawn('oil', x, y - h.r * 0.9, OIL.perPulse, { radius: 18, spread: 18, vy: -40 });
+        }
+    }
+
+    /** Ambient reef: autopilot, controls hidden, the screen kept awake, any input leaves. */
+    startAmbient() {
+        this.controller.ui?.setVisible(false);
+        this.autoDir = new Phaser.Math.Vector2();
+        this.autopilot = createAutopilot({
+            isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK),
+            poi: (x, y) => {
+                let best = null, bd = 1800;
+                for (const f of this.level.friends) {
+                    if (!f.img.active) continue;
+                    const d = Math.hypot(f.img.x - x, f.img.y - y);
+                    if (d > 300 && d < bd) { bd = d; best = { x: f.img.x, y: f.img.y - 120 }; }
+                }
+                return best;
+            }
+        });
+        const de = this.lang === 'de';
+        const hint = this.add.text(this.scale.width / 2, this.scale.height - 60, de ? 'Tippen zum Beenden' : 'Tap to leave', {
+            fontFamily: 'Arial', fontSize: '30px', color: '#eafcff', stroke: '#0a3f6e', strokeThickness: 6
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(60).setAlpha(0.8);
+        this.tweens.add({ targets: hint, alpha: 0, delay: 3500, duration: 1500, onComplete: () => hint.destroy() });
+        try { navigator.wakeLock?.request('screen').then(l => { this.wakeLock = l; }).catch(() => {}); } catch { /* not supported */ }
+        const leave = () => {
+            if (this.leaving) return;
+            this.leaving = true;
+            this.registry.set('ambient', false);
+            this.wakeLock?.release?.().catch?.(() => {});
+            this.cameras.main.fadeOut(400, 10, 40, 70);
+            this.time.delayedCall(420, () => this.scene.start(SCENE_KEYS.INTRO));
+        };
+        this.time.delayedCall(600, () => {                       // ignore the tap that started it
+            this.input.on('pointerdown', leave);
+            this.input.keyboard?.on('keydown', leave);
+        });
+    }
+
+    /**
+     * The guide fish (spec 1.4): after a stall it swims ahead to open water east and
+     * waits; following it moves it on, progress sends it off. Drawn once, procedurally.
+     */
+    updateGuide(dt) {
+        const p = this.fish.sprite;
+        const { state, target } = this.guide.update(dt, p.x, p.y);
+        let g = this.guideFish;
+        if (state === 'away') { if (g) g.setVisible(false); return; }
+        if (!g) {
+            if (!this.textures.exists('guide_fish')) {
+                const d = this.make.graphics({ add: false });
+                d.fillStyle(0xffd23f, 1).fillEllipse(34, 22, 52, 34);          // body
+                d.fillStyle(0xffb000, 1).fillTriangle(6, 22, -10, 8, -10, 36);   // tail
+                d.fillStyle(0xfff3b0, 0.9).fillEllipse(36, 14, 30, 10);         // shine
+                d.fillStyle(0xffffff, 1).fillCircle(48, 18, 7);
+                d.fillStyle(0x10324a, 1).fillCircle(50, 18, 4);
+                d.generateTexture('guide_fish', 64, 44);
+                d.destroy();
+            }
+            g = this.guideFish = this.add.image(p.x, p.y, 'guide_fish').setDepth(4.6).setOrigin(0.4, 0.5);
+            g.vx = 0; g.vy = 0;
+        }
+        if (!g.visible) {                              // arrives from just ahead, off to the side
+            g.setPosition(p.x + 260, p.y - 160).setAlpha(0).setVisible(true);
+        }
+        const to = state === 'leave' ? { x: g.x + 900, y: g.y - 200 } : target;
+        const dx = to.x - g.x, dy = to.y - g.y, dist = Math.hypot(dx, dy);
+        const speed = state === 'leave' ? 520 : Math.min(360, dist * 1.5);
+        g.vx += ((dist ? dx / dist : 0) * speed - g.vx) * Math.min(1, dt * 3);
+        g.vy += ((dist ? dy / dist : 0) * speed - g.vy) * Math.min(1, dt * 3);
+        g.x += g.vx * dt;
+        g.y += g.vy * dt + Math.sin(this.time.now / 260) * 0.4;
+        if (Math.abs(g.vx) > 8) g.setFlipX(g.vx < 0);
+        g.rotation = Phaser.Math.Clamp(Math.atan2(g.vy, Math.abs(g.vx) + 1) * 0.5, -0.4, 0.4) * (g.vx < 0 ? -1 : 1);
+        g.setAlpha(state === 'leave' ? Math.max(0, g.alpha - dt * 0.8) : Math.min(1, g.alpha + dt * 1.5));
+        if (state === 'leave' && g.alpha <= 0) { g.setVisible(false); this.guide.gone(); }
+    }
+
+    /**
+     * Reef book: whatever Lompi sees up close (friends, leftovers) and every biome he
+     * enters fills in an entry; the first time, a small card pops up.
+     */
+    discover(delta) {
+        this.seeAt = (this.seeAt || 0) - delta;
+        if (this.seeAt > 0) return;
+        this.seeAt = BOOK.scanMs;
+        const p = this.fish.sprite, r2 = BOOK.seePx * BOOK.seePx;
+        const near = o => o.img.active && (o.img.x - p.x) ** 2 + (o.img.y - p.y) ** 2 < r2;
+        const ids = [BIOMES[biomeIndexAt(p.x)].id];
+        for (const f of this.level.friends) if (f.key && near(f)) ids.push(f.key);
+        for (const h of this.level.hazards) if (h.key && near(h)) ids.push(h.key);
+        for (const s of this.swarms.near(p.x, p.y, BOOK.seePx)) ids.push(`school_${s}`);
+        for (const id of ids) this.bookEntry(id);
+    }
+
+    /** Fill in one reef book entry; the first time, a small card pops up. */
+    bookEntry(id) {
+        const e = this.reefBook.discover(id);
+        if (!e) return;
+        this.progression.set?.('reefbook', this.reefBook.toJSON());
+        this.bookToast(e);
+    }
+
+    /** A small card in the corner: "New in the reef book" + picture + name. */
+    bookToast(e) {
+        if (this.ambientMode) return;
+        const de = this.lang === 'de', H = this.scale.height;
+        const box = this.add.container(30, H - 170).setScrollFactor(0).setDepth(55).setAlpha(0);
+        box.add(this.add.rectangle(0, 0, 420, 130, 0x0d3b5c, 0.92).setOrigin(0).setStrokeStyle(3, 0xfff3b0, 0.9));
+        if (e.image && this.textures.exists(e.image)) {
+            const img = this.add.image(70, 65, e.image);
+            img.setScale(Math.min(100 / img.width, 100 / img.height));
+            box.add(img);
+        }
+        box.add(this.add.text(140, 24, de ? 'Neu im Riffbuch' : 'New in the reef book', { fontFamily: 'Arial', fontSize: '24px', color: '#fff3b0', fontStyle: 'bold' }));
+        box.add(this.add.text(140, 60, e.name[this.lang] || e.name.en, { fontFamily: 'Arial', fontSize: '34px', color: '#ffffff', fontStyle: 'bold' }));
+        play('nest');
+        this.tweens.add({ targets: box, alpha: 1, y: H - 190, duration: 300, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: box, alpha: 0, delay: 2600, duration: 500, onComplete: () => box.destroy() });
+    }
+
+    /** Menu: open the reef book over the paused game. */
+    openBook() {
+        this.scene.pause();
+        this.scene.launch(BOOK_KEY, { main: this });
+        this.scene.bringToTop(BOOK_KEY);
+    }
+
+    /** The calm main route shows itself: warm motes of light drift along it (spec 5.2c, 1.4). */
+    laneGlints(delta) {
+        this.glintAcc = (this.glintAcc || 0) + delta * WORLD.laneGlints / 1000;
+        if (this.glintAcc < 1) return;
+        const wv = this.cameras.main.worldView, field = this.level.field;
+        for (let n = Math.floor(this.glintAcc); n > 0; n--) {
+            const x = wv.x - 100 + Math.random() * (wv.width + 200);
+            const y = field.routeY(x) + (Math.random() - 0.5) * ROUTE.halfWidth * 0.8;
+            if (y > 40 && this.level.isOpen(x, y)) this.particles.spawn('glint', x, y, 1, { spread: 10 });
+        }
+        this.glintAcc %= 1;
+    }
+
+    /** Coins hop on the music's beat, all together (spec ch.12, music-synced world). */
+    /**
+     * The player is never hidden (spec 10.10a): foreground objects (FOREGROUND depth band)
+     * fade while Lompi or a friend overlaps them, and come back when clear.
+     */
+    revealPlayers(dt, view) {
+        const r = this.fish.radius * FOREGROUND.pad;
+        const players = [view];
+        for (const g of this.mp?.ghosts.values() ?? []) if (g.pos) players.push(g.pos);
+        const box = this.fgBox || (this.fgBox = new Phaser.Geom.Rectangle());
+        const edges = { x0: 0, y0: 0, x1: 0, y1: 0 };
+        for (const o of this.children.list) {
+            if (o.depth < FOREGROUND.minDepth || o.depth >= FOREGROUND.maxDepth || !o.visible) continue;
+            if (o.getBounds) {
+                o.getBounds(box);
+                edges.x0 = box.x; edges.y0 = box.y; edges.x1 = box.right; edges.y1 = box.bottom;
+            } else if (o.points?.length) {            // a Rope (swaying plants): box of its points
+                edges.x0 = edges.y0 = Infinity; edges.x1 = edges.y1 = -Infinity;
+                for (const q of o.points) {
+                    const x = o.x + q.x * o.scaleX, y = o.y + q.y * o.scaleY;
+                    if (x < edges.x0) edges.x0 = x; if (x > edges.x1) edges.x1 = x;
+                    if (y < edges.y0) edges.y0 = y; if (y > edges.y1) edges.y1 = y;
+                }
+                const half = (o.frame?.height || 0) * Math.abs(o.scaleY) / 2;   // the strip's own width
+                edges.x0 -= half; edges.x1 += half; edges.y0 -= half; edges.y1 += half;
+            } else continue;
+            if (o.fgBase === undefined) { o.fgBase = o.alpha; o.fgAlpha = o.alpha; }
+            const covering = players.some(p => boxHitsCircle(edges, p.x, p.y, r));
+            if (!covering && o.fgAlpha === o.fgBase) continue;
+            o.fgAlpha = fadeStep(o.fgAlpha, o.fgBase, covering, dt);
+            o.setAlpha(o.fgAlpha);
+        }
+    }
+
+    bobCoins() {
+        const lift = COIN_BOB_PX * musicClock.pulse(nowSeconds(), 4);
+        for (const c of this.level.coins) if (c.img.active) c.img.y = c.y - lift;
+    }
+
+    /** A move that can link into a chain (game/chain.js). Relaxed and ambient play have no counter. */
+    chainMove(verb) {
+        if (this.relaxed) return;
+        const r = this.chain.add(verb, this.time.now);
+        if (!r) return;
+        this.events.emit('chain-move', r);
+        // Heard, not only shown: from the second linked move each one climbs the biome's scale.
+        if (r.count >= 2) play('chain', chainNote(this.biomeId(), r));
+    }
+
+    biomeId() { return BIOMES[biomeIndexAt(this.fish.sprite.x)].id; }
+
+    /** A chain is over: nothing is lost, a few bonus coins drift in. */
+    chainEnd(done) {
+        if (!done) return;
+        this.events.emit('chain-end', done);
+        if (!done.bonus) return;
+        this.coins += done.bonus;
+        play('chainEnd', chainChord(this.biomeId()));
+        const p = this.fish.sprite;
+        const t = this.add.text(p.x, p.y - 90, `+${done.bonus}`, {
+            fontFamily: 'Arial', fontSize: '52px', color: '#fff3b0', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 8
+        }).setOrigin(0.5).setDepth(8);
+        this.tweens.add({ targets: t, y: p.y - 190, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+    }
+
+    /** Streak feedback: "x2", "x3"... when the counter steps up, a ring of light when a phrase completes. */
+    streakFx(x, y, note) {
+        if (note.completed) this.chainMove('trail');
+        if (note.stepped) {
+            const t = this.add.text(x, y - 60, `x${note.multiplier}`, {
+                fontFamily: 'Arial', fontSize: '46px', color: '#fff3b0', fontStyle: 'bold',
+                stroke: '#0a3f6e', strokeThickness: 8
+            }).setOrigin(0.5).setDepth(8);
+            this.tweens.add({ targets: t, y: y - 140, alpha: 0, scale: 1.3, duration: 700, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+        }
+        if (note.completed) {
+            const ring = this.add.circle(x, y, 40, 0xfff3b0, 0).setStrokeStyle(6, 0xfff3b0, 0.9).setDepth(3);
+            this.tweens.add({ targets: ring, scale: 4, alpha: 0, duration: 520, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
+        }
+    }
+
     collect() {
         const p = this.fish.pos, fr = this.fish.radius;
         for (const c of this.level.coins) {
@@ -369,7 +783,10 @@ export default class MainScene extends Phaser.Scene {
             this.world.set(c.chunkKey, 'coin', c.index);
             this.mp?.claim(c.chunkKey, 'coin', c.index);
             this.coins++;
-            play('coin');
+            const bl = biomeBlendAt(x);
+            const note = this.streak.add(nowSeconds(), (bl.t < 0.5 ? bl.a : bl.b).id);
+            play('coin', note);
+            this.streakFx(x, y, note);
             for (let i = 0; i < 5; i++) {           // sparkle
                 const a = (i / 5) * Math.PI * 2 + Math.random();
                 const star = this.add.star(x, y, 4, 4, 11, 0xffffff).setDepth(3);
@@ -402,20 +819,60 @@ export default class MainScene extends Phaser.Scene {
         for (const h of this.level.hazards) {
             if (this.relaxed) break;
             if (!h.img.active || p.distance(h.img) > fr * LEVEL.hitSlack + h.r) continue;
-            if (this.fish.hit(new Phaser.Math.Vector2(h.img.x, h.img.y))) {
-                play('hit');
-                this.hitStop = WORLD.hitStopMs;
-                this.fish.squash = -0.3;
-                this.health = Math.max(0, this.health - (this.character.armor ?? 1));
-                this.cameras.main.shake(180, 0.008);
-                if (this.health <= 0 && !this.respawning) { this.goDown(); return; }
-            }
+            if (this.hurt(h.img.x, h.img.y)) return;
+        }
+    }
+
+    /** Something hurt the fish from (x, y). Returns true when it went down. */
+    hurt(x, y, amount = this.character.armor ?? 1) {
+        if (!this.fish.hit(new Phaser.Math.Vector2(x, y))) return false;
+        this.chainEnd(this.chain.end());
+        play('hit');
+        this.hitStop = WORLD.hitStopMs;
+        this.fish.squash = -0.3;
+        this.health = Math.max(0, this.health - amount);
+        this.cameras.main.shake(180, 0.008);
+        if (this.health <= 0 && !this.respawning) { this.goDown(); return true; }
+        return false;
+    }
+
+    /**
+     * Swimming in thick oil (spec 7.1): a short touch only darkens the fish; staying
+     * in a dense patch for OIL.graceS costs a heart, then a pause before it can again.
+     */
+    oilExposure(dt) {
+        if (this.relaxed || this.respawning) return;
+        const p = this.fish.sprite;
+        const dense = this.particles.densityAt('oil', p.x, p.y, this.fish.radius + 30) >= OIL.denseCount;
+        const t = this.oilTime || 0;
+        this.oilTime = dense ? t + dt : (t > 0 ? Math.max(0, t - dt * 2) : Math.min(0, t + dt));
+        if (this.oilTime > OIL.graceS) {
+            this.oilTime = -OIL.pauseS;
+            this.hurt(p.x, p.y - 40);
+        }
+    }
+
+    /** Deep vents (the trench's bubble plants) breathe dark mineral plumes and steam (spec 6.1b). */
+    ventPlumes(delta) {
+        this.ventAt = (this.ventAt || 0) - delta;
+        if (this.ventAt > 0) return;
+        this.ventAt = VENT_PLUME.everyMs;
+        const cam = this.cameras.main, m = VENT_PLUME.margin;
+        for (const v of this.level.vents) {
+            if (v.x < cam.scrollX - m || v.x > cam.scrollX + cam.width + m || v.y < cam.scrollY - m || v.y > cam.scrollY + cam.height + m) continue;
+            if (BIOMES[biomeIndexAt(v.x)].id !== 'trench') continue;
+            this.particles.spawn('smoker', v.x, v.y - 40, VENT_PLUME.smoke, { radius: 16, spread: 15, vy: -90 });
+            this.particles.spawn('steam', v.x, v.y - 30, VENT_PLUME.steam, { radius: 10, spread: 25, vy: -120 });
         }
     }
 
     /** One fixed 60 Hz simulation step: all forces + physics, display-rate independent. */
     fixedStep() {
-        if (!this.downTimer) this.controller.update(STEP_MS);
+        if (this.ambientMode) {
+            const p = this.fish.sprite;
+            const f = this.autopilot.step(STEP_MS / 1000, p.x, p.y);
+            if (f.x || f.y) this.fish.thrust(this.autoDir.set(f.x, f.y));
+        } else if (!this.downTimer) this.controller.update(STEP_MS);
         // Swimming close to friends makes everyone a little faster (a school).
         this.fish.boost = 1 + WORLD.schoolBoost * Math.min(2, this.mp?.nearFriends(this.fish.sprite.x, this.fish.sprite.y, WORLD.schoolRadius) ?? 0);
         if (this.keys) {
@@ -430,8 +887,24 @@ export default class MainScene extends Phaser.Scene {
         const fsp = this.fish.sprite;
         const lifted = this.level.liftAt(fsp.x, fsp.y);
         if (lifted) fsp.applyForce({ x: 0, y: -WORLD.ventLift * fsp.body.mass });
-        // Whatever carries the fish upward inside a bubble column is the water's doing.
-        this.fish.flow.set(0, lifted ? Math.min(0, fsp.body.velocity.y) : 0);
+        // Currents: the water takes the player up to its own speed and never brakes it,
+        // so a stream entered fast is left faster (flow.js).
+        const water = this.flow.at(fsp.x, fsp.y, this.time.now / 1000, this.flowAt);
+        if (!this.fish.inAir && !this.fish.hold && (water.x || water.y)) {
+            const push = carry(water.x, water.y, fsp.body.velocity.x, fsp.body.velocity.y, FLOW, this.flowPush || (this.flowPush = { x: 0, y: 0 }));
+            const sail = this.fish.mode?.flow ?? 1;      // a spread fan catches the current
+            fsp.setVelocity(fsp.body.velocity.x + push.x * sail, fsp.body.velocity.y + push.y * sail);
+        }
+        // Chain moves: riding a current, and loops flown in the air.
+        const fv = fsp.body.velocity;
+        if (this.fish.inAir) { if (this.spin.turn(Math.atan2(fv.y, fv.x))) this.chainMove('flip'); }
+        else {
+            this.spin.reset();
+            if (Math.hypot(water.x, water.y) >= CHAIN.streamSpeed && fv.x * water.x + fv.y * water.y > 0) this.chainMove('stream');
+        }
+        this.chainEnd(this.chain.tick(this.time.now));
+        // Whatever carries the fish is the water's doing, not its own swimming (it must not turn to face it).
+        this.fish.flow.set(water.x, water.y + (lifted ? Math.min(0, fsp.body.velocity.y) : 0));
         this.surface.recenter(fsp.x);
         this.surface.step();
         this.fish.update(STEP_MS, this.surface.heightAt(fsp.x, this.time.now / 1000));
@@ -467,14 +940,59 @@ export default class MainScene extends Phaser.Scene {
         this.camY = Math.max(this.camY, -760); // room for a jump, not the whole sky
         this.cameras.main.setScroll(this.camX, this.camY);
 
+        this.leakOil(delta);
+        this.ventPlumes(delta);
+        // Streams show themselves: bubbles are born along the lanes in view and ride them.
+        this.laneGlints(delta);
+        this.streamBubbles = (this.streamBubbles || 0) + delta * WORLD.streamBubbles / 1000;
+        if (this.streamBubbles >= 1) {
+            const wv = this.cameras.main.worldView;
+            for (const st of this.flow.streamsIn(wv.x - 200, wv.right + 200)) {
+                for (let n = Math.floor(this.streamBubbles); n > 0; n--) {
+                    const x = Phaser.Math.Between(Math.max(st.x0, wv.x - 200), Math.min(st.x1, wv.right + 200));
+                    const y = streamY(st, x) + Phaser.Math.Between(-FLOW.streamWidth, FLOW.streamWidth) * 0.8;
+                    // Only where the water really moves (a stream is muted where it meets the calm route).
+                    if (y > 40 && this.level.isOpen(x, y) && this.flow.at(x, y, 0, this.bubbleProbe || (this.bubbleProbe = { x: 0, y: 0 })).x > FLOW.streamSpeed * 0.3) this.particles.spawn('bubble', x, y, 1, { radius: 9, spread: 6 });
+                }
+            }
+            this.streamBubbles %= 1;
+        }
+        this.speedLines.update(delta, v.x, v.y, !this.relaxed && this.chain.flow);
+        this.drawFlow(delta);
+        if (this.aiDebug) this.drawAi();
+        const shot = this.boosters.update(this.cameras.main.worldView, this.fish, this.time.now);
+        if (shot) {
+            play(shot === 'cannon' ? 'cannon' : 'boing');
+            this.chainMove(shot);
+            if (shot === 'pad') this.bookEntry('friend_jellyfish');     // the pad is a big moon jelly
+            this.fish.squash = shot === 'cannon' ? 0.3 : -0.3;
+            this.particles.spawn('bubble', this.fish.sprite.x, this.fish.sprite.y, shot === 'cannon' ? 14 : 6, { radius: 10, spread: 60 });
+        }
+        this.particles.update(delta / 1000);
+        const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step
+        pl.x = view.x; pl.y = view.y; pl.vx = v.x * 60; pl.vy = v.y * 60; pl.fright = this.character.fright || 1;
+        this.swarms.update(delta / 1000, view.x, view.y, pl);
+        this.oilExposure(delta / 1000);
+        this.bobCoins();
+        this.discover(delta);
+        if (!this.ambientMode) this.updateGuide(delta / 1000);
+
         // Bubble trail when moving fast.
         const speed = Math.hypot(v.x, v.y);
         this.trailAt = (this.trailAt || 0) - delta;
-        if (speed > 9 && this.trailAt <= 0) {
+        if (speed > 9 && this.trailAt <= 0 && !this.fish.inAir) {
             this.trailAt = 55;
-            const b = this.add.circle(view.x - v.x * 3 + Phaser.Math.Between(-20, 20), view.y - v.y * 3 + Phaser.Math.Between(-20, 20),
-                Phaser.Math.Between(6, 15), 0xffffff, 0.35).setStrokeStyle(2, 0xffffff, 0.7).setDepth(4);
-            this.tweens.add({ targets: b, y: b.y - 70, alpha: 0, scale: 1.5, duration: 700, onComplete: () => b.destroy() });
+            this.particles.spawn('bubble', view.x - v.x * 3, view.y - v.y * 3, 1, { radius: 20, spread: 20 });
+        }
+
+        // Contrails: at high speed the fin tips draw thin bubble streaks (vortex trails).
+        if (speed > CONTRAIL.speed && !this.fish.inAir) {
+            const r = this.fish.radius, f = this.fish.facing, a = view.rotation;
+            const ca = Math.cos(a), sa = Math.sin(a);
+            for (const [ox, oy] of CONTRAIL.tips) {
+                const lx = ox * r * f, ly = oy * r;
+                this.particles.spawn('contrail', view.x + lx * ca - ly * sa, view.y + lx * sa + ly * ca, 1, { spread: 4 });
+            }
         }
 
         // Sand is kicked up when swimming fast just above the ground.
@@ -483,15 +1001,9 @@ export default class MainScene extends Phaser.Scene {
             const ground = this.level.groundBelow(view.x, view.y + this.fish.radius * 0.5, 130);
             if (ground) {
                 this.sandAt = 70;
-                for (let i = 0; i < 2 + Math.min(4, speed / 4); i++) {
-                    const puff = this.add.circle(view.x + Phaser.Math.Between(-50, 50), ground.y - Phaser.Math.Between(0, 14),
-                        Phaser.Math.Between(5, 13), ground.color, 0.55).setDepth(6);
-                    this.tweens.add({
-                        targets: puff, x: puff.x - v.x * Phaser.Math.Between(4, 9), y: puff.y - Phaser.Math.Between(30, 90),
-                        scale: 2.4, alpha: 0, duration: Phaser.Math.Between(600, 1000), ease: 'Quad.easeOut',
-                        onComplete: () => puff.destroy()
-                    });
-                }
+                // Silt from the shared particle simulation: thrown up and back, it drifts and settles.
+                this.particles.spawn('silt', view.x, ground.y - 6, Math.round(2 + Math.min(4, speed / 4)),
+                    { radius: 50, spread: 40, vx: -v.x * 20, vy: -60 });
             }
         }
 
@@ -509,7 +1021,10 @@ export default class MainScene extends Phaser.Scene {
 
         this.level.update(this.camX, this.camY);
         this.level.animate(time / 1000, view, speed);
+        this.revealPlayers(delta / 1000, view);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
+        this.farLayers.update(this.camX);
+        this.waterLight.update();
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
         const t2 = performance.now();

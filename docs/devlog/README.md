@@ -2,6 +2,33 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## A world that holds together: harbour pier, painted mangrove roots, caves with back walls, a glowing main route
+
+[`578708a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/578708a) · 2026-11-14
+
+![Harbour pier with barnacle-covered piles](18-harbour-pier.jpg)
+![Painted mangrove stilt roots; the front roots fade so Lompi stays visible](18-mangrove-roots.jpg)
+![Kelp cave with a stone back wall](18-kelp-cave.jpg)
+
+## Chains of jumps, flips and specials; bird-like flight; a special of its own for every character
+
+[`56b92fc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/56b92fc) · 2026-11-14 01:23
+
+![Chains of jumps, flips and specials; bird-like flight; a special of its own for every character](17-chains-of-jumps-flips-and-specials-bird-like-fli.jpg)
+
+## Shoals: anthias, tangs and silversides that part around Lompi and flee from Sharky
+
+[`7dc9bf4`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/7dc9bf4) · 2026-11-14
+
+![Anthias shoal in a reef cave](16-shoals-reef-cave.jpg)
+![Silversides parting in the open blue](16-shoals-open-blue.jpg)
+
+## Nests rebuilt: a level sand basin with raked-sand relief and shells
+
+[`da155c1`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/da155c1) · 2026-11-14 00:08
+
+![Nests rebuilt: a level sand basin with raked-sand relief and shells](15-nests-rebuilt-a-level-sand-basin-with-raked-sand.jpg)
+
 ## Lompi in 3D: four techniques compared with the same light and pose
 
 [`9c70f65`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9c70f65) · 2026-11-13 23:04

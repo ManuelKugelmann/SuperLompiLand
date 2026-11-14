@@ -12,6 +12,8 @@ import { parseGlb, normalize } from './glb.js';
 import { inflate, vertexNormals, shrinkMask } from '../rig/inflate.js';
 import { loftBody, fitProfile } from '../rig/loft.js';
 import { softnessMap } from '../rig/soft.js';
+import { Gaze } from '../rig/eyes.js';
+import { SWIM, Swimmer } from '../rig/swim.js';
 
 /**
  * Candidates per creature. Kinds:
@@ -41,7 +43,13 @@ const CREATURES = {
             // the picture's alpha cuts the exact edge, triangles only give volume, light and bending.
             id: 'loftlow', label: 'Procedural, low-poly', note: 'alpha cuts the outline', kind: 'loft',
             image: 'img/puffer_normal_body.png', stations: 8, sides: 8, width: 0.86, box: 2.3, grow: 1.1,
-            fin: { image: 'img/puffer_normal_fin.png', x: 216, y: 155, pivotX: 310, pivotY: 188 }
+            fin: { image: 'img/puffer_normal_fin.png', x: 216, y: 155, pivotX: 310, pivotY: 188 },
+            // Procedural eyes over the painted ones: middle, half sizes and tilt in the picture (pixels, degrees).
+            eyes: {
+                iris: [0.16, 0.6, 0.66], skin: [0.96, 0.9, 0.46],
+                // Only the near eye for now: the far one sits on the silhouette edge and stays painted.
+                at: [{ x: 391, y: 124, rx: 62, ry: 48, tilt: -8 }]
+            }
         },
         { id: 'trellis1', label: 'TRELLIS v1', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis1.glb', turn: [90, 0] },
         { id: 'trellis2', label: 'TRELLIS.2', note: 'generated mesh', kind: 'glb', url: '_ref/experiments/lompi/trellis2.glb', turn: [90, 0] },
@@ -49,7 +57,7 @@ const CREATURES = {
     ]
 };
 
-const POSES = ['turntable', 'swim', 'turn', 'puff'];
+const POSES = ['turntable', 'swim', 'turn', 'puff', 'eyes'];
 const POSE_SECONDS = 4;
 const GAME_SIZE = 170 / 1080;      // Lompi's width in the game as a share of the screen height
 // A character swims turned a little toward the camera, so its face always reads
@@ -146,7 +154,7 @@ async function build(c) {
             // spreads a little, and rides outward with the body when it puffs up.
             const finImg = await loadImage(c.fin.image), px = v => v / img.width - 0.5, py = v => (img.height / 2 - v) / img.width;
             const at = fit.profile(Math.min(1, Math.max(0, (c.fin.pivotX / img.width * small.w - fit.x0) / (fit.x1 - fit.x0))));
-            const z = at.w / small.w * 0.96;
+            const z = at.w / small.w * (c.grow || 1) * 1.01;                 // just outside the skin
             const x0 = px(c.fin.x), x1 = px(c.fin.x + finImg.width), y0 = py(c.fin.y), y1 = py(c.fin.y + finImg.height);
             const fin = renderer.upload({
                 positions: Float32Array.from([x0, y0, z, x1, y0, z, x1, y1, z, x0, y1, z]),
@@ -156,10 +164,51 @@ async function build(c) {
             fin.lift = 0.06;
             meshes.push(fin);
             const pivot = [px(c.fin.pivotX), py(c.fin.pivotY), z];
+            // Motion comes from the swim driver (rig/swim.js): a boxfish rows with its pectorals,
+            // ripples its other fins, and steers with the tail. It returns what the body should do.
+            const swimmer = new Swimmer(SWIM[c.swim || 'ostraciiform']);
+            let seen = null;
             animate = pose => {
-                const beat = Math.sin(pose.phase * 1.15);
+                const dt = seen === null || pose.time < seen ? 1 / 60 : Math.min(0.1, pose.time - seen);
+                seen = pose.time;
+                swimmer.update(dt, pose.drive);
                 // The fin trails backward from its hinge; a positive spread lifts its tip away from the flank.
-                fin.part = hinge(...pivot, beat * (0.12 + pose.swim * 0.25), 0.3 + beat * 0.22 * (0.4 + pose.swim));
+                fin.part = hinge(...pivot, swimmer.pectoral, 0.18 + swimmer.spread * 0.7);
+                return { swim: swimmer.power, phase: swimmer.phase, sway: swimmer.sway + swimmer.tail * 0.12 };
+            };
+        }
+        if (c.eyes) {
+            // Each eye is a small card lying on the body, drawn by the eye shader. Both look at the
+            // same point in front of the fish, so they converge when it is near.
+            const px = v => v / img.width - 0.5, py = v => (img.height / 2 - v) / img.width;
+            const eyes = c.eyes.at.map((e, i) => {
+                const at = fit.profile(Math.min(1, Math.max(0, (e.x / img.width * small.w - fit.x0) / (fit.x1 - fit.x0))));
+                const z = at.w / small.w * (c.grow || 1) * 1.04, cs = Math.cos(e.tilt * Math.PI / 180), sn = Math.sin(e.tilt * Math.PI / 180);
+                // A corner of the tilted eye rectangle: sx, sy = -1 or 1 (sy up).
+                const corner = (sx, sy) => [px(e.x) + (sx * e.rx * cs - sy * e.ry * sn) / img.width, py(e.y) + (sx * e.rx * sn + sy * e.ry * cs) / img.width, z];
+                const mesh = renderer.upload({
+                    positions: Float32Array.from([...corner(-1, 1), ...corner(1, 1), ...corner(1, -1), ...corner(-1, -1)]),
+                    normals: Float32Array.from([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+                    uvs: Float32Array.from([0, 0, 1, 0, 1, 1, 0, 1]), indices: Uint32Array.from([0, 2, 1, 0, 3, 2])
+                });
+                mesh.lift = 0.07;
+                mesh.eye = { x: 0, y: 0, lid: 0.1, pupil: 1, iris: c.eyes.iris, skin: c.eyes.skin };
+                meshes.push(mesh);
+                return { mesh, gaze: new Gaze(7 + i), cx: px(e.x), cy: py(e.y), size: e.rx / img.width };
+            });
+            const finMove = animate;
+            let last = null;
+            animate = pose => {
+                const body = finMove?.(pose);
+                const dt = last === null || pose.time < last ? 1 / 60 : Math.min(0.1, pose.time - last);
+                last = pose.time;
+                for (const e of eyes) {
+                    // Direction from this eye to the point being looked at, scaled to eye radii.
+                    const tx = (pose.look.x - e.cx) / e.size * 0.35, ty = (pose.look.y - e.cy) / e.size * 0.35;
+                    const g = e.gaze.update(dt, { x: tx, y: ty }, { scared: pose.scared, lid: pose.sleepy });
+                    Object.assign(e.mesh.eye, { x: g.x, y: g.y, lid: g.lid, pupil: g.pupil });
+                }
+                return body;
             };
         }
         return { ...c, meshes, animate, triangles: body.triangles + 2 * (meshes.length - 1), lit: 1 };
@@ -183,9 +232,31 @@ function poseAt(t, fixed = query.get('pose')) {
     const index = fixed ? Math.max(0, POSES.indexOf(fixed)) : Math.floor(t / POSE_SECONDS) % POSES.length;
     const u = (t % POSE_SECONDS) / POSE_SECONDS, name = POSES[index];
     const ease = v => v * v * (3 - 2 * v);
-    const pose = { name, u, yaw: FACE_YAW, pitch: 0, swim: 0.15, phase: t * 7, puff: 0 };
-    if (name === 'turntable') pose.yaw = Math.sin(u * Math.PI * 2) * Math.PI / 3;                 // ±60° around true profile
-    else if (name === 'swim') { pose.swim = 1; pose.yaw += Math.sin(t * 7) * 0.1; }
+    // `look` is the point the eyes follow (model space); by default somewhere ahead of the nose.
+    const pose = { name, u, time: t, yaw: FACE_YAW, pitch: 0, swim: 0.15, phase: t * 7, puff: 0, look: { x: 1.2, y: 0.1 }, scared: 0, sleepy: 0,
+        drive: { speed: 0, push: 0, turn: 0, brake: 0 } };          // input for the swim driver
+    if (name === 'eyes') {
+        // A point circles the face, then sits close in front of the nose (the eyes converge),
+        // then a fright, then sleepy.
+        const a = u * Math.PI * 4;
+        if (u < 0.5) pose.look = { x: 0.3 + Math.cos(a) * 0.9, y: 0.12 + Math.sin(a) * 0.6 };
+        else if (u < 0.7) pose.look = { x: 0.52, y: 0.1 };
+        else if (u < 0.85) { pose.look = { x: 1.4, y: 0.4 }; pose.scared = 1; }
+        else pose.sleepy = 0.45;
+    }
+    if (name === 'turntable') {
+        pose.yaw = Math.sin(u * Math.PI * 2) * Math.PI / 3;              // ±60° around true profile
+        pose.drive = { speed: 1, push: 0.3, turn: Math.cos(u * Math.PI * 2), brake: 0 };
+    }
+    else if (name === 'swim') {
+        pose.swim = 1; pose.yaw += Math.sin(t * 7) * 0.1;
+        // Slow, medium, a sprint, then letting go: a glide and a brake.
+        pose.drive = u < 0.25 ? { speed: 0.8, push: 0.3, turn: 0, brake: 0 }
+            : u < 0.5 ? { speed: 2, push: 0.6, turn: 0, brake: 0 }
+                : u < 0.75 ? { speed: 4.5, push: 1, turn: 0, brake: 0 }
+                    : { speed: 1.5, push: 0, turn: 0, brake: u > 0.9 ? 1 : 0 };
+    }
+    else if (name === 'eyes') pose.yaw = FACE_YAW;
     else if (name === 'turn') {
         // From facing right to facing left and back: the far side also ends turned toward the camera.
         const k = u < 0.5 ? ease(Math.min(1, u * 4)) : 1 - ease(Math.min(1, (u - 0.5) * 4));
@@ -200,7 +271,7 @@ const candidates = (await Promise.all(wanted.map(c => build(c).catch(e => { cons
 
 // Labels are painted on a canvas of their own over the picture, so saved frames carry them too.
 const labels = document.getElementById('labels'), pen = labels.getContext('2d');
-const POSE_TEXT = { turntable: 'Banking / turntable', swim: 'Swim', turn: 'Turn-around', puff: 'Puff' };
+const POSE_TEXT = { turntable: 'Banking / turntable', swim: 'Swim: slow, medium, sprint, glide, brake', turn: 'Turn-around', puff: 'Puff', eyes: 'Eyes: follow, converge, fright, sleepy' };
 
 function paintLabels(pose, W, H, cw, dpr) {
     if (labels.width !== W || labels.height !== H) { labels.width = W; labels.height = H; }
@@ -276,8 +347,9 @@ function frame(at = null) {
                 }
                 if (flat) yaw = 0;                                                         // today's sprite: no banking at all
             }
-            c.animate?.(pose);
-            renderer.draw(c.meshes, { ...pose, yaw, mirror, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
+            const body = c.animate?.(pose);       // a candidate with drivers says how its body moves
+            if (body) yaw += body.sway;
+            renderer.draw(c.meshes, { ...pose, ...(body ? { swim: body.swim, phase: body.phase } : null), yaw, mirror, puff: flat ? 0 : pose.puff, scale: scale * Math.min(1, cw / h * 1.1), aspect: cw / h, lit: c.lit, depth });
         }
     });
     paintLabels(pose, W, H, cw, dpr);

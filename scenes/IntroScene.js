@@ -5,13 +5,21 @@ import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
 import HudScene, { HUD_KEY } from './HudScene.js';
 import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
+import ReefBookScene, { BOOK_KEY } from './ReefBookScene.js';
+import PlayStyleScene, { STYLE_KEY } from './PlayStyleScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import Rig from '../game/Rig.js';
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
+import { MATERIALS } from '../game/level/materials.js';
+import { PROPS, KELP_STALKS } from '../game/level/LevelGenerator.js';
+import { openCredits } from '../game/credits.js';
 import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
+import { fitToWindow, fitsWindow } from '../game/orientation.js';
+import { SPECIES, schoolArt } from '../game/ai/SwarmLayer.js';
+import { PAD_ART } from '../game/level/BoosterLayer.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -29,6 +37,9 @@ export const gameMeta = {
 };
 
 // Generated art in public/img — loaded by relative URL so any deploy base works.
+/** Title screen idle time before the ambient reef starts by itself (spec ch.12). */
+const AMBIENT_IDLE_MS = 120000;
+
 const IMAGES = {
     puffer_normal: 'puffer_normal.png', puffer_inflated: 'puffer_inflated.png',
     coin: 'coin.png', bubble: 'bubble.png', mine: 'mine.png', urchin: 'urchin.png',
@@ -36,7 +47,7 @@ const IMAGES = {
     friend_turtle: 'friend_turtle.png',
     friend_jellyfish: 'friend_jellyfish.png', friend_seahorse: 'friend_seahorse.png',
     friend_starfish: 'friend_starfish.png', enemy_angler: 'enemy_angler.png', spikes: 'spikes.png',
-    friend_snail: 'friend_snail.png', friend_nudibranch: 'friend_nudibranch.png', coral_3: 'coral_3.png',
+    friend_snail: 'friend_snail.png', friend_nudibranch: 'friend_nudibranch.png', coral_3: 'coral_3.png', coral_4: 'coral_4.webp', coral_5: 'coral_5.webp',
     hazard_buoy: 'hazard_buoy.png', hazard_net: 'hazard_net.png',
     tex_rock: 'tex_rock.jpg', tex_sand: 'tex_sand.jpg',
     player_shark: 'player_shark.png', player_firefish: 'player_firefish.png', player_flyingfish: 'player_flyingfish.png',
@@ -60,18 +71,41 @@ export default class IntroScene extends Phaser.Scene {
         for (const [key, file] of Object.entries(IMAGES)) {
             if (!this.textures.exists(key)) this.load.image(key, `img/${file}`);
         }
+        for (const key of KELP_STALKS) if (!this.textures.exists(key)) this.load.image(key, `img/plants/${key}.webp`);
+        // Painted mangrove roots; LevelGenerator draws procedural ones when these are missing.
+        for (const n of [1, 2, 3]) if (!this.textures.exists(`root_${n}`)) this.load.image(`root_${n}`, `img/root_${n}.webp`);
+        for (const p of Object.values(PROPS)) {
+            for (const key of p.keys) if (!this.textures.exists(key)) this.load.image(key, `img/props/${key}.webp`);
+        }
+        // Rock materials for the terrain shader (game/level/materials.js).
+        for (const m of MATERIALS) {
+            if (!this.textures.exists(`mat_${m}`)) this.load.image(`mat_${m}`, `img/mat/${m}.jpg`);
+            if (!this.textures.exists(`mat_${m}_h`)) this.load.image(`mat_${m}_h`, `img/mat/${m}_h.jpg`);
+        }
+        for (const key of PAD_ART) if (!this.textures.exists(key)) this.load.image(key, `img/props/${key}.webp`);
+        // Painted shoal fish (game/ai/SwarmLayer.js); drawn procedurally while missing.
+        for (const id of Object.keys(SPECIES)) {
+            const { key, file } = schoolArt(id);
+            if (!this.textures.exists(key)) this.load.image(key, file);
+        }
         if (!this.cache.json.exists('fins')) this.load.json('fins', 'img/fins.json');
     }
 
     create() {
+        fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         const W = this.scale.width, H = this.scale.height;
         const lang = this.registry.get('currentLanguage') || 'de';
+        const refit = () => { if (!this.modal && !fitsWindow(this.game)) this.scene.restart(); };
+        this.scale.on('resize', refit);
+        this.events.once('shutdown', () => this.scale.off('resize', refit));
 
         if (!this.scene.get(SCENE_KEYS.MAIN)) {
             this.scene.add(SCENE_KEYS.MAIN, MainScene, false);
             this.scene.add(SCENE_KEYS.END, EndScene, false);
             this.scene.add(HUD_KEY, HudScene, false);
             this.scene.add(STORY_KEY, StoryScene, false);
+            this.scene.add(BOOK_KEY, ReefBookScene, false);
+            this.scene.add(STYLE_KEY, PlayStyleScene, false);
         }
 
         if (this.textures.exists('bg_far')) {
@@ -86,6 +120,7 @@ export default class IntroScene extends Phaser.Scene {
         this.buildCarousel(lang);
         flushFeedbackQueue();
         this.buildTogether(lang);
+        this.buildAmbient(lang);
         this.autoJoin();
 
         this.add.text(W - 24, H - 20, VERSION_TAG, {
@@ -97,6 +132,7 @@ export default class IntroScene extends Phaser.Scene {
             ...feedbackMenuItems(lang, () => ({ screen: 'title' })),
             soundMenuItem(lang, () => this.scene.restart()),
             ...pwaMenuItems(this, lang),
+            { label: lang === 'de' ? 'DANKE' : 'CREDITS', color: 0x00796b, callback: () => openCredits(lang) },
             { label: lang === 'de' ? 'ZURÜCK' : 'EXIT', color: 0xd32f2f, callback: () => this.scene.start('MainMenuScene') }
         ]);
 
@@ -158,6 +194,29 @@ export default class IntroScene extends Phaser.Scene {
         this.select(this.index);
     }
 
+    /**
+     * Ambient reef (spec ch.12): an "aquarium" button, and the same mode starts by
+     * itself after AMBIENT_IDLE_MS on the title screen without any input.
+     */
+    buildAmbient(lang) {
+        const H = this.scale.height, de = lang === 'de';
+        const btn = this.add.text(150, H * 0.905, de ? 'Aquarium' : 'Aquarium', {
+            fontFamily: 'Arial', fontStyle: 'bold', fontSize: '40px', color: '#ffffff', backgroundColor: '#2a7f6f', padding: { x: 30, y: 14 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        const go = () => {
+            if (this.modal) return;
+            this.registry.set('room', null);
+            this.registry.set('ambient', true);
+            this.scene.start(SCENE_KEYS.MAIN);
+        };
+        btn.on('pointerdown', go);
+        const idle = this.time.addEvent({ delay: AMBIENT_IDLE_MS, callback: go });
+        const reset = () => idle.reset({ delay: AMBIENT_IDLE_MS, callback: go });
+        this.input.on('pointerdown', reset);
+        this.input.on('pointermove', reset);
+        this.input.keyboard?.on('keydown', reset);
+    }
+
     /** "Together" button + room-code panel: make a room, or type a friend's code. */
     buildTogether(lang) {
         this.modal = false; // fresh title screen (the scene object is reused)
@@ -197,6 +256,7 @@ export default class IntroScene extends Phaser.Scene {
         if (test) {
             const ch = /[#&]char=([a-z]+)/.exec(window.location.hash)?.[1];
             if (ch && CHARACTERS.some(c => c.id === ch)) this.registry.set('character', ch);
+            this.registry.set('ambient', false);
             this.registry.set('room', word);
             this.time.delayedCall(300, () => this.scene.start(SCENE_KEYS.MAIN));
             return;
@@ -290,6 +350,7 @@ export default class IntroScene extends Phaser.Scene {
             // also fire start() and restart the game solo.
             window.removeEventListener('keydown', onKey);
             try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
+            this.registry.set('ambient', false);
             this.registry.set('room', word);
             this.scene.start(SCENE_KEYS.MAIN);
         }, invited ? 56 : 40);
@@ -313,6 +374,7 @@ export default class IntroScene extends Phaser.Scene {
     start() {
         if (this.modal) return;
         this.registry.set('room', null); // plain start = solo
+        this.registry.set('ambient', false);
         // First time: tell the story of the eruption before the journey begins.
         this.scene.start(storySeen() ? SCENE_KEYS.MAIN : STORY_KEY);
     }

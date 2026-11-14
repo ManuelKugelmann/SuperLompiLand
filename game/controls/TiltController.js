@@ -23,13 +23,12 @@ const SENSOR_WAIT_MS = 1500;
  *  - Some Android browsers deliver no `deviceorientation`; then gravity from
  *    `devicemotion` is used instead.
  * Without any sensor (desktop) the pointer position relative to the screen
- * centre stands in for the tilt. The little compass shows which source is live.
+ * centre stands in for the tilt.
  * `?debug=tilt` prints the raw values.
  */
 export default class TiltController extends ControllerBase {
     enter() {
         const W = this.scene.scale.width, H = this.scene.scale.height;
-        this.de = (this.scene.registry.get('currentLanguage') || 'de') === 'de';
         this.dir = new Phaser.Math.Vector2(0, 0);
         this.neutral = null;
         this.source = 'none';   // 'orientation' | 'motion' | 'pointer' | 'none'
@@ -37,14 +36,12 @@ export default class TiltController extends ControllerBase {
         this.debug = new URLSearchParams(window.location.search).get('debug') === 'tilt';
         this.raw = {};
 
-        this.compass = this.scene.add.circle(W - 150, H - 150, 70, 0xffffff, 0.04).setStrokeStyle(2, 0xffffff, 0.16);
-        this.needle = this.scene.add.circle(W - 150, H - 150, 14, 0xffffff, 0.3);
         this.status = this.scene.add.text(W - 150, H - 250, '', {
             fontFamily: 'Arial', fontSize: '26px', color: '#ffffff', align: 'center', stroke: '#0a3f6e', strokeThickness: 5
         }).setOrigin(0.5, 1);
-        this.ui.add([this.compass, this.needle, this.status]);
-        this.hint(this.de ? 'Handy neigen = Richtung · tippen = Tempo · lange halten = Spezial'
-            : 'Tilt = direction · tap = speed · long press = special');
+        this.ui.add(this.status);        // only says something when the sensor needs the player (or with ?debug=tilt)
+        this.hint(this.de ? `Handy neigen = Richtung · tippen = Tempo · lange halten = ${this.specialWord()}`
+            : `Tilt = direction · tap = speed · long press = ${this.specialWord()}`);
 
         this.onOrient = e => this.readOrientation(e);
         this.onMotion = e => this.readMotion(e);
@@ -168,7 +165,6 @@ export default class TiltController extends ControllerBase {
     }
 
     draw() {
-        this.needle.setPosition(this.compass.x + this.dir.x * 56, this.compass.y + this.dir.y * 56);
         if (this.debug) {
             const r = this.raw, f = v => (typeof v === 'number' ? v.toFixed(1) : String(v));
             this.status.setText(`src ${this.source}\nγ ${f(r.gamma)} β ${f(r.beta)}\nangle ${f(r.angle)} rot ${r.rotated}\ndir ${f(this.dir.x)} ${f(this.dir.y)}`);

@@ -5,12 +5,26 @@
 <!-- devlog:start -->
 ## Dev log
 
-**Lompi in 3D: four techniques compared with the same light and pose** — [`9c70f65`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9c70f65) · 2026-11-13 23:04
+**Chains of jumps, flips and specials; bird-like flight; a special of its own for every character** — [`56b92fc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/56b92fc) · 2026-11-14 01:23
 
-![Lompi in 3D: four techniques compared with the same light and pose](docs/devlog/14-lompi-in-3d-four-techniques-compared-with-the-sa.jpg)
+![Chains of jumps, flips and specials; bird-like flight; a special of its own for every character](docs/devlog/17-chains-of-jumps-flips-and-specials-bird-like-fli.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
+
+<!-- biomes:start -->
+## Biomes, west to east
+
+One shot per biome, captured with `node scripts/capture-biomes.mjs` (start spots via `?at=<biome>`).
+
+<table>
+<tr><td width="50%"><img src="docs/biomes/beach.jpg" alt="Sandy Beach"><br><b>Sandstrand</b> · Sandy Beach</td><td width="50%"><img src="docs/biomes/reef.jpg" alt="Home Reef"><br><b>Heimatriff</b> · Home Reef</td></tr>
+<tr><td width="50%"><img src="docs/biomes/mangrove.jpg" alt="Mangrove Lagoon"><br><b>Mangroven-Lagune</b> · Mangrove Lagoon</td><td width="50%"><img src="docs/biomes/kelp.jpg" alt="Kelp Forest"><br><b>Tangwald</b> · Kelp Forest</td></tr>
+<tr><td width="50%"><img src="docs/biomes/blue.jpg" alt="Open Blue"><br><b>Blaues Meer</b> · Open Blue</td><td width="50%"><img src="docs/biomes/wreck.jpg" alt="Ship Graveyard"><br><b>Schiffsfriedhof</b> · Ship Graveyard</td></tr>
+<tr><td width="50%"><img src="docs/biomes/harbour.jpg" alt="Harbour"><br><b>Hafen</b> · Harbour</td><td width="50%"><img src="docs/biomes/trench.jpg" alt="Deep Trench"><br><b>Tiefsee</b> · Deep Trench</td></tr>
+<tr><td width="50%"><img src="docs/biomes/abyss.jpg" alt="The Abyss"><br><b>Abgrund</b> · The Abyss</td><td></td></tr>
+</table>
+<!-- biomes:end -->
 
 ## Animation experiments
 
@@ -67,6 +81,26 @@ jagged edge when banking away is a known defect of this round.
 
 ![Procedural Lompi, 132 triangles: swim, bank, turn-around, puff](docs/devlog/anim-02-procedural.webp)
 
+**Round 3, first piece — a procedural eye.** The near eye is no longer painted: it is
+drawn by a small shader (eyeball, fibred iris with a dark ring, pupil, two catchlights that
+stay with the light, an upper lid) and moved by a gaze model: it holds a fixation and jumps
+to a new one in quick saccades instead of gliding, drifts a little, blinks at irregular
+intervals, and its pupil widens with fright. The loop: following a circling point, looking
+at something close, a fright, sleepy. The far eye is still painted, and the lid is a flat
+skin colour for now.
+
+![Procedural eye on Lompi: follow, look close, fright, sleepy](docs/devlog/anim-03-eyes.webp)
+
+**Round 3, second piece — motion from a swim driver.** No keyframes: the motion is
+computed from speed, push and steering. Beat frequency follows the Strouhal relation
+(faster and smaller swimmers beat faster); a boxfish like Lompi keeps its body rigid, rows
+with the pectoral fin, uses the tail as a rudder and only beats it in a sprint; when the
+push stops it glides and the fin trims out, and braking flares it. The loop: slow, medium,
+sprint, glide and brake, then banking with steering. Tail, dorsal and anal fins are not
+separate cards yet, and breathing and the mouth exist as a tested model without a picture.
+
+![Lompi driven by the swim model: slow, medium, sprint, glide, brake, banking](docs/devlog/anim-03-swim.webp)
+
 A colorful 2D pufferfish game — underwater, Super Mario Land-ish — built as an
 installable PWA with **switchable control schemes** for experimentation.
 
@@ -89,7 +123,7 @@ npm run serve      # zero-dep static server for dist/ (tests the real PWA/SW)
 
 Lompi the pufferfish lives on a reef. A volcano erupts, and what it shakes loose —
 mines, nets, buoys — drifts into the sea. Lompi sets out east across the
-ocean, from the shallow lagoon through reef, kelp forest, open blue, minefield and
+ocean, from the shallow lagoon through reef, kelp forest, open blue, ship graveyard and
 harbour down into the deep trench, to reach the grand nest.
 
 - **Nests** on the seabed save your coins, refill your health and are where you
@@ -97,7 +131,20 @@ harbour down into the deep trench, to reach the grand nest.
 - **Friends** (turtle, seahorse, snail, starfish, urchin, anglerfish, …) cheer you
   up: a bonus and a heart. They shimmer; hazards do not.
 - **Seven characters** to choose on the title screen, each moving differently and
-  with its own special (puff, dash, leap, shield, pulse).
+  with a special of its own: Lompi puffs up and stops, Sharky sprints (tap up to five
+  times), Flitzi leaps and glides over the waves, the firefish spreads its fins like a
+  parachute, Schildi tucks into a rolling shell, Quallina pulses upward, Hüpfi holds on
+  to the rock with its tail.
+- **Momentum from the sea:** currents carry you faster than you can swim, bubble
+  cannons at their ends shoot you on, a big moon jelly bounces you back up.
+- **Chains:** link jumps, flips, clean landings, wave skips, currents, cannons and
+  specials and a soft counter grows; a finished chain pays a few bonus coins. No timer,
+  nothing to lose.
+- **A calm route** of open water runs through the whole journey, past every nest;
+  hazards keep away from it, and little lights drift along it. Danger is optional.
+- **Animals with a mind of their own:** friends roam, rest, look at you, circle you
+  once to say hello and dart off when rushed; the turtle comes up for air, starfish and
+  snails crawl along the rock.
 - **Relaxed or adventure:** switch in the menu. Relaxed means nothing can hurt.
 - The strip at the top right shows the whole journey and where you are.
 - **Swim together:** tap *Zusammen* on the title screen and type a secret room
@@ -117,13 +164,13 @@ harbour down into the deep trench, to reach the grand nest.
 | Scheme | Move | Special |
 |---|---|---|
 | **Tippen** (rubber band) | touch and hold: the fish is pulled to your finger; let go and it brakes | double tap |
-| **Schubsen** (air hockey) | grab the fish and throw it, or shove it with your finger | double tap |
 | **Flattern** (flap) | every tap is a fin stroke: tap position = direction, tap rate = speed | long press |
 | **Neigen** (tilt) | tilt the phone to steer, tap for speed | long press |
 | **Stick** | floating virtual stick, drag to swim | double tap |
 
 Keyboard always works too: arrows / WASD swim, Space is the special.
-Out of the water there is no swimming — only your momentum, and a little steering.
+Out of the water you fly like a bird: steering turns your path and never adds speed,
+a dive gains speed, and puffing up is the air brake.
 
 Sound can be switched off in the menu (☰). The app updates itself when a new build
 is live; install it from the same menu.
@@ -135,8 +182,19 @@ npm test           # unit tests for the pure logic (terrain, biomes, characters,
 ```
 
 Add a control scheme in `game/controls/` and register it in `game/controls/index.js`;
-add a playable character in `game/characters.js`; biomes and their spawn tables live
-in `game/level/biomes.js`.
+add a playable character in `game/characters.js` and its special in `game/specials.js`;
+biomes and their spawn tables live in `game/level/biomes.js`.
+
+Handy while developing (add to the URL):
+
+| Parameter | What it does |
+|---|---|
+| `?at=<biome>` or `?at=x,y` | start at a biome's landmark or at a point |
+| `?debug=perf` | frame budget, chunk build times, object counts |
+| `?debug=flow` | currents as arrows, the calm route as a green line |
+| `?debug=ai` | every creature shows what it is doing |
+| `?tune=key:value,...` | override movement numbers, e.g. `?tune=waterDrag:0.5,thrust:0.0009` |
+| `?flight=ballistic` | the old flight model, for comparison |
 
 ## Deploy — GitHub Pages (dev/release routing)
 
@@ -163,3 +221,16 @@ worker/        feedback relay (Cloudflare Worker)
 tests/         unit tests
 scripts/       icon generator, static server, dev log helper
 ```
+
+## Credits
+
+A game by **Familie Kugelmann**.
+
+- Stone and metal surfaces (`public/img/mat/`): [ambientCG](https://ambientcg.com) — CC0
+  (Ground054, Rock029, Rock057, Rock055, Rock035, Metal021), reduced to 512-px tiles.
+- Seabed props (`public/img/props/`): rendered from [Poly Haven](https://polyhaven.com) models — CC0
+  (dutch_ship_medium, rock_moss_set_01/02, wooden_barrels_01, wooden_crate_02).
+- [Phaser](https://phaser.io), [Matter.js](https://brm.io/matter-js/), [Vite](https://vitejs.dev),
+  [Trystero](https://github.com/dmotz/trystero) — MIT.
+
+The same list is in the game menu (Danke / Credits), see `game/credits.js`.

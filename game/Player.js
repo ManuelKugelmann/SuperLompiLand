@@ -1,27 +1,44 @@
 import Phaser from 'phaser';
-import { CHARACTERS } from './characters.js';
-import { SPECIALS, canUse } from './specials.js';
+import { CHARACTERS, MOTION, glideLift, skim } from './characters.js';
+import { FLIGHT, fly } from './flight.js';
+import { SPECIALS, canUse, chainStep } from './specials.js';
 import Rig from './Rig.js';
 import { play } from './audio.js';
 
 /** Tunables — physics feel is adjusted here (velocities are px per physics step). */
 export const PLAYER = {
-    thrust: 0.0013,        // swim force per unit mass; terminal swim speed ~ thrust * 278 / drag
-    maxSpeed: 26,
-    carrySpeed: 16,        // top speed while being carried by a finger
-    brake: 0.9,            // velocity kept per step while braking
+    // Momentum ("ballistic" feel): little water drag, so a push carries far; less thrust, so
+    // the top speed stays the same but it takes longer to get going and to turn; a gentle
+    // brake, so letting go means coasting. The puff is the real brake.
+    // First step: thrust 0.0013 -> 0.00078, waterDrag 1 -> 0.6, brake 0.9 -> 0.975, bounce x1.5.
+    // Second step (higher top speed, same acceleration): waterDrag 0.6 -> 0.43, maxSpeed 26 -> 36.
+    thrust: 0.00078,       // swim force per unit mass; terminal swim speed ~ thrust * 278 / (drag * waterDrag)
+    ...MOTION,             // waterDrag, airDrag, airGravity (shared with the network prediction)
+    bounce: 1.5,           // multiplier on every state's bounciness off rock (capped at 0.9)
+    maxSpeed: 36,
+    brake: 0.975,          // velocity kept per step while braking
     turnRate: 0.2,         // radians per step the nose turns toward the travel direction
     mass: 6,
     hoverLift: 0.00012,    // upward force per unit mass while holding a pose (hover in place)
     sinkForce: 0.00012,    // what the world gravity does to a swimmer, per unit mass (used to cancel part of it)
-    airGravity: 0.0011,    // extra downward force per unit mass above the water
-    airDrag: 0.0015,       // almost no drag in the air
-    airTurn: 0.009,        // radians per step the flight path can be bent in the air (no speed gain)
+    airTurn: 0.009,        // ballistic flight: radians per step the path can be bent (bird flight: see flight.js)
     shoveRadius: 340,
     shovePower: 16
 };
 
-export const CAT = { WORLD: 1, PLAYER: 2, PADDLE: 4 };
+// Tuning on a device without a rebuild: ?tune=waterDrag:0.5,thrust:0.0009,brake:0.98
+// overrides any number in PLAYER for this page load.
+if (typeof window !== 'undefined') {
+    for (const pair of (new URLSearchParams(window.location.search).get('tune') || '').split(',')) {
+        const [key, value] = pair.split(':');
+        if (key in PLAYER && Number.isFinite(Number(value))) PLAYER[key] = Number(value);
+    }
+    // Short form for the one number tried most: ?drag=0.4
+    const drag = Number(new URLSearchParams(window.location.search).get('drag'));
+    if (drag > 0) PLAYER.waterDrag = drag;
+}
+
+export const CAT = { WORLD: 1, PLAYER: 2 };
 
 /**
  * A playable character: body, water/air movement, health reactions and the
@@ -29,9 +46,8 @@ export const CAT = { WORLD: 1, PLAYER: 2, PADDLE: 4 };
  * (characters.js, specials.js); the look is a Rig. Control schemes drive it
  * ONLY through this API:
  *   thrust(dir)   steady swim force (dir length 0..1)
- *   dragTo(point) follow a finger (grab) — release keeps the velocity = fling
  *   launch(vec)   one-shot velocity kick
- *   special()     the character's special move
+ *   special()     the character's special move (data in specials.js)
  */
 export default class Player {
     /** @param character one entry of CHARACTERS (movement profile, art, special) */
@@ -49,6 +65,13 @@ export default class Player {
         this.poseLeft = 0;      // ms left in a special's pose
         this.poseCooldown = 0;  // cooldown that starts when the pose ends
         this.cooldown = 0;
+        this.skips = 0;         // wave tops skipped off in the current flight
+        this.steer = { x: 0, y: 0, steps: 0 };   // steering input for the flight model, and how many steps it lasts
+        this.wings = {};        // scratch for the flight model
+        this.mode = null;       // a special's temporary behaviour: { left, drag, sink, flow, bounce, tuck }
+        this.hold = null;       // { x, y } rock the character holds on to (anchor special)
+        this.findHold = null;   // set by the scene: reach -> { x, y } to hold on to, or null
+        this.chain = { count: 0, left: 0 };   // uses of a chained special so far, ms left to continue
         this.shield = 0;        // ms hazards cannot hurt
         this.guard = 0;         // ms fully protected (not even pushed)
         this.invulnerable = 0;  // ms without damage
@@ -98,15 +121,29 @@ export default class Player {
         sp.setBody({ type: 'circle', radius: s.radius, x: at.x, y: at.y });
         sp.setFixedRotation()
             .setMass(PLAYER.mass)
-            .setFrictionAir(this.inAir ? PLAYER.airDrag : s.air * this.move.drag)
-            .setBounce(s.bounce)
+            .setFrictionAir(this.waterDrag())
+            .setBounce(this.mode?.bounce ?? Math.min(0.9, s.bounce * PLAYER.bounce))
             .setFriction(0.02)
             .setCollisionCategory(CAT.PLAYER)
-            .setCollidesWith([CAT.WORLD, CAT.PADDLE]);
+            .setCollidesWith([CAT.WORLD]);
         sp.setVelocity(vel.x, vel.y);
     }
 
+    /** Resistance of the medium the body is in right now (a special's mode can change it). */
+    waterDrag() {
+        if (this.inAir) return FLIGHT.model === 'bird' && this.posed ? FLIGHT.brakeDrag : PLAYER.airDrag;
+        return Math.min(0.5, this.states[this.state].air * this.move.drag * PLAYER.waterDrag * (this.mode?.drag ?? 1));
+    }
+
+    /** A special changes how the body behaves for a while (see `mode` in specials.js); null ends it. */
+    setMode(mode) {
+        this.mode = mode ? { ...mode, left: mode.ms } : null;
+        this.sprite.setFrictionAir(this.waterDrag())
+            .setBounce(this.mode?.bounce ?? Math.min(0.9, this.states[this.state].bounce * PLAYER.bounce));
+    }
+
     thrust(dir) {
+        if (this.hold) return;                 // holding on to a rock: no swimming until it lets go
         if (this.inAir) { this.airSteer(dir, 1); return; }
         this.sprite.applyForce(dir.clone().scale(this.move.thrust * this.boost * this.body.mass));
         this.effort = Math.min(1, this.effort + dir.length() * 0.25);
@@ -117,6 +154,12 @@ export default class Player {
      * it never adds speed. `strength` scales how far it may turn this step.
      */
     airSteer(dir, strength) {
+        if (FLIGHT.model === 'bird') {
+            // The wings do the turning in update(); a one-shot kick keeps steering for a few steps.
+            const len = dir.length();
+            if (len > 0.0001) { this.steer.x = dir.x / len * Math.min(1, len); this.steer.y = dir.y / len * Math.min(1, len); this.steer.steps = strength; }
+            return;
+        }
         const v = this.body.velocity;
         const speed = Math.hypot(v.x, v.y);
         if (speed < 0.5 || dir.lengthSq() < 0.0001) return;
@@ -127,25 +170,11 @@ export default class Player {
         this.sprite.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
     }
 
-    dragTo(point) {
-        if (this.inAir) return; // cannot be carried through the air
-        const v = point.clone().subtract(this.pos).scale(0.22);
-        if (v.length() > PLAYER.carrySpeed) v.setLength(PLAYER.carrySpeed);
-        this.sprite.setVelocity(v.x, v.y);
-    }
-
     /** Actively slow down (call every step while braking). */
     brake() {
         if (this.inAir || this.steered) return; // never fight a jump or other input
         const v = this.body.velocity;
         this.sprite.setVelocity(v.x * PLAYER.brake, v.y * PLAYER.brake);
-    }
-
-    /** Replace the velocity outright (release of a grab = the throw). */
-    throwAt(vec) {
-        const v = vec.clone();
-        if (v.length() > this.move.maxSpeed) v.setLength(this.move.maxSpeed);
-        this.sprite.setVelocity(v.x, v.y);
     }
 
     launch(vec) {
@@ -170,8 +199,16 @@ export default class Player {
         const sp = SPECIALS[this.char.special];
         if (!canUse(sp, this)) return;
         const v = this.body.velocity;
-        const fx = sp.start({ vx: v.x, vy: v.y, facing: this.facing, inAir: this.inAir });
-        this.cooldown = sp.cooldown;
+        // A special that holds on to rock asks the scene for a spot within its reach.
+        const spot = sp.reach && !this.hold ? this.findHold?.(sp.reach) : null;
+        const fx = sp.start({ vx: v.x, vy: v.y, facing: this.facing, inAir: this.inAir, holding: !!this.hold, canHold: !!spot });
+        if (fx.hold) this.hold = spot;
+        if (fx.release) this.hold = null;
+        if (fx.mode) this.setMode(fx.mode);
+        // A chained special (the sprint) counts its uses and rests after the last one.
+        const step = chainStep(sp, this.chain);
+        this.chain.count = step.count; this.chain.left = step.left;
+        this.cooldown = step.cooldown;
         if (fx.pose && this.states[fx.pose]) {
             // A bigger pose needs room: move into open water first, or do not start it.
             const room = this.makeRoom ? this.makeRoom(this.states[fx.pose].radius) : this.pos;
@@ -188,8 +225,29 @@ export default class Player {
         if (fx.squash) this.squash = fx.squash;
         if (fx.shove) this.shove();
         play(fx.sound ?? 'special');
-        const ring = this.scene.add.circle(this.sprite.x, this.sprite.y, this.radius, fx.color ?? 0xffffff, 0.4).setDepth(4);
-        this.scene.tweens.add({ targets: ring, scale: fx.ring ?? 2.6, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
+        this.scene.events.emit('fish-special', { x: this.sprite.x, y: this.sprite.y, kind: this.char.special });
+        this.burst(fx.burst ?? 'ring', fx);
+    }
+
+    /** What a special looks like the moment it starts: every one has its own picture. */
+    burst(kind, fx) {
+        const s = this.scene, x = this.sprite.x, y = this.sprite.y, color = fx.color ?? 0xffffff;
+        if (kind === 'ring') {
+            const ring = s.add.circle(x, y, this.radius, color, 0.4).setDepth(4);
+            s.tweens.add({ targets: ring, scale: fx.ring ?? 2.6, alpha: 0, duration: 400, onComplete: () => ring.destroy() });
+        } else if (kind === 'spines') {
+            // A ring of spines stands up all around and fades.
+            for (let i = 0; i < 14; i++) {
+                const a = (i / 14) * Math.PI * 2, r = this.radius * 0.9;
+                const spine = s.add.triangle(x + Math.cos(a) * r, y + Math.sin(a) * r, 0, -5, 0, 5, 46, 0, color, 0.9).setRotation(a).setDepth(4.2);
+                s.tweens.add({ targets: spine, x: x + Math.cos(a) * (r + 70), y: y + Math.sin(a) * (r + 70), alpha: 0, scaleX: 1.5, duration: 520, ease: 'Quad.easeOut', onComplete: () => spine.destroy() });
+            }
+        } else if (kind === 'ripple' && s.textures.exists('bd_glow')) {
+            // Light, not bubbles: a soft glow swells out and fades.
+            const glow = s.add.image(x, y, 'bd_glow').setTint(color).setBlendMode(Phaser.BlendModes.ADD).setDepth(4.2).setAlpha(0.85)
+                .setDisplaySize(this.radius * 1.6, this.radius * 1.6);
+            s.tweens.add({ targets: glow, scale: glow.scale * 4, alpha: 0, duration: 620, ease: 'Sine.easeOut', onComplete: () => glow.destroy() });
+        }
     }
 
     /** Leave a special's pose (back to the normal look and size). */
@@ -235,6 +293,17 @@ export default class Player {
     /** @param {number} dt ms  @param {number} waterY world y of the water surface at the fish */
     update(dt, waterY = -Infinity) {
         if (this.cooldown > 0) this.cooldown -= dt;
+        if (this.mode) {
+            this.mode.left -= dt;
+            if (this.mode.sink && !this.inAir) this.sprite.applyForce({ x: 0, y: PLAYER.sinkForce * this.mode.sink * this.body.mass });
+            if (this.mode.tuck) this.squash = -this.mode.tuck;
+            if (this.mode.left <= 0) this.setMode(null);
+        }
+        if (this.hold) {
+            // Holding on: pulled firmly to the spot, whatever the water does.
+            this.sprite.setVelocity((this.hold.x - this.sprite.x) * 0.25, (this.hold.y - this.sprite.y) * 0.25);
+        }
+        if (this.chain.left > 0) this.chain.left -= dt;
         if (this.invulnerable > 0) this.invulnerable -= dt;
 
         // Water <-> air. In the air: no drag, real gravity, hardly any control.
@@ -243,12 +312,40 @@ export default class Player {
         const inAir = this.inAir ? this.sprite.y < waterY + 10 : this.sprite.y < waterY - 16;
         if (inAir !== this.inAir) {
             this.inAir = inAir;
-            this.sprite.setFrictionAir(inAir ? PLAYER.airDrag : this.states[this.state].air * this.move.drag);
+            if (!inAir) this.skips = 0;
+            this.sprite.setFrictionAir(this.waterDrag());
+            if (inAir) this.hold = null;
             this.scene.events.emit('fish-splash', {
                 x: this.sprite.x, y: waterY, speed: Math.hypot(this.body.velocity.x, this.body.velocity.y), entering: !inAir
             });
         }
-        if (this.inAir) this.sprite.applyForce({ x: 0, y: this.move.airGravity * this.body.mass });
+        if (this.inAir) {
+            // Wings carry part of the weight while the flight is fast (also of the world's own
+            // gravity), and a gliding character skips off wave tops instead of diving in.
+            const bv = this.body.velocity;
+            if (FLIGHT.model === 'bird') {
+                // Bird flight (flight.js): input turns the heading, wings carry part of the weight,
+                // a dive gains speed. A held pose (the puffed ball) has no wings: it brakes and drops.
+                const on = this.steer.steps > 0 && !this.posed;
+                const w = this.posed ? null : fly({
+                    vx: bv.x, vy: bv.y, ix: on ? this.steer.x : 0, iy: on ? this.steer.y : 0,
+                    gravity: this.move.airGravity + PLAYER.sinkForce,
+                    lift: this.char.glide?.lift, agility: this.move.airTurn / PLAYER.airTurn
+                }, FLIGHT, this.wings);
+                this.steer.steps--;
+                if (w && on) this.sprite.setVelocity(w.vx, w.vy);
+                this.sprite.applyForce({ x: (w ? w.ax : 0) * this.body.mass, y: (this.move.airGravity + (w ? w.ay : 0)) * this.body.mass });
+            } else {
+                const lift = glideLift(this.char, bv.x);
+                this.sprite.applyForce({ x: 0, y: (this.move.airGravity * (1 - lift) - PLAYER.sinkForce * lift) * this.body.mass });
+            }
+            const hop = skim(this.char, { vx: bv.x, vy: bv.y, height: waterY - this.sprite.y, skips: this.skips });
+            if (hop) {
+                this.skips++;
+                this.sprite.setVelocity(hop.vx, hop.vy);
+                this.scene.events.emit('fish-splash', { x: this.sprite.x, y: waterY, speed: 4, entering: false, skim: true });
+            }
+        }
         // Light swimmers sink less than the world gravity alone would make them.
         else if (this.move.sink < 1) this.sprite.applyForce({ x: 0, y: -PLAYER.sinkForce * (1 - this.move.sink) * this.body.mass });
         if (this.shield > 0) this.shield -= dt;

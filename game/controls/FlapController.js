@@ -17,12 +17,8 @@ export default class FlapController extends ControllerBase {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         this.center = new Phaser.Math.Vector2(W / 2, H / 2);
 
-        const cross = this.scene.add.graphics();
-        cross.lineStyle(2, 0xffffff, 0.06);
-        cross.lineBetween(W / 2, 140, W / 2, H - 40);
-        cross.lineBetween(40, H / 2, W - 40, H / 2);
-        this.ui.add(cross);
-        this.hint('Schnell tippen = schnell schwimmen · Tipp-Ort = Richtung · lange halten = aufblasen');
+        this.hint(this.de ? `Schnell tippen = schnell schwimmen · Tipp-Ort = Richtung · lange halten = ${this.specialWord()}`
+            : `Tap fast = swim fast · where you tap = direction · long press = ${this.specialWord()}`);
         this.held = null;
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
@@ -39,10 +35,6 @@ export default class FlapController extends ControllerBase {
         if (dir.length() > 1) dir.normalize();
         this.fish.launch(dir.scale(KICK));
         play('flap');
-
-        const dot = this.scene.add.circle(pointer.x, pointer.y, 22, 0xffffff, 0.16);
-        this.ui.add(dot);
-        this.scene.tweens.add({ targets: dot, scale: 2.4, alpha: 0, duration: 300, onComplete: () => dot.destroy() });
     }
 
     update() {

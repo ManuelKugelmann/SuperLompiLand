@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { play } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
+import { fitToWindow } from '../game/orientation.js';
 
 export const STORY_KEY = `${SCENE_KEYS.MAIN}_Story`;
 const SEEN_KEY = 'sll_seen_intro';
@@ -22,6 +23,7 @@ export default class StoryScene extends Phaser.Scene {
     }
 
     create() {
+        fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         const W = this.scale.width, H = this.scale.height;
         const has = k => this.textures.exists(k);
         const SEA = 330;        // waterline

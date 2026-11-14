@@ -1,6 +1,5 @@
 import VirtualStickController from './VirtualStickController.js';
 import TapToMoveController from './TapToMoveController.js';
-import FlingController from './FlingController.js';
 import FlapController from './FlapController.js';
 import TiltController from './TiltController.js';
 
@@ -10,7 +9,6 @@ import TiltController from './TiltController.js';
  */
 export const CONTROL_SCHEMES = [
     { id: 'tap', label: 'Tippen', Ctor: TapToMoveController },     // first = default for new players
-    { id: 'fling', label: 'Schubsen', Ctor: FlingController },
     { id: 'flap', label: 'Flattern', Ctor: FlapController },
     { id: 'tilt', label: 'Neigen', Ctor: TiltController },
     { id: 'stick', label: 'Stick', Ctor: VirtualStickController }

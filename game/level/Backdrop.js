@@ -6,6 +6,20 @@ import { biomeBlendAt, mixColor } from './biomes.js';
  * drifting light rays near the surface, ambient bubbles, and the sky + waterline
  * above y = 0.
  */
+/** Far fish schools are placed again once this far outside the picture (px). */
+const SCHOOL_MARGIN = { x: 700, y: 500 };
+/**
+ * Where far schools swim, among the far scenery (farDepths.js: an object at parallax s
+ * draws at depth FarLayers.depthFor(s)): scroll = horizontal parallax, vscroll =
+ * vertical, depth = draw order, size/alpha shrink and fade with distance.
+ */
+const SCHOOL_SLOTS = [
+    { scroll: 0.3, vscroll: 0.18, depth: -18.5, size: 0.6, alpha: 0.32 },    // between far reef and back floor
+    { scroll: 0.38, vscroll: 0.23, depth: -18, size: 0.7, alpha: 0.38 },
+    { scroll: 0.5, vscroll: 0.42, depth: -16.5, size: 0.85, alpha: 0.46 },   // between back floor and mid reef
+    { scroll: 0.56, vscroll: 0.58, depth: -16, size: 0.95, alpha: 0.52 }
+];
+
 export default class Backdrop {
     constructor(scene, maxDepth) {
         this.scene = scene;
@@ -27,37 +41,34 @@ export default class Backdrop {
         this.foam = scene.add.graphics().setDepth(6);    // bright crest line, in front of the fish
 
         // The volcano's glow on the eastern horizon: always shows which way the journey goes.
-        this.eastGlow = scene.add.ellipse(W + 120, H * 0.5, 520, H * 1.5, 0xff3b1f, 0.12)
+        makeSoft(scene);
+        this.eastGlow = scene.add.image(W + 120, H * 0.5, 'bd_glow').setDisplaySize(900, H * 1.9).setTint(0xff3b1f).setAlpha(0.2)
             .setScrollFactor(0).setDepth(-11).setBlendMode(Phaser.BlendModes.ADD);
-        scene.tweens.add({ targets: this.eastGlow, alpha: 0.2, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        scene.tweens.add({ targets: this.eastGlow, alpha: 0.32, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
         // Distant schools of small fish: silhouettes far behind the play plane that
         // drift past slower than the world (parallax) and never interact.
         this.schools = [];
         for (let k = 0; k < 4; k++) {
+            // wx/wy: the school's place in its own far layer (set on the first update);
+            // on screen it sits at (wx - camX * depthFactor, wy - camY * depthFactor).
+            const slot = SCHOOL_SLOTS[k % SCHOOL_SLOTS.length];
             const school = {
-                x: Phaser.Math.Between(0, 4000), y: Phaser.Math.Between(120, H - 160), dir: k % 2 ? 1 : -1,
-                speed: Phaser.Math.FloatBetween(0.5, 1.1), depthFactor: 0.25 + k * 0.08, fish: []
+                wx: null, wy: null, dir: k % 2 ? 1 : -1,
+                speed: Phaser.Math.FloatBetween(0.5, 1.1), slot, fish: []
             };
             const n = Phaser.Math.Between(7, 13);
             for (let i = 0; i < n; i++) {
-                const size = Phaser.Math.Between(16, 26) * (0.7 + k * 0.12);
-                const body = scene.add.ellipse(0, 0, size, size * 0.42, 0x0d4763, 0.3 + k * 0.05).setScrollFactor(0).setDepth(-16 + k * 0.1);
+                const size = Phaser.Math.Between(16, 26) * slot.size;
+                // Soft, out-of-focus shapes: the farther school is smaller and fainter.
+                const body = scene.add.image(0, 0, 'bd_fish').setDisplaySize(size * 1.5, size * 0.75).setTint(0x0d4763).setScrollFactor(0).setDepth(slot.depth);
+                body.base = { sx: body.scaleX, sy: body.scaleY, alpha: slot.alpha };
                 school.fish.push({ body, ox: Phaser.Math.Between(-150, 150), oy: Phaser.Math.Between(-70, 70), phase: Math.random() * 6.28 });
             }
             this.schools.push(school);
         }
 
-        this.rays = [];
-        for (let i = 0; i < 6; i++) {
-            const x = (W / 6) * i + Phaser.Math.Between(-60, 60);
-            const ray = scene.add.triangle(x, 0, 0, 0, 190, 0, 380, H * 0.95, 0xffffff, 0.07)
-                .setOrigin(0).setScrollFactor(0).setDepth(-12).setBlendMode(Phaser.BlendModes.ADD);
-            ray.baseAlpha = Phaser.Math.FloatBetween(0.04, 0.09);
-            ray.phase = Math.random() * 6.28;
-            ray.baseX = x;
-            this.rays.push(ray);
-        }
+        // Light shafts live in game/fx/WaterLight.js (one system with caustics and the grade).
 
         this.bubbles = [];
         for (let i = 0; i < 16; i++) {
@@ -111,19 +122,28 @@ export default class Backdrop {
 
         const depthFade = Math.max(0.25, 1 - depth * 0.8);
         for (const sc of this.schools) {
-            sc.x += sc.dir * sc.speed;
-            const span = W + 900;
-            const sx = (((sc.x - camX * sc.depthFactor) % span) + span) % span - 450;
-            const sy = sc.y - (camY * sc.depthFactor * 0.3) % 200;
+            // Far away = moves less than the world, by the same factor sideways and up/down.
+            // A school keeps its own depth in the water: no wrapping. When it drifts well
+            // out of the picture it is quietly placed again just outside the view.
+            const f0 = sc.slot.scroll, v0 = sc.slot.vscroll;
+            let sx = sc.wx === null ? NaN : sc.wx - camX * f0;
+            let sy = sc.wy === null ? NaN : sc.wy - camY * v0;
+            const out = !(sx > -SCHOOL_MARGIN.x && sx < W + SCHOOL_MARGIN.x && sy > -SCHOOL_MARGIN.y && sy < H + SCHOOL_MARGIN.y);
+            if (out) {
+                const first = sc.wx === null;
+                const side = first ? Phaser.Math.Between(0, W) : (dx >= 0 ? W + 250 : -250);   // ahead of where the camera goes
+                sx = side; sy = Phaser.Math.Between(120, H - 160);
+                sc.wx = sx + camX * f0; sc.wy = sy + camY * v0;
+            }
+            sc.wx += sc.dir * sc.speed;
+            sx = sc.wx - camX * f0;
+            sy = sc.wy - camY * v0;
+            const surfaceY = -camY * v0 + 60;   // the waterline as seen in this far layer
             for (const f of sc.fish) {
                 f.body.setPosition(sx + f.ox + Math.sin(t * 0.7 + f.phase) * 18, sy + f.oy + Math.sin(t * 1.1 + f.phase) * 10);
-                f.body.setScale(sc.dir * (1 + Math.sin(t * 9 + f.phase) * 0.12), 1);   // tail beat
-                f.body.setVisible(camY + f.body.y > 60).setAlpha(f.body.fillAlpha * 0 + 0.32 * depthFade);
+                f.body.setScale(sc.dir * f.body.base.sx * (1 + Math.sin(t * 9 + f.phase) * 0.12), f.body.base.sy);   // tail beat
+                f.body.setVisible(f.body.y > surfaceY).setAlpha(f.body.base.alpha * depthFade);
             }
-        }
-        for (const ray of this.rays) {
-            ray.x = ray.baseX + Math.sin(t * 0.25 + ray.phase) * 70 - (camX * 0.05) % 40;
-            ray.setAlpha(ray.baseAlpha * (0.6 + 0.4 * Math.sin(t * 0.6 + ray.phase)) * Math.max(0, 1 - depth * 2.2));
         }
         for (const b of this.bubbles) {
             b.y -= b.speed + dy * 0.5;
@@ -132,6 +152,38 @@ export default class Backdrop {
             if (b.y < -60 || b.y > H + 80 || b.x < -80 || b.x > W + 80) this.resetBubble(b, b.y > H + 80 || b.x < -80 || b.x > W + 80);
         }
     }
+}
+
+/** Soft-edged textures for everything far away: nothing in the backdrop has a hard outline. */
+function makeSoft(scene) {
+    if (scene.textures.exists('bd_ray')) return;
+    // Light shaft: bright along the middle, feathered to both sides, fading in at the top and out at the bottom.
+    const ray = scene.textures.createCanvas('bd_ray', 128, 256), rc = ray.getContext();
+    const img = rc.createImageData(128, 256);
+    for (let y = 0; y < 256; y++) {
+        const v = y / 255, along = Math.min(1, v * 9) * Math.pow(1 - v, 1.4);
+        for (let x = 0; x < 128; x++) {
+            const u = Math.abs(x / 127 - 0.5) * 2, across = Math.pow(Math.max(0, 1 - u * u), 2.2);
+            const i = (y * 128 + x) * 4;
+            img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+            img.data[i + 3] = 255 * along * across;
+        }
+    }
+    rc.putImageData(img, 0, 0);
+    ray.refresh();
+    // Round glow that fades smoothly to nothing.
+    const glow = scene.textures.createCanvas('bd_glow', 128, 128), gc = glow.getContext();
+    const g = gc.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    gc.fillStyle = g; gc.fillRect(0, 0, 128, 128);
+    glow.refresh();
+    // A fish far away, out of focus: a blurred body with a tail.
+    const fish = scene.textures.createCanvas('bd_fish', 96, 48), fc = fish.getContext();
+    fc.filter = 'blur(3px)';
+    fc.fillStyle = '#ffffff';
+    fc.beginPath(); fc.ellipse(54, 24, 28, 11, 0, 0, Math.PI * 2); fc.fill();
+    fc.beginPath(); fc.moveTo(30, 24); fc.lineTo(10, 12); fc.lineTo(14, 24); fc.lineTo(10, 36); fc.closePath(); fc.fill();
+    fish.refresh();
 }
 
 function makeGradient(scene, key, h, stops) {
