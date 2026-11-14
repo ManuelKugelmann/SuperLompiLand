@@ -1554,7 +1554,7 @@ export default class MainScene extends Phaser.Scene {
         this.docks.update(sp, time / 1000);
         this.manta.update(sp, time / 1000, delta);
         this.whaleShark.update(sp, time / 1000, delta);
-        this.front.update(sp, time / 1000);
+        this.front.update(sp, time / 1000, delta);
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
