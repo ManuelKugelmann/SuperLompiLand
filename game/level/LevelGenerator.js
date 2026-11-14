@@ -6,7 +6,7 @@ import { createGrumpy, stepGrumpy, calmGrumpy } from '../ai/grumpy.js';
 import { createCrawler, stepCrawler } from '../ai/crawler.js';
 import { createReach } from './reach.js';
 import { createSpacing } from './spacing.js';
-import { eachCell as marchGrid } from './terrain.js';
+import { eachCell as marchGrid, hash } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
@@ -1053,13 +1053,15 @@ function makeNestTextures(scene) {
             // Light from above and a little from the left: slopes facing up-left are bright.
             const e = 0.02;
             const slope = (height(nx, ny + e) - height(nx, ny - e)) * 0.9 + (height(nx + e, ny) - height(nx - e, ny)) * 0.35;
-            const light = Math.max(0.55, Math.min(1.25, 0.92 + slope * 0.55 - Math.max(0, ny) * 0.1));
-            // Fine pale sand in the middle, warmer toward the rim.
+            // Soft relief (a real pufferfish nest is subtle sand, not a printed pattern), sand grain,
+            // and an outer edge that blends into the seabed.
+            const light = Math.max(0.74, Math.min(1.14, 0.95 + slope * 0.3 - Math.max(0, ny) * 0.08));
+            const grain = 0.92 + 0.16 * hash(x, y, 7);
             const t = Math.min(1, r / 0.9);
-            img.data[i] = (250 - 28 * t) * light;
-            img.data[i + 1] = (236 - 44 * t) * light;
-            img.data[i + 2] = (196 - 70 * t) * light;
-            img.data[i + 3] = 255 * Math.min(1, (1 - r) / 0.1);
+            img.data[i] = (226 - 26 * t) * light * grain;
+            img.data[i + 1] = (208 - 36 * t) * light * grain;
+            img.data[i + 2] = (168 - 52 * t) * light * grain;
+            img.data[i + 3] = 255 * Math.min(1, (1 - r) / 0.28);
         }
     }
     ctx.putImageData(img, 0, 0);
