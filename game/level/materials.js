@@ -16,13 +16,13 @@ export const MAT = {
     share: 0.38         // rough share of the second material
 };
 
-/** Material per file under public/img/mat/ (colour `<name>.jpg`, height `<name>_h.jpg`). */
-export const MATERIALS = ['limestone', 'sandstone', 'granite', 'mudstone', 'basalt', 'rust'];
+/** Material per file under public/img/mat/ (colour `<name>.jpg`, height `<name>_h.jpg`); `reef` is made by scripts/mat/reef.py. */
+export const MATERIALS = ['limestone', 'sandstone', 'granite', 'mudstone', 'basalt', 'rust', 'reef'];
 
 /** [main, second] material per biome. */
 export const BIOME_MATERIALS = {
     beach: ['limestone', 'sandstone'],
-    reef: ['limestone', 'granite'],
+    reef: ['reef', 'limestone'],     // coral-encrusted limestone (procedural: scripts/mat/reef.py)
     mangrove: ['mudstone', 'limestone'],
     kelp: ['granite', 'basalt'],
     blue: ['granite', 'limestone'],

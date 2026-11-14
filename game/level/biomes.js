@@ -31,7 +31,8 @@
 const WIDTHS = { beach: 11500, mangrove: 9000, reef: 8000, blue: 16000, kelp: 9000, harbour: 9000, wreck: 14000, shore: 10000, trench: 12000 };
 export const WORLD_WEST = -6500;
 
-const ROCK_REEF = [0xf3dba0, 0xd2ae6c, 0x9c7a54, 0x6a5748, 0x4b4350];
+// Living reef rock: warm limestone with pink coralline tones running deep, so its faces read as reef, not concrete.
+const ROCK_REEF = [0xf3dba0, 0xdcb986, 0xb88f78, 0x957474, 0x76606a];
 
 export const BIOMES = [
     {
