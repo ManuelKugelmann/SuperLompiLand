@@ -67,7 +67,10 @@ const IMAGES = {
     whale: 'whale.webp',   // the humpback (game/Whale.js; part cards in img/parts)
     whale_net: 'whale_net.webp',   // the ghost net over her (scripts/fx/net.py)
     beat_net: 'beat_net.webp',     // the net a friend is caught in (scripts/fx/net_ball.py)
-    nest: 'nest.webp'              // the painted nest (LevelGenerator NEST_ART)
+    nest: 'nest.webp',             // the painted nest (LevelGenerator NEST_ART)
+    giant_clam: 'cave/giant_clam.webp', giant_clam_open: 'cave/giant_clam_open.webp',   // the kelp cave (BranchLayer)
+    cave_rope: 'cave/cave_rope.webp', cave_pearl: 'cave/cave_pearl.webp',
+    ghost_finger: 'ui/ghost_finger.webp', ghost_ring: 'ui/ghost_ring.webp'              // the tutorial's hand (scripts/fx/ghost_finger.py)
 };
 
 export default class IntroScene extends Phaser.Scene {
