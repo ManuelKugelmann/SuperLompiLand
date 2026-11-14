@@ -38,6 +38,7 @@ export const ROUTE = {
     clear: 420,         // hazards stay at least this far from its middle
     fadeIn: [1500, 900],   // the lane starts this far west of the start pool and reaches full depth over this many px
     fadeOut: 280,       // and it closes over this many px before the world's east end (behind the grand nest)
+    wander: [110, 45],  // px its edges wander outward, on a broad and on a fine scale (never inward: the lane keeps its width)
     grid: 32            // px: its depth is worked out every so many px and joined by straight pieces
 };
 
@@ -160,7 +161,13 @@ export function createField(seed) {
             // again (a soft edge: no sharp step in the field). Where the lane runs just under the
             // open surface water, everything above it is lane too, so no sliver of rock is left between.
             const ry = routeY(x), shallow = crest < 0.5 && ry - ROUTE.halfWidth * 2 < 620 && y < ry;      // not under the reef crest: there the lane is a channel through coral
-            const off = shallow ? 0 : Math.abs(y - ry) / ROUTE.halfWidth;
+            // Its edges wander: the lane is never narrower than its half width, but how far beyond that
+            // it eats into the rock varies on two scales, so where the route ramps no straight cut shows.
+            let off = shallow ? 0 : Math.abs(y - ry) / ROUTE.halfWidth;
+            if (off > 0.9 && off < 2.6) {
+                const wide = ROUTE.halfWidth + ROUTE.wander[0] * vnoise(x / 260, y / 260, seed + 51) + ROUTE.wander[1] * vnoise(x / 85, y / 85, seed + 52);
+                off = Math.abs(y - ry) / wide;
+            }
             // The lane begins west of the start pool and ends at the grand nest; it fades in and out
             // there over a stretch, so it never ends in a cut face in the sand.
             const ends = Math.min(smooth01((x - (FIELD.spawn.x - ROUTE.fadeIn[0])) / ROUTE.fadeIn[1]), smooth01((WORLD_END - x) / ROUTE.fadeOut));
