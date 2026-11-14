@@ -46,11 +46,11 @@ export default class BloomLayer {
     constructor(scene, onSeen) {
         this.scene = scene; this.onSeen = onSeen; this.seen = false;
         this.fields = bloomFields();
+        ensureTextures(scene);      // baked at start-up, not on first sight
         this.live = null;      // { field, blitters: [big, small], bobs: [{ bob, i, k, ox, oy }] }
     }
 
     build(field) {
-        ensureTextures(this.scene);
         const L = BLOOM_LOOK, blitters = KEYS.map((key, k) => this.scene.add.blitter(0, 0, key).setDepth(L.depth[k]).setAlpha(L.alpha[k])), bobs = [];
         for (let i = 0; i < BLOOM.count; i++) {
             const k = jellyAt(field, i, 0, POS).small ? 1 : 0;
@@ -65,7 +65,7 @@ export default class BloomLayer {
         if (this.live && (fish.x < this.live.field.x0 - L.far || fish.x > this.live.field.x1 + L.far)) { for (const b of this.live.blitters) b.destroy(); this.live = null; }
         if (!this.live) {
             const f = this.fields.find(fl => fish.x > fl.x0 - L.near && fish.x < fl.x1 + L.near);
-            if (!f) return;
+            if (!f || !this.scene.buildSlot()) return;
             this.live = this.build(f);
         }
         const { field, bobs } = this.live, k = 1 - Math.pow(1 - L.ease, delta / (1000 / 60));

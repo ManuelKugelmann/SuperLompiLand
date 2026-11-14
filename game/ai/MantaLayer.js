@@ -21,7 +21,7 @@ export default class MantaLayer {
     update(fish, t, delta) {
         const p = mantaAt(t, this.routeY, POSE, MANTA, fish.x), near = Math.abs(p.x - fish.x) < this.scene.scale.width * 1.2 && Math.abs(p.y - fish.y) < this.scene.scale.height * 1.2;
         if (!this.rig) {
-            if (!near || !this.scene.textures.exists(MANTA_ART.key)) return;      // made when it first comes into view (and only with its picture)
+            if (!near || !this.scene.textures.exists(MANTA_ART.key) || !this.scene.buildSlot()) return;      // made when it first comes into view (and only with its picture)
             this.rig = createRig(this.scene, { states: { normal: { key: MANTA_ART.key, width: MANTA.width, wiggle: 10 } }, anim: 'swim', soft: 0.5, upright: true }, p.x, p.y, 3.6);
         }
         this.rig.setVisible(near);

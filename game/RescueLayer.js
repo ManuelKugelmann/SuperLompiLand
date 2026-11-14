@@ -69,7 +69,7 @@ export default class RescueLayer {
         for (const spot of this.spots) {
             if (spot.x < fish.x - L.near) continue;
             if (spot.x > fish.x + L.near) break;
-            if (!this.actors.has(spot.id) && !this.done.has(spot.id)) this.actors.set(spot.id, this.build(spot));
+            if (!this.actors.has(spot.id) && !this.done.has(spot.id) && this.scene.buildSlot()) this.actors.set(spot.id, this.build(spot));
         }
         for (const a of this.actors.values()) {
             if (a.state === 'caught') {

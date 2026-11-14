@@ -527,11 +527,12 @@ export default class MainScene extends Phaser.Scene {
     runPerfTour(delta, logicMs) {
         const tour = this.perfTour;
         if (tour.done) return;
-        // A chunk build counts in the frame it happened in (the last one's time stays on the counter;
-        // the builds right after a hop fall into the tour's skipped frames).
+        // A chunk build counts in the frame it happened in, under its own budget: its time is taken
+        // out of that frame's logic (the builds right after a hop fall into the tour's skipped frames).
         const built = this.level.buildMs.count !== this.perfBuilds;
         this.perfBuilds = this.level.buildMs.count;
-        tour.sample({ logicMs, chunkMs: built ? this.level.buildMs.last : 0, objects: this.children.list.length, tweens: this.tweens.getTweens().length });
+        const chunkMs = built ? this.level.buildMs.last : 0;
+        tour.sample({ logicMs: Math.max(0, logicMs - chunkMs), chunkMs, objects: this.children.list.length, tweens: this.tweens.getTweens().length });
         if (tour.step(delta)) {
             const p = this.safeSpot(tour.x, this.level.field.routeY(tour.x));
             this.fish.place(p.x, p.y);
@@ -556,6 +557,18 @@ export default class MainScene extends Phaser.Scene {
         this.bookEntry(spot.kind);
         this.announce(this.lang === 'de' ? 'Befreit!' : 'Set free!', `+${RESCUES.coins}`);
         this.particles.spawn('bubble', x, y, 8, { radius: 9, spread: 46 });
+    }
+
+    /**
+     * May a layer build its scene now? Only one lazy build per frame (a rescue, a bloom, a raft,
+     * the manta ...): arriving somewhere never stacks several builds into one frame. A layer that
+     * is told no simply asks again next frame.
+     */
+    buildSlot() {
+        const frame = this.game.loop.frame;
+        if (this.lastBuildFrame === frame) return false;
+        this.lastBuildFrame = frame;
+        return true;
     }
 
     /** Through the sea arch: a chain move, the first time an entry in the reef book; flown through, a cheer. */

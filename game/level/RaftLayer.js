@@ -40,6 +40,7 @@ export default class RaftLayer {
     constructor(scene, surfaceY, onSeen) {
         this.scene = scene; this.surfaceY = surfaceY; this.onSeen = onSeen; this.seen = false;
         this.spots = raftSpots();
+        ensureTexture(scene);       // drawn at start-up, not on first sight
         this.rafts = new Map();     // spot id -> image
         this.flyers = null;         // pooled pictures of one burst
         this.burstAt = null;        // { x, y, dir, seed, t0 }
@@ -65,7 +66,7 @@ export default class RaftLayer {
         for (const spot of this.spots) {
             const d = Math.abs(spot.x - fish.x), img = this.rafts.get(spot.id);
             if (!img && d < L.near) {
-                ensureTexture(this.scene);
+                if (!this.scene.buildSlot()) continue;
                 const r = this.scene.add.image(spot.x, 0, KEY).setOrigin(0.5, L.waterline).setDepth(L.depth);
                 this.rafts.set(spot.id, r.setScale(RAFTS.width / r.width));
             } else if (img && d > L.far) { img.destroy(); this.rafts.delete(spot.id); } else if (img) {
