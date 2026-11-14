@@ -49,7 +49,7 @@ import OctopusLayer from '../game/ai/OctopusLayer.js';
 import ContainerLayer from '../game/level/ContainerLayer.js';
 import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
-import { createLostCue, nextGoal } from '../game/lostCue.js';
+import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
@@ -263,7 +263,7 @@ export default class MainScene extends Phaser.Scene {
         this.sandbar = new SandbarLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.overSandbar());
         // The journey's even rhythm (spec 5.0l): coin figures on the route, huge coral colonies behind it, adult sharks passing out at sea.
         this.rhythm = new RhythmLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), id => this.bookEntry(id));
-        this.lostCue = createLostCue();      // no map: one soft arrow toward the next friend or nest when the child seems lost (spec 5.0l)
+        this.lostCue = createLostCue(); this.goalAge = LOST.goalS;      // no map: one soft arrow toward the next friend or nest when the child seems lost (spec 5.0l)
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -668,8 +668,13 @@ export default class MainScene extends Phaser.Scene {
      */
     updateLostCue(dt) {
         const f = this.fish.sprite, v = f.body.velocity;
-        const goals = [...this.journey.list.filter(c => c.friend && !this.journey.has(c.friend.id)).map(c => c.x), ...this.level.nests.filter(n => n.index > this.nestIndex).map(n => n.x)];
-        const gx = nextGoal(f.x, goals), alpha = this.lostCue.step(dt, v.x, Math.hypot(v.x, v.y), gx === null ? null : gx - f.x);
+        // The goal is looked up now and then, not every frame: it only changes when a friend is freed or a nest is reached.
+        this.goalAge = this.goalAge + dt;
+        if (this.goalAge >= LOST.goalS) {
+            this.goalAge = 0;
+            this.goalX = nextGoal(f.x, [...this.journey.list.filter(c => c.friend && !this.journey.has(c.friend.id)).map(c => c.x), ...this.level.nests.filter(n => n.index > this.nestIndex).map(n => n.x)]);
+        }
+        const gx = this.goalX, alpha = this.lostCue.step(dt, v.x, Math.hypot(v.x, v.y), gx === null ? null : gx - f.x);
         if (alpha <= 0) { this.lostArrow?.setVisible(false); return; }
         if (!this.textures.exists('lost_arrow')) {
             // A soft chevron of light, pointing right.

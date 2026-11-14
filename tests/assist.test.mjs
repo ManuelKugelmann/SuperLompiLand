@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust, easeRest } from '../game/controls/assist.js';
+import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust, easing, easeRest } from '../game/controls/assist.js';
 
 // A seabed step: rock below y 1000 west of x 500, and below y 800 east of it (a 200 px step up).
 const step = (x, y) => y < (x < 500 ? 1000 : 800);
@@ -85,13 +85,18 @@ test('a sideways pull damps speed up or down the player did not ask for; a pull 
     assert.equal(levelThrust(0, -100), L.max, 'never more than its cap');
 });
 
-test('a depth the player did not choose, far below the lane, rises gently back toward it; a dive is kept', () => {
+test('a depth the player did not choose, far below the lane, is eased back to the lane edge; a dive is kept', () => {
     const A = ASSIST.lane, laneBottom = 1085;
-    assert.equal(easeRest(1800, laneBottom, true, 1), 1800, 'chosen by a dive: kept');
-    assert.equal(easeRest(laneBottom + 100, laneBottom, false, 1), laneBottom + 100, 'near the lane anyway: left alone');
-    assert.equal(easeRest(1800, laneBottom, false, 1), 1800 - A.rise, 'one second: up by the rise');
-    let rest = 1800;
-    for (let i = 0; i < 60 * 40; i++) rest = easeRest(rest, laneBottom, false, 1 / 60);
-    assert.equal(rest, laneBottom + A.below, 'it stops a little under the lane, never above that');
-    assert.equal(easeRest(null, laneBottom, false, 1), null);
+    assert.equal(easing(1800, laneBottom, true, false), false, 'chosen by a dive: kept');
+    assert.equal(easing(1800, laneBottom, true, true), false, 'a dive ends an easing');
+    assert.equal(easing(laneBottom + A.below - 50, laneBottom, false, false), false, 'near the lane anyway: left alone');
+    assert.equal(easing(null, laneBottom, false, true), false);
+    assert.equal(easeRest(1800, laneBottom, 1), 1800 - A.rise, 'one second: up by the rise');
+    let rest = 1800, on = false;
+    for (let i = 0; i < 60 * 60; i++) {
+        on = easing(rest, laneBottom, false, on);
+        if (on) rest = easeRest(rest, laneBottom, 1 / 60);
+    }
+    assert.equal(rest, laneBottom + A.stop, 'once started it goes on to the lane edge, not only back within the start distance');
+    assert.equal(on, false, 'and then it is over');
 });

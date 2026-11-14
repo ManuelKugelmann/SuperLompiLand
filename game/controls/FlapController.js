@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
+import SteerAssist from './SteerAssist.js';
 import { play } from '../audio.js';
 
 const KICK = 10.5; // velocity added per tap at full deflection
@@ -20,6 +21,7 @@ export default class FlapController extends ControllerBase {
         this.hint(this.de ? `Schnell tippen = schnell schwimmen · Tipp-Ort = Richtung · lange halten = ${this.specialWord()}`
             : `Tap fast = swim fast · where you tap = direction · long press = ${this.specialWord()}`);
         this.held = null;
+        this.assist = new SteerAssist(this.scene, this.fish);
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
     }
@@ -32,8 +34,10 @@ export default class FlapController extends ControllerBase {
             Phaser.Math.Clamp((pointer.x - this.center.x) / (this.center.x * 0.6), -1, 1),
             Phaser.Math.Clamp((pointer.y - this.center.y) / (this.center.y * 0.6), -1, 1)
         );
-        if (dir.length() > 1) dir.normalize();
-        this.fish.launch(dir.scale(KICK));
+        // A stroke against a step goes up along it (the shared wall slide), as strong as the tap asked for.
+        const len = Math.min(1, dir.length());
+        if (len > 0) { const d = this.assist.aim(dir.normalize()); dir.set(d.x, d.y); }
+        this.fish.launch(dir.scale(len * KICK));
         play('flap');
     }
 

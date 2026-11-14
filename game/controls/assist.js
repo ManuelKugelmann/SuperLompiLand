@@ -19,10 +19,12 @@ export const ASSIST = {
         slack: 15,       // px the fish may sink below where it was let go before the hold begins to lift it
         full: 90,        // px below that at which the lift is at full strength
         lift: 0.5,       // the lift at full strength, as a share of a full stroke
-        dive: 150        // px the finger must be below the fish for the pull to count as "steered down": only then a release takes a deeper depth to hold
+        dive: 150,       // px the finger must be below the fish for the pull to count as "steered down": only then a release takes a deeper depth to hold
+        diveDir: 0.5     // ... and for schemes that steer by a direction: the downward share of it from which it counts as a dive
     },
     lane: {
         below: 250,      // px under the calm lane's lower edge from which a depth the player did not choose is eased back up
+        stop: 0,         // ... and px under that edge at which the easing, once started, ends
         rise: 40,        // px per second by which the held depth then rises toward that edge
         level: 0.15      // the pull counts as level (the hold keeps working during it) while its up or down part is below this share
     },
@@ -93,11 +95,16 @@ export function levelThrust(dirY, vy, cfg = ASSIST.level) {
 }
 
 /**
- * The held depth a moment later: a depth the player did not dive to, lying far below the calm
- * lane, rises gently toward the lane's lower edge (never above `below` px under it). A depth
- * the player chose by diving is kept. `laneBottom` = the lane's lower edge there (world y), `dt` s.
+ * Whether the held depth is being eased back to the calm lane: it starts once a depth the player
+ * did not dive to lies more than `below` px under the lane's lower edge, and then goes on until
+ * the depth has reached `stop` px under that edge (`was` = it was easing already). A depth the
+ * player chose by diving is never eased.
  */
-export function easeRest(rest, laneBottom, chosen, dt, cfg = ASSIST.lane) {
-    const limit = laneBottom + cfg.below;
-    return chosen || rest === null || rest <= limit ? rest : Math.max(limit, rest - cfg.rise * dt);
+export function easing(rest, laneBottom, chosen, was, cfg = ASSIST.lane) {
+    return !chosen && rest !== null && rest > laneBottom + (was ? cfg.stop : cfg.below);
+}
+
+/** The held depth a moment later while it is eased: up by `rise` px per second, no higher than `stop` px under the lane's lower edge. `dt` s. */
+export function easeRest(rest, laneBottom, dt, cfg = ASSIST.lane) {
+    return Math.max(laneBottom + cfg.stop, rest - cfg.rise * dt);
 }

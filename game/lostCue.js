@@ -11,7 +11,8 @@ export const LOST = {
     headS: 1.5,        // s of heading toward the goal after which the cue fades
     headSpeed: 2.5,    // px per step toward the goal from which that counts
     fadeIn: 0.8, fadeOut: 0.6,   // s the arrow takes to appear and to go
-    near: 900          // px: with the goal this close (it is on screen), no arrow is needed
+    near: 900,         // px: with the goal this close (it is on screen), no arrow is needed
+    goalS: 1           // s between two looks for the next goal
 };
 
 /** The next goal east of `x`: the nearest of `xs` (world x of unfreed friends and unreached nests) that lies ahead, or null. */

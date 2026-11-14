@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
+import SteerAssist from './SteerAssist.js';
 import { play } from '../audio.js';
 
 const KICK = 9;            // speed added per tap
@@ -33,6 +34,7 @@ export default class TiltController extends ControllerBase {
         this.neutral = null;
         this.source = 'none';   // 'orientation' | 'motion' | 'pointer' | 'none'
         this.held = null;
+        this.assist = new SteerAssist(this.scene, this.fish);
         this.debug = new URLSearchParams(window.location.search).get('debug') === 'tilt';
         this.raw = {};
 
@@ -138,7 +140,9 @@ export default class TiltController extends ControllerBase {
         this.heldSince = this.scene.time.now;
         // No tilt: stroke straight ahead.
         const d = this.dir.lengthSq() > 0 ? this.dir.clone() : new Phaser.Math.Vector2(this.fish.facing, 0);
-        this.fish.launch(d.setLength(KICK));
+        // A stroke against a step goes up along it (the shared wall slide).
+        const a = this.assist.aim(d.normalize());
+        this.fish.launch(d.set(a.x, a.y).setLength(KICK));
         play('flap');
     }
 

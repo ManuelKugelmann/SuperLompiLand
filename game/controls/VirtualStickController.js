@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import SteerAssist from './SteerAssist.js';
+import { ASSIST } from './assist.js';
 import ControllerBase from './ControllerBase.js';
 
 /**
@@ -11,6 +13,8 @@ export default class VirtualStickController extends ControllerBase {
         this.base = new Phaser.Math.Vector2(300, H - 300);
         this.R = 150;
         this.vec = new Phaser.Math.Vector2(0, 0);
+        this.aim = new Phaser.Math.Vector2();
+        this.assist = new SteerAssist(this.scene, this.fish);
         this.active = false;
         this.pointerId = null;
         this.pressAt = 0;
@@ -65,10 +69,14 @@ export default class VirtualStickController extends ControllerBase {
         this.thumb.setPosition(this.base.x, this.base.y);
     }
 
-    update() {
+    update(dt = 1000 / 60) {
         // A press can also end without any event reaching us (the pointer was taken away by
         // the system): the pointer itself knows whether it is still down.
         if (this.active && !this.scene.input.manager.pointers.some(p => p.id === this.pointerId && p.isDown)) this.recenter();
-        if (this.active && this.vec.length() > 0.05) this.fish.thrust(this.vec);
+        // The stick's direction with the shared steering help: steps climbed, the depth held when the thumb lets go.
+        this.assist.ease(dt);
+        const len = this.vec.length();
+        if (this.active && len > 0.05) this.assist.pull(this.aim.copy(this.vec).scale(1 / len), Math.min(1, len), 1, this.vec.y / len > ASSIST.hold.diveDir);
+        else this.assist.rest(false);      // no brake: the stick lets the fish glide on
     }
 }

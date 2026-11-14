@@ -1,5 +1,6 @@
 import { spotsOf } from './worldMap.js';
 import BonusCoins from './BonusCoins.js';
+import { createRig } from '../CardRig.js';
 
 // What fills the journey's rhythm (worldMap.js decides where; spec 5.0l): small coin figures on
 // the route, huge coral colonies behind the lane along the islands, and adult sharks passing
@@ -12,7 +13,7 @@ export const RHYTHM_LOOK = {
     colony: { scale: [4, 8], depth: -4, tint: 0xa9c6cc, seen: 900 },   // lengths of the fish it is tall; behind the play plane, a little hazy
     // Lengths of Sharky; px it cruises to either side; px under the route (far below the fish's lane: a big animal at a distance,
     // never beside the fish); hazy toward the water's colour; how fast it comes and goes; px at which it goes into the reef book.
-    shark: { scale: [4, 6], sharky: 250, roam: 1500, below: 760, depth: -5, tint: 0x4f7fa6, alpha: 0.55, pace: 0.045, seen: 1300 }
+    shark: { scale: [4, 6], sharky: 250, roam: 1500, below: 760, depth: -5, alpha: 0.55, pace: 0.045, seen: 1300 }
 };
 
 /** The painted big corals (loaded by the title screen): a table, a brain, a fan and a staghorn thicket. While one is missing, one of the reef's own corals stands in, grown huge. */
@@ -69,14 +70,15 @@ export default class RhythmLayer {
     makeShark(spot, i) {
         const s = this.scene, L = RHYTHM_LOOK.shark, key = have(s, ['adult_shark', 'player_shark']);
         if (!key) return { destroy() {} };
-        const img = s.add.image(spot.x0, 0, key).setDepth(L.depth).setTint(L.tint).setAlpha(L.alpha);
-        img.setScale(L.sharky * pick(L.scale, hash(i, 3)) / img.width);
-        return { img, book: 'adult_shark', seen: L.seen, phase: hash(i, 4) * 6.283, home: spot.x0, cruise: true, destroy: () => img.destroy() };
+        // The painted shark swims (its part rig bends tail and fins); `img` only says where it is.
+        const rig = createRig(s, { states: { normal: { key, width: L.sharky * pick(L.scale, hash(i, 3)), wiggle: 8 } }, anim: 'swim', soft: 0.5, upright: true }, spot.x0, 0, L.depth).setAlpha(L.alpha);
+        return { img: { x: spot.x0, y: 0 }, rig, book: 'adult_shark', seen: L.seen, phase: hash(i, 4) * 6.283, home: spot.x0, cruise: true, destroy: () => rig.destroy() };
     }
 
     /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s. */
     update(fish, radius, t) {
-        const L = RHYTHM_LOOK;
+        const L = RHYTHM_LOOK, frames = Math.min(3, (t - (this.t ?? t)) * 60);
+        this.t = t;
         for (const kind of Object.values(this.kinds)) {
             kind.spots.forEach((spot, i) => {
                 const d = Math.abs(spot.x0 - fish.x), live = kind.live.get(i);
@@ -88,7 +90,8 @@ export default class RhythmLayer {
                 if (o.cruise) {
                     // It comes and goes along its stretch, far under the route, turning round slowly at the ends.
                     const S = L.shark, a = t * S.pace + o.phase, x = o.home + Math.sin(a) * S.roam, dir = Math.cos(a) >= 0 ? 1 : -1;
-                    o.img.setPosition(x, this.routeY(x) + S.below + Math.sin(t * 0.3 + o.phase) * 50).setFlipX(dir < 0).setRotation(Math.sin(t * 1.1 + o.phase) * 0.03);
+                    o.img.x = x; o.img.y = this.routeY(x) + S.below + Math.sin(t * 0.3 + o.phase) * 50;
+                    o.rig.draw({ x, y: o.img.y, vx: Math.cos(a) * S.roam * S.pace / 60, vy: 0, frames, effort: 0.25, facing: dir, turn: 0.02 });
                 }
                 if (o.book && !this.seen.has(o.book) && Math.hypot(o.img.x - fish.x, o.img.y - fish.y) < o.seen) { this.seen.add(o.book); this.onSeen(o.book); }
             }
