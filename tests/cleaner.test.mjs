@@ -31,3 +31,12 @@ test('nobody around: the wrasse stay on the grouper', () => {
     assert.deepEqual(run(st, () => null, 5), []);
     assert.equal(st.state, 'grouper');
 });
+
+test('stations repeat along every reef coast, none elsewhere', async () => {
+    const { stationXs, STATIONS } = await import('../game/ai/cleaner.js');
+    const biomes = [{ id: 'beach', from: 0, width: 50000 }, { id: 'reef', from: 50000, width: 80000 }, { id: 'blue', from: 130000, width: 90000 }];
+    const xs = stationXs(biomes);
+    assert.equal(xs.length, 2, "two in an 80 000 px reef");
+    assert.ok(xs.every(x => x > 50000 && x < 130000));
+    for (let i = 1; i < xs.length; i++) assert.equal(xs[i] - xs[i - 1], STATIONS.every);
+});

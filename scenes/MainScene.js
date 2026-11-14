@@ -1297,7 +1297,7 @@ export default class MainScene extends Phaser.Scene {
         this.seabirds.update(delta / 1000, view.x, local, local ? [local, ...players.slice(1)] : [], shoals);
         this.deepGlow.update(this.cameras.main.worldView, this.time.now / 1000);
         const fv = this.fish.sprite.body.velocity;
-        this.cleaner.update(delta / 1000, this.time.now / 1000, this.ambientMode ? null : { x: view.x, y: view.y, speed: Math.hypot(fv.x, fv.y) * 60 });
+        this.cleaner.update(delta / 1000, this.time.now / 1000, this.ambientMode ? null : { x: view.x, y: view.y, speed: Math.hypot(fv.x, fv.y) * 60 }, view.x);
         // The ghost ship groans now and then when you are near it (spec 5.0e).
         const ship = ghostShip(), shipD = Math.hypot(view.x - ship.x, view.y - ship.y);
         if (shipD < WORLD.creakR && this.time.now > (this.creakAt || 0)) {

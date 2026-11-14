@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { BIOMES } from '../level/biomes.js';
-import { createStation, stepStation } from './cleaner.js';
+import { createStation, stepStation, stationXs } from './cleaner.js';
 
 /**
  * The cleaner station on the reef (spec 5.0f; ai/cleaner.js decides): a big grouper hovering
@@ -12,12 +12,12 @@ import { createStation, stepStation } from './cleaner.js';
  *   update():  this.cleaner.update(dt, t, fish {x, y, speed})
  */
 export const CLEANER_LOOK = {
-    at: 0.3,             // where in the reef (share of its width) the station is
     below: 140,          // px under the calm route
     grouperW: 300,       // px long
     wrasse: 3,
     wrasseW: 46,         // px long each
-    depth: 3.4
+    depth: 3.4,
+    near: 2600           // px: a station is built while the camera is this close
 };
 
 /** Painted art (preloaded by the intro scene when present): [key, file]. */
@@ -52,36 +52,55 @@ function ensureArt(scene) {
 
 export default class CleanerLayer {
     constructor(scene, routeY, isOpen, on) {
-        this.scene = scene; this.on = on;
-        const reef = BIOMES.find(b => b.id === 'reef'), x = reef.from + reef.width * CLEANER_LOOK.at;
-        let y = routeY(x) + CLEANER_LOOK.below;
-        for (let k = 0; k < 12 && !isOpen(x, y); k++) y -= 40;   // into open water near the route
-        this.station = createStation(x, y);
+        this.scene = scene; this.on = on; this.routeY = routeY; this.isOpen = isOpen;
         ensureArt(scene);
-        const L = CLEANER_LOOK, gKey = scene.textures.exists('friend_grouper') ? 'friend_grouper' : 'cleaner_grouper';
-        this.grouper = scene.add.image(x, y, gKey).setDepth(L.depth);
-        this.grouper.setScale(L.grouperW / this.grouper.width);
-        const wKey = scene.textures.exists('school_wrasse') ? 'school_wrasse' : 'cleaner_wrasse';
-        this.wrasse = Array.from({ length: L.wrasse }, (_, i) => {
-            const w = scene.add.image(x, y, wKey).setDepth(L.depth + 0.01);
-            w.setScale(L.wrasseW / w.width); w.phase = i * 2.1;
-            w.at = { x, y };
-            return w;
-        });
+        // Stations along every reef coast (spec 5.0i); each is built only while the camera is near.
+        this.stations = stationXs(BIOMES).map(x => ({ x, mind: null, view: null }));
     }
 
-    /** dt s, t s, fish = { x, y, speed px/s }. */
-    update(dt, t, fish) {
-        const st = this.station, ev = stepStation(st, dt, fish);
+    /** The station's mind (made once, where the water near the route is open) and its pictures. */
+    build(s) {
+        if (!s.mind) {
+            let y = this.routeY(s.x) + CLEANER_LOOK.below;
+            for (let k = 0; k < 12 && !this.isOpen(s.x, y); k++) y -= 40;   // into open water near the route
+            s.mind = createStation(s.x, y);
+        }
+        const sc = this.scene, L = CLEANER_LOOK, { x, y } = s.mind;
+        const gKey = sc.textures.exists('friend_grouper') ? 'friend_grouper' : 'cleaner_grouper';
+        const grouper = sc.add.image(x, y, gKey).setDepth(L.depth);
+        grouper.setScale(L.grouperW / grouper.width);
+        const wKey = sc.textures.exists('school_wrasse') ? 'school_wrasse' : 'cleaner_wrasse';
+        const wrasse = Array.from({ length: L.wrasse }, (_, i) => {
+            const w = sc.add.image(x, y, wKey).setDepth(L.depth + 0.01);
+            w.setScale(L.wrasseW / w.width); w.phase = i * 2.1; w.at = { x, y };
+            return w;
+        });
+        s.view = { grouper, wrasse };
+    }
+
+    drop(s) { s.view.grouper.destroy(); for (const w of s.view.wrasse) w.destroy(); s.view = null; }
+
+    /** dt s, t s, fish = { x, y, speed px/s } or null; viewX = the camera's middle. */
+    update(dt, t, fish, viewX = fish?.x ?? 0) {
+        for (const s of this.stations) {
+            const near = Math.abs(s.x - viewX) < CLEANER_LOOK.near;
+            if (near && !s.view) this.build(s);
+            else if (!near && s.view) this.drop(s);
+            if (s.view) this.animate(s, dt, t, fish);
+        }
+    }
+
+    animate(s, dt, t, fish) {
+        const st = s.mind, { grouper, wrasse } = s.view, ev = stepStation(st, dt, fish);
         if (ev) this.on(ev, st.x, st.y);
-        // The grouper hovers, gills and mouth "breathing" a little.
-        this.grouper.setPosition(st.x + Math.sin(t * 0.4) * 10, st.y + Math.sin(t * 0.7) * 6)
-            .setScale(CLEANER_LOOK.grouperW / this.grouper.width * (1 + Math.sin(t * 1.6) * 0.012));
+        // The grouper hovers, gills and mouth breathing a little.
+        grouper.setPosition(st.x + Math.sin(t * 0.4) * 10, st.y + Math.sin(t * 0.7) * 6)
+            .setScale(CLEANER_LOOK.grouperW / grouper.width * (1 + Math.sin(t * 1.6) * 0.012));
         // The wrasse pick over whoever is being cleaned, darting; scattered ones hide behind the station.
         const target = st.state === 'fish' && fish ? fish
-            : st.state === 'scattered' ? { x: st.x - 260, y: st.y + 120 } : { x: this.grouper.x, y: this.grouper.y };
+            : st.state === 'scattered' ? { x: st.x - 260, y: st.y + 120 } : { x: grouper.x, y: grouper.y };
         const span = st.state === 'fish' ? 60 : 110;
-        for (const w of this.wrasse) {
+        for (const w of wrasse) {
             const tx = target.x + Math.sin(t * 2.3 + w.phase) * span, ty = target.y + Math.sin(t * 3.1 + w.phase * 1.7) * span * 0.35;
             const k = 1 - Math.exp(-dt * (st.state === 'scattered' ? 6 : 3.5));
             const nx = w.at.x + (tx - w.at.x) * k, ny = w.at.y + (ty - w.at.y) * k;
@@ -90,8 +109,8 @@ export default class CleanerLayer {
         }
     }
 
-    destroy() {
-        this.grouper.destroy();
-        for (const w of this.wrasse) w.destroy();
-    }
+    /** The first station (for tests and tools). */
+    get station() { return this.stations[0]?.mind || null; }
+
+    destroy() { for (const s of this.stations) if (s.view) this.drop(s); }
 }

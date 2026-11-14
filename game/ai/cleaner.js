@@ -46,3 +46,15 @@ export function stepStation(st, dt, fish) {
     }
     return event;
 }
+
+/** Where the stations are (spec 5.0i): every STATIONS.every px along each reef-type biome, starting half a step in. */
+export const STATIONS = { biomes: ['reef'], every: 30000 };
+
+export function stationXs(biomes, cfg = STATIONS) {
+    const out = [];
+    for (const b of biomes) {
+        if (!cfg.biomes.includes(b.id)) continue;
+        for (let x = b.from + cfg.every / 2; x < b.from + b.width - cfg.every / 4; x += cfg.every) out.push(x);
+    }
+    return out;
+}
