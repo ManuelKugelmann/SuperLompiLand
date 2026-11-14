@@ -24,14 +24,15 @@ test('every biome has a closed share; the open ocean is all open', () => {
     }
 });
 
-test('closed share per biome: the trench is far more walled than the beach and the kelp forest', () => {
+test('closed share per biome: islands stand in front of their rock socket, the open sea is clear, the trench walled', () => {
     const closed = id => {
         const b = biome(id);
         let n = 0, k = 0;
         for (let x = b.from + 600; x < b.from + b.width - 600; x += 97) { if (enclosure(x, ROCK_LAYERS[0]) > 0) k++; n++; }
         return k / n;
     };
-    assert.ok(closed('trench') > closed('reef') && closed('reef') > closed('beach'), `${closed('trench')} ${closed('reef')} ${closed('beach')}`);
+    for (const id of ['beach', 'mangrove', 'reef']) assert.ok(closed(id) > 0.6, `${id} ${closed(id)}`);
+    assert.ok(closed('trench') > 0.4, `trench ${closed('trench')}`);
     // An island's flank stands in front of its rock socket (no far view); the open sea has none (spec 5.0c).
     assert.ok(closed('kelp') > 0.5);
     assert.equal(closed('blue'), 0);

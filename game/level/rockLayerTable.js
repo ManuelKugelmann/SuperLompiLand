@@ -10,7 +10,7 @@
 // Pure (no Phaser): the terrain worker shades the layer chunks, RockLayers.js shows them.
 // Tested in tests/rockLayers.test.mjs.
 import { vnoise } from './terrain.js';
-import { biomeBlendAt } from './biomes.js';
+import { biomeBlendAt, seaShare } from './biomes.js';
 import { SHADE } from './shade.js';
 import { FIELD, ROUTE } from './density.js';
 
@@ -25,7 +25,9 @@ export const ROCK_LAYERS = [
     // dark = tint multiply on top; depth = draw order.
     // clearRoute: keep the calm main route free (the play field is open water there; a wall
     // drawn over it would read as solid, gamedesigner 2026-11-14).
-    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.45, dark: 0.92, depth: -9.5 },
+    // socket: closed share in front of an island at least (its rocky underwater base: no far
+    // view right in front of an island, spec 5.0c); it eases off into the open sea.
+    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.45, dark: 0.92, depth: -9.5, socket: 0.85 },
     { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.3, dark: 0.95, depth: -7, clearRoute: true }
 ];
 
@@ -75,10 +77,14 @@ const Q = (() => {
 /** The value below which share q (0..1) of the enclosure noise lies. */
 export const noiseQuantile = q => Q[Math.min(Q.length - 1, Math.max(0, Math.floor(q * Q.length)))];
 
-/** Closed share (0..1) of the rock layers at world x, blended across biome borders. */
-export function wallShare(x) {
+/**
+ * Closed share (0..1) of the rock layers at world x, blended across biome borders; with a
+ * layer, its island socket raises it along the coasts (fading out into the open sea).
+ */
+export function wallShare(x, layer) {
     const { a, b, t } = biomeBlendAt(x);
-    return (a.rockWall || 0) * (1 - t) + (b.rockWall || 0) * t;
+    const base = (a.rockWall || 0) * (1 - t) + (b.rockWall || 0) * t;
+    return Math.max(base, (layer?.socket || 0) * (1 - seaShare(x)));
 }
 
 /**
@@ -86,7 +92,7 @@ export function wallShare(x) {
  * the biome's closed share, so roughly that share of the stretches is wall.
  */
 export function enclosure(x, layer) {
-    const c = wallShare(x) * layer.share;
+    const c = wallShare(x, layer) * layer.share;
     if (c <= 0.001) return -1;
     const n = encNoise(x, layer);
     return Math.max(-1, Math.min(1, (n - noiseQuantile(1 - c)) * 6));   // share c of stretches above the cut
