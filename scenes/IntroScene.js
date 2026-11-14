@@ -94,7 +94,7 @@ export default class IntroScene extends Phaser.Scene {
         }
         for (const key of PAD_ART) if (!this.textures.exists(key)) this.load.image(key, `img/props/${key}.webp`);
         if (!this.textures.exists('hull_bottom')) this.load.image('hull_bottom', 'img/props/hull_bottom.webp');
-        if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/sand_ripples.webp');
+        if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);
         if (!this.textures.exists(SURF_ART.puffs.key)) this.load.spritesheet(SURF_ART.puffs.key, SURF_ART.puffs.file, { frameWidth: SURF_ART.puffs.frame, frameHeight: SURF_ART.puffs.frame });
         for (const key of SEABIRD_ART) if (!this.textures.exists(key)) this.load.image(key, `img/${key}.webp`);
