@@ -42,16 +42,16 @@ const CH = LEVEL.cell * LEVEL.cells;
 // pulse, sway; sit and throb for the ones on the rock), `soft` = how loose its thin parts are,
 // `wiggle` = size of the body wave, `upright` = never tips along its movement.
 const FRIENDS = {
-    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'paddle', soft: 0.35, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
+    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'paddle', soft: 0.5, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', soft: 1, wiggle: 6, upright: true, ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
     friend_seahorse: { size: 120, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
-    friend_starfish: { size: 170, ground: true, anim: 'sit', soft: 0.15, upright: true, crawl: { speed: 0.1, range: 160 } },
-    friend_snail: { size: 160, ground: true, anim: 'sit', soft: 0.2, upright: true, crawl: { speed: 0.18, range: 240 } },
-    friend_nudibranch: { size: 190, ground: true, anim: 'sit', soft: 0.6, upright: true, crawl: { speed: 0.26, range: 300 } },
-    urchin: { size: 140, ground: true, anim: 'throb', soft: 0.3, upright: true, crawl: { speed: 0.05, range: 90 } },
+    friend_starfish: { size: 170, ground: true, anim: 'sit', soft: 0.2, upright: true, crawl: { speed: 0.1, range: 160 } },
+    friend_snail: { size: 160, ground: true, anim: 'sit', soft: 0.3, upright: true, crawl: { speed: 0.18, range: 240 } },
+    friend_nudibranch: { size: 190, ground: true, anim: 'sit', soft: 0.8, upright: true, crawl: { speed: 0.26, range: 300 } },
+    urchin: { size: 140, ground: true, anim: 'throb', soft: 0.2, upright: true, crawl: { speed: 0.05, range: 90 } },
     // The anglerfish art faces left (tail on the right); it lights the deep, its lure sways as a soft part.
-    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', soft: 0.7, wiggle: 22, facesLeft: true, glow: true,
+    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', soft: 0.35, wiggle: 22, facesLeft: true, glow: true,
         grumpy: { territory: 320 } }   // guards its patch of the dark: warns, then shoves (ai/grumpy.js)
 };
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
