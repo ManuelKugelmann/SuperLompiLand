@@ -26,11 +26,11 @@
 One shot per biome, captured with `node scripts/capture-biomes.mjs` (start spots via `?at=<biome>`).
 
 <table>
-<tr><td width="50%"><img src="docs/biomes/beach.jpg" alt="Sandy Beach"><br><b>Sandstrand</b> · Sandy Beach</td><td width="50%"><img src="docs/biomes/reef.jpg" alt="Home Reef"><br><b>Heimatriff</b> · Home Reef</td></tr>
-<tr><td width="50%"><img src="docs/biomes/mangrove.jpg" alt="Mangrove Lagoon"><br><b>Mangroven-Lagune</b> · Mangrove Lagoon</td><td width="50%"><img src="docs/biomes/kelp.jpg" alt="Kelp Forest"><br><b>Tangwald</b> · Kelp Forest</td></tr>
-<tr><td width="50%"><img src="docs/biomes/blue.jpg" alt="Open Blue"><br><b>Blaues Meer</b> · Open Blue</td><td width="50%"><img src="docs/biomes/wreck.jpg" alt="Ship Graveyard"><br><b>Schiffsfriedhof</b> · Ship Graveyard</td></tr>
-<tr><td width="50%"><img src="docs/biomes/harbour.jpg" alt="Harbour"><br><b>Hafen</b> · Harbour</td><td width="50%"><img src="docs/biomes/trench.jpg" alt="Deep Trench"><br><b>Tiefsee</b> · Deep Trench</td></tr>
-<tr><td width="50%"><img src="docs/biomes/abyss.jpg" alt="The Abyss"><br><b>Abgrund</b> · The Abyss</td><td></td></tr>
+<tr><td width="50%"><img src="docs/biomes/beach.jpg" alt="Shallow Lagoon"><br><b>Flache Lagune</b> · Shallow Lagoon</td><td width="50%"><img src="docs/biomes/mangrove.jpg" alt="Mangroves"><br><b>Mangroven</b> · Mangroves</td></tr>
+<tr><td width="50%"><img src="docs/biomes/reef.jpg" alt="Coral Reef"><br><b>Korallenriff</b> · Coral Reef</td><td width="50%"><img src="docs/biomes/blue.jpg" alt="Open Blue"><br><b>Blaues Meer</b> · Open Blue</td></tr>
+<tr><td width="50%"><img src="docs/biomes/kelp.jpg" alt="Kelp Forest"><br><b>Tangwald</b> · Kelp Forest</td><td width="50%"><img src="docs/biomes/harbour.jpg" alt="Harbour"><br><b>Hafen</b> · Harbour</td></tr>
+<tr><td width="50%"><img src="docs/biomes/wreck.jpg" alt="Ship Graveyard"><br><b>Schiffsfriedhof</b> · Ship Graveyard</td><td width="50%"><img src="docs/biomes/shore.jpg" alt="Rocky Shore"><br><b>Felsenküste</b> · Rocky Shore</td></tr>
+<tr><td width="50%"><img src="docs/biomes/trench.jpg" alt="Deep Trench"><br><b>Tiefsee</b> · Deep Trench</td><td width="50%"><img src="docs/biomes/abyss.jpg" alt="The Abyss"><br><b>Abgrund</b> · The Abyss</td></tr>
 </table>
 <!-- biomes:end -->
 
