@@ -52,9 +52,10 @@ export default class Creature {
     /**
      * Think and draw one frame. `t` s, `dt` s since the last frame; `water` = the swimmers' and
      * grumpies' world ({ isOpen, players, alarm, ... }), `ground` = the crawlers'.
+     * `seen` = false: it is out of view; it thinks on but is not drawn (the body is the costly part).
      * Returns 'hit' when a grumpy's shove touches the local fish, else null.
      */
-    step(t, dt, water, ground) {
+    step(t, dt, water, ground, seen = true) {
         let event = null;
         if (dt > 0) {
             if (this.crawler) stepCrawler(this.crawler, dt, ground);
@@ -69,6 +70,8 @@ export default class Creature {
         const p = poseOf(this, this.body, t, POSE_OUT), body = this.body;
         body.dir = p.dir; body.lean = p.lean;
         this.x = p.x; this.y = p.y;
+        if (seen !== this.seen) { this.seen = seen; this.rig.setVisible(seen); }
+        if (!seen) return event;
         this.size += (p.size - this.size) * CREATURE.grow;
         this.rig.zoom = this.size;
         this.rig.draw({

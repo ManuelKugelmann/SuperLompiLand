@@ -118,6 +118,7 @@ export default class Rig {
         this.shown = on;
         this.view.setVisible(on);
         this.view.fin?.setVisible(on);
+        this.overlay?.setVisible(on);
         return this;
     }
 

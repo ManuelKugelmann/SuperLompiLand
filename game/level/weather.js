@@ -31,11 +31,14 @@ export const WEATHER = {
 const clamp01 = v => (v <= 0 ? 0 : v >= 1 ? 1 : v);
 const smooth = v => { const t = clamp01(v); return t * t * (3 - 2 * t); };
 const biome = id => BIOMES.find(b => b.id === id);
+let STORM_SPAN = null, COLUMNS = null;      // the shipped storm and current: worked out once (asked for many times a frame)
 
 /** The storm's stretch of the world: { x0, x1 }. */
 export function stormSpan(cfg = WEATHER.storm) {
-    const b = biome(cfg.biome);
-    return { x0: b.from + b.width * cfg.from, x1: b.from + b.width * cfg.to };
+    if (cfg === WEATHER.storm && STORM_SPAN) return STORM_SPAN;
+    const b = biome(cfg.biome), span = { x0: b.from + b.width * cfg.from, x1: b.from + b.width * cfg.to };
+    if (cfg === WEATHER.storm) STORM_SPAN = span;
+    return span;
 }
 
 /** How much storm there is over x: 0 outside, 1 in the middle, building over `ramp` at both ends. */
@@ -56,15 +59,17 @@ export function stormAt(x, y, t, out = { x: 0, y: 0 }, cfg = WEATHER.storm) {
 
 /** Where the current goes down and where it comes up again: { down, up } (world x). */
 export function downwelling(cfg = WEATHER.down) {
-    const b = biome(cfg.biome), down = b.from + b.width * cfg.at;
-    return { down, up: down + cfg.span };
+    if (cfg === WEATHER.down && COLUMNS) return COLUMNS;
+    const b = biome(cfg.biome), down = b.from + b.width * cfg.at, cols = { down, up: down + cfg.span };
+    if (cfg === WEATHER.down) COLUMNS = cols;
+    return cols;
 }
 
 /** The downwelling's water velocity: straight down in the one column, straight up in the other, between `top` and a little under the route. */
 export function downAt(x, y, out = { x: 0, y: 0 }, cfg = WEATHER.down) {
     out.x = 0; out.y = 0;
     const { down, up } = downwelling(cfg), bottom = cfg.routeY + 250;
-    if (y < cfg.top || y > bottom) return out;
+    if (y < cfg.top || y > bottom || x < down - cfg.halfWidth || x > up + cfg.halfWidth) return out;
     const ends = smooth((y - cfg.top) / 200) * smooth((bottom - y) / 300);
     const col = c => smooth(1 - Math.abs(x - c) / cfg.halfWidth);
     out.y = cfg.speed * ends * (col(down) - col(up));

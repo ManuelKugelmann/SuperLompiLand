@@ -3,7 +3,7 @@
 // (px per 60 Hz step) that add to the flow field; neither ever hurts. Time is counted in
 // waves (`phase`, one per wave period), so the sea can breathe with the music's bars.
 
-import { floorY, REEF_CREST, reefCrestX, reefCrest } from './biomes.js';
+import { floorY, SHORE, REEF_CREST, reefCrestX, reefCrest } from './biomes.js';
 
 export const SURF = {
     surge: {
@@ -32,9 +32,20 @@ export const SURF = {
 const clamp01 = v => (v <= 0 ? 0 : v >= 1 ? 1 : v);
 const smooth = v => { const t = clamp01(v); return t * t * (3 - 2 * t); };
 
+let SURF_EAST = null;
+
+/** East end of the surf zone: beyond it the sand is too deep for any surge (worked out once for the shipped numbers). */
+function surfEast(cfg) {
+    if (cfg === SURF.surge && SURF_EAST !== null) return SURF_EAST;
+    let x = SHORE;
+    while (floorY(x) < cfg.floorMax && x < SHORE + 40000) x += 50;
+    if (cfg === SURF.surge) SURF_EAST = x;
+    return x;
+}
+
 /** How much of the surge reaches (x, y): 1 in the shallows at the surface, 0 in deeper water and below the surf zone. */
 export function surgeShare(x, y, cfg = SURF.surge) {
-    if (y < 0 || y > cfg.depth) return 0;
+    if (y < 0 || y > cfg.depth || x > surfEast(cfg)) return 0;
     return smooth((cfg.floorMax - floorY(x)) / cfg.fade) * (1 - y / cfg.depth);
 }
 

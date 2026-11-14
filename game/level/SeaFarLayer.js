@@ -92,12 +92,17 @@ export default class SeaFarLayer {
         const img = key => scene.add.image(0, 0, key).setScrollFactor(0).setDepth(L.depth).setTint(L.tint).setVisible(false);
         this.socket = img('seafar_socket').setOrigin(0, 1).setDisplaySize(W * 0.95, H * 1.05).setTint(L.socketTint);
         this.pass = { img: img('seafar_manta'), n: 0, t: 0, spec: passing(0), waiting: true };
+        this.snow = [];      // made when the open sea is first reached (makeSnow)
+        this.out = { x: 0, alpha: 0 };
+    }
+
+    makeSnow() {
+        const scene = this.scene, W = scene.scale.width, H = scene.scale.height, L = SEA_FAR_LOOK;
         this.snow = Array.from({ length: L.snow }, (_, i) => {
             const f = scene.add.image(((i * 0.618) % 1) * W, ((i * 0.381) % 1) * H, 'seafar_snow').setScrollFactor(0).setDepth(-9).setVisible(false);
             f.drift = 0.5 + ((i * 0.27) % 1); f.setScale(L.snowScale[0] + (L.snowScale[1] - L.snowScale[0]) * (f.drift - 0.5));      // near flakes are bigger and move more
             return f;
         });
-        this.out = { x: 0, alpha: 0 };
     }
 
     /** Per frame; `camX`, `camY` = the camera's top left in the world, `dx`, `dy` = how far it moved, `delta` ms. */
@@ -112,6 +117,7 @@ export default class SeaFarLayer {
 
         // Marine snow: sinks slowly, slides against the camera's movement, wraps round the screen.
         const show = sea > 0.05 && camY > 60;
+        if (show && !this.snow.length) this.makeSnow();
         for (const f of this.snow) {
             f.setVisible(show);
             if (!show) continue;

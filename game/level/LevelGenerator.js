@@ -29,6 +29,7 @@ export const LEVEL = {
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     kelpMinDepth: 420,    // no kelp where the water is shallower than this
     propHeadroom: 50,     // a prop's top stays at least this far under the surface
+    liveView: 0.95,       // creatures and plants within this many screen sizes of the fish (to either side) are animated
     surgeLean: 0.45,      // how far the surge bends the plants in the surf zone (share of a full bend)
     friendSheen: 0.4,     // strength of the rainbow sheen on friends
     sheenSpeed: 0.1,      // how fast its colours travel (turns of the colour wheel per second)
@@ -311,8 +312,11 @@ export default class LevelGenerator {
 
     /** Per frame: bend / pulse every creature and plant. `t` in seconds; `others` = the other players in the room; `waves` = time in waves (surf.js). */
     animate(t, fish, speed = 0, others = null, waves = 0) {
+        // Only what can be on screen is bent and drawn: chunks are loaded well beyond the view.
+        const vw = this.scene.scale.width * LEVEL.liveView, vh = this.scene.scale.height * LEVEL.liveView;
+        const inView = o => !fish || (Math.abs(o.x - fish.x) < vw && Math.abs(o.y - fish.y) < vh);
         for (const o of this.animated) {
-            if (!o.active) continue;
+            if (!o.active || !inView(o)) continue;
             if (o.isPlant && fish) {
                 // In the surf zone the plants lean with every push of the surge and swing back with the backwash.
                 const surge = o.surf ? -surgeWave(o.x, waves) * o.surf * LEVEL.surgeLean : 0;
@@ -364,7 +368,7 @@ export default class LevelGenerator {
         const ground = this.crawlEnv;
         ground.player = env.player; ground.players = all;
         for (const c of this.creatures) {
-            if (c.active && c.step(t, dt, env, ground) === 'hit') this.scene.events.emit('grumpy-hit', { x: c.x, y: c.y });
+            if (c.active && c.step(t, dt, env, ground, inView(c)) === 'hit') this.scene.events.emit('grumpy-hit', { x: c.x, y: c.y });
         }
         for (const l of this.lights) {
             if (!l.active || !l.follow.active) continue;
