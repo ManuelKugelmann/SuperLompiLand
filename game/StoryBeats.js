@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { createRig } from './CardRig.js';
 import { JOURNEY } from './journey.js';
 import { musicClock, nowSeconds } from './audio.js';
+import { RESCUE_HALO, netShadow, rescueHalo } from './RescueLayer.js';
 
 export const BEATS = {
     zoom: 1.5,          // the caught friend is shown this much bigger than it plays: it is the hero of its screen
@@ -9,7 +10,6 @@ export const BEATS = {
     netMin: 330,        // ... but at least this many px
     struggle: 16,       // px the caught friend wriggles
     glow: 380,          // px radius of the soft light that makes the scene readable from afar
-    glowAlpha: 0.3,     // its brightness on the beat (half of that between beats)
     helpEvery: 2,       // s between the bubbles it sends up for help
     happyMs: 3600,      // how long a freed friend dances around its spot ...
     happyRadius: 120    // ... on a circle this big; then it joins the school of freed friends behind the fish (FriendSchool)
@@ -55,21 +55,21 @@ export default class StoryBeats {
         const s = this.scene, x = ch.x, y = this.routeY(x), size = ch.friend.states.normal.width;
         const rig = createRig(s, ch.friend, x, y, 4.5);
         rig.zoom = BEATS.zoom;
-        const glow = s.add.image(x, y, 'bd_glow').setDisplaySize(BEATS.glow * 2, BEATS.glow * 2).setTint(0xfff3b0).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
+        const glow = s.add.image(x, y, rescueHalo(s)).setDisplaySize(BEATS.glow * 2, BEATS.glow * 2).setTint(RESCUE_HALO.tint).setDepth(4.4);
         const n = Math.max(BEATS.netMin, size * BEATS.zoom * BEATS.netSize);
-        const net = s.add.image(x, y, NET_KEY).setDepth(4.6).setDisplaySize(n, n);
-        return { ch, x, y, rig, glow, net, state: 'caught', left: 0, seed: x * 0.01, help: 0, top: n * 0.5, px: x, py: y };
+        const net = s.add.image(x, y, NET_KEY).setDepth(4.6).setDisplaySize(n, n), shadow = netShadow(s, net);
+        return { ch, x, y, rig, glow, net, shadow, state: 'caught', left: 0, seed: x * 0.01, help: 0, top: n * 0.5, px: x, py: y };
     }
 
     remove(a) {
-        a.rig.destroy(); a.glow.destroy(); a.net?.destroy();
+        a.rig.destroy(); a.glow.destroy(); a.net?.destroy(); a.shadow?.destroy();
         this.actors.delete(a.ch.id);
     }
 
     free(a) {
         if (a.state !== 'caught' || !this.journey.free(a.ch.friend.id)) return;
         a.state = 'happy'; a.left = BEATS.happyMs; a.rig.zoom = 1;
-        const net = a.net; a.net = null;
+        const net = a.net; a.net = null; a.shadow?.destroy(); a.shadow = null;
         this.scene.tweens.add({ targets: net, y: net.y + 260, angle: 70, alpha: 0, scale: net.scale * 0.6, duration: 900, ease: 'Sine.easeIn', onComplete: () => net.destroy() });
         this.onFree(a.ch, a.x, a.y);
     }
@@ -105,7 +105,8 @@ export default class StoryBeats {
                 const wx = Math.sin(t * 9 + a.seed) * BEATS.struggle, wy = Math.cos(t * 7 + a.seed) * BEATS.struggle * 0.6;
                 a.rig.draw({ x: a.x + wx, y: a.y + wy, frames, effort: 0.8, facing: fish.x < a.x ? -1 : 1 });
                 a.net.setPosition(a.x + wx * 0.5, a.y + wy * 0.5).setRotation(Math.sin(t * 1.4 + a.seed) * 0.08);
-                a.glow.setAlpha(BEATS.glowAlpha * (0.5 + 0.5 * musicClock.pulse(nowSeconds(), 2)));
+                a.shadow.follow();
+                a.glow.setAlpha(RESCUE_HALO.alpha * (RESCUE_HALO.low + (1 - RESCUE_HALO.low) * musicClock.pulse(nowSeconds(), 2)));
                 a.help -= delta / 1000;
                 if (a.help <= 0) { a.help = BEATS.helpEvery; this.callForHelp(a); }
                 continue;
@@ -115,7 +116,7 @@ export default class StoryBeats {
             const k = t * 4.2, r = BEATS.happyRadius;
             a.px = a.x + Math.cos(k) * r; a.py = a.y + Math.sin(k) * r * 0.7;
             a.rig.draw({ x: a.px, y: a.py, vx: -Math.sin(k) * 8, vy: Math.cos(k) * 5.6, frames, effort: 1 });
-            a.glow.setPosition(a.px, a.py).setAlpha(BEATS.glowAlpha * 0.5);
+            a.glow.setPosition(a.px, a.py).setAlpha(RESCUE_HALO.alpha * 0.35);
             if (a.left <= 0) { this.onJoin(a.ch, a.px, a.py); this.remove(a); }
         }
     }

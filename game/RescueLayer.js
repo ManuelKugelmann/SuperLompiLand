@@ -2,6 +2,33 @@ import Phaser from 'phaser';
 import { RESCUES, rescueSpots, freesRescue } from './rescues.js';
 import BonusCoins from './level/BonusCoins.js';
 
+/**
+ * How a trapped animal stands out (tester: rescues should be more noticeable), shared by the small
+ * rescues and the chapter's netted friend: a warm pulsing halo that reads from a screen away
+ * (colour, brightest alpha, lowest share of it in the pulse) and a dark copy of the net just behind
+ * it, so the mesh shows against bright water ([tint, alpha, scale]).
+ */
+export const RESCUE_HALO = { tint: 0xffb24f, alpha: 0.85, low: 0.55, netShadow: [0x05161c, 0.55, 1.05] };   // a normal blend, not an added light: added light vanishes in bright shallow water
+
+/** The halo picture: full in the middle, fading smoothly to nothing at its rim (baked once). */
+export function rescueHalo(scene) {
+    if (!scene.textures.exists('rescue_halo')) {
+        const N = 127, t = scene.textures.createCanvas('rescue_halo', N, N), c = t.getContext(), g = c.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+        for (let i = 0; i <= 8; i++) { const r = i / 8, a = (1 - r) * (1 - r) * (1 + 2 * r); g.addColorStop(r, `rgba(255,255,255,${a.toFixed(3)})`); }
+        c.fillStyle = g; c.fillRect(0, 0, N, N); t.refresh();
+    }
+    return 'rescue_halo';
+}
+
+/** A dark copy of a net picture just behind it (RESCUE_HALO.netShadow): it keeps the net's place and turn through `follow()`. */
+export function netShadow(scene, net) {
+    const [tint, alpha, k] = RESCUE_HALO.netShadow;
+    const sh = scene.add.image(net.x, net.y, net.texture.key).setDepth(net.depth - 0.05).setTint(tint).setAlpha(alpha)
+        .setDisplaySize(net.displayWidth * k, net.displayHeight * k);
+    sh.follow = () => sh.setPosition(net.x + 2, net.y + 3).setRotation(net.rotation).setVisible(net.active && net.visible);
+    return sh;
+}
+
 export const RESCUE_LOOK = {
     near: 2600, far: 4200,   // px: a scene is built when the player is this close, removed beyond that
     size: 190,           // px across of the caught animal in its trap, and of the animal once it is free
@@ -13,7 +40,6 @@ export const RESCUE_LOOK = {
     callEvery: 1.4,      // s between the bubbles that rise from a trap on the seabed up toward the route
     trail: 5,            // coins that lead from the route down to a trap on the seabed
     glow: 240,           // px radius of the soft light that shows it from afar
-    glowAlpha: 0.28,
     happyMs: 1500,       // one happy loop where the net was ...
     happyRadius: 90,
     alongMs: 9000,       // ... then it swims along with the fish this long ...
@@ -41,18 +67,19 @@ export default class RescueLayer {
     build(spot) {
         const s = this.scene, L = RESCUE_LOOK, x = spot.x, ry = this.routeY(x), ground = spot.ground ? this.groundY(x, ry) : null;
         const y = ground === null ? ry : ground - L.size * (0.5 - L.sunk) * 0.6;
-        const glow = s.add.image(x, y, 'bd_glow').setDisplaySize(L.glow * 2, L.glow * 2).setTint(0xfff3b0).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
+        const glow = s.add.image(x, y, rescueHalo(s)).setDisplaySize(L.glow * 2, L.glow * 2).setTint(RESCUE_HALO.tint).setDepth(4.4);
         const key = `rescue_${spot.trap}`, painted = s.textures.exists(key);
         const img = painted ? s.add.image(x, y, key) : s.add.circle(x, y, 40, 0xffb36b);
         img.setDepth(4.5).setScale(L.size / Math.max(img.width, img.height));
         const net = painted ? null : s.add.image(x, y, 'beat_net').setDepth(4.6).setDisplaySize(L.net, L.net);
+        const shadow = net ? netShadow(s, net) : null;
         // A trap on the seabed lies below the view from the route: a trail of coins leads down to it.
         const n = L.trail, trail = ground === null ? null : new BonusCoins(s, Array.from({ length: n }, (_, i) => ({ x: x - 120 + 120 * i / (n - 1), y: ry + 130 + (y - 260 - ry) * i / (n - 1) })), 2, this.onCoin);
-        return { spot, x, y, px: x, py: y, img, glow, net, trail, state: 'caught', left: 0, seed: x * 0.013, lying: ground !== null, call: 0 };
+        return { spot, x, y, px: x, py: y, img, glow, net, shadow, trail, state: 'caught', left: 0, seed: x * 0.013, lying: ground !== null, call: 0 };
     }
 
     remove(a) {
-        a.img.destroy(); a.glow.destroy(); a.net?.destroy(); a.trail?.destroy();
+        a.img.destroy(); a.glow.destroy(); a.net?.destroy(); a.shadow?.destroy(); a.trail?.destroy();
         this.actors.delete(a.spot.id);
     }
 
@@ -62,7 +89,7 @@ export default class RescueLayer {
         this.done.add(a.spot.id);
         const free = `rescue_${a.spot.trap}_free`;
         if (this.scene.textures.exists(free) && a.img.setTexture) a.img.setTexture(free).setScale(RESCUE_LOOK.size / Math.max(a.img.width, a.img.height));
-        const net = a.net; a.net = null;
+        const net = a.net; a.net = null; a.shadow?.destroy(); a.shadow = null;
         if (net) this.scene.tweens.add({ targets: net, y: net.y + 200, angle: 70, alpha: 0, scale: net.scale * 0.6, duration: 800, ease: 'Sine.easeIn', onComplete: () => net.destroy() });
         this.onFree(a.spot, a.x, a.y);
     }
@@ -91,7 +118,8 @@ export default class RescueLayer {
                 a.img.setPosition(a.x + wx, a.y + wy).setRotation(Math.sin(t * 6.3 + a.seed) * L.wobble + pull * 0.006);
                 if (a.lying && (a.call -= delta / 1000) <= 0) { a.call = L.callEvery; s.particles?.spawn('bubble', a.x, a.y - L.size * 0.3, 2, { radius: 10, spread: 30, vy: -260 }); }
                 a.net?.setRotation(Math.sin(t * 1.4 + a.seed) * 0.08);
-                a.glow.setAlpha(L.glowAlpha * (0.7 + 0.3 * Math.sin(t * 2.2 + a.seed)));
+                a.shadow?.follow();
+                a.glow.setAlpha(RESCUE_HALO.alpha * (RESCUE_HALO.low + (1 - RESCUE_HALO.low) * (0.5 + 0.5 * Math.sin(t * 2.2 + a.seed))));
                 continue;
             }
             a.left -= delta;
@@ -112,7 +140,7 @@ export default class RescueLayer {
             }
             if (Math.abs(a.px - fromX) > 0.3 && a.img.setFlipX) a.img.setFlipX(a.px < fromX);
             a.img.setPosition(a.px, a.py).setRotation(Math.sin(t * 6 + a.seed) * 0.06);
-            a.glow.setPosition(a.px, a.py).setAlpha(L.glowAlpha * 0.5 * (a.state === 'leave' ? Math.max(0, a.left / L.leaveMs) : 1));
+            a.glow.setPosition(a.px, a.py).setAlpha(RESCUE_HALO.alpha * 0.35 * (a.state === 'leave' ? Math.max(0, a.left / L.leaveMs) : 1));
         }
     }
 
