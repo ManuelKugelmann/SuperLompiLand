@@ -11,9 +11,11 @@ export const RHYTHM_LOOK = {
     lompi: 170,          // px: the fish's own length, the measure for "huge"
     treat: { coins: 5, half: 240, rise: 120, depth: 2.6 },      // a coin figure: coins, px to either side of its spot, px it swings up or down
     colony: { scale: [4, 8], depth: -4, tint: 0xa9c6cc, seen: 900 },   // lengths of the fish it is tall; behind the play plane, a little hazy
-    // Lengths of Sharky; px it cruises to either side; px under the route (far below the fish's lane: a big animal at a distance,
-    // never beside the fish); hazy toward the water's colour; how fast it comes and goes; px at which it goes into the reef book.
-    shark: { scale: [4, 6], sharky: 250, roam: 1500, below: 760, depth: -5, alpha: 0.55, pace: 0.045, seen: 1300 }
+    // An adult shark is seen at a distance (spec 5.0l): lengths of Sharky it is long (small for what it is: it is far away);
+    // px it cruises to either side; px under the route (whole in the picture when the fish swims the lane, never beside it);
+    // faded into the water; how fast it comes and goes; `far` = how much of the camera's travel it follows
+    // (it drifts past slower than the play plane, like everything distant); px at which it goes into the reef book.
+    shark: { scale: [2.6, 3.4], sharky: 250, roam: 1500, below: 330, depth: -5, alpha: 0.4, pace: 0.045, far: 0.3, seen: 1300 }
 };
 
 /** The painted big corals (loaded by the title screen): a table, a brain, a fan and a staghorn thicket. While one is missing, one of the reef's own corals stands in, grown huge. */
@@ -90,8 +92,9 @@ export default class RhythmLayer {
                 if (o.cruise) {
                     // It comes and goes along its stretch, far under the route, turning round slowly at the ends.
                     const S = L.shark, a = t * S.pace + o.phase, x = o.home + Math.sin(a) * S.roam, dir = Math.cos(a) >= 0 ? 1 : -1;
-                    o.img.x = x; o.img.y = this.routeY(x) + S.below + Math.sin(t * 0.3 + o.phase) * 50;
-                    o.rig.draw({ x, y: o.img.y, vx: Math.cos(a) * S.roam * S.pace / 60, vy: 0, frames, effort: 0.25, facing: dir, turn: 0.02 });
+                    // Drawn shifted toward the fish by `far` of the way: against the scrolling picture it moves like something far off.
+                    o.img.x = x + (fish.x - x) * S.far; o.img.y = this.routeY(x) + S.below + Math.sin(t * 0.3 + o.phase) * 50;
+                    o.rig.draw({ x: o.img.x, y: o.img.y, vx: Math.cos(a) * S.roam * S.pace / 60, vy: 0, frames, effort: 0.25, facing: dir, turn: 0.02 });
                 }
                 if (o.book && !this.seen.has(o.book) && Math.hypot(o.img.x - fish.x, o.img.y - fish.y) < o.seen) { this.seen.add(o.book); this.onSeen(o.book); }
             }
