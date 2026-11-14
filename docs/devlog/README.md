@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## A world ten times as long: sea arch, small rescues, jelly blooms
+
+[`dea67e2`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/dea67e2) · 2026-11-14 14:28
+
+![A world ten times as long: sea arch, small rescues, jelly blooms](24-a-world-ten-times-as-long-sea-arch-small-rescues.jpg)
+
 ## Set pieces for the long sea: swim through a ghost ship under the storm, dive down the trench past glowing deep-sea life to the grand nest; a painted story opening
 
 [`9d45a47`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9d45a47) · 2026-11-14 13:20
