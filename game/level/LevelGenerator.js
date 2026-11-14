@@ -17,7 +17,7 @@ import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt } from './biomes.js';
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare } from './biomes.js';
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
@@ -69,6 +69,11 @@ const FRIENDS = {
     enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', soft: 0.35, wiggle: 22, facesLeft: true, glow: true,
         grumpy: { territory: 320 } }   // guards its patch of the dark: warns, then shoves (ai/grumpy.js)
 };
+// The painted boat hull an anchor chain hangs from (img/props/hull_bottom.webp): its top edge is
+// the waterline; `top` = world y of that edge (just under the surface), `keel` = picture px of
+// the keel where the chain is made fast, `scale` = its size.
+const HULL = { top: -6, keel: 330, scale: 0.75 };
+
 // What grows on steep rock faces (biomes.js wallRate / wallLife): picture keys and width range
 // (px) per kind; at most `max` per chunk; `dropBoost` = extra rate at an island's drop-off.
 const WALL_LIFE = {
@@ -739,6 +744,8 @@ export default class LevelGenerator {
         for (const e of this.storyStretches) if (x > e.x0 && x < e.x1) return null;
         const top = y - h.size * 0.46, rock = h.chain ? this.ceilingAbove(x, top) : null;
         if (h.chain && top - (rock ? rock.y : 16) > h.reach) return null;
+        // A boat lies at anchor near a coast, not out in the open sea: no anchor hangs there from the surface.
+        if (h.chain && !rock && seaShare(x) > 0.5) return null;
         const img = makeCritter(s, key, x, y, h.size, h.anim || 'still', { ...h, rotation: angle }).setDepth(3);
         this.animated.push(img);
         chunk.objects.push(img);
@@ -757,10 +764,12 @@ export default class LevelGenerator {
                 this.addChain(chunk, x, rock.y - 6, top, img, h.size * 0.46);
                 chunk.objects.push(s.add.ellipse(x, rock.y - 2, 34, 22, 0x3b3a3d).setStrokeStyle(4, 0x23222a).setDepth(2.92));
             } else if (!rock && top > 40) {
-                this.addChain(chunk, x, 16, top, img, h.size * 0.46);
-                // The painted hull hangs with its keel (where the chain is made fast) at the fallback's depth.
-                chunk.objects.push(s.textures.exists('hull_bottom')
-                    ? s.add.image(x, 104, 'hull_bottom').setOrigin(0.5, 330 / 364).setDepth(2.95)
+                // The painted hull's top edge is its waterline: it hangs from the surface, and the
+                // chain is made fast at its keel.
+                const painted = s.textures.exists('hull_bottom'), keel = painted ? HULL.top + HULL.keel * HULL.scale : 16;
+                this.addChain(chunk, x, Math.min(keel, top - 40), top, img, h.size * 0.46);
+                chunk.objects.push(painted
+                    ? s.add.image(x, HULL.top, 'hull_bottom').setOrigin(0.5, 0).setScale(HULL.scale).setDepth(2.95)
                     : s.add.image(x, 6, 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
             }
         } else if (h.tether || h.drift) {
