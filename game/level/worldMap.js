@@ -19,6 +19,7 @@ import { MANTA, mantaSpan } from '../ai/manta.js';
 import { baitballSlot } from './baitball.js';
 import { meadowSpot } from './meadow.js';
 import { ventSpot } from './ventField.js';
+import { dolphinSpot } from './dolphinRings.js';
 import { containerSpan } from './containers.js';
 import { whaleSharkSlot } from './whaleShark.js';
 
@@ -60,6 +61,7 @@ export function worldMap() {
     span('baitball', baitballSlot().x0, baitballSlot().x1);
     span('meadow', meadowSpot().x0, meadowSpot().x1);
     span('vents', ventSpot().x0, ventSpot().x1);
+    span('dolphins', dolphinSpot().x0, dolphinSpot().x1);
     span('containers', containerSpan().x0, containerSpan().x1);
     span('whaleshark', whaleSharkSlot().x0, whaleSharkSlot().x1);
     for (const d of downwellings()) span('current', d.down, d.up);
