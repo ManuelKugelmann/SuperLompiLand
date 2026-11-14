@@ -13,7 +13,11 @@ export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
 
 export const HUD = {
     switcherFirstMs: 14000,   // the control-scheme row stays this long on the very first run
-    switcherMenuMs: 12000     // ... and this long when called from the menu
+    switcherMenuMs: 12000,    // ... and this long when called from the menu
+    bannerAlpha: 0.85,        // announcements never cover the picture fully (spec 5.0j: faint and minimal)
+    mapRest: 0.3,             // the journey strip is the map (no minimap): faint at rest ...
+    mapShown: 0.9,            // ... clear for a while when something on it changes
+    mapShowMs: 3500
 };
 
 /**
@@ -102,6 +106,8 @@ export default class HudScene extends Phaser.Scene {
             return dot;
         });
         this.mapYou = this.add.triangle(0, this.mapY - 20, -9, -10, 9, -10, 0, 6, 0xffffff).setStrokeStyle(2, 0x06343a);
+        this.map = this.add.container(0, 0, [mg, ...this.nestDots, ...this.friendDots, this.mapYou]).setAlpha(HUD.mapRest);
+        this.mapState = '';
 
         // ?debug=perf: frame time and where it goes, for checking on a real device.
         if (new URLSearchParams(window.location.search).get('debug') === 'perf') {
@@ -111,13 +117,14 @@ export default class HudScene extends Phaser.Scene {
             this.perfAt = 0;
         }
 
-        // Banner line for announcements (biome names, nest reached, ...).
+        // Banner line for announcements (biome names, nest reached, ...): faint and minimal (spec 5.0j),
+        // light text with a soft shadow, no outline, never fully opaque.
         const W = this.scale.width, H = this.scale.height;
-        this.bannerTitle = this.add.text(W / 2, H * 0.26, '', {
-            fontFamily: 'Arial', fontSize: '96px', color: '#ffffff', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 14
+        this.bannerTitle = this.add.text(W / 2, H * 0.2, '', {
+            fontFamily: 'Arial', fontSize: '60px', color: '#ffffff', shadow: { offsetY: 2, color: '#06243d', blur: 12, fill: true }
         }).setOrigin(0.5).setAlpha(0);
-        this.bannerSub = this.add.text(W / 2, H * 0.26 + 86, '', {
-            fontFamily: 'Arial', fontSize: '40px', color: '#fff3b0', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 8
+        this.bannerSub = this.add.text(W / 2, H * 0.2 + 56, '', {
+            fontFamily: 'Arial', fontSize: '28px', color: '#fff3b0', shadow: { offsetY: 2, color: '#06243d', blur: 10, fill: true }
         }).setOrigin(0.5).setAlpha(0);
 
         new BurgerMenu(this, 60, 60, [
@@ -156,14 +163,20 @@ export default class HudScene extends Phaser.Scene {
         for (const k of ['physics', 'world']) { p[k].sum = 0; p[k].n = 0; p[k].max = 0; }
     }
 
+    showMap() {
+        this.tweens.killTweensOf(this.map);
+        this.tweens.add({ targets: this.map, alpha: HUD.mapShown, duration: 400 });
+        this.tweens.add({ targets: this.map, alpha: HUD.mapRest, duration: 1200, delay: HUD.mapShowMs });
+    }
+
     banner(title, subtitle = '') {
         const targets = [this.bannerTitle, this.bannerSub];
         this.tweens.killTweensOf(targets);
-        this.bannerTitle.setText(title).setAlpha(0).setScale(0.8);
+        this.bannerTitle.setText(title).setAlpha(0);
         this.bannerSub.setText(subtitle).setAlpha(0);
-        this.tweens.add({ targets: this.bannerTitle, alpha: 1, scale: 1, duration: 320, ease: 'Back.easeOut' });
-        this.tweens.add({ targets: this.bannerSub, alpha: 1, duration: 320, delay: 150 });
-        this.tweens.add({ targets, alpha: 0, duration: 600, delay: 2400 });
+        this.tweens.add({ targets: this.bannerTitle, alpha: HUD.bannerAlpha, duration: 500 });
+        this.tweens.add({ targets: this.bannerSub, alpha: HUD.bannerAlpha, duration: 500, delay: 150 });
+        this.tweens.add({ targets, alpha: 0, duration: 900, delay: 2200 });
     }
 
     update() {
@@ -176,13 +189,17 @@ export default class HudScene extends Phaser.Scene {
         // Playing together: every friend is a dot in their colour on the journey strip.
         for (const g of m.mp?.ghosts.values() ?? []) {
             if (!g.mapDot) {
-                g.mapDot = this.add.circle(0, this.mapY + 20, 8, g.color ?? 0xffffff, 1).setStrokeStyle(3, 0xffffff).setDepth(this.mapYou.depth);
+                g.mapDot = this.add.circle(0, this.mapY + 20, 8, g.color ?? 0xffffff, 1).setStrokeStyle(3, 0xffffff);
+                this.map.add(g.mapDot);
             }
             g.mapDot.setVisible(!!g.pos);
             if (g.pos) g.mapDot.x = this.toMap(g.pos.x);
         }
         this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });
         for (const d of this.friendDots) d.setFillStyle(0xff6b9a, m.journey.has(d.friendId) ? 1 : 0);
+        // The strip lights up when the biome, the nest or the freed friends change, then fades back.
+        const state = `${m.biomeIndex}/${m.nestIndex}/${this.friendDots.filter(d => m.journey.has(d.friendId)).length}`;
+        if (state !== this.mapState) { if (this.mapState) this.showMap(); this.mapState = state; }
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
     }

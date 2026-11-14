@@ -979,22 +979,21 @@ export default class MainScene extends Phaser.Scene {
         this.bookToast(e);
     }
 
-    /** A small card in the corner: "New in the reef book" + picture + name. */
+    /** A faint note in the corner (spec 5.0j: faint and minimal): picture + "New in the reef book" + name, no box. */
     bookToast(e) {
         if (this.ambientMode) return;
-        const de = this.lang === 'de', H = this.scale.height;
-        const box = this.add.container(30, H - 230).setScrollFactor(0).setDepth(55).setAlpha(0);
-        box.add(this.add.rectangle(0, 0, 420, 130, 0x0d3b5c, 0.92).setOrigin(0).setStrokeStyle(3, 0xfff3b0, 0.9));
+        const de = this.lang === 'de', H = this.scale.height, shadow = { offsetY: 2, color: '#06243d', blur: 10, fill: true };
+        const box = this.add.container(36, H - 150).setScrollFactor(0).setDepth(55).setAlpha(0);
         if (e.image && this.textures.exists(e.image)) {
-            const img = this.add.image(70, 65, e.image);
-            img.setScale(Math.min(100 / img.width, 100 / img.height));
+            const img = this.add.image(40, 40, e.image);
+            img.setScale(Math.min(72 / img.width, 72 / img.height));
             box.add(img);
-        } else if (e.kind === 'place') box.add(placeBadge(this, 70, 65, 44, e.id));
-        box.add(this.add.text(140, 24, de ? 'Neu im Riffbuch' : 'New in the reef book', { fontFamily: 'Arial', fontSize: '24px', color: '#fff3b0', fontStyle: 'bold' }));
-        box.add(this.add.text(140, 60, e.name[this.lang] || e.name.en, { fontFamily: 'Arial', fontSize: '34px', color: '#ffffff', fontStyle: 'bold' }));
+        } else if (e.kind === 'place') box.add(placeBadge(this, 40, 40, 30, e.id));
+        box.add(this.add.text(92, 10, de ? 'Neu im Riffbuch' : 'New in the reef book', { fontFamily: 'Arial', fontSize: '20px', color: '#fff3b0', shadow }));
+        box.add(this.add.text(92, 36, e.name[this.lang] || e.name.en, { fontFamily: 'Arial', fontSize: '30px', color: '#ffffff', shadow }));
         play('nest');
-        this.tweens.add({ targets: box, alpha: 1, y: H - 250, duration: 300, ease: 'Back.easeOut' });
-        this.tweens.add({ targets: box, alpha: 0, delay: 2600, duration: 500, onComplete: () => box.destroy() });
+        this.tweens.add({ targets: box, alpha: 0.85, y: H - 160, duration: 500 });
+        this.tweens.add({ targets: box, alpha: 0, delay: 2800, duration: 800, onComplete: () => box.destroy() });
     }
 
     /** Menu: open the reef book over the paused game. */
