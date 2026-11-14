@@ -15,6 +15,7 @@ import { createSpacing } from './spacing.js';
 import { eachCell as marchGrid, hash } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { CAUSTICS, installCaustics } from '../fx/CausticsPipeline.js';
+import { getCharacter, loadSelectedId } from '../characters.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
@@ -26,7 +27,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 32,
+    version: 33,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -63,7 +64,7 @@ const FRIENDS = {
     // Parrotfish graze the reef (spec 9.1 wonder beat): calm, unhurried, a little shy.
     friend_parrotfish: { size: 230, swim: 420, bob: 12, anim: 'swim', soft: 0.35, wiggle: 16, ai: { speed: 0.9, range: 420, turn: 0.03, shy: 0.9 } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', soft: 1, wiggle: 6, upright: true, ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
-    friend_seahorse: { size: 120, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
+    friend_seahorse: { size: 120, every: 3, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
     friend_starfish: { size: 170, ground: true, anim: 'sit', soft: 0.2, upright: true, crawl: { speed: 0.1, range: 160 } },
     friend_snail: { size: 160, ground: true, anim: 'sit', soft: 0.3, upright: true, crawl: { speed: 0.18, range: 240 } },
@@ -169,6 +170,7 @@ export default class LevelGenerator {
         this.creatures = [];
         this.lights = [];     // glows that follow a creature
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
+        this.playerKey = getCharacter(scene.registry.get('character') || loadSelectedId())?.states.normal.key;      // the playable's picture
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
         this.buildMs = { last: 0, max: 0, count: 0 };   // cost of building chunks, shown by ?debug=perf
         this.makeKelpTexture();
@@ -893,6 +895,8 @@ export default class LevelGenerator {
     }
 
     addFriend(chunk, key, x, y, rng, angle = 0) {
+        // No friend that looks like the fish you are playing (a child must always know which one is theirs); its number stays taken.
+        if (key === this.playerKey) { chunk.friendCount = (chunk.friendCount ?? -1) + 1; return; }
         const s = this.scene, f = FRIENDS[key];
         // A Rig body with a mind of its own (game/Creature.js): it roams, crawls or guards, per its row.
         const img = new Creature(s, key, f, x, y, this.crawlEnv, rng.frac() * 1000, angle);

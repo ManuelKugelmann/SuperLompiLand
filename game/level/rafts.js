@@ -6,11 +6,12 @@
 import { BIOMES, isSea } from './biomes.js';
 import { WEATHER, stormSpan } from './weather.js';
 import { JOURNEY, chapters } from '../journey.js';
+import { baitballSlot } from './baitball.js';
 
 export const RAFTS = {
     seas: ['blue', 'wreck'],
     first: 6000,         // px into each sea where its first raft floats ...
-    every: 22000,        // ... and again every so many px
+    every: 11000,        // ... and again every so many px (about one every 20 s of swimming)
     width: 760,          // px across as drawn
     keep: 2500,          // px they stay away from the storm and from big events
     seen: 700            // px: this close, sargassum goes into the reef book
@@ -32,6 +33,7 @@ export function raftSpots(cfg = RAFTS) {
     if (cfg === RAFTS && SPOTS) return SPOTS;
     const s = stormSpan(), keep = [[s.x0 - WEATHER.storm.ramp, s.x1 + WEATHER.storm.ramp]], out = [];
     for (const c of chapters()) if (c.event) keep.push([c.event.x - JOURNEY.eventClear, c.event.endX + JOURNEY.eventClear]);
+    keep.push([baitballSlot().x0, baitballSlot().x1]);      // the bait ball reaches up to the surface
     for (const id of cfg.seas) {
         const b = BIOMES.find(bi => bi.id === id);
         for (let x = b.from + cfg.first; x < b.from + b.width - cfg.first; x += cfg.every) {
