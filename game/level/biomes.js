@@ -216,10 +216,14 @@ export const REEF_CREST = {
 
 const cellRand = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
 
+let crestX = null;
+
 /** World x of the middle of the reef crest. */
 export function reefCrestX(cfg = REEF_CREST) {
-    const reef = BIOMES.find(b => b.id === 'reef');
-    return reef.from + reef.width - cfg.inset;
+    if (cfg === REEF_CREST && crestX !== null) return crestX;
+    const reef = BIOMES.find(b => b.id === 'reef'), x = reef.from + reef.width - cfg.inset;
+    if (cfg === REEF_CREST) crestX = x;
+    return x;
 }
 
 /**
