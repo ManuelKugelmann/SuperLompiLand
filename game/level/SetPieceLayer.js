@@ -28,8 +28,14 @@ export const SET_LOOK = {
     hullThin: 0.62,         // the hull's alpha while the fish is behind its planking (it stays a solid ship)
     portSize: 170,          // the painted ship's lit portholes: size and brightness of their flicker
     portAlpha: 0.5,
-    column: [460, 40],      // a nest's column of light: its width, and how far under the surface it ends
-    columnAlpha: 0.3,
+    column: [240, 40],      // a nest's column of light: its width, and how far under the surface it ends
+    columnAlpha: 0.55,
+    columnTint: 0xffc84a,   // warm gold: home is down here
+    columnDepth: 43,        // above the scene's light and vignette layers, so it reads in bright water too
+    sparks: 5,              // sparkles rising in the column nearest to the fish ...
+    sparkRise: 170,         // ... at this many px per second ...
+    sparkSize: [26, 54],    // ... this big (px) ...
+    sparkNear: 2200,        // ... when the fish is within this many px of the nest (in x)
     beaconTint: 0xffd9a0,
     beaconAlpha: 0.42
 };
@@ -68,7 +74,9 @@ export default class SetPieceLayer {
         // Every nest stands in a thin column of light that reaches up to the surface: it marks the
         // savepoint from wherever you pass, and swimming through it is enough to reach the nest.
         this.columns = nests.map(n => scene.add.image(n.x, n.y, 'bd_ray').setOrigin(0.5, 1).setFlipY(true)
-            .setDisplaySize(SET_LOOK.column[0], Math.max(400, n.y - SET_LOOK.column[1])).setTint(SET_LOOK.beaconTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(3));
+            .setDisplaySize(SET_LOOK.column[0], Math.max(400, n.y - SET_LOOK.column[1])).setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth));
+        this.nests = nests;
+        this.sparks = Array.from({ length: SET_LOOK.sparks }, () => scene.add.image(0, 0, 'bd_glow').setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth).setVisible(false));
         // The beacon: a column of warm light standing on the grand nest, fading out far above it.
         const [bw, bh] = SET_PIECES.descent.beacon;
         this.beacon = scene.add.image(nest.x, nest.y, 'bd_ray').setOrigin(0.5, 1).setFlipY(true).setDisplaySize(bw, bh)
@@ -165,6 +173,16 @@ export default class SetPieceLayer {
         this.lanterns.forEach((l, i) => l.setAlpha(this.lanternAlpha * (0.72 + 0.28 * Math.sin(t * 1.3 + i * 2.1) * Math.sin(t * 3.7 + i))));
         this.beacon.setAlpha(SET_LOOK.beaconAlpha * (0.8 + 0.2 * Math.sin(t * 0.7)));
         this.columns.forEach((c, i) => c.setAlpha(SET_LOOK.columnAlpha * (0.8 + 0.2 * Math.sin(t * 0.9 + i))));
+        // Sparkles rise in the column of the nest nearest to the fish.
+        let near = null;
+        for (const n of this.nests) if (Math.abs(n.x - fish.x) < SET_LOOK.sparkNear && (!near || Math.abs(n.x - fish.x) < Math.abs(near.x - fish.x))) near = n;
+        this.sparks.forEach((sp, i) => {
+            sp.setVisible(!!near);
+            if (!near) return;
+            const L = SET_LOOK, h = Math.max(400, near.y - L.column[1]), u = ((t * L.sparkRise + i * h / L.sparks) % h) / h;
+            const size = L.sparkSize[0] + (L.sparkSize[1] - L.sparkSize[0]) * (0.5 + 0.5 * Math.sin(i * 2.4));
+            sp.setPosition(near.x + Math.sin(t * 1.3 + i * 1.9) * L.column[0] * 0.3, near.y - u * h).setDisplaySize(size, size).setAlpha(Math.sin(Math.PI * u) * (0.6 + 0.4 * Math.sin(t * 5 + i)));
+        });
         if (this.front) {
             // The hull thins a little only while the fish is behind solid planking; in the hole it is seen anyway.
             const hidden = boxHitsCircle(this.hull, fish.x, fish.y, radius) && ((fish.x - this.hole.x) / this.hole.rx) ** 2 + ((fish.y - this.hole.y) / this.hole.ry) ** 2 > 1;
