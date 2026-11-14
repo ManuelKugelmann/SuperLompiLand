@@ -59,7 +59,11 @@ function softFor(scene, key) {
  *   secondary motion  physical: thin parts of the picture — fins, spines, tassels,
  *                     tentacles — trail behind, swing through and settle (`soft`)
  * It has no physics body and takes no input — Player drives it from its body,
- * RemoteFish from network snapshots, the title screen from the carousel.
+ * RemoteFish from network snapshots, the title screen from the carousel, Creature
+ * (the animals of the world) from its brain.
+ * Profile fields read here: states, anim (swim | paddle | pulse | sway | sit | throb), soft,
+ * upright, facesLeft (art drawn nose-left), alignFrom / alignFull / pitch (how the nose follows
+ * the movement; slow animals tip already at low speed, and only part of the way).
  */
 export default class Rig {
     constructor(scene, character, x, y, depth = 5) {
@@ -134,8 +138,10 @@ export default class Rig {
      * @param p.turn     radians per step the nose may turn
      * @param p.facing   force the facing (1 / -1) instead of deriving it from vx
      * @param p.flowX,p.flowY  velocity of the water around it (soft parts drift with it)
+     * @param p.lean     extra turn of the whole picture (a sitter lying on sloping ground)
+     * @param p.beat     -1..1: a pulsing body pumps on this instead of its own swim cycle
      */
-    draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, flowX = 0, flowY = 0 }) {
+    draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, flowX = 0, flowY = 0, lean = 0, beat }) {
         const view = this.view, grid = view.grid, halo = grid.halo;
         view.setPosition(x, y);
 
@@ -153,12 +159,15 @@ export default class Rig {
         }
         const flip = this.facing < 0 ? -1 : 1;
         const level = flip < 0 ? Math.PI : 0;
-        const follow = this.char.upright ? 0 : Phaser.Math.Clamp((speed - RIG.alignFrom) / (RIG.alignFull - RIG.alignFrom), 0, 1);
+        const from = this.char.alignFrom ?? RIG.alignFrom, full = this.char.alignFull ?? RIG.alignFull;
+        const follow = this.char.upright ? 0 : Phaser.Math.Clamp((speed - from) / (full - from), 0, 1) * (this.char.pitch ?? 1);
         const target = Phaser.Math.Angle.Wrap(level + Phaser.Math.Angle.Wrap(Math.atan2(vy, vx) - level) * follow);
         this.angle = Phaser.Math.Angle.RotateTo(this.angle, target, turn * frames);
         const sq = Phaser.Math.Clamp(squash, -0.35, 0.35);
         const sc = view.baseScale * this.zoom;
-        let scaleX = sc * (1 + sq), scaleY = sc * (1 - sq) * flip, rotation = this.angle;
+        // Art drawn nose-left is mirrored once, so everything below sees a nose on the right.
+        const left = !!this.char.facesLeft;
+        let scaleX = sc * (1 + sq) * (left ? -1 : 1), scaleY = sc * (1 - sq) * flip, rotation = this.angle + lean;
 
         // --- Primary motion (procedural), driven by how hard the character swims
         // and how fast it moves (being carried is not swimming). Idle = a slow,
@@ -172,8 +181,8 @@ export default class Rig {
         if (style === 'pulse') {
             // Jellyfish: the bell pumps (harder when swimming), the tentacles trail
             // behind the movement and ripple.
-            const beat = Math.sin(ph * 0.9), pump = 0.05 + drive * 0.09;
-            scaleX *= 1 + beat * pump; scaleY *= 1 - beat * pump * 1.3;
+            const push = beat ?? Math.sin(ph * 0.9), pump = 0.05 + drive * 0.09;
+            scaleX *= 1 + push * pump; scaleY *= 1 - push * pump * 1.3;
             const trail = Phaser.Math.Clamp(-vx * 0.012, -0.35, 0.35) * flip;
             bend = (u, v, out) => { out.x = (Math.sin(ph * 0.9 - v * 3.4) * 0.06 + trail * v) * w * v * v * 2.2; out.y = 0; };
         } else if (style === 'sway') {
@@ -185,10 +194,20 @@ export default class Rig {
             const stroke = Math.sin(ph * 0.55);
             rotation += stroke * 0.07 * (0.3 + drive) * flip;
             scaleX *= 1 + stroke * 0.03 * drive; scaleY *= 1 - stroke * 0.045 * (0.4 + drive);
-            bend = (u, v, out) => { const t = 1 - u; out.x = 0; out.y = Math.sin(ph * 0.55 - t * 1.5) * amp * 0.5 * t * t * t; };
+            bend = (u, v, out) => { const t = left ? u : 1 - u; out.x = 0; out.y = Math.sin(ph * 0.55 - t * 1.5) * amp * 0.5 * t * t * t; };
+        } else if (style === 'sit') {
+            // Sitters (starfish, snail, slug): they rock a little and breathe; the thin parts do the rest.
+            rotation += Math.sin(ph * 0.18) * 0.05;
+            scaleY *= 1 + Math.sin(ph * 0.25) * 0.025;
+            bend = still;
+        } else if (style === 'throb') {
+            // Urchin: the spines swell in and out.
+            const swell = 1 + Math.sin(ph * 0.33) * 0.045;
+            scaleX *= swell; scaleY *= swell;
+            bend = still;
         } else {
             // Fish: a wave runs down the body, strongest at the tail.
-            bend = (u, v, out) => { const t = 1 - u; out.x = 0; out.y = Math.sin(ph - t * 2.6) * amp * t * t; };
+            bend = (u, v, out) => { const t = left ? u : 1 - u; out.x = 0; out.y = Math.sin(ph - t * 2.6) * amp * t * t; };
         }
         view.setScale(scaleX, scaleY);
         view.rotation = rotation;
@@ -260,14 +279,36 @@ export default class Rig {
             fin.rotation = rotation + flap * flip;
             fin.setAlpha(view.alpha);
         }
+
+        const over = this.overlay;
+        if (over) {
+            over.setPosition(x, y).setScale(scaleX, scaleY);
+            over.rotation = rotation;
+            over.vertices.set(verts);
+        }
+    }
+
+    /**
+     * A second copy of the picture that lies exactly on the body and bends with it (a sheen,
+     * a glow). The caller sets blend mode, colours and alpha; it follows the 'normal' look.
+     */
+    addOverlay(scene, depth) {
+        const v = this.views.normal;
+        const over = scene.add.rope(v.x, v.y, v.texture.key, null, STRIP.length / 2, true).setDepth(depth);
+        over.dirty = false;
+        over.uv.set(v.uv);
+        this.overlay = over;
+        return over;
     }
 
     destroy() {
         for (const v of Object.values(this.views)) { v.fin?.destroy(); v.destroy(); }
+        this.overlay?.destroy();
     }
 }
 
 const TMP = { x: 0, y: 0 };
+const still = (u, v, out) => { out.x = 0; out.y = 0; };
 
 /** Everything about one picture's grid that never changes: places, texture coordinates, soft weights, rays. */
 function makeGrid(view, map) {

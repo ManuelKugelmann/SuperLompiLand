@@ -465,13 +465,13 @@ export default class MainScene extends Phaser.Scene {
     /** Debug only: a label over every creature with a mind, naming its state. */
     drawAi() {
         for (const f of this.level.friends) {
-            const mind = f.img.brain || f.img.crawler;
+            const mind = f.img.mind;
             if (!mind || !f.img.active || this.aiLabels.has(f.img)) continue;
             this.aiLabels.set(f.img, this.add.text(0, 0, '', { fontFamily: 'Arial', fontSize: '26px', color: '#ffffff', stroke: '#0a3f6e', strokeThickness: 6 }).setOrigin(0.5).setDepth(9.6));
         }
         for (const [img, label] of this.aiLabels) {
             if (!img.active) { label.destroy(); this.aiLabels.delete(img); continue; }
-            label.setText((img.brain || img.crawler).state).setPosition(img.x, img.y - img.displayHeight * 0.5 - 24);
+            label.setText(img.mind.state).setPosition(img.x, img.y - img.height * 0.5 - 24);
         }
     }
 

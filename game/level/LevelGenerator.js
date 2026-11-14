@@ -1,9 +1,7 @@
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
-import { createSwimmer, stepSwimmer } from '../ai/swimmer.js';
-import { createGrumpy, stepGrumpy, calmGrumpy } from '../ai/grumpy.js';
-import { createCrawler, stepCrawler } from '../ai/crawler.js';
+import Creature from '../Creature.js';
 import { createReach } from './reach.js';
 import { createSpacing } from './spacing.js';
 import { eachCell as marchGrid, hash } from './terrain.js';
@@ -40,17 +38,20 @@ const CH = LEVEL.cell * LEVEL.cells;
 // `ai`: how a swimming creature behaves (game/ai/swimmer.js): own speed (px per step), home
 // range (px), turn rate (radians per step), shy (1 = normal; bigger = scared from further away),
 // breathe (goes up for air now and then), anchor (rests holding on to rock).
+// The body is a Rig like the playables' (game/Creature.js): `anim` = how it moves (swim, paddle,
+// pulse, sway; sit and throb for the ones on the rock), `soft` = how loose its thin parts are,
+// `wiggle` = size of the body wave, `upright` = never tips along its movement.
 const FRIENDS = {
-    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
-    friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
-    friend_seahorse: { size: 120, bob: 26, anim: 'sway', ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
+    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'paddle', soft: 0.35, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
+    friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', soft: 1, wiggle: 6, upright: true, ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
+    friend_seahorse: { size: 120, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
-    friend_starfish: { size: 170, ground: true, anim: 'wobble', crawl: { speed: 0.1, range: 160 } },
-    friend_snail: { size: 160, ground: true, anim: 'wobble', crawl: { speed: 0.18, range: 240 } },
-    friend_nudibranch: { size: 190, ground: true, anim: 'wobble', crawl: { speed: 0.26, range: 300 } },
-    urchin: { size: 140, ground: true, anim: 'throb', crawl: { speed: 0.05, range: 90 } },
-    // The anglerfish art faces left (tail on the right); it lights the deep.
-    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', tail: 'right', speed: 0.7, facesLeft: true, glow: true,
+    friend_starfish: { size: 170, ground: true, anim: 'sit', soft: 0.15, upright: true, crawl: { speed: 0.1, range: 160 } },
+    friend_snail: { size: 160, ground: true, anim: 'sit', soft: 0.2, upright: true, crawl: { speed: 0.18, range: 240 } },
+    friend_nudibranch: { size: 190, ground: true, anim: 'sit', soft: 0.6, upright: true, crawl: { speed: 0.26, range: 300 } },
+    urchin: { size: 140, ground: true, anim: 'throb', soft: 0.3, upright: true, crawl: { speed: 0.05, range: 90 } },
+    // The anglerfish art faces left (tail on the right); it lights the deep, its lure sways as a soft part.
+    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', soft: 0.7, wiggle: 22, facesLeft: true, glow: true,
         grumpy: { territory: 320 } }   // guards its patch of the dark: warns, then shoves (ai/grumpy.js)
 };
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
@@ -101,7 +102,6 @@ export const PROPS = {
 
 /** Painted kelp stalks (generated art, public/img/plants/); the procedural 'kelp' strip is the fallback. */
 export const KELP_STALKS = ['kelp_stalk_1', 'kelp_stalk_2', 'kelp_stalk_3'];
-const GRUMPY_CALM_R = 320;         // px: a special this close calms a grumpy (it backs off)
 const KELP_BACK_TINT = 0x5f8f86;   // stalks behind the play plane: hazier, toward the water colour
 const PROP_BACK_HAZE = 0.5;        // how far passable seabed props shift toward the water colour
 
@@ -127,6 +127,7 @@ export default class LevelGenerator {
         this.hazards = [];
         this.friends = [];
         this.animated = [];
+        this.creatures = [];
         this.lights = [];     // glows that follow a creature
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
         this.buildMs = { last: 0, max: 0, count: 0 };   // cost of building chunks, shown by ?debug=perf
@@ -343,47 +344,16 @@ export default class LevelGenerator {
         this.alarmLeft -= dt;
         const ground = this.crawlEnv;
         ground.player = env.player; ground.players = all;
-        for (const o of this.animated) {
-            const c = o.crawler;
-            if (c && o.active && dt > 0) {
-                stepCrawler(c, dt, ground);
-                o.setPosition(c.x + c.nx * o.lift, c.y + c.ny * o.lift);
-                o.lean = Math.atan2(c.nx, -c.ny);
-                o.shrink += ((c.state === 'curl' ? 0.78 : 1) - o.shrink) * 0.15;
-                if (c.state === 'crawl') o.face(c.dir);
-            }
-            const g = o.grumpy;
-            if (g && o.active && dt > 0) {
-                if (env.alarm && Math.hypot(env.alarm.x - g.x, env.alarm.y - g.y) < GRUMPY_CALM_R) calmGrumpy(g);
-                const ev = stepGrumpy(g, dt, env);
-                if (ev === 'hit') this.scene.events.emit('grumpy-hit', { x: g.x, y: g.y });
-                // Warning: it puffs up and trembles; then it swings round in its shove.
-                o.shrink += ((g.state === 'warn' ? 1.18 : 1) - o.shrink) * 0.2;
-                const shake = g.state === 'warn' ? Math.sin(t * 60) * 4 : 0;
-                o.setPosition(g.x + shake, g.y + Math.sin(t * 1.3 + g.seed) * o.bob * 0.35);
-                if (g.heading) o.face(g.heading > 0 ? o.look : -o.look);
-            }
-            const a = o.brain;
-            if (!a || !o.active || dt <= 0) continue;
-            stepSwimmer(a, dt, env);
-            const ahead = Math.cos(a.heading);
-            if (Math.abs(ahead) > 0.25) o.face(ahead > 0 ? o.look : -o.look);
-            o.setPosition(a.x, a.y + Math.sin(t * 1.3 + a.seed) * o.bob * 0.35);
-            if (o.pitches) o.rotation += (Math.atan2(Math.sin(a.heading), Math.abs(ahead)) * 0.45 * (ahead >= 0 ? 1 : -1) - o.rotation) * 0.1;
+        for (const c of this.creatures) {
+            if (c.active && c.step(t, dt, env, ground) === 'hit') this.scene.events.emit('grumpy-hit', { x: c.x, y: c.y });
         }
         for (const l of this.lights) {
             if (!l.active || !l.follow.active) continue;
-            l.setPosition(l.follow.x, l.follow.y);
-            l.rotation = l.follow.rotation;
-            if (l.hue !== undefined) {
-                // Rainbow sheen: colours run across the body and shimmer a little.
-                l.face(l.follow.facing());
-                l.setAlpha(LEVEL.friendSheen * (0.75 + 0.25 * Math.sin(t * 2 + l.hue * 20)));
-                const at = k => RAINBOW[Math.floor(((l.hue + t * LEVEL.sheenSpeed + k * LEVEL.sheenSpread) % 1) * RAINBOW.length)];
-                if (l.colors) { for (let i = 0, n = l.colors.length; i < n; i++) l.colors[i] = at((i >> 1) / (n / 2)); }
-                else if (Phaser.TintModes) l.setTint(at(0), at(0.5), at(0.5), at(1));        // the fill mode set at creation stays
-                else l.setTintFill(at(0), at(0.5), at(0.5), at(1));
-            }
+            if (l.hue === undefined) { l.setPosition(l.follow.x, l.follow.y); continue; }
+            // Rainbow sheen: colours run across the body and shimmer a little.
+            l.setAlpha(LEVEL.friendSheen * (0.75 + 0.25 * Math.sin(t * 2 + l.hue * 20)));
+            const n = l.colors.length, base = l.hue + t * LEVEL.sheenSpeed;
+            for (let i = 0; i < n; i++) l.colors[i] = RAINBOW[Math.floor(((base + (i / n) * LEVEL.sheenSpread) % 1) * RAINBOW.length)];
         }
     }
 
@@ -727,26 +697,9 @@ export default class LevelGenerator {
 
     addFriend(chunk, key, x, y, rng, angle = 0) {
         const s = this.scene, f = FRIENDS[key];
-        const img = makeCritter(s, key, x, y, f.size, f.anim, { ...f, rotation: angle }).setDepth(f.ground ? 1 : 4);
-        this.animated.push(img);
-        if (f.crawl) {
-            // On the rock: it follows the outline, pauses, and pulls in when bumped.
-            const c = createCrawler(x, y, this.crawlEnv.density, LEVEL.threshold, f.crawl, rng.frac() * 1000);
-            if (c.onRock) { img.crawler = c; img.lift = Math.hypot(x - c.x, y - c.y); img.shrink = 1; }
-        }
-        if (f.ai) {
-            // No fixed path: it roams, rests, notices and greets the player, and darts off when rushed.
-            img.brain = createSwimmer({ x, y }, f.ai, rng.frac() * 1000);
-            img.look = f.facesLeft ? -1 : 1;      // which way the art is drawn
-            img.bob = f.bob;
-            img.pitches = f.anim === 'swim';      // long bodies tip their nose up and down
-        }
-        if (f.grumpy) {
-            img.grumpy = createGrumpy(x, y, f.grumpy, rng.frac() * 1000);
-            img.look = f.facesLeft ? -1 : 1;
-            img.bob = f.bob;
-            img.shrink = 1;
-        }
+        // A Rig body with a mind of its own (game/Creature.js): it roams, crawls or guards, per its row.
+        const img = new Creature(s, key, f, x, y, this.crawlEnv, rng.frac() * 1000, angle);
+        this.creatures.push(img);
         if (f.glow) {
             const light = s.add.circle(x, y, 150, 0xfff3b0, 0.16).setDepth(42).setBlendMode(Phaser.BlendModes.ADD);
             light.follow = img;
@@ -757,14 +710,11 @@ export default class LevelGenerator {
         // two can be told apart at a glance.
         // The sheen is the friend's own picture once more, added on top in travelling
         // rainbow colours: it lies exactly on the body and bends with it.
-        const sheen = makeCritter(s, key, x, y, f.size, f.anim, { ...f, rotation: angle })
-            .setDepth(f.ground ? 1.05 : 4.05).setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
+        const sheen = img.addOverlay(s, f.ground ? 1.05 : 4.05).setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
         // Pure colour inside the picture's outline (a tint would only multiply with the body colour).
         if (Phaser.TintModes) sheen.setTintMode?.(Phaser.TintModes.FILL); else sheen.tintFill = true;
         sheen.follow = img;
         sheen.hue = rng.frac();
-        this.animated.push(sheen);
-        chunk.objects.push(sheen);
         this.lights.push(sheen);
         chunk.objects.push(img);
         // Friends are numbered per chunk too. They greet you every time you come
@@ -1022,6 +972,7 @@ export default class LevelGenerator {
         this.hazards = this.hazards.filter(h => h.img.active);
         this.friends = this.friends.filter(f => f.img.active);
         this.animated = this.animated.filter(o => o.active);
+        this.creatures = this.creatures.filter(o => o.active);
         this.lights = this.lights.filter(o => o.active);
         this.tethers = this.tethers.filter(o => o.active);
         this.chains = this.chains.filter(o => o.active);
