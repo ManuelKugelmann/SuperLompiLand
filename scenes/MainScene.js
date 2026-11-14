@@ -214,7 +214,7 @@ export default class MainScene extends Phaser.Scene {
         // Small rescues between the chapters (spec 5.0i): an animal in a bit of net every so often on the route.
         this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), (x, y) => this.seabedBelow(x, y), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y), (x, y) => this.coinTaken(x, y));
         // Moon jelly blooms drift across the route in the open seas (spec 5.0i).
-        this.blooms = new BloomLayer(this, () => this.bookEntry('friend_jellyfish'));
+        this.blooms = new BloomLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('friend_jellyfish'));
         // ... and at their surface float sargassum rafts; a skip off a wave sends flying fish out of the water.
         this.rafts = new RaftLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('sargassum'));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)

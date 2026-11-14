@@ -25,7 +25,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 30,
+    version: 31,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -58,7 +58,7 @@ const CH = LEVEL.cell * LEVEL.cells;
 // pulse, sway; sit and throb for the ones on the rock), `soft` = how loose its thin parts are,
 // `wiggle` = size of the body wave, `upright` = never tips along its movement.
 const FRIENDS = {
-    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'paddle', soft: 0.5, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
+    friend_turtle: { size: 320, swim: 380, bob: 18, anim: 'paddle', soft: 0.5, wiggle: 14, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
     // Parrotfish graze the reef (spec 9.1 wonder beat): calm, unhurried, a little shy.
     friend_parrotfish: { size: 230, swim: 420, bob: 12, anim: 'swim', soft: 0.35, wiggle: 16, ai: { speed: 0.9, range: 420, turn: 0.03, shy: 0.9 } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', soft: 1, wiggle: 6, upright: true, ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
@@ -92,11 +92,11 @@ const HAZARDS = {
     // Keys are historical; what they show now: spikes = wreck scrap, hazard_buoy =
     // leaking oil drum, mine = lost anchor on its chain, hazard_net = ghost net.
     spikes: { size: 240, r: 62, place: 'floor', lift: 26 },
-    hazard_buoy: { size: 170, r: 64, place: 'floor', lift: 38 },   // the oil comes from its crack (OIL.crack in MainScene)
+    hazard_buoy: { size: 260, r: 98, place: 'floor', lift: 58 },   // the oil comes from its crack (OIL.crack in MainScene)
     // The lost anchor hangs on its chain from a hull at the surface: the chain runs all the way up.
     // An anchor hangs on a chain of at most `reach` px (from a hull at the surface or from rock
     // above); where that is not possible there is no anchor.
-    mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6, chain: true, reach: 1500 },
+    mine: { size: 360, r: 150, place: 'water', anim: 'sway', speed: 0.6, chain: true, reach: 1500 },
     // A ghost net never just hangs in the water: where the seabed is within `tether` px below,
     // it is caught on a line to a stone and tugs at it; near the surface it hangs from a float;
     // otherwise it drifts `drift` px to and fro.

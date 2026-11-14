@@ -39,7 +39,7 @@ export const ROUTE = {
     ease: 5, easeStep: 280,   // the cruise depth is averaged over this many steps of this size to either side
     aboveNest: 240,     // it passes this far above every nest
     descent: 1.6,       // px along the way per px of depth when it dips to a nest (gentle slopes)
-    clear: 420,         // hazards stay at least this far from its middle
+    clear: 560,         // hazards stay at least this far from its middle (the biggest is 360 px across)
     nestHalf: 300,      // px to either side of a nest within which passing over it reaches it, at any depth (its light stands up to the surface)
     fadeIn: [1500, 900],   // the lane starts this far west of the start pool and reaches full depth over this many px
     fadeOut: 280,       // and it closes over this many px before the world's east end (behind the grand nest)

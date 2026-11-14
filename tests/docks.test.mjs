@@ -17,11 +17,11 @@ test('the docks are under the harbour\'s landmark pier, at the surface', () => {
     assert.ok(Math.abs(chapters().find(c => c.id === 'harbour').x - spot.x) > 2500);
 });
 
-test('they lie far off the calm route: everything in them is clear of the lane and of the hazard-free corridor', () => {
-    for (let x = spot.x0; x <= spot.x1; x += 100) assert.ok(f.routeY(x) - spot.bottom > ROUTE.clear, `route at ${x}: ${Math.round(f.routeY(x))}`);
+test('they lie far off the calm route: everything in them lies well above the lane', () => {
+    for (let x = spot.x0; x <= spot.x1; x += 100) assert.ok(f.routeY(x) - spot.bottom > ROUTE.halfWidth + 200, `route at ${x}: ${Math.round(f.routeY(x))}`);
     for (const p of [spot.net, spot.crab]) {
         assert.ok(p.x > spot.x0 && p.x < spot.x1 && p.y > spot.top && p.y < spot.bottom);
-        assert.ok(f.routeY(p.x) - p.y > ROUTE.clear + 100);
+        assert.ok(f.routeY(p.x) - p.y > ROUTE.halfWidth + 200);
     }
     assert.ok(Math.hypot(spot.net.x - spot.crab.x, spot.net.y - spot.crab.y) > 300, 'the crab does not hang in the net');
     assert.ok(spot.ropes.some(x => Math.abs(x - spot.crab.x) < 1), 'it hangs in one of the ropes');

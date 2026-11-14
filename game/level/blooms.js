@@ -15,6 +15,8 @@ export const BLOOM = {
     width: 2800,         // px a field is long
     top: 160, bottom: 1050,   // from just under the surface down to here (the calm route runs through it)
     keep: 1500,          // px a field stays away from storm, currents, friends, events and small rescues
+    // In the deep trench the jellies glow in the dark and drift around the calm route itself, all the way down.
+    deep: { biome: 'trench', first: 12500, every: 25000, half: 480 },   // px into the trench of the first field, px between fields, px above and below the route
     count: 44,           // jellies in a field
     small: 0.4,          // share of them that are small and further back
     drift: [70, 40],     // px each drifts to and fro, sideways and up and down
@@ -27,12 +29,12 @@ const hash = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453;
 
 let FIELDS = null;
 
-/** Every bloom field, west to east: [{ id, x0, x1, top, bottom }]. */
+/** Every bloom field, west to east: [{ id, x0, x1, top, bottom }]. A `deep` field's top and bottom are px above and below the calm route. */
 export function bloomFields(cfg = BLOOM) {
     if (cfg === BLOOM && FIELDS) return FIELDS;
     const w = weatherZones(), keep = [w.storm, ...w.downs.map(([a, z]) => [a - WEATHER.down.ramp, z + WEATHER.down.ramp])], out = [];
     for (const c of chapters()) {
-        keep.push([c.x, c.x]);
+        if (c.friend) keep.push([c.x, c.x]);
         if (c.event) keep.push([c.event.x - JOURNEY.eventClear, c.event.endX + JOURNEY.eventClear]);
     }
     for (const r of rescueSpots()) keep.push([r.x, r.x]);
@@ -48,6 +50,10 @@ export function bloomFields(cfg = BLOOM) {
             }
             if (at + cfg.width + cfg.first < b.from + b.width && (!out.length || at > out[out.length - 1].x1 + cfg.keep)) out.push({ id: `bloom${out.length}`, x0: at, x1: at + cfg.width, top: cfg.top, bottom: cfg.bottom });
         }
+    }
+    const t = BIOMES.find(bi => bi.id === cfg.deep.biome);
+    for (let x0 = t.from + cfg.deep.first; x0 + cfg.width + cfg.first / 2 < t.from + t.width; x0 += cfg.deep.every) {
+        if (!keep.some(([a, z]) => x0 + cfg.width + cfg.keep >= a && x0 - cfg.keep <= z)) out.push({ id: `bloom${out.length}`, x0, x1: x0 + cfg.width, top: -cfg.deep.half, bottom: cfg.deep.half, deep: true });
     }
     if (cfg === BLOOM) FIELDS = out;
     return out;

@@ -15,8 +15,10 @@ test('bloom fields come again and again in both open seas, across the calm route
     for (const fl of fields) {
         assert.ok(isSea(fl.x0) && isSea(fl.x1));
         const ry = f.routeY((fl.x0 + fl.x1) / 2);
-        assert.ok(ry > fl.top && ry < fl.bottom, `the route runs through it (${Math.round(ry)})`);
+        if (fl.deep) assert.ok(fl.top < 0 && fl.bottom > 0, 'a deep field lies around the route');
+        else assert.ok(ry > fl.top && ry < fl.bottom, `the route runs through it (${Math.round(ry)})`);
     }
+    assert.ok(fields.filter(fl => fl.deep).length >= 3, 'glowing fields all the way down the trench');
 });
 
 test('none lies at the storm, a current, a friend, the whale or a small rescue', () => {
@@ -24,7 +26,7 @@ test('none lies at the storm, a current, a friend, the whale or a small rescue',
     for (const fl of fields) {
         for (const [a, z] of [w.storm, ...w.downs]) assert.ok(fl.x1 < a || fl.x0 > z);
         for (const c of chapters()) {
-            assert.ok(c.x < fl.x0 - BLOOM.keep || c.x > fl.x1 + BLOOM.keep, c.id);
+            if (c.friend) assert.ok(c.x < fl.x0 - BLOOM.keep || c.x > fl.x1 + BLOOM.keep, c.id);
             if (c.event) assert.ok(c.event.endX < fl.x0 || c.event.x > fl.x1);
         }
         for (const r of rescueSpots()) assert.ok(r.x < fl.x0 - BLOOM.keep || r.x > fl.x1 + BLOOM.keep, r.id);

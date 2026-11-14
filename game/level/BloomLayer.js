@@ -63,8 +63,9 @@ const POS = {}, PUSH = { x: 0, y: 0 };
  * them. Built only while the fish is near. `onSeen()` is called the first time the fish is in one.
  */
 export default class BloomLayer {
-    constructor(scene, onSeen) {
-        this.scene = scene; this.onSeen = onSeen; this.seen = false;
+    /** `routeY(x)` = depth of the calm route (the deep fields drift around it). */
+    constructor(scene, routeY, onSeen) {
+        this.scene = scene; this.routeY = routeY; this.onSeen = onSeen; this.seen = false;
         this.fields = bloomFields();
         ensureTextures(scene);      // baked at start-up, not on first sight
         this.live = null;      // { field, blitters: [big, small], bobs: [{ bob, i, k, ox, oy }] }
@@ -72,6 +73,7 @@ export default class BloomLayer {
 
     build(field) {
         const L = BLOOM_LOOK, blitters = KEYS.map((key, k) => this.scene.add.blitter(0, 0, key).setDepth(L.depth[k]).setAlpha(L.alpha[k])), bobs = [];
+        if (field.deep) for (const b of blitters) b.setBlendMode('ADD');      // down there they are lights in the dark
         for (let i = 0; i < BLOOM.count; i++) {
             const k = jellyAt(field, i, 0, POS).small ? 1 : 0, si = (i * 7 + 3) % L.scales.length, ti = (i * 5 + 1) % L.tilts.length;
             bobs.push({ bob: blitters[k].create(0, 0, `${si}_${ti}_0`), i, k, si, ti, ox: 0, oy: 0 });
@@ -94,11 +96,12 @@ export default class BloomLayer {
             const beat = Math.sin(t * 1.9 + j.i), pi = beat > 0.6 ? 2 : beat > 0 ? 1 : 0;
             j.bob.setFrame(`${j.si}_${j.ti}_${pi}`);
             const p = jellyAt(field, j.i, t, POS), h = j.bob.frame.height, w = j.bob.frame.width;
+            if (field.deep) p.y += this.routeY(p.x);
             // Only the big ones share the fish's plane: they are the ones it bumps aside.
             const push = j.k === 0 ? bumpAside(p.x + j.ox, p.y + j.oy, fish.x, fish.y, PUSH) : (PUSH.x = 0, PUSH.y = 0, PUSH);
             j.ox += (push.x - j.ox) * k * (push.x || push.y ? 1 : 0.25); j.oy += (push.y - j.oy) * k * (push.x || push.y ? 1 : 0.25);
             j.bob.setPosition(p.x + j.ox - w / 2, p.y + j.oy - h / 2 - beat * h * L.pulse);
         }
-        if (!this.seen && Math.abs(fish.x - (field.x0 + field.x1) / 2) < BLOOM.seen && fish.y < field.bottom + 200) { this.seen = true; this.onSeen(); }
+        if (!this.seen && Math.abs(fish.x - (field.x0 + field.x1) / 2) < BLOOM.seen && (field.deep || fish.y < field.bottom + 200)) { this.seen = true; this.onSeen(); }
     }
 }
