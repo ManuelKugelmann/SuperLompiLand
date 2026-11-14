@@ -142,7 +142,9 @@ export function createField(seed) {
         if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;
         // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.
         if (Math.abs(x - SHIP_X) < 2600) {
-            const top = pinnacleTop(x) + SET_PIECES.ship.lump * (vnoise(x / 210, 5.3, seed + 31) * 2 - 1);
+            // Broad lumps on its flanks (none under the keel, which must lie in its hollow) and small knobs everywhere.
+            const P = SET_PIECES.ship, flank = Math.min(1, Math.max(0, (Math.abs(x - SHIP_X) - P.pinnacleHalf * 0.6) / 300));
+            const top = pinnacleTop(x) + P.lump * flank * (vnoise(x / 400, 5.3, seed + 31) * 2 - 1) + P.knobs * (vnoise(x / 90, 2.9, seed + 32) * 2 - 1);
             if (y > top) n += (FIELD.crestRock - n) * smooth01((y - top) / 140);
         }
         // The reef crest: solid coral from just under the surface down, whatever the noise says.

@@ -21,7 +21,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 16,
+    version: 17,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -616,6 +616,18 @@ export default class LevelGenerator {
         // Coins are accents, not filling: at most one trail per chunk, and not in
         // every chunk. A trail is a gentle arc leading east, the way the journey
         // goes, so following coins always means making progress.
+        // Along the ghost ship's deck: a row of coins through the hull (their own numbers, from the
+        // top of the chunk's range, so the trails keep theirs).
+        {
+            const ship = ghostShip(), n = SET_PIECES.ship.deckCoins;
+            for (let i = 0; i < n; i++) {
+                const x = ship.x + (i - (n - 1) / 2) * SET_PIECES.ship.coinStep, y = ship.y - 30 - Math.sin((i / (n - 1)) * Math.PI) * 70;
+                if (x < ox || x >= ox + CH || y < oy || y >= oy + CH) continue;
+                const index = 63 - i;
+                placed.push({ x, y });
+                if (!this.state?.has(chunkKey, 'coin', index)) this.addCoin(chunk, x, y, chunkKey, index);
+            }
+        }
         if (rng.frac() < biome.coins * LEVEL.trailChance) {
             let x = ox + rng.between(80, CH * 0.4), y = oy + rng.between(140, CH - 140);
             let heading = rng.realInRange(-0.45, 0.45);
