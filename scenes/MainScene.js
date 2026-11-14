@@ -5,7 +5,7 @@ import WorldState from '../systems/worldState.js';
 import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
-import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor } from '../game/level/biomes.js';
+import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor, dropOffView } from '../game/level/biomes.js';
 import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
@@ -64,6 +64,7 @@ const WORLD = {
     gravity: 0.12,         // gentle sink
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
     lookAhead: 9,         // camera leads the fish by velocity * this
+    wallLook: 0.26,       // at a drop-off the camera looks down by this share of the screen height
     doubleTapMs: 320,
     doubleTapDist: 110,
     maxHealth: 5,
@@ -1072,7 +1073,8 @@ export default class MainScene extends Phaser.Scene {
         const k = 1 - Math.pow(WORLD.cameraEase, delta / STEP_MS);
         const prevX = this.camX, prevY = this.camY;
         this.camX = Phaser.Math.Linear(this.camX, view.x + v.x * WORLD.lookAhead - W / 2, k);
-        this.camY = Phaser.Math.Linear(this.camY, view.y + v.y * WORLD.lookAhead - H / 2, k);
+        // At a drop-off the view tips down: the wall and the blue below it come into the picture.
+        this.camY = Phaser.Math.Linear(this.camY, view.y + v.y * WORLD.lookAhead - H / 2 + WORLD.wallLook * H * dropOffView(view.x), k);
         this.camY = Math.max(this.camY, -760); // room for a jump, not the whole sky
         this.cameras.main.setScroll(this.camX, this.camY);
 

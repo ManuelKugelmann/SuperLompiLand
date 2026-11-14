@@ -180,7 +180,7 @@ export const ABYSS = { x: BIOMES[BIOMES.length - 1].from + 5200, halfWidth: 650,
 // How the seabed gets from one biome's depth to the next (px along the way). Between an island
 // and the sea the whole slope lies on the sea's side, so an island's coast keeps its depth right
 // up to its edge: leaving an island the bottom falls away as a wall, toward one it climbs gently.
-export const SEABED = { dropOff: 900, rise: 2600, coast: 1600, seaEdge: [300, 900] };   // seaEdge: px over which the open sea begins after an island and ends before one
+export const SEABED = { dropOff: 900, rise: 2600, coast: 1600, seaEdge: [300, 900], dropView: 1500 };   // seaEdge: px over which the open sea begins after an island and ends before one; dropView: px to either side of a drop-off over which the view tips down
 
 const smooth = v => { const t = clamp(v, 0, 1); return t * t * (3 - 2 * t); };
 
@@ -210,6 +210,19 @@ export function seaShare(x, cfg = SEABED) {
     const b = BIOMES[biomeIndexAt(x)];
     if (b.zone !== 'sea') return 0;
     return Math.min(smooth((x - b.from) / cfg.seaEdge[0]), smooth((b.from + b.width - x) / cfg.seaEdge[1]));
+}
+
+/**
+ * How much the view should tip down at x (0..1): at a drop-off, where an island's seabed falls
+ * away into the open sea, so the wall and the deep below come into the picture.
+ */
+export function dropOffView(x, cfg = SEABED) {
+    let k = 0;
+    for (let i = 1; i < BIOMES.length; i++) {
+        if (BIOMES[i].zone !== 'sea' || BIOMES[i - 1].zone !== 'island') continue;
+        k = Math.max(k, smooth(1 - Math.abs(x - (BIOMES[i].from + cfg.dropOff * 0.4)) / cfg.dropView));
+    }
+    return k;
 }
 
 /** Seabed depth: shallow along the islands, far down in the open sea between them, plus the abyss. */

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, SEABED, isSea, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor, landmarkGroup, LANDMARK
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, SEABED, isSea, dropOffView, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor, landmarkGroup, LANDMARK
 } from '../game/level/biomes.js';
 
 test('biomes are ordered west to east and every table is complete', () => {
@@ -132,4 +132,16 @@ test('a biome with a landmark shows it where the player arrives: at its entry an
 
 test('the mangrove spot is under the roots at the surface', () => {
     assert.ok(spotFor('mangrove').y < 500);
+});
+
+test('the view tips down at every drop-off and nowhere else', () => {
+    const drops = BIOMES.filter((b, i) => i > 0 && b.zone === 'sea' && BIOMES[i - 1].zone === 'island');
+    assert.ok(drops.length >= 3);
+    for (const b of drops) {
+        assert.ok(dropOffView(b.from + SEABED.dropOff * 0.4) > 0.99, `${b.id}: full at the wall`);
+        assert.ok(dropOffView(b.from - 200) > 0.5, 'already tipping as you come to the edge');
+        assert.equal(dropOffView(b.from + SEABED.dropOff * 0.4 + SEABED.dropView + 10), 0);
+        assert.equal(dropOffView(b.from + b.width / 2), 0, 'not out at sea');
+    }
+    assert.equal(dropOffView(0), 0);
 });
