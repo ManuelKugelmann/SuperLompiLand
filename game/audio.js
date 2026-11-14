@@ -342,7 +342,7 @@ export function updateMusic(biomeId, depth01) {
             for (const hz of chordAt(biomeId, bar).hz) pad(hz, nextBeat, beatS * musicClock.beatsPerBar * SCORE.barsPerChord);
         }
         for (const half of [0, 1]) {
-            const hz = arpAt(biomeId, bar, inBar * 2 + half);
+            const hz = arpAt(biomeId, bar, inBar * 2 + half, depth01);
             if (hz) bellNote(hz, nextBeat + half * beatS / 2);
         }
         nextBeat += beatS;

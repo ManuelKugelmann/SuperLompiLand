@@ -11,7 +11,8 @@ export const SCORE = {
     padOctave: -2,            // pads sit two octaves under the coin melody ...
     lowRoot: 66,              // ... one octave only where the key is this low (MIDI), so they never sink into a hum
     arpOctave: -1,            // the arpeggio one octave under it
-    restChance: 0.45          // share of arpeggio steps left silent (space, not a stream)
+    restChance: 0.45,         // share of arpeggio steps left silent (space, not a stream)
+    deepRest: 0.4             // in the deep (depth 1) this much more of it is silent: the score thins out as the light goes (5.0e)
 };
 
 /** Chord roots as scale degrees, per mood. Bright biomes rise, dark ones circle. */
@@ -37,11 +38,12 @@ export function chordAt(biomeId, bar) {
 /**
  * One arpeggio step (8 steps per bar, eighth notes): a frequency or null (rest).
  * Deterministic from bar and step, so every player in a room hears the same tune.
+ * depth01 (0 surface .. 1 deep) leaves more steps silent.
  */
-export function arpAt(biomeId, bar, step) {
+export function arpAt(biomeId, bar, step, depth01 = 0) {
     const id = biomeOf(biomeId), { root } = chordAt(id, bar);
     const h = Math.sin((bar * 8 + step) * 12.9898 + root * 78.233) * 43758.5453;
-    if (h - Math.floor(h) < SCORE.restChance || step % 2 === 1 && (h * 7 - Math.floor(h * 7)) < 0.5) return null;
+    if (h - Math.floor(h) < SCORE.restChance + SCORE.deepRest * Math.max(0, Math.min(1, depth01)) || step % 2 === 1 && (h * 7 - Math.floor(h * 7)) < 0.5) return null;
     const shape = [0, 2, 4, 7, 4, 2, 4, 9];                  // up and back down, a wave
     return degreeHz(id, SCORE.arpOctave * scaleLen(id) + root + shape[step % 8]);
 }

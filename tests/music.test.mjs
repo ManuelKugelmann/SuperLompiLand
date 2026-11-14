@@ -123,3 +123,12 @@ test('score: every biome has chords in its own key, slow changes, and a sparse a
     }
     assert.deepEqual(chordAt('nowhere', 0), chordAt('reef', 0), 'unknown biome falls back');
 });
+
+test('score: the arpeggio thins out in the deep, never on the surface', async () => {
+    const { arpAt } = await import('../game/music/score.js');
+    const count = depth => { let n = 0; for (let bar = 0; bar < 32; bar++) for (let s = 0; s < 8; s++) if (arpAt('trench', bar, s, depth)) n++; return n; };
+    const top = count(0), deep = count(1);
+    assert.ok(deep < top * 0.5, `deep ${deep} vs surface ${top}`);
+    assert.ok(deep > 0, 'a few notes remain in the dark');
+    assert.equal(count(0), count(undefined), 'depth defaults to the surface');
+});
