@@ -81,6 +81,8 @@ const WORLD = {
     tumbleAt: 4,          // px/step of breaker push that tumbles the fish (squash, bubbles)
     tumbleMs: 900,        // at most one tumble per this long
     rushFull: 9,          // px/step of moving water (surge, breaker, downwelling) heard at full rush
+    creakR: 1800,         // px: the ghost ship is heard creaking this close ...
+    creakMs: 5000,        // ... about this often
     friendBonus: 5,
     schoolRadius: 420,    // friends (other players) this close swim as a school ...
     schoolBoost: 0.1,     // ... each of up to two makes you this much faster
@@ -1207,6 +1209,12 @@ export default class MainScene extends Phaser.Scene {
         const local = this.ambientMode ? null : bird;
         this.seabirds.update(delta / 1000, view.x, local, local ? [local, ...players.slice(1)] : [], shoals);
         this.deepGlow.update(this.cameras.main.worldView, this.time.now / 1000);
+        // The ghost ship groans now and then when you are near it (spec 5.0e).
+        const ship = ghostShip(), shipD = Math.hypot(view.x - ship.x, view.y - ship.y);
+        if (shipD < WORLD.creakR && this.time.now > (this.creakAt || 0)) {
+            this.creakAt = this.time.now + WORLD.creakMs * (0.6 + Math.random() * 0.8);
+            play('creak', 1 - shipD / WORLD.creakR);
+        }
         this.oilExposure(delta / 1000);
         this.bobCoins();
         this.discover(delta);

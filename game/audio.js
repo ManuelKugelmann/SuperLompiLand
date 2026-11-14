@@ -5,6 +5,7 @@
 
 import { createClock } from './music/clock.js';
 import { SCORE, chordAt, arpAt } from './music/score.js';
+import { creakSamples } from './music/creak.js';
 
 /**
  * The one music clock (spec ch.12): visual animation may lock to its beat via
@@ -14,7 +15,7 @@ export const musicClock = createClock();
 export const nowSeconds = () => performance.now() / 1000;
 
 const MUTE_KEY = 'sll_muted';
-let ctx = null, master = null, noiseBuf = null;
+let ctx = null, master = null, noiseBuf = null, creaks = null;
 let muted = (() => { try { return window.localStorage.getItem(MUTE_KEY) === '1'; } catch { return false; } })();
 
 export const isMuted = () => muted;
@@ -183,6 +184,19 @@ const SOUNDS = {
     // Whale song: two long calls that slide, with a high answer.
     whale() { tone({ f: 170, to: 330, dur: 1.5, vol: 0.24 }); tone({ f: 330, to: 150, at: 1.3, dur: 1.9, vol: 0.22 }); tone({ f: 660, to: 880, at: 2.2, dur: 0.9, vol: 0.08 }); },
     hop() { tone({ f: 400, to: 800, type: 'sine', dur: 0.12, vol: 0.16 }); },
+    // Old timbers groaning in the swell (the ghost ship, spec 5.0e; music/creak.js makes the samples).
+    creak(k = 1) {
+        // Three groans are made once (a few ms each) and played in turn, pitched a little apart.
+        if (!creaks) creaks = [0, 1, 2].map(() => {
+            const d = creakSamples(ctx.sampleRate, 0.9 + Math.random() * 0.6), buf = ctx.createBuffer(1, d.length, ctx.sampleRate);
+            buf.getChannelData(0).set(d);
+            return buf;
+        });
+        const src = ctx.createBufferSource(), g = ctx.createGain();
+        src.buffer = creaks[Math.floor(Math.random() * creaks.length)]; src.playbackRate.value = 0.85 + Math.random() * 0.3; g.gain.value = 0.22 * k;
+        src.connect(g).connect(master);
+        src.start();
+    },
     // A seabird calls before it dives (spec 5.0d): two harsh, falling croaks.
     cry() { [0, 0.16].forEach((at, i) => { tone({ f: 980 - i * 120, to: 620 - i * 80, type: 'sawtooth', dur: 0.13, vol: 0.07, at }); noise({ dur: 0.12, vol: 0.05, from: 1800, to: 900, q: 2, at }); }); },
     splash(strength = 1) {

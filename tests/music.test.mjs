@@ -132,3 +132,15 @@ test('score: the arpeggio thins out in the deep, never on the surface', async ()
     assert.ok(deep > 0, 'a few notes remain in the dark');
     assert.equal(count(0), count(undefined), 'depth defaults to the surface');
 });
+
+test('creak: a groan of jittered slips, normalised, silent at both ends', async () => {
+    const { creakSamples } = await import('../game/music/creak.js');
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const d = creakSamples(8000, 1.2, rnd);
+    assert.equal(d.length, 9600);
+    let pk = 0; for (const v of d) pk = Math.max(pk, Math.abs(v));
+    assert.ok(Math.abs(pk - 1) < 1e-6);
+    assert.equal(d[0], 0);
+    let tail = 0; for (let i = d.length - 80; i < d.length; i++) tail = Math.max(tail, Math.abs(d[i]));
+    assert.ok(tail < 0.2, `fades out (${tail})`);
+});
