@@ -10,6 +10,7 @@
 // Pure (no Phaser): the terrain worker shades the layer chunks, RockLayers.js shows them.
 // Tested in tests/rockLayers.test.mjs.
 import { vnoise } from './terrain.js';
+import { softenLayer } from './layerMath.js';
 import { biomeBlendAt, seaShare, waterTone } from './biomes.js';
 import { SHADE } from './shade.js';
 import { FIELD, ROUTE } from './density.js';
@@ -233,29 +234,6 @@ export function layerChunkRect(layer, cx, cy, span = LAYER_CHUNK) {
  */
 const LIFT_LUMA = 128, FOG_LIFT = 0.35;
 
-/**
- * Layer pictures are small (LAYER_SHADE.rockSize for a whole chunk) and drawn several times
- * enlarged: fine bright detail in the material would show as pixel blocks. A one-texel blur of
- * the colour (the outline, in alpha, stays sharp) keeps them soft, as far rock should be.
- */
-export function softenLayer(rgba, size) {
-    const src = Uint8ClampedArray.from(rgba);
-    for (let y = 1; y < size - 1; y++) {
-        for (let x = 1; x < size - 1; x++) {
-            const o = (y * size + x) * 4;
-            if (src[o + 3] === 0) continue;
-            for (let c = 0; c < 3; c++) {
-                let sum = 0, w = 0;
-                for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-                    const q = o + (dy * size + dx) * 4, k = (dx === 0 && dy === 0 ? 4 : dx === 0 || dy === 0 ? 2 : 1) * (src[q + 3] > 0 ? 1 : 0);
-                    sum += src[q + c] * k; w += k;
-                }
-                rgba[o + c] = sum / w;
-            }
-        }
-    }
-    return rgba;
-}
 
 export function fogLayer(rgba, size, ox, oy, span, layer, deepTint = SHADE.deepTint, maxDepth = 5600) {
     const fog = layer.fog;

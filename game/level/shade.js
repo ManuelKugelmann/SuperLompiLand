@@ -13,6 +13,7 @@ import { biomeBlendAt, waterTone } from './biomes.js';
 import { FIELD } from './density.js';
 import { MAT, BIOME_INDEX, materialTiles } from './materials.js';
 import { backRockCover } from './backRock.js';
+import { softenLayer } from './layerMath.js';
 
 export const SHADE = {
     rockSize: 640,        // rock picture, px per chunk side
@@ -276,5 +277,6 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
             back[o + 3] = a * 255;
         }
     }
+    softenLayer(back, B);                                    // drawn enlarged: no pixel blocks
     return { rock, back };
 }
