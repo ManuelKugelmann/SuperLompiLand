@@ -2,6 +2,14 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## A world that holds together: harbour pier, painted mangrove roots, caves with back walls, a glowing main route
+
+[`578708a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/578708a) · 2026-11-14
+
+![Harbour pier with barnacle-covered piles](18-harbour-pier.jpg)
+![Painted mangrove stilt roots; the front roots fade so Lompi stays visible](18-mangrove-roots.jpg)
+![Kelp cave with a stone back wall](18-kelp-cave.jpg)
+
 ## Chains of jumps, flips and specials; bird-like flight; a special of its own for every character
 
 [`56b92fc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/56b92fc) · 2026-11-14 01:23
