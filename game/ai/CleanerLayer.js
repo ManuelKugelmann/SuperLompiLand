@@ -84,7 +84,7 @@ export default class CleanerLayer {
     update(dt, t, fish, viewX = fish?.x ?? 0) {
         for (const s of this.stations) {
             const near = Math.abs(s.x - viewX) < CLEANER_LOOK.near;
-            if (near && !s.view) this.build(s);
+            if (near && !s.view && (this.scene.buildSlot?.() ?? true)) this.build(s);   // one lazy build per frame (MainScene.buildSlot)
             else if (!near && s.view) this.drop(s);
             if (s.view) this.animate(s, dt, t, fish);
         }
