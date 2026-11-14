@@ -48,6 +48,7 @@ export const LEVEL = {
     atlasChunks: 36,      // chunks an atlas holds (a full one falls back to canvases)
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
+    nestClear: 320,       // px to either side of a nest kept free of props and ground cover: the painted nest's own rim of grass and shells shows, its hollow stays open
     frontAlpha: 0.75,     // trees and kelp that stand in front of the fish are this see-through, decided when they are built and never changed
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
@@ -691,7 +692,7 @@ export default class LevelGenerator {
                 const rockUnder = (x, y) => { for (let d = 0; d <= h * p.reach; d += 20) if (this.density(x, y + d) > T) return true; return false; };
                 const below = f => f.y + h * p.sink * 0.8;
                 // Nothing stands out of the water, and the reef crest carries corals only.
-                const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat * (forced ? 2 : 1)
+                const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat * (forced ? 2 : 1) && !this.nests.some(n => Math.abs(n.x - f.x) < LEVEL.nestClear)
                     && f.y - h * (1 - p.sink) > LEVEL.propHeadroom && reefCrest(f.x) === 0
                     && rockUnder(f.x - w * 0.45, below(f)) && rockUnder(f.x + w * 0.45, below(f)));
                 if (!spot) continue;
@@ -728,7 +729,7 @@ export default class LevelGenerator {
             let strips = 0;
             for (const f of floors) {
                 if (strips >= LEVEL.rippleMax) break;
-                if (Math.abs(f.angle) > 0.35 || this.nests.some(n => Math.abs(n.x - f.x) < 320)) continue;      // flat sand only, and not in a nest's basin
+                if (Math.abs(f.angle) > 0.35 || this.nests.some(n => Math.abs(n.x - f.x) < LEVEL.nestClear)) continue;      // flat sand only, and not in a nest's basin
                 const img = keep(s.add.image(f.x, f.y, 'sand_ripples').setOrigin(0.5, 0.1).setRotation(f.angle).setDepth(0.85));
                 img.setScale(Math.max(LEVEL.rippleWidth, f.len * 1.15) / img.width);
                 strips++;
@@ -746,7 +747,7 @@ export default class LevelGenerator {
                 if (placed >= Math.round(MICRO.max * cover)) break;
                 if (f.prop || reefCrest(f.x) > 0 && f.y < 400) continue;      // not under a prop; the crest's top belongs to the corals
                 const m = microAt(biome.id, f.angle, next, microCfg);
-                if (!m) continue;
+                if (!m || this.nests.some(n => Math.abs(n.x - f.x) < LEVEL.nestClear && Math.abs(n.y - f.y) < LEVEL.nestClear)) continue;
                 const img = keep(s.add.image(f.x, f.y + 4, microKey(m.kind, m.variant)).setOrigin(0.5, MICRO_ORIGIN_Y)
                     .setRotation(f.angle).setDepth(0.9).setFlipX(m.flip));
                 img.setScale(m.width / img.width);
