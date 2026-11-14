@@ -52,7 +52,9 @@ import NudiGardenLayer from '../game/level/NudiGardenLayer.js';
 import SecretLayer from '../game/level/SecretLayer.js';
 import { SECRETS, countIn } from '../game/level/secrets.js';
 import DumboLayer from '../game/level/DumboLayer.js';
+import DugongLayer from '../game/level/DugongLayer.js';
 import { powersOf, magnetStep, POWER_WORDS } from '../game/friendPowers.js';
+import { setPlaying } from '../game/pwa.js';
 import BonusCoins from '../game/level/BonusCoins.js';
 import DolphinLayer from '../game/level/DolphinLayer.js';
 import OctopusLayer from '../game/ai/OctopusLayer.js';
@@ -197,6 +199,7 @@ export default class MainScene extends Phaser.Scene {
         // Ambient reef (spec ch.12): the game as a meditative background. Lompi swims
         // on autopilot, no HUD, nothing hurts, any tap returns to the title.
         this.ambientMode = !!this.registry.get('ambient');
+        setPlaying(!this.ambientMode);      // no update or reload while a game runs: it waits for the title or the end screen
         if (this.ambientMode) this.relaxed = true;
 
         this.matter.world.setGravity(0, WORLD.gravity);
@@ -323,6 +326,8 @@ export default class MainScene extends Phaser.Scene {
         this.nudis = new NudiGardenLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), kind => this.bookEntry(kind));
         // A dumbo octopus in the trench (user reference): flaps its ear fins, drifts over to look at Lompi.
         this.dumbo = new DumboLayer(this, x => this.level.field.routeY(x), kind => this.bookEntry(kind));
+        // A dugong grazing at the lagoon's seagrass meadow (user reference): lifts its head to look at Lompi.
+        this.dugong = new DugongLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), kind => this.bookEntry(kind));
         // Three pearls hidden in clams in every area (spec 5.0r): a small reason to dive down and look.
         this.pearls = new Set(this.progression.get?.('secrets', []) || []);
         this.secrets = this.ambientMode ? null : new SecretLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), x => this.level.field.routeY(x), this.pearls, s => this.pearlFound(s));
@@ -1790,6 +1795,7 @@ export default class MainScene extends Phaser.Scene {
         this.stingray.update(sp, time / 1000);
         this.nudis.update(sp, time / 1000);
         this.dumbo.update(sp, time / 1000, delta / 1000);
+        this.dugong.update(sp, time / 1000, delta / 1000);
         this.secrets?.update(sp, time / 1000);
         this.dolphins.update(sp, time / 1000, delta);
         { const fv = this.fish.sprite.body.velocity; this.octopus.update(sp, Math.hypot(fv.x, fv.y), time / 1000, delta); }

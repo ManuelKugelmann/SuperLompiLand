@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SCENE_KEYS } from './keys.js';
 import { chapters } from '../game/journey.js';
 import { createRig } from '../game/CardRig.js';
+import { setPlaying } from '../game/pwa.js';
 
 export default class EndScene extends Phaser.Scene {
     constructor() {
@@ -9,6 +10,7 @@ export default class EndScene extends Phaser.Scene {
     }
 
     create(data) {
+        setPlaying(false);      // the game is over: an update that waited may be applied
         const W = this.scale.width, H = this.scale.height;
         const de = (this.registry.get('currentLanguage') || 'de') === 'de';
         const score = data?.score ?? 0;

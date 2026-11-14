@@ -108,7 +108,7 @@ function install(game) {
     if (handheld && !isStandalone()) {
         const goFull = () => {
             const el = document.documentElement;
-            if (document.fullscreenElement || !el.requestFullscreen) return;
+            if (windowed || document.fullscreenElement || !el.requestFullscreen) return;
             el.requestFullscreen({ navigationUI: 'hide' })
                 .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
                 .catch(() => {});
@@ -156,4 +156,21 @@ export function keepInSafeArea(scene) {
     const rotated = !!scene.game.registry.get('landscapeRotated'), W = scene.scale.width, H = scene.scale.height;
     const v = safeView(W, H, gameInsets(page, rotated, W / (rotated ? window.innerHeight : window.innerWidth)));
     scene.cameras.main.setViewport(v.x, v.y, v.width, v.height).setZoom(v.zoom).setScroll(v.scrollX, v.scrollY);
+}
+
+// The player's own choice (the top bar's fullscreen button): once they leave fullscreen with it, taps no longer ask for it again.
+let windowed = false;
+
+/** Is the page in fullscreen now? */
+export const isFullscreen = () => !!document.fullscreenElement;
+
+/** Whether this browser can do fullscreen at all (an installed app already fills the screen). */
+export const canFullscreen = () => !!document.documentElement.requestFullscreen && !isStandalone();
+
+/** The top bar's button: leave fullscreen (and stay out of it), or go back in. Returns the new state asked for. */
+export function toggleFullscreen() {
+    if (document.fullscreenElement) { windowed = true; document.exitFullscreen?.().catch(() => {}); return false; }
+    windowed = false;
+    document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+    return true;
 }

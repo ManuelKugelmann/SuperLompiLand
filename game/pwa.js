@@ -55,8 +55,19 @@ async function liveBuild() {
     }
 }
 
+// Never reload in the middle of play (user 2026-11-14): while a game is running an update only
+// waits; it is applied the next time the title screen shows (setPlaying(false)).
+let playing = false, pendingReload = null;
+
+/** The scenes say whether a game is running. Leaving play applies an update that was waiting. */
+export function setPlaying(on) {
+    playing = !!on;
+    if (!playing && pendingReload) { const go = pendingReload; pendingReload = null; go(); }
+}
+
 /** Drop every cache + worker and reload. Guarded so it can never loop. */
 async function hardRefresh(target) {
+    if (playing) { pendingReload = () => hardRefresh(target); return false; }
     try {
         if (sessionStorage.getItem(RELOAD_GUARD) === target) return false;
         sessionStorage.setItem(RELOAD_GUARD, target);
@@ -103,7 +114,8 @@ if (typeof window !== 'undefined' && !IS_DEV) {
         sw.addEventListener('controllerchange', () => {
             if (!hadController || reloaded) return;
             reloaded = true;
-            window.location.reload();
+            if (playing) pendingReload = () => window.location.reload();
+            else window.location.reload();
         });
     }
     window.addEventListener('load', () => { setTimeout(() => checkForUpdate(true), 1500); });

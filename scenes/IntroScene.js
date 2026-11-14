@@ -7,7 +7,7 @@ import HudScene, { HUD_KEY } from './HudScene.js';
 import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
 import ReefBookScene, { BOOK_KEY } from './ReefBookScene.js';
 import PlayStyleScene, { STYLE_KEY } from './PlayStyleScene.js';
-import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
+import { pwaMenuItems, VERSION_TAG, setPlaying } from '../game/pwa.js';
 import { CHARACTERS, getCharacter, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import ProgressionManager from '../systems/ProgressionManager.js';
 import { fromCookie } from '../systems/savepoints.js';
@@ -45,6 +45,7 @@ import { GARDEN_ART } from '../game/level/JellyGardenLayer.js';
 import { HEART_FILES } from '../game/ui/kit.js';
 import { NUDI_ART } from '../game/level/NudiGardenLayer.js';
 import { DUMBO_ART } from '../game/level/DumboLayer.js';
+import { DUGONG_ART } from '../game/level/DugongLayer.js';
 import { FAR_ART } from '../game/level/FarLayers.js';
 import { ARCHER_ART } from '../game/level/ArcherLayer.js';
 import { EEL_ART } from '../game/level/GardenEelLayer.js';
@@ -143,7 +144,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.textures.exists('hull_bottom')) this.load.image('hull_bottom', 'img/props/hull_bottom.webp');
         for (const [key, file] of Object.entries(SHIP_FILES.images)) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.cache.json.exists(SHIP_FILES.json[0])) this.load.json(SHIP_FILES.json[0], SHIP_FILES.json[1]);
-        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART, ...VENT_ART, ...GARDEN_ART, ...HEART_FILES, ...NUDI_ART, ...DUMBO_ART, ...FAR_ART, ...ARCHER_ART, ...EEL_ART, ...RAY_ART, ...SIPHON_ART, ...CONTAINER_ART, ...DOLPHIN_ART, ...OCTOPUS_ART, ...SANDBAR_ART, ...GRAND_ART, ...CONTROL_ART, ...COLONY_ART, ...SHARK_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
+        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART, ...VENT_ART, ...GARDEN_ART, ...HEART_FILES, ...NUDI_ART, ...DUMBO_ART, ...DUGONG_ART, ...FAR_ART, ...ARCHER_ART, ...EEL_ART, ...RAY_ART, ...SIPHON_ART, ...CONTAINER_ART, ...DOLPHIN_ART, ...OCTOPUS_ART, ...SANDBAR_ART, ...GRAND_ART, ...CONTROL_ART, ...COLONY_ART, ...SHARK_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
         for (const [key, file] of Object.entries({ ...PUP_ART, ...GANNET_ART, ...SEAL_ART, ...SEA_LION_ART, ...SEA_OTTER_ART, ...FERRY_ART })) if (!this.textures.exists(key)) this.load.image(key, file);      // the coder's sights (a line of its own: fewer merge conflicts)
         if (!this.textures.exists(MANTA_ART.key)) this.load.image(MANTA_ART.key, MANTA_ART.file);
         if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');
@@ -167,6 +168,7 @@ export default class IntroScene extends Phaser.Scene {
 
     create() {
         fitToWindow(this.game);     // the picture fills the screen, whatever its shape
+        setPlaying(false);          // on the title an update that waited during play may be applied
         const W = this.scale.width, H = this.scale.height;
         const lang = this.registry.get('currentLanguage') || 'de';
         // A phone's browser reshapes the window all the time by a few pixels (its address bar comes

@@ -7,7 +7,7 @@ import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { feedbackMenuItems } from '../game/feedback.js';
 import { soundMenuItem } from '../game/audio.js';
-import { keepInSafeArea } from '../game/orientation.js';
+import { keepInSafeArea, canFullscreen, isFullscreen, toggleFullscreen } from '../game/orientation.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
@@ -151,6 +151,14 @@ export default class HudScene extends Phaser.Scene {
         x -= s + gap;
         // The reef book.
         button(x, x0 => this.add.text(x0, y + 2, '📖', { fontSize: `${Math.round(s * 0.5)}px` }).setOrigin(0.5), () => m.openBook());
+        // Fullscreen on or off (user: 'add exit fullscreen button to topbar'); only where the browser can do it.
+        if (canFullscreen()) {
+            x -= s + gap;
+            const face = button(x, x0 => this.add.text(x0, y, isFullscreen() ? '⤡' : '⤢', textStyle(Math.round(s * 0.5))).setOrigin(0.5), () => { face.setText(toggleFullscreen() ? '⤡' : '⤢'); });
+            const sync = () => face.setText(isFullscreen() ? '⤡' : '⤢');
+            document.addEventListener('fullscreenchange', sync);
+            this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => document.removeEventListener('fullscreenchange', sync));
+        }
         x -= s / 2 + gap;
         this.fpsText = this.add.text(x, y, '', textStyle(22)).setOrigin(1, 0.5).setAlpha(0.8);
         this.fpsAt = 0;
