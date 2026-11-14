@@ -57,6 +57,8 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import GrandNestLayer from '../game/level/GrandNestLayer.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
+import SurgeChannelLayer from '../game/level/SurgeChannelLayer.js';
+import { channelLean } from '../game/level/surgeChannel.js';
 import GannetLayer from '../game/level/GannetLayer.js';
 import SealLayer from '../game/level/SealLayer.js';
 import FerryLayer from '../game/level/FerryLayer.js';
@@ -261,6 +263,9 @@ export default class MainScene extends Phaser.Scene {
         this.seal = new SealLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('seal'));
         // Gannets behind the sea arch (spec 5.0o): they plunge in ahead of the fish one after the other and swim up with a catch.
         this.gannets = new GannetLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('gannet'));
+        // The kelp forest's surge channel (spec 5.0o): the swell carries the fish on, draws it back a little, and the kelp leans with it.
+        this.surgeChannel = new SurgeChannelLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('surge_channel'));
+        this.level.lean = x => (this.surgeChannel.live ? channelLean(x, this.time.now / 1000) : 0);
         // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
         this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
@@ -1051,6 +1056,7 @@ export default class MainScene extends Phaser.Scene {
         if (this.ventField?.live) { this.ventField.flowAt(x, y, add); out.y += add.y; }      // warm water rising over the smokers
         if (this.jellyGarden?.live) { this.jellyGarden.flowAt(x, y, this.time.now / 1000, add); out.y += add.y; }      // the jellies' puffs
         if (this.ferry?.live) { this.ferry.flowAt(x, y, add); out.x += add.x; }      // the ferry's wash
+        if (this.surgeChannel?.live) { this.surgeChannel.flowAt(x, y, this.time.now / 1000, add); out.x += add.x; }      // the kelp forest's surge channel
         return out;
     }
 
@@ -1681,6 +1687,7 @@ export default class MainScene extends Phaser.Scene {
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);
+        this.surgeChannel.update(sp, time / 1000, delta);
         this.gannets.update(sp, this.fish.facing, time / 1000);
         this.seal.update(sp, time / 1000, delta / 1000);
         this.ferry.update(sp, this.fish.facing, time / 1000, delta);

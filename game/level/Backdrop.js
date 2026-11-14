@@ -10,7 +10,32 @@ import SeaFarLayer from './SeaFarLayer.js';
  */
 /** Far fish schools are placed again once this far outside the picture (px). */
 /** The surface crest line: behind the fish (full) and in front of it (a thin meniscus). */
-const WATERLINE = { back: { width: 6, alpha: 0.85, depth: 4.9 }, front: { width: 2, alpha: 0.4, depth: 6 } };
+const WATERLINE = {
+    step: 32,      // px between two points of the wave line
+    sea: { key: 'waterline_sea', height: 320, solid: 80, colour: '155,233,239' },      // px tall; solid sea colour for the first `solid` px, then fading out
+    back: { key: 'waterline_back', width: 6, alpha: 0.85, depth: 4.9 },
+    front: { key: 'waterline_front', width: 2, alpha: 0.4, depth: 6 }
+};
+
+/** The waterline's three pictures, painted once: the sea band (a strip that fades downward) and the two white crest lines. */
+function makeWaterline(scene) {
+    const T = scene.textures, S = WATERLINE.sea;
+    if (!T.exists(S.key)) {
+        const t = T.createCanvas(S.key, 8, S.height), c = t.getContext();
+        for (let y = 0; y < S.height; y++) {
+            const k = (y - S.solid) / (S.height - S.solid);
+            c.fillStyle = `rgba(${S.colour},${y < S.solid ? 1 : 0.9 * (1 - k) ** 1.6})`;
+            c.fillRect(0, y, 8, 1);
+        }
+        t.refresh();
+    }
+    for (const L of [WATERLINE.back, WATERLINE.front]) {
+        if (T.exists(L.key)) continue;
+        const t = T.createCanvas(L.key, 8, L.width), c = t.getContext();
+        c.fillStyle = '#ffffff'; c.fillRect(0, 0, 8, L.width);
+        t.refresh();
+    }
+}
 
 /** The backdrop water from the surface (0) to the bottom of the screen (1): brightness shares of the top. */
 const WATER_GRADIENT = [[0, 1], [0.25, 0.9], [0.6, 0.63], [1, 0.46]];
@@ -51,12 +76,17 @@ export default class Backdrop {
             .setDepth(-29.5).setScrollFactor(0, 1);
         this.seaFar = new SeaFarLayer(scene);            // the open sea's far view: the next island's socket, marine snow, big shapes passing
         this.sky = new SkyLayer(scene);                  // clouds, birds, the coast and the volcano on the horizon
-        this.sea = scene.add.graphics().setDepth(-28);   // water body drawn over the sky, wavy top edge
-        // The crest line: bright just behind the fish, and a thin faint meniscus in front of it,
-        // so a fish half out of the water reads as crossing the surface without a white slice
-        // through its face (WATERLINE).
-        this.foamBack = scene.add.graphics().setDepth(WATERLINE.back.depth);
-        this.foam = scene.add.graphics().setDepth(WATERLINE.front.depth);
+        // The waterline: three bands that follow the waves (ropes: only their points move each frame;
+        // a filled path would be cut into triangles again every frame). `sea` = the water body over
+        // the sky with its wavy top edge. The crest line: bright just behind the fish, and a thin
+        // faint meniscus in front of it, so a fish half out of the water reads as crossing the
+        // surface without a white slice through its face (WATERLINE).
+        makeWaterline(scene);
+        const along = Array.from({ length: Math.ceil((W + 80) / WATERLINE.step) + 1 }, () => new Phaser.Math.Vector2());
+        const band = (key, depth, alpha) => scene.add.rope(0, 0, key, null, along.map(v => v.clone()), true).setDepth(depth).setAlpha(alpha).setVisible(false);
+        this.sea = band(WATERLINE.sea.key, -28, 1);
+        this.foamBack = band(WATERLINE.back.key, WATERLINE.back.depth, WATERLINE.back.alpha);
+        this.foam = band(WATERLINE.front.key, WATERLINE.front.depth, WATERLINE.front.alpha);
 
         // The volcano's glow on the eastern horizon: always shows which way the journey goes.
         makeSoft(scene);
@@ -125,25 +155,22 @@ export default class Backdrop {
         this.sky.update(camX, camY);
         this.seaFar.update(camX, camY, dx, dy, this.scene.game.loop.delta);
         // Waterline: only when it is on screen.
-        this.sea.clear();
-        this.foam.clear();
-        this.foamBack.clear();
-        if (camY < 80) {
-            const pts = [];
-            for (let sx = -40; sx <= W + 40; sx += 32) pts.push({ x: camX + sx, y: surface.heightAt(camX + sx, t) });
-            // Sky is a screen-wide image; hide the part below the waves with sea colour.
-            // The sky image reaches a little below sea level; cover it from the
-            // wave line down with a bright band that fades into the depth gradient.
-            const x0 = pts[0].x, x1 = pts[pts.length - 1].x;
-            this.sea.fillStyle(0x9be9ef, 1).beginPath().moveTo(x0, 62);
-            for (const p of pts) this.sea.lineTo(p.x, p.y);
-            this.sea.lineTo(x1, 62).closePath().fillPath();
-            for (let k = 0; k < 40; k++) this.sea.fillStyle(0x9be9ef, 0.9 * (1 - k / 40) ** 1.6).fillRect(x0, 62 + k * 6, x1 - x0, 6);
-            for (const [g, L] of [[this.foamBack, WATERLINE.back], [this.foam, WATERLINE.front]]) {
-                g.lineStyle(L.width, 0xffffff, L.alpha).beginPath().moveTo(pts[0].x, pts[0].y);
-                for (const p of pts) g.lineTo(p.x, p.y);
-                g.strokePath();
+        const shown = camY < 80;
+        for (const band of [this.sea, this.foamBack, this.foam]) band.setVisible(shown);
+        if (shown) {
+            // Sky is a screen-wide image; the sea band hides the part of it below the waves: sea colour
+            // from the wave line down, fading into the depth gradient (its picture, WATERLINE.sea).
+            // A wider view than the bands were made for (the window grew): more points.
+            const need = Math.ceil((W + 80) / WATERLINE.step) + 1;
+            if (this.sea.points.length < need) for (const band of [this.sea, this.foamBack, this.foam]) band.setPoints(Array.from({ length: need }, () => new Phaser.Math.Vector2()));
+            const n = this.sea.points.length, half = WATERLINE.sea.height / 2;
+            for (let i = 0; i < n; i++) {
+                const x = camX - 40 + i * WATERLINE.step, y = surface.heightAt(x, t);
+                this.sea.points[i].set(x, y + half);      // a band is centred on its points: this one hangs down from the wave line
+                this.foamBack.points[i].set(x, y);
+                this.foam.points[i].set(x, y);
             }
+            for (const band of [this.sea, this.foamBack, this.foam]) band.setDirty();
         }
 
         const depthFade = Math.max(0.25, 1 - depth * 0.8);

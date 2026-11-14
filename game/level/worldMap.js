@@ -29,6 +29,7 @@ import { nurserySpot } from './nursery.js';
 import { gardenSpot } from './jellyGarden.js';
 import { archerX } from './archerfish.js';
 import { siphonSpots } from './siphonophore.js';
+import { channelSpot } from './surgeChannel.js';
 import { gannetSpot } from './gannets.js';
 import { sealSpot } from './seal.js';
 import { ferrySpot } from './ferry.js';
@@ -60,7 +61,7 @@ export const SCENERY_KINDS = ['colony', 'arch'];
  * Kinds that are a landmark (spec 5.0n): what moves or answers the child (animals that act, toys,
  * rides, rescues, weather). Still scenery, however big, is not.
  */
-export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion', 'otter', 'ferry', 'seal', 'gannets'].filter(k => !SCENERY_KINDS.includes(k));
+export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion', 'otter', 'ferry', 'seal', 'gannets', 'surge'].filter(k => !SCENERY_KINDS.includes(k));
 
 
 /** Landmarks merged into moments (those closer than `merge` play as one): [{ x0, x1, kinds }], west to east. */
@@ -140,6 +141,7 @@ export function worldMap() {
     span('jelly_garden', gardenSpot().x0, gardenSpot().x1);
     spot('archerfish', archerX());
     for (const sp of siphonSpots()) span('siphonophore', sp.x0, sp.x1);
+    span('surge', channelSpot().x0, channelSpot().x1);
     span('gannets', gannetSpot().x0, gannetSpot().x1);
     span('seal', sealSpot().x0, sealSpot().x1);
     span('ferry', ferrySpot().x0, ferrySpot().x1);

@@ -189,6 +189,7 @@ export default class LevelGenerator {
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
         this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
         this.job = null;        // the chunk build in progress (build() is cut into steps)
+        this.lean = null;       // x -> how far plants there lean with a swell of their place (east positive, in the surf surge's measure), or null
         this.stepMax = new Map();   // step name -> { ms, x }: the slowest it has been and where the view was (perf tour, ?debug=perf)
         this.started = false;   // the first update builds what is on screen at once (behind the start's fade); later jumps go through the worker
         this.viewReady = false; // every chunk on screen is complete
@@ -422,7 +423,8 @@ export default class LevelGenerator {
             if (!o.active || !inView(o)) continue;
             if (o.isPlant && fish) {
                 // In the surf zone the plants lean with every push of the surge and swing back with the backwash.
-                const surge = o.surf ? -surgeWave(o.x, waves) * o.surf * LEVEL.surgeLean : 0;
+                // ... and where another swell runs (the kelp forest's surge channel: `lean`, set by the scene), with that.
+                const surge = (o.surf ? -surgeWave(o.x, waves) * o.surf : 0) * LEVEL.surgeLean + (this.lean ? this.lean(o.x) * LEVEL.surgeLean : 0);
                 // Swimming past pushes plants aside; they swing back when it is calm.
                 const dx = o.x - fish.x, d = Math.hypot(dx, o.y - fish.y);
                 const push = d < LEVEL.wakeRadius ? Math.sign(dx || 1) * (1 - d / LEVEL.wakeRadius) * Math.min(1, speed / 9) : 0;
