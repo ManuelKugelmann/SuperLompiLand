@@ -45,8 +45,8 @@ export const NEAR_COAST = {
     scroll: 0.5,           // share of the camera's movement (nearer than the far skyline, but a coast on the horizon)
     width: 1400,           // px of one piece at size 1
     size: [0.4, 0.56],     // (playtest: "no foreground islands": a coast sits on the horizon behind the sea, never big and dark over the swimmer)
-    alpha: 0.85,           // hazed by the air between ...
-    tint: 0xbfe0ea,        // ... which also takes its darks toward the sky's colour
+    alpha: 0.94,           // the air between is baked into the pictures (scripts/fx/coast_haze.py) ...
+    tint: 0xf2fbff,        // ... a tint only multiplies, so it just cools them a touch
     gap: [0.5, 1.6],       // gap after a piece, in piece widths (small: the island shows on most jumps)
     edge: 0.08,            // share of the biome left free at both ends (its neighbours' coasts take over)
     biomes: ['reef', 'kelp', 'harbour', 'shore']
