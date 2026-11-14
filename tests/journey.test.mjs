@@ -53,3 +53,13 @@ test('progress runs 0..1 across the world and the chapter follows the place', ()
     assert.equal(j.total, 6);
     assert.ok(JOURNEY.far > JOURNEY.near && JOURNEY.specialRadius > JOURNEY.freeRadius);
 });
+
+test('the whale waits in the open blue, after the friend there, and is remembered without counting as a friend', () => {
+    const j = createJourney();
+    const blue = j.list.find(c => c.id === 'blue'), ev = j.event('whale');
+    assert.ok(ev && ev.x > blue.x && ev.endX > ev.x);
+    assert.equal(j.event('nothing'), null);
+    assert.equal(j.free('whale'), true);
+    assert.equal(j.count, 0);
+    assert.ok(createJourney(j.toJSON()).has('whale'));
+});

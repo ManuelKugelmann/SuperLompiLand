@@ -27,6 +27,7 @@ import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
+import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
 import { ROUTE } from '../game/level/density.js';
 import { BOOK_KEY, placeBadge } from './ReefBookScene.js';
@@ -129,6 +130,10 @@ export default class MainScene extends Phaser.Scene {
         // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
         this.journey = createJourney(this.progression.get?.('journey', []) || []);
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y));
+        // The great whale of the open blue: free her from the net and she carries you east (spec 9.0).
+        const whaleAt = this.journey.event(WHALE_SCENE.id);
+        this.whale = this.ambientMode || !whaleAt ? null
+            : new Whale(this, this.journey, whaleAt.x, whaleAt.endX, x => this.level.field.routeY(x), (ev, x, y) => this.whaleEvent(ev, x, y));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -363,6 +368,29 @@ export default class MainScene extends Phaser.Scene {
             this.tweens.add({ targets: heart, x: x + Math.cos(a) * 230, y: y + Math.sin(a) * 180 - 60, alpha: 0, duration: 1300, ease: 'Sine.easeOut', onComplete: () => heart.destroy() });
         }
         this.events.emit('journey-free', ch);
+    }
+
+    /** The great whale's story, as it happens (game/Whale.js). */
+    whaleEvent(ev, x, y) {
+        const de = this.lang === 'de';
+        if (ev === 'cut') {
+            play('grab');
+            this.announce('', de ? 'Noch ein Stück Netz!' : 'One more piece of net!');
+        } else if (ev === 'freed') {
+            this.journey.free(WHALE_SCENE.id);
+            this.progression.set?.('journey', this.journey.toJSON());
+            this.coins += JOURNEY.coins * 2;
+            this.health = this.maxHealth;
+            play('whale'); play('nest');
+            this.announce(de ? 'Der Wal ist frei!' : 'The whale is free!', de ? 'Bleib an ihrem Rücken: sie trägt dich!' : 'Stay at her back: she will carry you!');
+            for (let i = 0; i < 12; i++) {
+                const a = (i / 12) * Math.PI * 2;
+                const heart = this.add.text(x, y, '♥', { fontFamily: 'Arial', fontSize: '72px', color: '#ff6b9a', stroke: '#ffffff', strokeThickness: 8 }).setOrigin(0.5).setDepth(8);
+                this.tweens.add({ targets: heart, x: x + Math.cos(a) * 520, y: y + Math.sin(a) * 300 - 80, alpha: 0, duration: 1700, ease: 'Sine.easeOut', onComplete: () => heart.destroy() });
+            }
+        } else if (ev === 'ride') {
+            play('whale');
+        }
     }
 
     /** Swam into a nest: coins are safe, this is the new restart point. */
@@ -1079,6 +1107,11 @@ export default class MainScene extends Phaser.Scene {
         this.rockLayers.update(this.camX, this.camY);
         this.waterLight.update();
         this.beats?.update(sp, time / 1000, delta);
+        if (this.whale) {
+            this.whale.update(sp, time / 1000, delta);
+            const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);
+            if (pull) sp.setVelocity(pull.x, pull.y);
+        }
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
         const t2 = performance.now();

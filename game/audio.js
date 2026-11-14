@@ -180,6 +180,8 @@ const SOUNDS = {
     // Water elements: a bubble cannon's deep pop with a rush of air, a pad's rubbery boing.
     cannon() { tone({ f: 110, to: 320, type: 'sine', dur: 0.22, vol: 0.24 }); noise({ dur: 0.34, vol: 0.2, from: 400, to: 3200, q: 0.7 }); },
     boing() { tone({ f: 190, to: 560, type: 'triangle', dur: 0.2, vol: 0.2 }); tone({ f: 380, to: 300, type: 'sine', at: 0.16, dur: 0.14, vol: 0.1 }); },
+    // Whale song: two long calls that slide, with a high answer.
+    whale() { tone({ f: 170, to: 330, dur: 1.5, vol: 0.24 }); tone({ f: 330, to: 150, at: 1.3, dur: 1.9, vol: 0.22 }); tone({ f: 660, to: 880, at: 2.2, dur: 0.9, vol: 0.08 }); },
     hop() { tone({ f: 400, to: 800, type: 'sine', dur: 0.12, vol: 0.16 }); },
     splash(strength = 1) {
         // Soft and airy; a hard dive is only a little louder than a gentle one.

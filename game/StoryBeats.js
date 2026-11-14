@@ -17,10 +17,10 @@ export const BEATS = {
     leaveSpeed: 7       // px per step
 };
 
-const NET_KEY = 'beat_net';
+export const NET_KEY = 'beat_net';
 
 /** The ghost net as a picture: a sagging mesh of old rope (fallback art, drawn once). */
-function ensureNet(scene) {
+export function ensureNet(scene) {
     if (scene.textures.exists(NET_KEY)) return;
     const S = 256, c = S / 2, g = scene.make.graphics({ add: false });
     g.lineStyle(5, 0xb9a27a, 0.95);
