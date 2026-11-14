@@ -18,6 +18,7 @@ import { CAUSTICS, installCaustics } from '../fx/CausticsPipeline.js';
 import { getCharacter, loadSelectedId } from '../characters.js';
 import { coralSize } from './coralSizes.js';
 import { SHADE, shadeChunk } from './shade.js';
+import ChunkAtlas from './ChunkAtlas.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import { SIZES } from '../scale.js';
@@ -40,7 +41,9 @@ export const LEVEL = {
     earlyPerFrame: 3,     // chunks that get their early collision per frame
     edgeBatch: 2,         // collision strips made per build step
     coinBatch: 1,         // coins of a trail made per build step
-    rockStrips: 4,        // the rock picture of a chunk is painted in this many strips, a build step each
+    rockStrips: 4,        // the rock picture of a chunk is painted (or sent to its atlas) in this many strips, a build step each
+    atlas: true,          // chunk pictures share two atlas textures (one draw call for all of a kind, no canvas); false = a canvas texture per picture, as before
+    atlasChunks: 36,      // chunks an atlas holds (a full one falls back to canvases)
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
@@ -243,6 +246,19 @@ export default class LevelGenerator {
         // for the chunks' own pictures follow right after the first view is built (update).
         ensureGrandArch(scene);
         if (scene.textures.exists('grand_garden')) ensureGardenGlow(scene);
+        this.atlases = LEVEL.atlas ? this.chunkAtlases() : null;
+    }
+
+    /** The two atlases of chunk pictures ({ back, rock }), made once per game (they live in its registry), or null where they cannot be had. */
+    chunkAtlases() {
+        const reg = this.scene.registry, t = this.scene.textures;
+        let a = reg.get('chunkAtlases');
+        if (a && t.exists(a.back.key) && t.exists(a.rock.key)) { a.back.reset(); a.rock.reset(); return a; }
+        const back = ChunkAtlas.make(this.scene, 'chunk_atlas_back', SHADE.backSize, LEVEL.atlasChunks);
+        const rock = back && ChunkAtlas.make(this.scene, 'chunk_atlas_rock', SHADE.rockSize, LEVEL.atlasChunks);
+        a = back && rock ? { back, rock } : null;
+        reg.set('chunkAtlases', a);
+        return a;
     }
 
     /** Fills the pool of chunk canvases (canvasFor) up to LEVEL.canvasWarm chunks' worth: making a canvas uploads it once, a long step on a phone. */
@@ -371,7 +387,7 @@ export default class LevelGenerator {
             const [cx, cy] = key.split(',').map(Number);
             if (!wanted(cx, cy)) this.dropEarly(key);
         }
-        if (!this.started) this.warmCanvasPool();      // after the first view has taken its canvases: the reserve for play
+        if (!this.started && !this.atlases) this.warmCanvasPool();      // after the first view has taken its canvases: the reserve for play
         this.started = true;
         this.viewReady = true;
         for (let cy = Math.max(0, Math.floor(camY / CH)); cy <= Math.floor((camY + H) / CH) && this.viewReady; cy++) {
@@ -529,17 +545,33 @@ export default class LevelGenerator {
             keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
         };
         if (!baked) { yield 'shade'; if (chunk.dead) return; }
-        const back = paint('back', pics.back, SHADE.backSize);
-        yield 'paint back'; if (chunk.dead) return;
-        show(back, SHADE.backSize, -6);
-        yield 'upload back'; if (chunk.dead) return;
-        let rock = null;
-        for (let strip = 0; strip < LEVEL.rockStrips; strip++) {
-            rock = paint('rock', pics.rock, SHADE.rockSize, strip, LEVEL.rockStrips);
-            yield 'paint rock'; if (chunk.dead) return;
+        // With the atlases: each picture goes straight to its place in the shared texture, the rock in strips.
+        const A = this.atlases, place = A && A.back.slots.free && A.rock.slots.free ? [A.back.take(), A.rock.take()] : null;
+        if (place) {
+            chunk.places = [[A.back, place[0]], [A.rock, place[1]]];      // given back when the chunk is dropped
+            const put = (atlas, i, depth) => keep(s.add.image(ox, oy, atlas.key, String(i)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth));
+            A.back.upload(place[0], pics.back, 0, SHADE.backSize);
+            put(A.back, place[0], -6);
+            yield 'upload back'; if (chunk.dead) return;
+            const rows = SHADE.rockSize / LEVEL.rockStrips;
+            for (let strip = 0; strip < LEVEL.rockStrips; strip++) {
+                A.rock.upload(place[1], pics.rock, strip * rows, rows);
+                yield 'upload rock'; if (chunk.dead) return;
+            }
+            put(A.rock, place[1], -2);
+        } else {
+            const back = paint('back', pics.back, SHADE.backSize);
+            yield 'paint back'; if (chunk.dead) return;
+            show(back, SHADE.backSize, -6);
+            yield 'upload back'; if (chunk.dead) return;
+            let rock = null;
+            for (let strip = 0; strip < LEVEL.rockStrips; strip++) {
+                rock = paint('rock', pics.rock, SHADE.rockSize, strip, LEVEL.rockStrips);
+                yield 'paint rock'; if (chunk.dead) return;
+            }
+            show(rock, SHADE.rockSize, -2);
+            yield 'upload rock'; if (chunk.dead) return;
         }
-        show(rock, SHADE.rockSize, -2);
-        yield 'upload rock'; if (chunk.dead) return;
 
         // Collision strips and floor spots come from the coarse grid (corners
         // shared with the neighbours -> seamless).
@@ -1354,6 +1386,7 @@ export default class LevelGenerator {
         for (const b of chunk.bodies) this.scene.matter.world.remove(b);
         for (const o of chunk.objects) { this.scene.tweens.killTweensOf(o); o.destroy(); }
         for (const key of chunk.textures) this.poolCanvas(key);
+        for (const [atlas, i] of chunk.places || []) atlas.give(i);
         this.chunks.delete(key);
         this.coins = this.coins.filter(c => c.img.active);
         this.hazards = this.hazards.filter(h => h.img.active);
