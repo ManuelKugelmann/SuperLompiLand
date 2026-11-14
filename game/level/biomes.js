@@ -81,9 +81,10 @@ export const BIOMES = [
         hazards: { hazard_net: 4, hazard_buoy: 3, mine: 2, spikes: 2 }
     },
     {
+        // No light down here: no reef corals and no seaweed (review R2).
         id: 'trench', name: { de: 'Tiefsee', en: 'Deep Trench' },
         rock: [0x7f86c4, 0x5b5f9c, 0x434576, 0x303158, 0x21213f], water: [0x1a0f4a, 0.42], open: 0.04,
-        coral: 0.2, kelp: 0.05, coins: 4, friendRate: 0.25, hazardRate: 0.5,
+        coral: 0, kelp: 0, coins: 4, friendRate: 0.25, hazardRate: 0.5,
         props: { boulder: 2, anemone: 1 }, propRate: 0.8,
         friends: { friend_jellyfish: 2, friend_nudibranch: 1, enemy_angler: 4, urchin: 1 },
         hazards: { mine: 3, spikes: 1 }
