@@ -95,7 +95,7 @@ export function enclosure(x, layer) {
     const c = wallShare(x, layer) * layer.share;
     if (c <= 0.001) return -1;
     const n = encNoise(x, layer);
-    return Math.max(-1, Math.min(1, (n - noiseQuantile(1 - c)) * 6));   // share c of stretches above the cut
+    return Math.max(-1, Math.min(1, (n - noiseQuantile(1 - c)) * 3));   // share c of stretches above the cut (eased: walls give way over a few hundred px)
 }
 
 /** A low-passed copy of a density field: smooth bilinear over a cached grid (no specks); `g` = px or [x, y]. */
@@ -156,14 +156,17 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
     return {
         density(x, y) {
             const e = enclosure(x, layer);
-            if (e <= -0.999) return -1;                         // open: nothing behind
-            const shift = layer.swing * e - 0.12 + (layer.open || 0);
+            // Toward fully open the field is pushed far out of rock: walls go, only the deep
+            // ground stays (sinking lower), so an open stretch never ends in a straight cut.
+            const gone = smooth01((-0.55 - e) / 0.45);
+            const shift = layer.swing * e - 0.12 + (layer.open || 0) - gone * 0.9;
             // Only rock strong enough to carry a foot is shown: a thin ledge that would not reach
             // the floor is dropped whole. The detail comes from the fine field, but it is capped
             // by the coarse one the feet are carried from — what shows here always has a foot.
             const lo = T + sup.minCarry;
             let d = Math.min(soft.density(x, y) + shift - (sup.minCarry + sup.band * 0.5),
                 T + (carry.density(x, y) + shift - lo) * 2);
+            if (e <= -0.999) return d - surfacePush(x, y);      // open: no walls, so no feet to look for
             // The strongest rock in the stretch above (centre and both sides of the foot): once it
             // is clearly rock, this point is too — a flat foot, smooth in x and y.
             const w = (vnoise(x / 700, y / 380, layer.seed + 5) - 0.5) * sup.wobble + (vnoise(x / 160, y / 260, layer.seed + 8) - 0.5) * sup.wobble * 0.12;   // meandering sides
