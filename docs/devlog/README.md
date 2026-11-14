@@ -2,6 +2,13 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Shoals: anthias, tangs and silversides that part around Lompi and flee from Sharky
+
+[`7dc9bf4`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/7dc9bf4) · 2026-11-14
+
+![Anthias shoal in a reef cave](16-shoals-reef-cave.jpg)
+![Silversides parting in the open blue](16-shoals-open-blue.jpg)
+
 ## Nests rebuilt: a level sand basin with raked-sand relief and shells
 
 [`da155c1`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/da155c1) · 2026-11-14 00:08
