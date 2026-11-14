@@ -8,7 +8,7 @@ test('every tier names every share, and each is no more expensive than the one a
     const keys = Object.keys(QUALITY.high);
     for (const t of QUALITY.tiers) assert.deepEqual(Object.keys(QUALITY[t]), keys, t);
     const [low, medium, high] = QUALITY.tiers.map(t => QUALITY[t]);
-    for (const k of ['caustics', 'particles', 'shoals']) assert.ok(low[k] <= medium[k] && medium[k] <= high[k], k);
+    for (const k of ['caustics', 'particles', 'shoals', 'glow', 'far']) assert.ok(low[k] <= medium[k] && medium[k] <= high[k], k);
     for (const k of ['simEvery', 'midEvery']) assert.ok(low[k] >= medium[k] && medium[k] >= high[k], k);
 });
 

@@ -7,10 +7,12 @@ export const QUALITY = {
     tiers: ['low', 'medium', 'high'],
     // caustics: strength of the net of light on the ground (0 = its shader is not used at all);
     // particles: share of every burst that is spawned; shoals: share of a shoal's fish;
-    // simEvery / midEvery: a shoal in sight is simulated every so many frames (near the middle / further out).
-    low: { caustics: 0, particles: 0.35, shoals: 0.45, simEvery: 3, midEvery: 5 },
-    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, simEvery: 2, midEvery: 4 },
-    high: { caustics: 1, particles: 1, shoals: 1, simEvery: 2, midEvery: 3 },
+    // simEvery / midEvery: a shoal in sight is simulated every so many frames (near the middle / further out);
+    // glow: share of the soft glow pictures that are drawn (fish light, deep glow, coin glows); far: share of the far scenery's single objects.
+    // (A layer reads its share as QUALITY[scene.quality.tier].glow and the like, when it builds or each frame.)
+    low: { caustics: 0, particles: 0.35, shoals: 0.45, simEvery: 3, midEvery: 5, glow: 0, far: 0.4 },
+    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, simEvery: 2, midEvery: 4, glow: 1, far: 0.7 },
+    high: { caustics: 1, particles: 1, shoals: 1, simEvery: 2, midEvery: 3, glow: 1, far: 1 },
     tune: {
         windowS: 2,       // the frame rate is the average over this many seconds
         lowFps: 30,       // under this for `lowS` seconds: a tier down
