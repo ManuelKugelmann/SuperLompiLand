@@ -35,7 +35,7 @@ export const SET_LOOK = {
     sparks: 5,              // sparkles rising in the column nearest to the fish ...
     sparkRise: 170,         // ... at this many px per second ...
     sparkSize: [26, 54],    // ... this big (px) ...
-    sparkNear: 2200,        // ... when the fish is within this many px of the nest (in x)
+    sparkNear: 5000,        // the column and its sparkles show when the fish is within this many px of the nest (in x)
     beaconTint: 0xffd9a0,
     beaconAlpha: 0.42
 };
@@ -73,8 +73,8 @@ export default class SetPieceLayer {
         }
         // Every nest stands in a thin column of light that reaches up to the surface: it marks the
         // savepoint from wherever you pass, and swimming through it is enough to reach the nest.
-        this.columns = nests.map(n => scene.add.image(n.x, n.y, 'bd_ray').setOrigin(0.5, 1).setFlipY(true)
-            .setDisplaySize(SET_LOOK.column[0], Math.max(400, n.y - SET_LOOK.column[1])).setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth));
+        // One picture, standing on whichever nest is nearest to the fish (nests lie far apart).
+        this.column = scene.add.image(0, 0, 'bd_ray').setOrigin(0.5, 1).setFlipY(true).setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth).setVisible(false);
         this.nests = nests;
         this.sparks = Array.from({ length: SET_LOOK.sparks }, () => scene.add.image(0, 0, 'bd_glow').setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth).setVisible(false));
         // The beacon: a column of warm light standing on the grand nest, fading out far above it.
@@ -172,10 +172,11 @@ export default class SetPieceLayer {
     update(t, fish, radius, dt) {
         this.lanterns.forEach((l, i) => l.setAlpha(this.lanternAlpha * (0.72 + 0.28 * Math.sin(t * 1.3 + i * 2.1) * Math.sin(t * 3.7 + i))));
         this.beacon.setAlpha(SET_LOOK.beaconAlpha * (0.8 + 0.2 * Math.sin(t * 0.7)));
-        this.columns.forEach((c, i) => c.setAlpha(SET_LOOK.columnAlpha * (0.8 + 0.2 * Math.sin(t * 0.9 + i))));
-        // Sparkles rise in the column of the nest nearest to the fish.
+        // The column of light and its rising sparkles stand on the nest nearest to the fish.
         let near = null;
         for (const n of this.nests) if (Math.abs(n.x - fish.x) < SET_LOOK.sparkNear && (!near || Math.abs(n.x - fish.x) < Math.abs(near.x - fish.x))) near = n;
+        this.column.setVisible(!!near);
+        if (near) this.column.setPosition(near.x, near.y).setDisplaySize(SET_LOOK.column[0], Math.max(400, near.y - SET_LOOK.column[1])).setAlpha(SET_LOOK.columnAlpha * (0.8 + 0.2 * Math.sin(t * 0.9)));
         this.sparks.forEach((sp, i) => {
             sp.setVisible(!!near);
             if (!near) return;
