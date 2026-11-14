@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { biomeBlendAt, mixColor } from './biomes.js';
 import SkyLayer from './SkyLayer.js';
+import SeaFarLayer from './SeaFarLayer.js';
 
 /**
  * Calm backdrop for the open world: a depth gradient that darkens as you dive,
@@ -38,6 +39,7 @@ export default class Backdrop {
         this.sun = scene.add.circle(W * 0.72, -420, 110, 0xfffbe0, 0.95).setDepth(-29).setScrollFactor(0, 1);
         this.skyImg = scene.add.image(0, -1400, 'bd_sky').setOrigin(0).setDisplaySize(W, 1460)
             .setDepth(-29.5).setScrollFactor(0, 1);
+        this.seaFar = new SeaFarLayer(scene);            // the open sea's far view: the next island's socket, marine snow, big shapes passing
         this.sky = new SkyLayer(scene);                  // clouds, birds, the coast and the volcano on the horizon
         this.sea = scene.add.graphics().setDepth(-28);   // water body drawn over the sky, wavy top edge
         this.foam = scene.add.graphics().setDepth(6);    // bright crest line, in front of the fish
@@ -104,6 +106,7 @@ export default class Backdrop {
         const t = this.scene.time.now / 1000;
 
         this.sky.update(camX, camY);
+        this.seaFar.update(camX, camY, dx, dy, this.scene.game.loop.delta);
         // Waterline: only when it is on screen.
         this.sea.clear();
         this.foam.clear();
