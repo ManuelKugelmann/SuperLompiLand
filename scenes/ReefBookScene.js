@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { KINDS } from '../game/reefbook.js';
+import { factsOf } from '../game/reefFacts.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { SCENE_KEYS } from './keys.js';
 import { play } from '../game/audio.js';
@@ -19,11 +20,13 @@ const TITLES = {
     leftover: { de: 'Was Menschen hinterlassen', en: 'What people left behind' }
 };
 const CARD = { max: 190, min: 96, gap: 18, gapRatio: 0.095 };   // cards shrink to fit the panel as the book grows
+/** The detail view of one entry: sheet size (of the screen), picture box (of the sheet), text sizes (px). */
+const DETAIL = { w: 0.8, h: 0.78, picture: 0.34, name: 64, kind: 32, fact: 42, gap: 26, depth: 50 };
 
 /**
  * The reef book (spec 5.2d): every creature, place and leftover Lompi has seen up
  * close, with one true fact each. Opened from the in-game menu over the paused
- * game; tap a card to read its fact, tap outside or press Esc to close.
+ * game; tap a card for its detail view (picture, name, facts), tap outside or press Esc to close.
  */
 export default class ReefBookScene extends Phaser.Scene {
     constructor() { super({ key: BOOK_KEY }); }
@@ -32,7 +35,7 @@ export default class ReefBookScene extends Phaser.Scene {
     create({ main }) {
         const W = this.scale.width, H = this.scale.height, lang = main.lang, de = lang === 'de';
         const book = main.reefBook;
-        const closeBook = () => { play('tap'); this.scene.stop(); main.scene.resume(); };
+        const closeBook = () => { play('tap'); if (this.sheet) { this.closeDetail(); return; } this.scene.stop(); main.scene.resume(); };
 
         this.add.rectangle(0, 0, W, H, 0x03182c, 0.86).setOrigin(0).setInteractive().on('pointerup', closeBook);
         const panel = this.add.rectangle(W / 2, H / 2, W - 140, H - 110, 0x0d3b5c, 0.96).setStrokeStyle(4, 0x7fd3ff, 0.7)
@@ -45,7 +48,7 @@ export default class ReefBookScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.add.text(W / 2, 145, `${found} / ${total}`, { fontFamily: 'Arial', fontSize: '30px', color: '#fff3b0', fontStyle: 'bold' }).setOrigin(0.5);
 
-        const fact = this.add.text(W / 2, H - 100, de ? 'Tippe auf eine Karte.' : 'Tap a card.', {
+        this.add.text(W / 2, H - 100, de ? 'Tippe auf eine Karte.' : 'Tap a card.', {
             fontFamily: 'Arial', fontSize: '30px', color: '#eafcff', align: 'center', wordWrap: { width: W - 260 }
         }).setOrigin(0.5);
 
@@ -66,7 +69,7 @@ export default class ReefBookScene extends Phaser.Scene {
             items.forEach((e, i) => {
                 const cx = 110 + (i % perRow) * (size + gap) + size / 2;
                 const cy = y + Math.floor(i / perRow) * (size + gap) + size / 2;
-                this.card(e, cx, cy, lang, fact, size);
+                this.card(e, cx, cy, lang, size);
             });
             y += Math.ceil(items.length / perRow) * (size + gap) + 14;
         }
@@ -77,7 +80,7 @@ export default class ReefBookScene extends Phaser.Scene {
         this.input.keyboard?.once('keydown-ESC', closeBook);
     }
 
-    card(e, cx, cy, lang, fact, size = CARD.max) {
+    card(e, cx, cy, lang, size = CARD.max) {
         const k = size / CARD.max;
         const bg = this.add.rectangle(cx, cy, size, size, e.found ? 0x1d6f9a : 0x163248, 1)
             .setStrokeStyle(3, e.found ? 0xfff3b0 : 0x2b5573, e.found ? 0.9 : 0.6)
@@ -99,10 +102,47 @@ export default class ReefBookScene extends Phaser.Scene {
             bg.on('pointerup', (p, x, y, ev) => {
                 ev.stopPropagation();
                 play('tap');
-                fact.setText(`${e.name[lang] || e.name.en}: ${e.fact[lang] || e.fact.en}`);
+                this.detail(e, lang);
             });
         } else {
             bg.on('pointerup', (p, x, y, ev) => ev.stopPropagation());
         }
+    }
+
+    /** The detail view: the entry's picture large, its name, what it is, and all its facts. A tap closes it. */
+    detail(e, lang) {
+        this.closeDetail();
+        const W = this.scale.width, H = this.scale.height, D = DETAIL, w = W * D.w, h = H * D.h, x0 = (W - w) / 2, y0 = (H - h) / 2;
+        const parts = [];
+        const shade = this.add.rectangle(0, 0, W, H, 0x03182c, 0.8).setOrigin(0).setInteractive();
+        const sheet = this.add.rectangle(W / 2, H / 2, w, h, 0x12507a, 1).setStrokeStyle(5, 0xfff3b0, 0.9).setInteractive();
+        const close = (p, x, y, ev) => { ev.stopPropagation(); play('tap'); this.closeDetail(); };
+        shade.on('pointerup', close); sheet.on('pointerup', close);
+        parts.push(shade, sheet);
+        // Picture on the left in a lit box, text on the right.
+        const box = w * D.picture, bx = x0 + 40 + box / 2, by = H / 2;
+        parts.push(this.add.rectangle(bx, by, box, Math.min(box, h - 80), 0x1d6f9a, 1).setStrokeStyle(3, 0x7fd3ff, 0.6));
+        if (e.image && this.textures.exists(e.image)) {
+            const img = this.add.image(bx, by, e.image);
+            img.setScale(Math.min((box - 40) / img.width, (Math.min(box, h - 80) - 40) / img.height));
+            parts.push(img);
+        } else {
+            parts.push(placeBadge(this, bx, by, box * 0.3, e.id));
+        }
+        const tx = x0 + 40 + box + 40, tw = x0 + w - 40 - tx;
+        let y = y0 + 44;
+        const line = (text, style) => { const t = this.add.text(tx, y, text, { fontFamily: 'Arial', wordWrap: { width: tw }, ...style }); parts.push(t); y += t.height + D.gap; };
+        line(e.name[lang] || e.name.en, { fontSize: `${D.name}px`, color: '#ffffff', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 8 });
+        y -= D.gap * 0.6;
+        line(TITLES[e.kind][lang] || TITLES[e.kind].en, { fontSize: `${D.kind}px`, color: '#7fd3ff', fontStyle: 'bold' });
+        for (const f of factsOf(e)) line(f[lang] || f.en, { fontSize: `${D.fact}px`, color: '#eafcff', lineSpacing: 6 });
+        for (const part of parts) part.setDepth(D.depth);
+        this.sheet = parts;
+    }
+
+    closeDetail() {
+        if (!this.sheet) return;
+        for (const part of this.sheet) part.destroy();
+        this.sheet = null;
     }
 }
