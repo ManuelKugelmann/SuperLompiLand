@@ -118,7 +118,7 @@ export default class MainScene extends Phaser.Scene {
         });
         this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
-        this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK) });   // shows the way when stuck (spec 1.4)
+        this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);

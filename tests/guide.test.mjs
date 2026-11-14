@@ -51,3 +51,25 @@ test('no open water ahead: it does not appear', () => {
     for (let t = 0; t <= GUIDE.stallS + 5; t += 0.5) g.update(0.5, 0, 0);
     assert.equal(g.state, 'away');
 });
+
+test('with a main route, the guide leads east and back into the lane', async () => {
+    const { createGuide, GUIDE } = await import('../game/guide.js');
+    const lane = x => 1000 + Math.sin(x / 3000) * 200;
+    const g = createGuide({ isOpen: () => true, routeY: lane }, () => 0.5);
+    let px = 0, py = 2200;                                   // lost, far below the lane
+    let r;
+    for (let t = 0; t <= GUIDE.stallS + 0.1; t += 0.1) r = g.update(0.1, px, py);
+    assert.equal(r.state, 'lead');
+    const gap = Math.abs(py - lane(px)), t = g.target;
+    assert.ok(t.x > px, 'east');
+    const next = Math.abs(t.y - lane(t.x));
+    assert.ok(gap - next > 400, `first waypoint climbs toward the lane: ${gap.toFixed(0)} -> ${next.toFixed(0)}`);
+});
+
+test('a guide without a route still works (random open waypoints)', async () => {
+    const { createGuide, GUIDE } = await import('../game/guide.js');
+    const g = createGuide({ isOpen: () => true }, () => 0.5);
+    let r;
+    for (let t = 0; t <= GUIDE.stallS + 0.1; t += 0.1) r = g.update(0.1, 0, 0);
+    assert.equal(r.state, 'lead');
+});

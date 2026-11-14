@@ -11,11 +11,12 @@ export const GUIDE = {
     followPx: 260,       // player this close to the guide: it moves on
     patienceS: 12,       // s the guide waits at a waypoint before giving up
     cooldownS: 60,       // s before an ignored guide may come back
-    maxHops: 5           // waypoints per visit
+    maxHops: 5,          // waypoints per visit
+    toLane: 0.7          // share of the way back to the main route per waypoint
 };
 
 /**
- * @param env  isOpen(x, y) -> true in open water
+ * @param env  isOpen(x, y) -> true in open water; routeY(x) -> y of the calm main route (optional)
  * @param random 0..1 generator (seedable for tests)
  */
 export function createGuide(env, random = Math.random, opts = {}) {
@@ -24,6 +25,14 @@ export function createGuide(env, random = Math.random, opts = {}) {
     let state = 'away', target = null, wait = 0, hops = 0;
 
     function nextWaypoint(x, y) {
+        // Along the calm main route when there is one (spec 5.2c): east, and back toward the lane.
+        if (env.routeY) {
+            for (let i = 0; i < 6; i++) {
+                const tx = x + G.lead[0] + random() * (G.lead[1] - G.lead[0]);
+                const lane = env.routeY(tx), ty = y + Math.max(-G.lead[1] * 0.6, Math.min(G.lead[1] * 0.6, (lane - y) * G.toLane));
+                if (env.isOpen(tx, ty) && env.isOpen((x + tx) / 2, (y + ty) / 2)) return { x: tx, y: ty };
+            }
+        }
         for (let i = 0; i < 12; i++) {
             const d = G.lead[0] + random() * (G.lead[1] - G.lead[0]);
             const a = (random() - 0.5) * 1.2;                       // ahead, within ~±35° of east
