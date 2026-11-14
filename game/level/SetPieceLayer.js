@@ -16,6 +16,11 @@ export const SET_LOOK = {
     lanterns: [[-0.28, -0.45], [0.04, -0.6], [0.3, -0.4]],   // lights in the hull: place as shares of the ship's length from its middle, and of the hull's height above the keel
     lanternSize: 420,
     lanternAlpha: 0.32,
+    debris: 7,              // pieces of storm debris sinking past the ship ...
+    debrisKeys: ['storm_plank', 'storm_weed'],   // ... (the storm's own pictures, once it has made them)
+    debrisFall: 38,         // px per second
+    debrisSpan: [380, 1500],   // from just under the churned layer down to the ship's keel line (below it is rock), then again from the top
+    debrisWithin: 2600,     // px from the ship within which they are shown
     portSize: 170,          // the painted ship's lit portholes: size and brightness of their flicker
     portAlpha: 0.5,
     beaconTint: 0xffd9a0,
@@ -103,5 +108,28 @@ export default class SetPieceLayer {
         this.lanterns.forEach((l, i) => l.setAlpha(this.lanternAlpha * (0.72 + 0.28 * Math.sin(t * 1.3 + i * 2.1) * Math.sin(t * 3.7 + i))));
         this.beacon.setAlpha(SET_LOOK.beaconAlpha * (0.8 + 0.2 * Math.sin(t * 0.7)));
         if (this.front) this.front.setAlpha(fadeStep(this.front.alpha, 1, boxHitsCircle(this.box, fish.x, fish.y, radius), dt));
+        this.sink(t, fish);
+    }
+
+    /** Storm debris sinks slowly past the ship from the churned layer above: planks and weed, turning as they fall. */
+    sink(t, fish) {
+        const s = this.scene, L = SET_LOOK, ship = ghostShip(), near = Math.abs(fish.x - ship.x) < L.debrisWithin;
+        if (!this.debris) {
+            const keys = L.debrisKeys.filter(k => s.textures.exists(k));
+            if (!near || !keys.length) return;      // made when the fish first comes near, and the storm has baked its pictures
+            this.debris = Array.from({ length: L.debris }, (_, i) => {
+                const d = s.add.image(0, 0, keys[i % keys.length]).setDepth(2.8).setTint(L.shipTint);
+                d.dx = (((i * 0.618) % 1) - 0.5) * 2 * 1500; d.phase = (i * 0.377) % 1; d.spin = 0.25 + ((i * 0.29) % 1) * 0.5;
+                return d;
+            });
+        }
+        const [top, bottom] = L.debrisSpan, span = bottom - top;
+        for (const d of this.debris) {
+            d.setVisible(near);
+            if (!near) continue;
+            const k = (d.phase + t * L.debrisFall / span) % 1;
+            d.setPosition(ship.x + d.dx + Math.sin(t * 0.4 + d.phase * 9) * 60, top + k * span).setRotation(t * d.spin + d.phase * 6)
+                .setAlpha(Math.min(1, k * 8, (1 - k) * 8));
+        }
     }
 }
