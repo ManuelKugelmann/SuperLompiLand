@@ -44,9 +44,10 @@ export const RESCUE_LOOK = {
     glow: 240,           // px radius of the soft light that shows it from afar
     happyMs: 1500,       // one happy loop where the net was ...
     happyRadius: 90,
-    alongMs: 9000,       // ... then it swims along with the fish this long ...
-    alongOff: [-150, -110],   // ... at this place beside it (px behind, px above) ...
-    alongEase: 0.05,     // ... easing there by this share per step
+    alongMax: 6,         // ... then it swims along with the fish for good (tester: "they follow, then vanish: strange"); only when more than this many follow, the one that has followed longest says goodbye ...
+    alongOff: [-150, -110],   // ... the first at this place beside the fish (px behind, px above) ...
+    alongStep: [-78, 46],     // ... each further one this much further behind, in turn above and below the line ...
+    alongEase: 0.09,     // ... easing there by this share per step (keeps up with a sprinting fish)
     leaveMs: 1800        // and fades as it swims off
 };
 
@@ -136,11 +137,17 @@ export default class RescueLayer {
             if (a.state === 'happy') {
                 const k = (1 - a.left / L.happyMs) * Math.PI * 2;
                 a.px = a.x + Math.sin(k) * L.happyRadius; a.py = a.y - (1 - Math.cos(k)) * L.happyRadius * 0.7;
-                if (a.left <= 0) { a.state = 'along'; a.left = L.alongMs; }
+                if (a.left <= 0) { a.state = 'along'; a.left = Infinity; a.joined = this.joined = (this.joined || 0) + 1; }
             } else {
                 // Beside the fish, a little behind and above; when its time is up it stays behind and fades.
                 const k = 1 - Math.pow(1 - L.alongEase, frames);
-                if (a.state === 'along') { a.px += (fish.x + L.alongOff[0] - a.px) * k; a.py += (fish.y + L.alongOff[1] + Math.sin(t * 2.4 + a.seed) * 18 - a.py) * k; }
+                if (a.state === 'along') {
+                    // Its place in the line: the newest nearest the fish, older ones further back.
+                    const i = this.joined - a.joined;
+                    if (i >= L.alongMax) { a.state = 'leave'; a.left = L.leaveMs; continue; }
+                    const ox = L.alongOff[0] + L.alongStep[0] * i, oy = L.alongOff[1] + (i % 2 ? L.alongStep[1] : 0);
+                    a.px += (fish.x + ox - a.px) * k; a.py += (fish.y + oy + Math.sin(t * 2.4 + a.seed) * 18 - a.py) * k;
+                }
                 else { a.py -= 1.1 * frames; a.img.setAlpha(Math.max(0, a.left / L.leaveMs)); }
                 if (a.left <= 0) {
                     if (a.state === 'leave') { this.remove(a); continue; }
