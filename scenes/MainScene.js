@@ -48,6 +48,7 @@ import DolphinLayer from '../game/level/DolphinLayer.js';
 import OctopusLayer from '../game/ai/OctopusLayer.js';
 import ContainerLayer from '../game/level/ContainerLayer.js';
 import SandbarLayer from '../game/level/SandbarLayer.js';
+import RhythmLayer from '../game/level/RhythmLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
@@ -258,6 +259,8 @@ export default class MainScene extends Phaser.Scene {
         this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'), (x, y) => this.roofBounce(x, y));
         // The lagoon's sandbar: coins lead up to it, and an arc of coins hangs in the air for the jump over its crown.
         this.sandbar = new SandbarLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.overSandbar());
+        // The journey's even rhythm (spec 5.0l): coin figures on the route, huge coral colonies behind it, adult sharks passing out at sea.
+        this.rhythm = new RhythmLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), id => this.bookEntry(id));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -1573,6 +1576,7 @@ export default class MainScene extends Phaser.Scene {
         { const fv = this.fish.sprite.body.velocity; this.octopus.update(sp, Math.hypot(fv.x, fv.y), time / 1000, delta); }
         this.containers.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.sandbar.update(sp, this.fish.radius, time / 1000);
+        this.rhythm.update(sp, this.fish.radius, time / 1000);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
             const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);

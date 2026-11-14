@@ -4,7 +4,7 @@
 // west to east. Nothing here draws or builds: the world itself is refined on demand around the
 // view (chunks, layers); the map is what the whole journey looks like from far above.
 
-import { BIOMES, WORLD_WEST, WORLD_END, reefCrestX, REEF_CREST, LANDMARK } from './biomes.js';
+import { BIOMES, WORLD_WEST, WORLD_END, biomeIndexAt, reefCrestX, REEF_CREST, LANDMARK } from './biomes.js';
 import { zoneEdges, zoneMix } from './subzones.js';
 import { FIELD, nestSpots } from './density.js';
 import { BRANCH } from './branches.js';
@@ -28,6 +28,56 @@ import { sandbarSpot } from './sandbar.js';
 
 /** Kinds of feature that are a place's main sight: no two of them may share a screen. */
 export const SET_PIECE_KINDS = ['crest', 'cave', 'docks', 'arch', 'ship', 'friend', 'whale', 'baitball', 'whaleshark', 'front'];
+
+/**
+ * The journey's rhythm (spec 5.0l): at cruise speed something small every 6-12 s and a landmark
+ * or set piece every 40-60 s, evenly: never a long empty stretch, never a crowd.
+ */
+export const RHYTHM = {
+    cruise: 330,              // px per second a child swims along the route
+    small: [2000, 4000],      // px between two things of any kind
+    landmark: [13000, 20000], // px between two landmarks
+    ratio: 2.5,               // the longest landmark gap is less than this many times the shortest
+    merge: 9000,              // landmarks closer together than this play as one moment
+    fill: 16500,              // the spacing aimed at where a long gap is filled with landmarks
+    treat: 3000,              // ... and where a gap between small things is filled with coin figures
+    sharks: 40000             // an adult shark passes every so many px of the open blue (spec 5.0l)
+};
+
+/** Kinds that are a landmark: the set pieces and everything else big enough to be remembered. */
+export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'colony', 'bigshark'];
+
+/** Landmarks merged into moments (those closer than `merge` play as one): [{ x0, x1, kinds }], west to east. */
+export function moments(features, cfg = RHYTHM) {
+    const out = [];
+    for (const f of features.filter(ft => LANDMARK_KINDS.includes(ft.kind) && ft.x1 >= 0).sort((a, b) => a.x0 - b.x0)) {
+        const last = out[out.length - 1];
+        if (last && f.x0 - last.x1 <= cfg.merge) { last.x1 = Math.max(last.x1, f.x1); last.kinds.push(f.kind); }
+        else out.push({ x0: f.x0, x1: f.x1, kinds: [f.kind] });
+    }
+    return out;
+}
+
+/** The gaps of open route between the things in `list` ([{ x0, x1 }], sorted), from `from` to `to`: [{ x0, x1 }]. */
+function gapsOf(list, from, to) {
+    const out = [];
+    let reach = from;
+    for (const f of list) {
+        if (f.x1 < from) continue;
+        if (f.x0 > reach) out.push({ x0: reach, x1: f.x0 });
+        reach = Math.max(reach, f.x1);
+    }
+    if (to > reach) out.push({ x0: reach, x1: to });
+    return out;
+}
+
+/** Evenly spaced spots that cut a gap into pieces no longer than about `aim`: [x, ...] (none when the gap is not longer than `limit`). */
+function cut(gap, limit, aim) {
+    const len = gap.x1 - gap.x0;
+    if (len <= limit) return [];
+    const n = Math.ceil(len / aim) - 1;
+    return Array.from({ length: n }, (_, k) => gap.x0 + len * (k + 1) / (n + 1));
+}
 
 let MAP = null;
 
@@ -75,9 +125,43 @@ export function worldMap() {
     for (const r of raftSpots()) spot('raft', r.x);
     const reef = by(MANTA.biome);
     for (const at of MANTA.ats) { const m = mantaSpan(reef.from + reef.width * at); span('manta', m.x0, m.x1); }
+    // Adult sharks pass in the open blue every so often (spec 5.0l), whatever else is there.
+    const blue = by('blue');
+    for (let x = blue.from + RHYTHM.sharks / 2; x < blue.from + blue.width - RHYTHM.sharks / 4; x += RHYTHM.sharks) spot('bigshark', x);
+    // Even rhythm: a long stretch without a landmark gets one, a huge coral colony along the islands
+    // and an adult shark passing out at sea (the trench has its glowing jelly fields for that).
+    features.sort((a, b) => a.x0 - b.x0);
+    for (const gap of gapsOf(moments(features), FIELD.spawn.x, WORLD_END)) {
+        for (const x of cut(gap, RHYTHM.landmark[1], RHYTHM.fill)) spot(BIOMES[biomeIndexAt(x)].zone === 'island' ? 'colony' : 'bigshark', x);
+    }
+    // ... and a long stretch with nothing at all gets a small treat: a figure of coins on the route.
+    features.sort((a, b) => a.x0 - b.x0);
+    for (const gap of gapsOf(features, FIELD.spawn.x, WORLD_END)) for (const x of cut(gap, RHYTHM.small[1], RHYTHM.treat)) spot('treat', x);
     features.sort((a, b) => a.x0 - b.x0);
     MAP = { from: WORLD_WEST, to: WORLD_END, start: FIELD.spawn.x, zones, features };
     return MAP;
+}
+
+/** The spots of one kind on the map, west to east: [{ x0, x1 }]. */
+export function spotsOf(kind, map = worldMap()) {
+    return map.features.filter(f => f.kind === kind);
+}
+
+/**
+ * How even the journey is: the gaps between things of any kind and between landmark moments,
+ * in px and in seconds at cruise speed.
+ * { small: { n, median, max }, landmark: { n, min, max, ratio, gaps: [px, ...], first, last }, seconds(px) }
+ */
+export function rhythm(map = worldMap(), cfg = RHYTHM) {
+    const lens = list => gapsOf(list, map.start, map.to).map(g => g.x1 - g.x0).sort((a, b) => a - b);
+    // Between landmark moments only: the way to the first one and from the last one to the grand nest are the journey's beginning and end, not its rhythm.
+    const small = lens(map.features), mom = moments(map.features, cfg), land = mom.slice(1).map((m, i) => m.x0 - mom[i].x1);
+    const sorted = [...land].sort((a, b) => a - b);
+    return {
+        small: { n: small.length, median: small[small.length >> 1], max: small[small.length - 1] },
+        landmark: { n: land.length, min: sorted[0], max: sorted[sorted.length - 1], ratio: sorted[sorted.length - 1] / sorted[0], gaps: land, first: mom[0].x0 - map.start, last: map.to - mom[mom.length - 1].x1 },
+        seconds: px => px / cfg.cruise
+    };
 }
 
 /** The longest stretches of the calm route (from the start pool on) with nothing on the map: [{ x0, x1 }], longest first. */
