@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HUNTER, hunterSpots, spotNear, startHunter, stepHunter, sightBlocked, freeHeading } from '../game/level/hunter.js';
+import { HUNTER, hunterSpots, spotNear, startHunter, stepHunter, sightBlocked, freeHeading, findCover } from '../game/level/hunter.js';
 import { BIOMES } from '../game/level/biomes.js';
 
 const DT = 1 / 60;
@@ -17,7 +17,9 @@ test('hunters pass at fixed places inside their areas, each met once', () => {
     for (const s of spots) { const b = BIOMES.find(q => q.id === s.biome); assert.ok(s.x > b.from && s.x < b.from + b.width, s.id); }
     const s = spots[0], done = new Set();
     assert.equal(spotNear(s.x + HUNTER.trigger - 10, done).id, s.id);
-    assert.equal(spotNear(s.x + HUNTER.trigger + 10, done), null);
+    assert.equal(spotNear(s.x - HUNTER.trigger - 10, done), null, 'not before its window');
+    assert.equal(spotNear(s.x + HUNTER.window - 10, done).id, s.id, 'still while cover is looked for');
+    assert.equal(spotNear(s.x + HUNTER.window + 10, done), null);
     done.add(s.id);
     assert.equal(spotNear(s.x, done), null);
     assert.deepEqual(hunterSpots({ ...HUNTER, enabled: false }), []);
@@ -78,4 +80,14 @@ test('the free heading is the wanted one in open water and turns off before rock
     const open = { solid: () => false, top: () => -Infinity };
     assert.equal(freeHeading(0, 0, 0.3, open), 0.3);
     assert.notEqual(freeHeading(0, 0, 0, { solid: x => x > 200, top: () => -Infinity }), 0);
+});
+
+test('cover: a place ahead with rock between it and where the hunter comes from, else none', () => {
+    // A rock shelf above and behind a pocket 600 px ahead: from behind and above, the pocket is hidden.
+    const shelf = (x, y) => x > 5200 && x < 5700 && y > 500 && y < 700;
+    const c = findCover(shelf, 5000, 900);
+    assert.ok(c, 'found');
+    assert.ok(c.x > 5000 && !shelf(c.x, c.y));
+    assert.ok(sightBlocked(shelf, c.x + HUNTER.from[0], c.y + HUNTER.from[1], c.x, c.y));
+    assert.equal(findCover(() => false, 5000, 900), null, 'open water: nowhere to hide, so no hunt');
 });

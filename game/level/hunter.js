@@ -8,7 +8,12 @@ import { BIOMES } from './biomes.js';
 export const HUNTER = {
     enabled: true,
     spots: { reef: [0.55], blue: [0.4, 0.8], kelp: [0.6], wreck: [0.5] },   // where in each area (share of its width)
-    trigger: 500,        // px from a spot at which it starts
+    trigger: 500,        // px before a spot from which it may start ...
+    window: 4000,        // ... until this far past it: it starts only where cover is near (see findCover), else not at all
+    cover: [200, 1100],  // px ahead of Lompi in which a hiding place behind rock is looked for ...
+    coverDepth: [-500, 900],   // ... from this far above to this far below him
+    coverStep: 60,       // px between the places tried
+    room: 70,            // px of open water a hiding place needs around it
     warnS: 2,            // s between the warning and the hunter setting off
     chaseS: 7,           // s it chases at most
     from: [-1500, -520], // where it sets off, from the fish (px): behind and above, outside the picture
@@ -32,9 +37,25 @@ export function hunterSpots(cfg = HUNTER) {
     return out;
 }
 
-/** The spot the fish has just come to and has not met yet, or null. `done` = a Set of ids. */
+/** The spot whose window the fish is in and has not met yet, or null. `done` = a Set of ids. */
 export function spotNear(x, done, cfg = HUNTER, spots = hunterSpots(cfg)) {
-    return spots.find(s => !done.has(s.id) && Math.abs(x - s.x) < cfg.trigger) || null;
+    return spots.find(s => !done.has(s.id) && x > s.x - cfg.trigger && x < s.x + cfg.window) || null;
+}
+
+/**
+ * A fair hunt needs somewhere to hide (playtest 2026-11-15: at no spot was there rock cover near enough).
+ * The nearest place ahead of the fish with open water around it and rock between it and where a hunter
+ * would come from (the place + cfg.from): { x, y } or null. `solid(x, y)` = rock there.
+ */
+export function findCover(solid, fx, fy, cfg = HUNTER) {
+    const r = cfg.room, open = (x, y) => !solid(x, y) && !solid(x + r, y) && !solid(x - r, y) && !solid(x, y + r) && !solid(x, y - r);
+    for (let dx = cfg.cover[0]; dx <= cfg.cover[1]; dx += cfg.coverStep) {
+        for (let dy = cfg.coverDepth[0]; dy <= cfg.coverDepth[1]; dy += cfg.coverStep) {
+            const x = fx + dx, y = fy + dy;
+            if (open(x, y) && sightBlocked(solid, x + cfg.from[0], y + cfg.from[1], x, y)) return { x, y };
+        }
+    }
+    return null;
 }
 
 /** A hunter that has just been announced: it waits outside the picture, pointed at the fish. */

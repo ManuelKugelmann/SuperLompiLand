@@ -1,4 +1,4 @@
-import { HUNTER, hunterSpots, spotNear, startHunter, stepHunter, sightBlocked } from './hunter.js';
+import { HUNTER, hunterSpots, spotNear, startHunter, stepHunter, sightBlocked, findCover } from './hunter.js';
 import { due, everyOf } from '../throttle.js';
 import { createRig } from '../CardRig.js';
 
@@ -10,7 +10,7 @@ import { createRig } from '../CardRig.js';
  *   create():  this.hunter = new HunterLayer(scene, { solid, top }, { warn, caught, escaped, seen })
  *   update():  this.hunter.update(fish, dt)
  */
-export const HUNTER_LOOK = { depth: 3.8, bubbleS: 0.12 };
+export const HUNTER_LOOK = { depth: 3.8, bubbleS: 0.12, coverR: 110, coverColor: 0xbff6ff, coverAlpha: [0.1, 0.28] };
 
 const KEY = 'barracuda';      // a painted picture under this key (head right) replaces the drawn one
 /** The painted barracuda (scripts/fx/fish_cut.py; loaded by the title screen). */
@@ -55,9 +55,13 @@ export default class HunterLayer {
             // No event: is Lompi at a spot? Asked only now and then (throttle.js 'idle').
             if (!due(frame, everyOf('idle', tier), 7)) return;
             const s = spotNear(fish.x, this.done, HUNTER, this.spots);
-            if (!s) return;
+            if (!s) { for (const q of this.spots) if (fish.x > q.x + HUNTER.window) this.done.add(q.id); return; }
+            // Only where there is somewhere to hide: the place lights up softly so a child sees where to go.
+            const cover = findCover(this.world.solid, fish.x, fish.y);
+            if (!cover) return;
             this.done.add(s.id);
             this.h = startHunter(fish, HUNTER, this.world);
+            this.showCover(cover);
             this.on.warn();
             return;
         }
@@ -65,6 +69,7 @@ export default class HunterLayer {
         // Rock between them hides Lompi; looked up every few frames (throttle.js 'check').
         if (h.phase === 'chase' && due(frame, everyOf('check', tier), 3)) this.sees = !sightBlocked(this.world.solid, h.x, h.y, fish.x, fish.y);
         stepHunter(h, fish, this.sees, dt, HUNTER, this.world);
+        if (h.phase !== 'warn' && h.phase !== 'chase') this.hideCover();
         if (h.phase === 'done') { this.rig?.destroy(); this.rig = null; this.h = null; return; }
         if (h.phase === 'warn') return;
         if (!this.rig) {
@@ -78,5 +83,18 @@ export default class HunterLayer {
         this.rig.draw({ x: h.x, y: h.y, vx: Math.cos(h.angle) * speed, vy: Math.sin(h.angle) * speed, frames: dt * 60, effort: 1, turn: 0.35 });
         this.bubble -= dt;
         if (this.bubble <= 0) { this.bubble = L.bubbleS; this.scene.particles.spawn('bubble', h.x - Math.cos(h.angle) * HUNTER.size * 0.45, h.y - Math.sin(h.angle) * HUNTER.size * 0.45, 1, { radius: 10, spread: 14 }); }
+    }
+
+    /** A soft pulsing light over the hiding place while the hunter is about. */
+    showCover({ x, y }) {
+        const L = HUNTER_LOOK;
+        this.cover = this.scene.add.circle(x, y, L.coverR, L.coverColor, L.coverAlpha[1]).setDepth(L.depth - 0.1).setBlendMode('ADD');
+        this.scene.tweens.add({ targets: this.cover, alpha: L.coverAlpha[0] / L.coverAlpha[1], scale: 1.15, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+
+    hideCover() {
+        if (!this.cover) return;
+        this.scene.tweens.killTweensOf(this.cover);
+        this.cover.destroy(); this.cover = null;
     }
 }
