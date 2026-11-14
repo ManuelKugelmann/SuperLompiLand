@@ -1,9 +1,11 @@
 import { createRig } from '../CardRig.js';
 import { SPECIES, fishTexture } from '../ai/SwarmLayer.js';
-import { NURSERY, nurserySpot, fryHome, fryDrift, fryPart, pupAt, pupBeside } from './nursery.js';
+import { NURSERY, nurserySpot, fryHome, fryPace, fryDrift, fryPart, pupAt, pupBeside } from './nursery.js';
 
 export const NURSERY_LOOK = {
     near: 2600, far: 4200,   // px from the nursery at which it is built, and beyond which it is removed
+    sight: 1900,             // px from it within which it moves at all (further off it is out of the picture)
+    fryEvery: 2,             // the fry are moved every so many frames (they drift slowly; the pups move every frame)
     fryDepth: 3.6,           // with the shoals
     pupDepth: 3.4            // just behind them
 };
@@ -21,13 +23,13 @@ export default class NurseryLayer {
         this.scene = scene; this.routeY = routeY; this.isShark = isShark; this.onSeen = onSeen;
         this.spot = nurserySpot();
         this.built = null; this.seen = false; this.followed = 0;
-        this.a = {}; this.b = {};
+        this.a = {}; this.b = {}; this.owed = 0; this.frame = 0;
     }
 
     build() {
         const s = this.scene, N = NURSERY, key = fishTexture(s, 'juvenile', SPECIES.juvenile);
         const blitter = s.add.blitter(0, 0, key).setDepth(NURSERY_LOOK.fryDepth);
-        const fry = Array.from({ length: N.fry }, (_, i) => ({ home: fryHome(i), bob: blitter.create(0, 0, 1), px: 0, py: 0 }));
+        const fry = Array.from({ length: N.fry }, (_, i) => ({ home: fryHome(i), pace: fryPace(i), bob: blitter.create(0, 0, 1), px: 0, py: 0 }));
         const pupKey = ['lemon_pup', 'player_shark'].find(k => s.textures.exists(k));
         const pups = pupKey ? Array.from({ length: N.pups }, () => ({
             rig: createRig(s, { states: { normal: { key: pupKey, width: N.pupLength, wiggle: 8 } }, anim: 'swim', soft: 0.5, upright: true }, this.spot.x, 0, NURSERY_LOOK.pupDepth),
@@ -51,17 +53,22 @@ export default class NurseryLayer {
             if (d > NURSERY_LOOK.near || !this.scene.buildSlot()) return;
             this.build();
         }
-        const N = NURSERY, B = this.built, cx = this.spot.x, cy = this.routeY(cx) - N.above;
+        if (d > NURSERY_LOOK.sight) return;
+        const N = NURSERY, B = this.built, cx = this.spot.x, cy = (this.cy ??= this.routeY(cx) - N.above);
         // The fry: each round its own place, out of the fish's way quickly and back slowly.
-        for (let i = 0; i < B.fry.length; i++) {
-            const f = B.fry[i], hx = cx + f.home.x, hy = cy + f.home.y, part = fryPart(hx, hy, fish.x, fish.y, this.a), drift = fryDrift(i, t, this.b);
-            const away = Math.hypot(part.x, part.y) > Math.hypot(f.px, f.py), k = Math.min(1, dt / (away ? N.partS : N.closeS));
+        this.owed += dt;
+        const move = ++this.frame % NURSERY_LOOK.fryEvery === 0, step = this.owed;
+        if (move) this.owed = 0;
+        for (let i = 0; move && i < B.fry.length; i++) {
+            const f = B.fry[i], hx = cx + f.home.x, hy = cy + f.home.y, part = fryPart(hx, hy, fish.x, fish.y, this.a), drift = fryDrift(i, t, this.b, N, f.pace);
+            const away = part.x * part.x + part.y * part.y > f.px * f.px + f.py * f.py, k = Math.min(1, step / (away ? N.partS : N.closeS));
             f.px += (part.x - f.px) * k; f.py += (part.y - f.py) * k;
             const x = hx + drift.x + f.px;
             f.bob.flipX = x < (f.lastX ?? x) - 0.01 ? true : x > (f.lastX ?? x) + 0.01 ? false : f.bob.flipX;
             f.lastX = x;
             f.bob.x = x - B.w / 2; f.bob.y = hy + drift.y + f.py - B.h / 2;
-            f.bob.setFrame(Math.sin(t * 9 + i) < -0.33 ? 0 : Math.sin(t * 9 + i) > 0.33 ? 2 : 1);
+            const beat = Math.sin(t * 9 + i);
+            f.bob.setFrame(beat < -0.33 ? 0 : beat > 0.33 ? 2 : 1);
         }
         // The pups: their slow round under the cloud; with Sharky near, they swim along with him for a while.
         const near = this.isShark() && B.pups.some(p => p.x !== null && Math.hypot(p.x - fish.x, p.y - fish.y) < N.follow.near);

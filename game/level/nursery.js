@@ -9,7 +9,7 @@ export const NURSERY = {
     biome: 'mangrove',
     at: 0.73,            // how far into the biome it lies (about 8.8 minutes into the journey)
     above: 60,           // px over the calm route the cloud's middle lies (the fish swims right through)
-    fry: 70,             // fry in the cloud
+    fry: 56,             // fry in the cloud
     cloud: [520, 190],   // px half width and half height of the cloud
     wander: 24,          // px each fry drifts round its place
     part: 200,           // px round the fish the cloud leaves open ...
@@ -38,10 +38,15 @@ export function fryHome(i, cfg = NURSERY) {
     return { x: Math.cos(a) * r * cfg.cloud[0], y: Math.sin(a) * r * cfg.cloud[1] };
 }
 
-/** Where fry `i` drifts round its place at time `t` (s): offset into `out`. */
-export function fryDrift(i, t, out = {}, cfg = NURSERY) {
-    out.x = Math.sin(t * (0.6 + hash(i, 3) * 0.7) + hash(i, 4) * 6.283) * cfg.wander;
-    out.y = Math.cos(t * (0.5 + hash(i, 5) * 0.6) + hash(i, 6) * 6.283) * cfg.wander * 0.6;
+/** How fry `i` drifts: its own pace and phase sideways and up and down (worked out once per fry). */
+export function fryPace(i) {
+    return { sx: 0.6 + hash(i, 3) * 0.7, px: hash(i, 4) * 6.283, sy: 0.5 + hash(i, 5) * 0.6, py: hash(i, 6) * 6.283 };
+}
+
+/** Where fry `i` drifts round its place at time `t` (s): offset into `out`. `pace` = fryPace(i), when the caller keeps it. */
+export function fryDrift(i, t, out = {}, cfg = NURSERY, pace = fryPace(i)) {
+    out.x = Math.sin(t * pace.sx + pace.px) * cfg.wander;
+    out.y = Math.cos(t * pace.sy + pace.py) * cfg.wander * 0.6;
     return out;
 }
 

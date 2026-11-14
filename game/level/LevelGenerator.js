@@ -36,7 +36,9 @@ export const LEVEL = {
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
     buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
-    edgeBatch: 10,        // collision strips made per build step
+    edgeBatch: 5,         // collision strips made per build step
+    coinBatch: 3,         // coins of a trail made per build step
+    rockParts: 2,         // the rock picture of a chunk is this many textures, one under the other
     canvasPool: 12,       // canvas textures of dropped chunks kept for the next ones, per size
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
@@ -490,30 +492,31 @@ export default class LevelGenerator {
         // terrain is redrawn while playing.
         const pics = baked || { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, ...shadeChunk(this.field, LEVEL.seed, ox, oy, CH) };
         // Each picture in two steps (painting it, then handing it to the graphics card): together they are the build's biggest cost.
-        // `rows` = [from, to) as shares of the picture's height: the big rock picture is painted in two halves, a step each.
-        const paint = (name, data, size, rows = [0, 1]) => {
-            const key = `chunk:${chunk.key}:${name}`, first = rows[0] === 0;
-            if (first && s.textures.exists(key)) s.textures.remove(key);
-            const tex = first ? this.canvasFor(key, size) : s.textures.get(key);
-            tex.context.putImageData(new ImageData(data, size, size), 0, 0, 0, rows[0] * size, size, (rows[1] - rows[0]) * size);
-            if (first) chunk.textures.push(key);
+        // `part` = which of `parts` equal strips of the picture (top to bottom) this texture holds: the big rock
+        // picture is two textures, so no step paints or uploads more than half of it.
+        const paint = (name, data, size, part = 0, parts = 1) => {
+            const key = `chunk:${chunk.key}:${name}`, h = size / parts;
+            if (s.textures.exists(key)) s.textures.remove(key);
+            const tex = this.canvasFor(key, size, h);
+            tex.context.putImageData(new ImageData(data.subarray(part * h * size * 4, (part + 1) * h * size * 4), size, h), 0, 0);
+            chunk.textures.push(key);
             return tex;
         };
-        const show = (tex, size, depth) => {
+        const show = (tex, size, depth, part = 0, parts = 1) => {
             tex.refresh();
-            keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
+            keep(s.add.image(ox, oy + part * CH / parts, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
         };
         if (!baked) { yield 'shade'; if (chunk.dead) return; }
         const back = paint('back', pics.back, SHADE.backSize);
         yield 'paint back'; if (chunk.dead) return;
         show(back, SHADE.backSize, -6);
         yield 'upload back'; if (chunk.dead) return;
-        paint('rock', pics.rock, SHADE.rockSize, [0, 0.5]);
-        yield 'paint rock'; if (chunk.dead) return;
-        const rock = paint('rock', pics.rock, SHADE.rockSize, [0.5, 1]);
-        yield 'paint rock 2'; if (chunk.dead) return;
-        show(rock, SHADE.rockSize, -2);
-        yield 'upload rock'; if (chunk.dead) return;
+        for (let part = 0; part < LEVEL.rockParts; part++) {
+            const rock = paint(`rock${part}`, pics.rock, SHADE.rockSize, part, LEVEL.rockParts);
+            yield 'paint rock'; if (chunk.dead) return;
+            show(rock, SHADE.rockSize, -2, part, LEVEL.rockParts);
+            yield 'upload rock'; if (chunk.dead) return;
+        }
 
         // Collision strips and floor spots come from the coarse grid (corners
         // shared with the neighbours -> seamless).
@@ -532,6 +535,7 @@ export default class LevelGenerator {
         for (const nest of this.nests) {
             if (nest.x >= ox && nest.x < ox + CH && nest.y >= oy && nest.y < oy + CH) this.drawNest(chunk, nest);
         }
+        yield 'nest'; if (chunk.dead) return;
         const nearNest = this.nests.some(n => Math.abs(n.x - mid) < 800 && Math.abs(n.y - (oy + CH / 2)) < 1100);
         const safe = nearNest || Math.hypot(mid - LEVEL.spawn.x, oy + CH / 2 - LEVEL.spawn.y) < CH * 1.6;
 
@@ -563,12 +567,13 @@ export default class LevelGenerator {
                     this.addKelp(chunk, { ...f, x: f.x + rng.between(-160, 160) }, rng.between(700, 1100), -5, rng, KELP_BACK_TINT);
                 }
                 stalks++;
+                yield 'floor kelp'; if (chunk.dead) return;
             } else if (!safe && roll > 1 - biome.hazardRate * 0.25) {
                 const key = pickWeighted(rng, floorHazards, has);
-                if (key) this.addHazard(chunk, key, f.x + up.x * HAZARDS[key].lift, f.y + up.y * HAZARDS[key].lift, rng, f.angle);
+                if (key) { this.addHazard(chunk, key, f.x + up.x * HAZARDS[key].lift, f.y + up.y * HAZARDS[key].lift, rng, f.angle); yield 'floor hazard'; if (chunk.dead) return; }
             } else if (sitters < 1 && roll > 0.5 && roll < 0.5 + biome.friendRate * 0.12) {
                 const key = pickWeighted(rng, groundFriends, has);
-                if (key) { this.addFriend(chunk, key, f.x + up.x * 46, f.y + up.y * 46, rng, f.angle); sitters++; }
+                if (key) { this.addFriend(chunk, key, f.x + up.x * 46, f.y + up.y * 46, rng, f.angle); sitters++; yield 'floor friend'; if (chunk.dead) return; }
             }
         }
 
@@ -782,6 +787,7 @@ export default class LevelGenerator {
                     placed.push({ x, y });
                     const index = coinIndex++;
                     if (!this.state?.has(chunkKey, 'coin', index)) this.addCoin(chunk, x, y, chunkKey, index);
+                    if (index % LEVEL.coinBatch === LEVEL.coinBatch - 1) { yield 'coins'; if (chunk.dead) return; }
                 }
                 heading += bend;
                 x += Math.cos(heading) * LEVEL.coinStep;
@@ -808,30 +814,31 @@ export default class LevelGenerator {
             const every = key && FRIENDS[key].every, rare = every && !(cx % every === 0 && cy === Math.floor(cx / every) % 2);
             if (p && !onRoute && !rare) this.addFriend(chunk, key, p.x, p.y, rng);
         }
+        yield 'swimmer friend'; if (chunk.dead) return;
         if (!safe && rng.frac() < biome.hazardRate) {
             const key = pickWeighted(rng, only(biome.hazards, k => HAZARDS[k]?.place === 'water'), has);
             const p = key && openSpot((HAZARDS[key].patrol || 0) / 2 + 60);
             if (p) this.addHazard(chunk, key, p.x, p.y, rng);
         }
         chunk.done = true;
-        return 'swimmers';
+        return 'swimmer hazard';
     }
 
     /**
-     * A canvas texture of `size` px under `key`: one a dropped chunk left behind when there is one
+     * A canvas texture of `w` x `h` px under `key`: one a dropped chunk left behind when there is one
      * (making a new one allocates the canvas and uploads it once more), else a new one. The pool
      * belongs to the game (its registry), since textures outlive the scene.
      */
-    canvasFor(key, size) {
-        const t = this.scene.textures, spare = this.canvasPool()[size]?.pop();
-        if (!spare) return t.createCanvas(key, size, size);
+    canvasFor(key, w, h = w) {
+        const t = this.scene.textures, spare = this.canvasPool()[`${w}x${h}`]?.pop();
+        if (!spare) return t.createCanvas(key, w, h);
         t.renameTexture(spare, key);
         return t.get(key);
     }
 
     /** A dropped chunk's canvas texture goes back to the pool (up to LEVEL.canvasPool per size), else it is removed. */
     poolCanvas(key) {
-        const t = this.scene.textures, pool = this.canvasPool(), size = t.get(key).source[0].width, list = pool[size] || (pool[size] = []);
+        const t = this.scene.textures, pool = this.canvasPool(), src = t.get(key).source[0], size = `${src.width}x${src.height}`, list = pool[size] || (pool[size] = []);
         if (list.length >= LEVEL.canvasPool) { t.remove(key); return; }
         const spare = `chunkpool:${size}:${pool.made = (pool.made || 0) + 1}`;
         t.renameTexture(key, spare);
