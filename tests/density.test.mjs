@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { SEA_ARCH, seaArch } from '../game/level/seaArch.js';
 import assert from 'node:assert/strict';
 import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY, nestReached } from '../game/level/density.js';
 import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS, REEF_CREST, reefCrest, reefCrestX } from '../game/level/biomes.js';
@@ -155,4 +156,21 @@ test('following the calm route reaches every nest: anywhere in the lane over it 
             assert.ok(ROUTE.nestHalf * 2 > 30 * 4);
         }
     }
+});
+
+test('the sea arch: the calm route runs through its opening and tunnels through its legs, which are rock around it', () => {
+    const f = createField(1337), a = seaArch(), mid = (a.open.x0 + a.open.x1) / 2;
+    assert.ok(SEA_ARCH.swim + ROUTE.halfWidth <= SEA_ARCH.under, 'the lane fits into the opening');
+    for (let x = a.x0; x <= a.x1; x += 50) {
+        const ry = f.routeY(x);
+        assert.ok(Math.abs(ry - SEA_ARCH.swim) < 30, `route at ${x}: ${Math.round(ry)}`);
+        for (let dy = -ROUTE.halfWidth + 20; dy <= ROUTE.halfWidth - 20; dy += 40) assert.ok(f.density(x, ry + dy) < FIELD.threshold, `lane open at ${x}, ${Math.round(ry + dy)}`);
+    }
+    for (const x of [a.x0 + 400, a.x1 - 400]) {
+        for (const y of [30, 150, 270]) assert.ok(f.density(x, y) > FIELD.threshold, 'the leg is solid from the surface down to the tunnel');
+        assert.ok(f.density(x, 1100) > FIELD.threshold && f.density(x, 1800) > FIELD.threshold, 'and goes down into the seabed');
+    }
+    assert.ok(f.density(mid, 60) < FIELD.threshold, 'the opening is water up to the surface');
+    // The climb to it is gentle, and it does not disturb the friend's net or the way into the trench.
+    for (let x = a.x0 - SEA_ARCH.approach - 400; x < a.x1 + SEA_ARCH.approach + 400; x += 32) assert.ok(Math.abs(f.routeY(x + 32) - f.routeY(x)) / 32 < 1, `slope at ${x}`);
 });

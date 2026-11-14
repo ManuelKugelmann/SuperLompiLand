@@ -5,6 +5,7 @@ import { vnoise } from './terrain.js';
 import { detour } from './weather.js';
 import { SET_PIECES, ghostShip, pinnacleTop, descentStart } from './setPieces.js';
 import { BRANCH, sideCave, ridgeTop, caveAt } from './branches.js';
+import { SEA_ARCH, seaArch, archRock } from './seaArch.js';
 import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
 
 export const FIELD = {
@@ -72,6 +73,7 @@ const DETOUR = { y: 0, k: 0 };
 
 const SHIP_X = ghostShip().x;      // the ghost ship's place (worked out once)
 const TRENCH_FROM = BIOMES[BIOMES.length - 1].from;
+const ARCH = seaArch(), ARCH_HALF = (ARCH.x1 - ARCH.x0) / 2;      // the rocky shore's sea arch (worked out once)
 const CAVE_REACH = BRANCH.mouth + BRANCH.rim + BRANCH.ends * 4;      // how far beyond mouth and exit the side cave's ridge can reach
 
 // Where the reef crest is and how far its slopes can reach (worked out once).
@@ -95,6 +97,9 @@ export function createField(seed) {
             const dx = Math.abs(x - nest.x);
             if (dx < nest.reach) y += (nest.y - ROUTE.aboveNest - y) * smooth01(1 - dx / nest.reach);
         }
+        // The sea arch: the route climbs to just under the surface and runs through its opening.
+        const ax = Math.abs(x - ARCH.x) - ARCH_HALF;
+        if (ax < SEA_ARCH.approach) y += (SEA_ARCH.swim - y) * smooth01(1 - Math.max(0, ax) / SEA_ARCH.approach);
         if (routeGrid.size > 16384) routeGrid.clear();
         routeGrid.set(i, y);
         return y;
@@ -206,6 +211,19 @@ export function createField(seed) {
                     const rock = n + (FIELD.crestRock - n) * smooth01((y - top) / 100), water = Math.min(n, FIELD.threshold - 0.5);
                     n = water + (rock - water) * smooth01(0.5 + d / (BRANCH.soft * 2));
                 }
+            }
+        }
+        // The sea arch (seaArch.js): two legs of solid rock from the surface down into the seabed, the
+        // opening between them, and the calm route's lane as a tunnel through each leg.
+        if (withNests && nests && y >= 0 && x > ARCH.x0 && x < ARCH.x1) {
+            const a = y >= SEA_ARCH.footDepth ? 1 : archRock(ARCH, x, y);
+            if (a < 0) n = Math.min(n, FIELD.threshold - 0.5);
+            else {
+                const wide = ROUTE.halfWidth + ROUTE.wander[1] * vnoise(x / 85, y / 85, seed + 52);
+                const lean = SEA_ARCH.edge * (0.6 + 0.8 * vnoise(y / 240, 6.3, seed + 61));
+                const w = smooth01((Math.abs(y - routeY(x)) / wide - 1) / 0.3) * smooth01(Math.min(x - ARCH.x0, ARCH.x1 - x) / lean);
+                const open = Math.min(n, FIELD.threshold - 0.5);
+                n = Math.max(n, open + (FIELD.crestRock - open) * w);
             }
         }
         // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.

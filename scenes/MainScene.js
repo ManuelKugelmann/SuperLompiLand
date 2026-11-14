@@ -37,6 +37,8 @@ import SetPieceLayer from '../game/level/SetPieceLayer.js';
 import BranchLayer from '../game/level/BranchLayer.js';
 import DocksLayer from '../game/level/DocksLayer.js';
 import MantaLayer from '../game/ai/MantaLayer.js';
+import SeaArchLayer from '../game/level/SeaArchLayer.js';
+import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
@@ -202,6 +204,8 @@ export default class MainScene extends Phaser.Scene {
         this.docks = new DocksLayer(this, docksSpot(), this.pearls.includes('docks_crab'), (x, y) => this.freeCrab(x, y));
         // The reef's wonder beat (spec 9.1): a manta glides to and fro high over the reef.
         this.manta = new MantaLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('manta'));
+        // The rocky shore's set piece (spec 5.0g): the sea arch, with its arc of coins for a jump through it.
+        this.arch = new SeaArchLayer(this, seaArch(), inAir => this.throughArch(inAir), (x, y) => this.coinTaken(x, y));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -528,6 +532,15 @@ export default class MainScene extends Phaser.Scene {
         console.log(text);
         this.add.text(40, 120, text, { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
             .setScrollFactor(0).setDepth(99);
+    }
+
+    /** Through the sea arch: a chain move, the first time an entry in the reef book; flown through, a cheer. */
+    throughArch(inAir) {
+        this.chainMove('arch');
+        this.bookEntry('sea_arch');
+        if (!inAir) return;
+        play('friend');
+        this.announce(this.lang === 'de' ? 'Durchs Felsentor!' : 'Through the sea arch!');
     }
 
     /** The hermit crab under the docks is out of its bottle cap: coins, a cheer, an entry in the reef book. Once per save. */
@@ -1050,19 +1063,7 @@ export default class MainScene extends Phaser.Scene {
             c.img.destroy();
             this.world.set(c.chunkKey, 'coin', c.index);
             this.mp?.claim(c.chunkKey, 'coin', c.index);
-            const bl = biomeBlendAt(x);
-            const note = this.streak.add(nowSeconds(), (bl.t < 0.5 ? bl.a : bl.b).id);
-            // A coin in a streak (x2, x3) or collected in flow really counts more (chain.js).
-            this.coins += coinWorth(note.multiplier, !this.relaxed && this.chain.flow);
-            play('coin', note);
-            this.streakFx(x, y, note);
-            for (let i = 0; i < 5; i++) {           // sparkle
-                const a = (i / 5) * Math.PI * 2 + Math.random();
-                const star = this.add.star(x, y, 4, 4, 11, 0xffffff).setDepth(3);
-                this.tweens.add({ targets: star, x: x + Math.cos(a) * 70, y: y + Math.sin(a) * 70, alpha: 0, angle: 180, scale: 0.3, duration: 380, onComplete: () => star.destroy() });
-            }
-            const pop = this.add.circle(x, y, 30, 0xfff3b0, 0.8).setDepth(3);
-            this.tweens.add({ targets: pop, scale: 2.6, alpha: 0, duration: 260, onComplete: () => pop.destroy() });
+            this.coinTaken(x, y);
         }
         for (const f of this.level.friends) {
             if (f.greeted || !f.img.active || p.distance(f.img) > fr + f.r) continue;
@@ -1090,6 +1091,23 @@ export default class MainScene extends Phaser.Scene {
             if (!h.img.active || p.distance(h.img) > fr * LEVEL.hitSlack + h.r) continue;
             if (this.hurt(h.img.x, h.img.y)) return;
         }
+    }
+
+    /** A coin was taken at (x, y): it counts, sounds in the melody and sparkles. */
+    coinTaken(x, y) {
+        const bl = biomeBlendAt(x);
+        const note = this.streak.add(nowSeconds(), (bl.t < 0.5 ? bl.a : bl.b).id);
+        // A coin in a streak (x2, x3) or collected in flow really counts more (chain.js).
+        this.coins += coinWorth(note.multiplier, !this.relaxed && this.chain.flow);
+        play('coin', note);
+        this.streakFx(x, y, note);
+        for (let i = 0; i < 5; i++) {           // sparkle
+            const a = (i / 5) * Math.PI * 2 + Math.random();
+            const star = this.add.star(x, y, 4, 4, 11, 0xffffff).setDepth(3);
+            this.tweens.add({ targets: star, x: x + Math.cos(a) * 70, y: y + Math.sin(a) * 70, alpha: 0, angle: 180, scale: 0.3, duration: 380, onComplete: () => star.destroy() });
+        }
+        const pop = this.add.circle(x, y, 30, 0xfff3b0, 0.8).setDepth(3);
+        this.tweens.add({ targets: pop, scale: 2.6, alpha: 0, duration: 260, onComplete: () => pop.destroy() });
     }
 
     /** Something hurt the fish from (x, y). Returns true when it went down. */
@@ -1359,6 +1377,7 @@ export default class MainScene extends Phaser.Scene {
         this.branch.update(sp, time / 1000, delta, this.particles);
         this.docks.update(sp, time / 1000);
         this.manta.update(sp, time / 1000, delta);
+        this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);

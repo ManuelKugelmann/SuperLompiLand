@@ -1,5 +1,5 @@
 // The rocky shore's sea arch (pure, no Phaser; spec gamedesign §5.0g). A huge natural arch stands
-// in the surf in the middle of the rocky shore. Its painted upper half (img/coast/sea_arch.webp,
+// in the surf late on the rocky shore. Its painted upper half (img/coast/sea_arch.webp,
 // sea_arch.json: the picture's bottom edge is the waterline) shows the opening above the water;
 // below the water the rock goes on down to the seabed with the opening continuing under the
 // surface, so the calm route swims through it and a jump flies through its top half.
@@ -8,10 +8,13 @@ import { BIOMES } from './biomes.js';
 
 export const SEA_ARCH = {
     biome: 'shore',
-    at: 0.5,              // where in the biome (share of its width)
+    at: 0.74,             // where in the biome (share of its width): past the friend's net, before the trench
+    swim: 620,            // depth at which the calm route runs through it (its lane ends at the opening's floor)
+    approach: 1200,       // px to either side over which the route climbs up to it and sinks back
+    edge: 150,            // px over which the legs' outer faces lean out of the water around them
     scale: 1.25,          // picture px -> world px
     art: { size: [1800, 600], opening: [570, 250, 689, 350] },   // from sea_arch.json
-    under: 640,           // px the opening reaches under the surface
+    under: 900,           // px the opening reaches under the surface
     footDepth: 1700,      // px down to which the arch's legs are solid rock (they join the seabed)
     wear: 40,             // px the under-water opening's edge wanders
     coins: 9              // coins in the arc through the opening's top half

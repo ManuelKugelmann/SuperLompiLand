@@ -61,8 +61,8 @@ export default class HudScene extends Phaser.Scene {
         // Chain: a soft counter that names the last move; no timer, it simply fades when the chain ends.
         this.chainText = hudText(40, 356, '38px').setAlpha(0);
         const moves = de
-            ? { leap: 'Sprung', landing: 'Landung', skim: 'Wellenhüpfer', flip: 'Salto', special: 'Spezial', stream: 'Strömung', trail: 'Melodie', cannon: 'Blubberkanone', pad: 'Hüpfkissen' }
-            : { leap: 'Jump', landing: 'Landing', skim: 'Wave skip', flip: 'Flip', special: 'Special', stream: 'Current', trail: 'Melody', cannon: 'Bubble cannon', pad: 'Bounce pad' };
+            ? { leap: 'Sprung', landing: 'Landung', skim: 'Wellenhüpfer', flip: 'Salto', special: 'Spezial', stream: 'Strömung', trail: 'Melodie', cannon: 'Blubberkanone', pad: 'Hüpfkissen', arch: 'Felsentor' }
+            : { leap: 'Jump', landing: 'Landing', skim: 'Wave skip', flip: 'Flip', special: 'Special', stream: 'Current', trail: 'Melody', cannon: 'Bubble cannon', pad: 'Bounce pad', arch: 'Sea arch' };
         const onMove = ({ count, verb, flow }) => {
             this.tweens.killTweensOf(this.chainText);
             this.chainText.setText(count > 1 ? `${count} · ${moves[verb]}` : moves[verb]).setColor(flow ? '#ffd54a' : '#ffffff').setAlpha(1).setScale(1.25);

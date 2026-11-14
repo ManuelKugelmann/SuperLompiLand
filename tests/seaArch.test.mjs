@@ -5,7 +5,7 @@ import { BIOMES } from '../game/level/biomes.js';
 
 const arch = seaArch();
 
-test('the arch stands in the middle of the rocky shore, its opening reaching from above the water to under it', () => {
+test('the arch stands on the rocky shore, its opening reaching from above the water to under it', () => {
     const shore = BIOMES.find(b => b.id === 'shore');
     assert.ok(arch.x > shore.from && arch.x < shore.from + shore.width);
     assert.ok(arch.open.top < -200, 'opening rises well above the surface');
