@@ -141,6 +141,9 @@ the deep trench, to reach the grand nest.
   is free, dances and swims on. The strip at the top right shows who is found.
 - **The great whale** waits in the open blue with net wrapped round her. Tear it off
   piece by piece and she sings, then carries you east on her back.
+- **A ghost ship** stands on a pinnacle of rock under the storm, lanterns still lit; the
+  way on leads through the hole in its bow. In the trench the way goes down and down,
+  toward the glow of the grand nest.
 - **Islands and open sea:** along a coast the water is shallow and full of life; between
   the islands the bottom is far below and the way across runs just under the surface.
   A storm closes the surface for a stretch (the way on is underneath), and a current
