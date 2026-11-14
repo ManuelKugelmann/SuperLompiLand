@@ -323,7 +323,11 @@ export default class MainScene extends Phaser.Scene {
         this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
             // Chain moves: a fast jump out, a landing after real air time, a skip off a wave.
             if (skim) { this.chainMove('skim'); this.rafts.skim(x, this.fish.sprite.body.velocity.x, this.time.now / 1000); }
-            else if (!entering && speed >= CHAIN.minLeap) { this.airAt = this.time.now; this.chainMove('leap'); }
+            else if (!entering && speed >= CHAIN.minLeap) {
+                this.airAt = this.time.now; this.chainMove('leap');
+                // Any fast leap out at sea startles flying fish too (not only a glider's skip): every character sees them.
+                this.rafts.skim(x, this.fish.sprite.body.velocity.x, this.time.now / 1000);
+            }
             else if (entering && this.airAt && this.time.now - this.airAt >= CHAIN.minAir) { this.airAt = 0; this.chainMove('landing'); }
             if (speed < 2 || this.time.now - (this.lastSplash || -999) < 180) return; // no plop for a gentle bob
             this.lastSplash = this.time.now;
