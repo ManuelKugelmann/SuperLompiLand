@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BIOMES } from '../level/biomes.js';
 import { createStation, stepStation, stationXs } from './cleaner.js';
+import { createRig } from '../CardRig.js';
 
 /**
  * The cleaner station on the reef (spec 5.0f; ai/cleaner.js decides): a big grouper hovering
@@ -14,6 +15,8 @@ import { createStation, stepStation, stationXs } from './cleaner.js';
 export const CLEANER_LOOK = {
     below: 140,          // px under the calm route
     grouperW: 300,       // px long
+    hover: [34, 14],     // px the grouper drifts to and fro and up and down while it is cleaned (playtest: it "looked stuffed")
+    hoverS: [9, 6],      // ... s for one drift each way
     wrasse: 3,
     wrasseW: 46,         // px long each
     depth: 3.4,
@@ -67,8 +70,9 @@ export default class CleanerLayer {
         }
         const sc = this.scene, L = CLEANER_LOOK, { x, y } = s.mind;
         const gKey = sc.textures.exists('friend_grouper') ? 'friend_grouper' : 'cleaner_grouper';
-        const grouper = sc.add.image(x, y, gKey).setDepth(L.depth);
-        grouper.setScale(L.grouperW / grouper.width);
+        // On a rig: its body bends, its tail and fins beat slowly, it breathes. A still picture read as a stuffed fish.
+        const grouper = createRig(sc, { states: { normal: { key: gKey, width: L.grouperW, wiggle: 9 } }, anim: 'swim', soft: 0.45 }, x, y, L.depth);
+        grouper.at = { x, y };
         const wKey = sc.textures.exists('school_wrasse') ? 'school_wrasse' : 'cleaner_wrasse';
         const wrasse = Array.from({ length: L.wrasse }, (_, i) => {
             const w = sc.add.image(x, y, wKey).setDepth(L.depth + 0.01);
@@ -93,12 +97,14 @@ export default class CleanerLayer {
     animate(s, dt, t, fish) {
         const st = s.mind, { grouper, wrasse } = s.view, ev = stepStation(st, dt, fish);
         if (ev) this.on(ev, st.x, st.y);
-        // The grouper hovers, gills and mouth breathing a little.
-        grouper.setPosition(st.x + Math.sin(t * 0.4) * 10, st.y + Math.sin(t * 0.7) * 6)
-            .setScale(CLEANER_LOOK.grouperW / grouper.width * (1 + Math.sin(t * 1.6) * 0.012));
+        // The grouper hovers in place: a slow drift to and fro, tail and fins fanning to hold still.
+        const L = CLEANER_LOOK, w0 = Math.PI * 2 / L.hoverS[0], w1 = Math.PI * 2 / L.hoverS[1];
+        const gx = st.x + Math.sin(t * w0) * L.hover[0], gy = st.y + Math.sin(t * w1 + 1) * L.hover[1];
+        grouper.draw({ x: gx, y: gy, vx: Math.cos(t * w0) * L.hover[0] * w0 / 60, vy: Math.cos(t * w1 + 1) * L.hover[1] * w1 / 60, frames: dt * 60, effort: 0.3, facing: 1, turn: 0.02 });
+        grouper.at.x = gx; grouper.at.y = gy;
         // The wrasse pick over whoever is being cleaned, darting; scattered ones hide behind the station.
         const target = st.state === 'fish' && fish ? fish
-            : st.state === 'scattered' ? { x: st.x - 260, y: st.y + 120 } : { x: grouper.x, y: grouper.y };
+            : st.state === 'scattered' ? { x: st.x - 260, y: st.y + 120 } : grouper.at;
         const span = st.state === 'fish' ? 60 : 110;
         for (const w of wrasse) {
             const tx = target.x + Math.sin(t * 2.3 + w.phase) * span, ty = target.y + Math.sin(t * 3.1 + w.phase * 1.7) * span * 0.35;
