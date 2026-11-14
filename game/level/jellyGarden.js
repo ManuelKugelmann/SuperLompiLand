@@ -9,9 +9,9 @@ export const JELLY_GARDEN = {
     biome: 'mangrove',
     at: 0.12,            // share of the biome's width where the garden starts (about a minute into the mangrove)
     width: 2600,         // px the garden is long
-    count: 30,           // jellies lying in it
+    count: 22,           // jellies lying in it
     patch: 0.55,         // where along the garden (0..1) the jellies lie thickest, and the coins hang
-    size: [120, 190],    // px across a jelly (about one to one and a half fish: readable as an animal, not a pebble)
+    size: [80, 125],     // px across a jelly (under one fish: a garden of small animals, not a wall)
     periodS: 1.7,        // s between two pulses of one jelly
     lift: 3.2,           // px/step a pulse lifts the fish at its strongest (a vent lifts 4.5)
     reach: 240,          // px above the mud the pulses are felt
