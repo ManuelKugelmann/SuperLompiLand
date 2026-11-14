@@ -1,8 +1,8 @@
 // Zero-dependency PNG generator for PWA icons + the game card preview.
-// Draws a simple shaded pufferfish so the project builds with no binary assets
-// committed. Replace these with real art (e.g. exported from Rive) later.
+// The painted icons (assets/icons/, made by scripts/fx/app_icon.py from Lompi's art) are copied
+// into place; where one is missing, a simple shaded pufferfish is drawn instead (the fallback).
 import { deflateSync, crc32 } from 'node:zlib';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,13 +59,16 @@ function fishPixel(size) {
 }
 
 const targets = [
-    ['public/pwa-192x192.png', 192],
-    ['public/pwa-512x512.png', 512],
-    ['assets/card_preview.png', 512]
+    ['public/pwa-192x192.png', 192, 'pwa-192x192.png'],
+    ['public/pwa-512x512.png', 512, 'pwa-512x512.png'],
+    ['public/maskable-192.png', 192, 'maskable-192.png'],
+    ['public/maskable-512.png', 512, 'maskable-512.png'],
+    ['assets/card_preview.png', 512, 'card_preview.png']
 ];
-for (const [rel, size] of targets) {
-    const out = resolve(ROOT, rel);
+for (const [rel, size, painted] of targets) {
+    const out = resolve(ROOT, rel), src = resolve(ROOT, 'assets/icons', painted);
     mkdirSync(dirname(out), { recursive: true });
+    if (existsSync(src)) { copyFileSync(src, out); console.log('copied', rel); continue; }
     writeFileSync(out, png(size, fishPixel(size)));
     console.log('wrote', rel, `(${size}x${size})`);
 }
