@@ -244,7 +244,10 @@ export default class MainScene extends Phaser.Scene {
         // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
         // Whoever the player plays is not waiting in a net: Lompi waits there instead (journey.js).
         this.journey = createJourney(this.progression.get?.('journey', []) || [], chapters(undefined, undefined, this.registry.get('character') || loadSelectedId()));
-        this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y));
+        this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y),
+            x => this.level.nests.find(n => n.x > x) || null,
+            // A freed friend has swum along to the next nest and settles in there: said once, so the child knows where it will be.
+            ch => this.announce('', this.lang === 'de' ? `${ch.friend.name} wartet im großen Nest auf dich` : `${ch.friend.name} waits for you at the grand nest`));
         // The great whale of the open blue: free her from the net and she carries you east (spec 9.0).
         const whaleAt = this.journey.event(WHALE_SCENE.id);
         this.whale = this.ambientMode || !whaleAt ? null
@@ -1682,7 +1685,7 @@ export default class MainScene extends Phaser.Scene {
         this.whaleShark.update(sp, time / 1000, delta);
         this.front.update(sp, time / 1000, delta);
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
-        this.beats?.update(sp, time / 1000, delta);
+        this.beats?.update(sp, time / 1000, delta, this.fish.facing);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
         else if (this.creaturesWarm && !this.stormWarm && this.buildSlot()) this.stormWarm = !prewarmStorm(this);      // then the storm's pictures, one per frame
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
