@@ -38,8 +38,8 @@ export const SET_LOOK = {
     sparkNear: 5000,        // the column and its sparkles show when the fish is within this many px of the nest (in x)
     beaconTint: 0xffd9a0,
     beaconAlpha: 0.42,
-    poolSize: 1500,         // px across the warm light pool on the grand nest: the brightest place in the dark trench (spec 5.0m)
-    poolAlpha: 0.55
+    poolSize: 1100,         // px across the warm light pool on the grand nest: the brightest place in the dark trench (spec 5.0m)
+    poolAlpha: 0.32
 };
 
 // How each picture that can stand in for the ship is painted (measured on the file): where the
