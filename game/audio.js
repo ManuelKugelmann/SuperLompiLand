@@ -26,6 +26,12 @@ export function setMuted(on) {
 }
 
 const VOLUME = 0.5;
+/**
+ * Master bus (mix check 2026-11-14: every area measured -42 LUFS, far too quiet for a phone speaker, where
+ * mobile games sit around -23 to -16): a gentle compressor holds the peaks, make-up gain lifts the whole
+ * mix. Target: music about -28 LUFS, nothing over -1 dBTP.
+ */
+const MASTER = { threshold: -20, knee: 8, ratio: 4, attack: 0.004, release: 0.25, makeup: 3.2 };
 // Fallback when play('coin') is called without a streak note: C major pentatonic.
 const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
 
@@ -37,7 +43,10 @@ function ready() {
         ctx = new AC();
         master = ctx.createGain();
         master.gain.value = VOLUME;
-        master.connect(ctx.destination);
+        const comp = ctx.createDynamicsCompressor(), makeup = ctx.createGain();
+        comp.threshold.value = MASTER.threshold; comp.knee.value = MASTER.knee; comp.ratio.value = MASTER.ratio;
+        comp.attack.value = MASTER.attack; comp.release.value = MASTER.release; makeup.gain.value = MASTER.makeup;
+        master.connect(comp).connect(makeup).connect(ctx.destination);
         noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
