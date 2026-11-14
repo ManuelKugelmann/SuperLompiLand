@@ -123,7 +123,7 @@ npm run serve      # zero-dep static server for dist/ (tests the real PWA/SW)
 
 Lompi the pufferfish lives on a reef. A volcano erupts, and what it shakes loose —
 mines, nets, buoys — drifts into the sea. Lompi sets out east across the
-ocean, from the shallow lagoon through reef, kelp forest, open blue, minefield and
+ocean, from the shallow lagoon through reef, kelp forest, open blue, ship graveyard and
 harbour down into the deep trench, to reach the grand nest.
 
 - **Nests** on the seabed save your coins, refill your health and are where you
@@ -131,7 +131,20 @@ harbour down into the deep trench, to reach the grand nest.
 - **Friends** (turtle, seahorse, snail, starfish, urchin, anglerfish, …) cheer you
   up: a bonus and a heart. They shimmer; hazards do not.
 - **Seven characters** to choose on the title screen, each moving differently and
-  with its own special (puff, dash, leap, shield, pulse).
+  with a special of its own: Lompi puffs up and stops, Sharky sprints (tap up to five
+  times), Flitzi leaps and glides over the waves, the firefish spreads its fins like a
+  parachute, Schildi tucks into a rolling shell, Quallina pulses upward, Hüpfi holds on
+  to the rock with its tail.
+- **Momentum from the sea:** currents carry you faster than you can swim, bubble
+  cannons at their ends shoot you on, a big moon jelly bounces you back up.
+- **Chains:** link jumps, flips, clean landings, wave skips, currents, cannons and
+  specials and a soft counter grows; a finished chain pays a few bonus coins. No timer,
+  nothing to lose.
+- **A calm route** of open water runs through the whole journey, past every nest;
+  hazards keep away from it, and little lights drift along it. Danger is optional.
+- **Animals with a mind of their own:** friends roam, rest, look at you, circle you
+  once to say hello and dart off when rushed; the turtle comes up for air, starfish and
+  snails crawl along the rock.
 - **Relaxed or adventure:** switch in the menu. Relaxed means nothing can hurt.
 - The strip at the top right shows the whole journey and where you are.
 - **Swim together:** tap *Zusammen* on the title screen and type a secret room
@@ -156,7 +169,8 @@ harbour down into the deep trench, to reach the grand nest.
 | **Stick** | floating virtual stick, drag to swim | double tap |
 
 Keyboard always works too: arrows / WASD swim, Space is the special.
-Out of the water there is no swimming — only your momentum, and a little steering.
+Out of the water you fly like a bird: steering turns your path and never adds speed,
+a dive gains speed, and puffing up is the air brake.
 
 Sound can be switched off in the menu (☰). The app updates itself when a new build
 is live; install it from the same menu.
@@ -168,8 +182,19 @@ npm test           # unit tests for the pure logic (terrain, biomes, characters,
 ```
 
 Add a control scheme in `game/controls/` and register it in `game/controls/index.js`;
-add a playable character in `game/characters.js`; biomes and their spawn tables live
-in `game/level/biomes.js`.
+add a playable character in `game/characters.js` and its special in `game/specials.js`;
+biomes and their spawn tables live in `game/level/biomes.js`.
+
+Handy while developing (add to the URL):
+
+| Parameter | What it does |
+|---|---|
+| `?at=<biome>` or `?at=x,y` | start at a biome's landmark or at a point |
+| `?debug=perf` | frame budget, chunk build times, object counts |
+| `?debug=flow` | currents as arrows, the calm route as a green line |
+| `?debug=ai` | every creature shows what it is doing |
+| `?tune=key:value,...` | override movement numbers, e.g. `?tune=waterDrag:0.5,thrust:0.0009` |
+| `?flight=ballistic` | the old flight model, for comparison |
 
 ## Deploy — GitHub Pages (dev/release routing)
 
