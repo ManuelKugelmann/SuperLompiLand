@@ -1,5 +1,6 @@
 import { HUNTER, hunterSpots, spotNear, startHunter, stepHunter, sightBlocked } from './hunter.js';
 import { due, everyOf } from '../throttle.js';
+import { createRig } from '../CardRig.js';
 
 /**
  * What the passing hunter looks like (level/hunter.js says how it hunts): a long silver barracuda
@@ -9,7 +10,7 @@ import { due, everyOf } from '../throttle.js';
  *   create():  this.hunter = new HunterLayer(scene, { solid, top }, { warn, caught, escaped, seen })
  *   update():  this.hunter.update(fish, dt)
  */
-export const HUNTER_LOOK = { depth: 3.8, wag: 0.07, wagHz: 5, bubbleS: 0.12 };
+export const HUNTER_LOOK = { depth: 3.8, bubbleS: 0.12 };
 
 const KEY = 'barracuda';      // a painted picture under this key (head right) replaces the drawn one
 /** The painted barracuda (scripts/fx/fish_cut.py; loaded by the title screen). */
@@ -43,7 +44,7 @@ export default class HunterLayer {
     constructor(scene, world, on) {
         this.scene = scene; this.world = world; this.on = on;
         this.spots = hunterSpots(); this.done = new Set();
-        this.h = null; this.img = null; this.sees = true; this.bubble = 0;
+        this.h = null; this.rig = null; this.sees = true; this.bubble = 0;
         ensureTexture(scene);
     }
 
@@ -64,17 +65,17 @@ export default class HunterLayer {
         // Rock between them hides Lompi; looked up every few frames (throttle.js 'check').
         if (h.phase === 'chase' && due(frame, everyOf('check', tier), 3)) this.sees = !sightBlocked(this.world.solid, h.x, h.y, fish.x, fish.y);
         stepHunter(h, fish, this.sees, dt, HUNTER, this.world);
-        if (h.phase === 'done') { this.img?.destroy(); this.img = null; this.h = null; return; }
+        if (h.phase === 'done') { this.rig?.destroy(); this.rig = null; this.h = null; return; }
         if (h.phase === 'warn') return;
-        if (!this.img) {
-            this.img = this.scene.add.image(h.x, h.y, KEY).setDepth(HUNTER_LOOK.depth);
-            this.img.setScale(HUNTER.size / this.img.width);
+        if (!this.rig) {
+            // The shared swim rig: it swims by the spine wave like every fish (tail-driven by default).
+            this.rig = createRig(this.scene, { states: { normal: { key: KEY, width: HUNTER.size, wiggle: 8 } }, anim: 'swim' }, h.x, h.y, HUNTER_LOOK.depth);
             this.on.seen('barracuda');
         }
         if (was === 'chase' && h.phase === 'leave') { if (h.result === 'caught') this.on.caught(h.x, h.y); else this.on.escaped(); }
-        // Head along its way (the picture faces right; swimming left it is flipped, not upside down), the tail beating.
-        const L = HUNTER_LOOK, left = Math.cos(h.angle) < 0, wag = Math.sin(h.t * Math.PI * 2 * L.wagHz) * L.wag;
-        this.img.setPosition(h.x, h.y).setFlipY(left).setRotation(h.angle + wag);
+        // The rig heads along its velocity (px per step) and beats its tail with the effort: a sprint.
+        const L = HUNTER_LOOK, speed = (h.phase === 'chase' ? HUNTER.speed : HUNTER.leaveSpeed) / 60;
+        this.rig.draw({ x: h.x, y: h.y, vx: Math.cos(h.angle) * speed, vy: Math.sin(h.angle) * speed, frames: dt * 60, effort: 1, turn: 0.35 });
         this.bubble -= dt;
         if (this.bubble <= 0) { this.bubble = L.bubbleS; this.scene.particles.spawn('bubble', h.x - Math.cos(h.angle) * HUNTER.size * 0.45, h.y - Math.sin(h.angle) * HUNTER.size * 0.45, 1, { radius: 10, spread: 14 }); }
     }
