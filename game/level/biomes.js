@@ -60,7 +60,7 @@ export const BIOMES = [
     {
         // Shallow, sheltered, full of roots to weave through. `roots` = mangrove
         // roots hanging from the surface, some in front of the fish, most behind.
-        id: 'mangrove', name: { de: 'Mangroven', en: 'Mangroves' }, zone: 'island', floor: 1900,
+        id: 'mangrove', name: { de: 'Mangroven', en: 'Mangroves' }, zone: 'island', floor: 1050,      // shallow: mangroves stand in knee-deep water by the sea's measure, every root reaches the mud
         rock: [0xe8d9a6, 0xbfae77, 0x8f8257, 0x665d44, 0x474233], water: [0x4fb98a, 0.22], open: 0.22,
         backRock: 400,
         rockWall: 0.6,

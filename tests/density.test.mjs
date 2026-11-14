@@ -98,7 +98,7 @@ test('the calm route crosses the open sea just under the surface and runs half w
         if (b.id === 'beach' || b.id === 'trench') continue;
         const x = b.from + b.width / 2, y = cruiseY(x);
         if (b.zone === 'sea') { const x0 = b.from + b.width * 0.9; assert.ok(Math.abs(cruiseY(x0 - 3200) - ROUTE.seaY) < 1 || detour(x0 - 3200).k > 0, `${b.id}: ${Math.round(y)}`); }      // storm and downwelling stretches: tests/weather.test.mjs
-        else assert.ok(y > 800 && y < 1300, `${b.id}: ${Math.round(y)}`);
+        else assert.ok(y > b.floor * 0.4 && y < b.floor * 0.7, `${b.id}: ${Math.round(y)} (seabed ${b.floor})`);      // half way down, whatever the coast's depth (the mangrove is shallow)
     }
     assert.ok(f.nests.every(n => n.grand || BIOMES[n.biome].zone === 'island'), 'nests lie on the coasts (and the grand nest at the end)');
     assert.equal(f.nests.length, nestSpots().length);
