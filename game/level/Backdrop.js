@@ -9,6 +9,9 @@ import SeaFarLayer from './SeaFarLayer.js';
  * above y = 0.
  */
 /** Far fish schools are placed again once this far outside the picture (px). */
+/** The surface crest line: behind the fish (full) and in front of it (a thin meniscus). */
+const WATERLINE = { back: { width: 6, alpha: 0.85, depth: 4.9 }, front: { width: 2, alpha: 0.4, depth: 6 } };
+
 /** The backdrop water from the surface (0) to the bottom of the screen (1): brightness shares of the top. */
 const WATER_GRADIENT = [[0, 1], [0.25, 0.9], [0.6, 0.63], [1, 0.46]];
 const WATER_TOP_LUMA = 160;     // brightness of the water just under the surface (higher clips blues to cyan: atLuma)
@@ -49,7 +52,11 @@ export default class Backdrop {
         this.seaFar = new SeaFarLayer(scene);            // the open sea's far view: the next island's socket, marine snow, big shapes passing
         this.sky = new SkyLayer(scene);                  // clouds, birds, the coast and the volcano on the horizon
         this.sea = scene.add.graphics().setDepth(-28);   // water body drawn over the sky, wavy top edge
-        this.foam = scene.add.graphics().setDepth(6);    // bright crest line, in front of the fish
+        // The crest line: bright just behind the fish, and a thin faint meniscus in front of it,
+        // so a fish half out of the water reads as crossing the surface without a white slice
+        // through its face (WATERLINE).
+        this.foamBack = scene.add.graphics().setDepth(WATERLINE.back.depth);
+        this.foam = scene.add.graphics().setDepth(WATERLINE.front.depth);
 
         // The volcano's glow on the eastern horizon: always shows which way the journey goes.
         makeSoft(scene);
@@ -120,6 +127,7 @@ export default class Backdrop {
         // Waterline: only when it is on screen.
         this.sea.clear();
         this.foam.clear();
+        this.foamBack.clear();
         if (camY < 80) {
             const pts = [];
             for (let sx = -40; sx <= W + 40; sx += 32) pts.push({ x: camX + sx, y: surface.heightAt(camX + sx, t) });
@@ -131,9 +139,11 @@ export default class Backdrop {
             for (const p of pts) this.sea.lineTo(p.x, p.y);
             this.sea.lineTo(x1, 62).closePath().fillPath();
             for (let k = 0; k < 40; k++) this.sea.fillStyle(0x9be9ef, 0.9 * (1 - k / 40) ** 1.6).fillRect(x0, 62 + k * 6, x1 - x0, 6);
-            this.foam.lineStyle(7, 0xffffff, 0.85).beginPath().moveTo(pts[0].x, pts[0].y);
-            for (const p of pts) this.foam.lineTo(p.x, p.y);
-            this.foam.strokePath();
+            for (const [g, L] of [[this.foamBack, WATERLINE.back], [this.foam, WATERLINE.front]]) {
+                g.lineStyle(L.width, 0xffffff, L.alpha).beginPath().moveTo(pts[0].x, pts[0].y);
+                for (const p of pts) g.lineTo(p.x, p.y);
+                g.strokePath();
+            }
         }
 
         const depthFade = Math.max(0.25, 1 - depth * 0.8);
