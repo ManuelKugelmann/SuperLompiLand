@@ -17,7 +17,8 @@ export default class FlapController extends ControllerBase {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         this.center = new Phaser.Math.Vector2(W / 2, H / 2);
 
-        this.hint('Schnell tippen = schnell schwimmen · Tipp-Ort = Richtung · lange halten = aufblasen');
+        this.hint(this.de ? `Schnell tippen = schnell schwimmen · Tipp-Ort = Richtung · lange halten = ${this.specialWord()}`
+            : `Tap fast = swim fast · where you tap = direction · long press = ${this.specialWord()}`);
         this.held = null;
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);

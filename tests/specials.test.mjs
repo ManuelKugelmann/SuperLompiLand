@@ -23,6 +23,7 @@ test('no two characters share a special, and no special is left without a charac
 test('every special has the full interface and returns a finite velocity', () => {
     for (const [name, sp] of Object.entries(SPECIALS)) {
         assert.ok(sp.cooldown >= 0 && typeof sp.air === 'boolean' && typeof sp.start === 'function', name);
+        assert.ok(sp.label.de && sp.label.en && sp.label.de !== sp.label.en, `${name}: a name in both languages`);
         for (const ctx of [still, { ...still, vx: -6, vy: 3, facing: -1 }, { ...still, vx: 4, vy: -9, inAir: true }, { ...still, holding: true }, { ...still, canHold: true }]) {
             const fx = sp.start(ctx);
             assert.ok(Number.isFinite(fx.vx) && Number.isFinite(fx.vy), `${name}: velocity`);

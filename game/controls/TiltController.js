@@ -29,7 +29,6 @@ const SENSOR_WAIT_MS = 1500;
 export default class TiltController extends ControllerBase {
     enter() {
         const W = this.scene.scale.width, H = this.scene.scale.height;
-        this.de = (this.scene.registry.get('currentLanguage') || 'de') === 'de';
         this.dir = new Phaser.Math.Vector2(0, 0);
         this.neutral = null;
         this.source = 'none';   // 'orientation' | 'motion' | 'pointer' | 'none'
@@ -41,8 +40,8 @@ export default class TiltController extends ControllerBase {
             fontFamily: 'Arial', fontSize: '26px', color: '#ffffff', align: 'center', stroke: '#0a3f6e', strokeThickness: 5
         }).setOrigin(0.5, 1);
         this.ui.add(this.status);        // only says something when the sensor needs the player (or with ?debug=tilt)
-        this.hint(this.de ? 'Handy neigen = Richtung · tippen = Tempo · lange halten = Spezial'
-            : 'Tilt = direction · tap = speed · long press = special');
+        this.hint(this.de ? `Handy neigen = Richtung · tippen = Tempo · lange halten = ${this.specialWord()}`
+            : `Tilt = direction · tap = speed · long press = ${this.specialWord()}`);
 
         this.onOrient = e => this.readOrientation(e);
         this.onMotion = e => this.readMotion(e);

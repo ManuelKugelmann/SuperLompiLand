@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SPECIALS } from '../specials.js';
 
 /**
  * Base for a swappable control scheme. Each scheme owns its input listeners and
@@ -15,6 +16,12 @@ export default class ControllerBase {
         this.ui = scene.add.container(0, 0).setDepth(40).setScrollFactor(0);
         this.world = scene.add.container(0, 0).setDepth(6);
         this._listeners = [];
+        this.de = (scene.registry.get('currentLanguage') || 'de') === 'de';
+    }
+
+    /** What this character's special move is called (for the hints). */
+    specialWord() {
+        return SPECIALS[this.fish.char.special].label[this.de ? 'de' : 'en'];
     }
 
     listen(target, event, fn) {

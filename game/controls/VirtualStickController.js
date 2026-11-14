@@ -21,7 +21,7 @@ export default class VirtualStickController extends ControllerBase {
         this.thumb = this.scene.add.circle(this.base.x, this.base.y, 54, 0xffffff, 0.16)
             .setStrokeStyle(3, 0xffffff, 0.28);
         this.ui.add([this.ring, this.thumb]);
-        this.hint('Ziehen = schwimmen · Doppeltipp = aufblasen');
+        this.hint(this.de ? `Ziehen = schwimmen · Doppeltipp = ${this.specialWord()}` : `Drag = swim · double tap = ${this.specialWord()}`);
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
         this.listen(this.scene.input, 'pointermove', this.onMove);

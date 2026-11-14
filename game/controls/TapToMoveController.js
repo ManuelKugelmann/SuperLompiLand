@@ -11,7 +11,8 @@ const BAND_FULL = 520; // finger distance at which the pull is at full strength
 export default class TapToMoveController extends ControllerBase {
     enter() {
         this.held = null;
-        this.hint('Halten = Gummiband zum Finger · Loslassen = bremsen · Doppeltipp = aufblasen');
+        this.hint(this.de ? `Halten = Gummiband zum Finger · Loslassen = bremsen · Doppeltipp = ${this.specialWord()}`
+            : `Hold = rubber band to your finger · let go = brake · double tap = ${this.specialWord()}`);
 
         this.listen(this.scene.input, 'pointerdown', this.onDown);
         this.listen(this.scene.input, 'pointerup', this.onUp);
