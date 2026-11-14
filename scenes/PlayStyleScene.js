@@ -46,7 +46,7 @@ export default class PlayStyleScene extends Phaser.Scene {
             chosen = true;
             play('tap');
             this.scene.stop();
-            if (relaxed !== main.relaxed) main.setRelaxed(relaxed);   // restarts at this nest
+            if (relaxed !== main.relaxed) main.setRelaxed(relaxed);   // applied while the game goes on
             else main.scene.resume();
         };
         const gentle = this.option(W / 2 - 290, H * 0.53, TEXT.relaxed, lang, 0x2f8f6a, () => choose(true));

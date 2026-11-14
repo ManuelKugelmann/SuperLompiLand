@@ -1017,8 +1017,13 @@ export default class MainScene extends Phaser.Scene {
 
     /** Menu: switch between relaxed (no damage) and adventure. Takes effect at once. */
     setRelaxed(on) {
-        this.progression.set?.('relaxed', !!on);
-        this.scene.restart();
+        // Applied while the game goes on (no restart: a restart in the first minute is a hitch without a cause);
+        // every rule reads this.relaxed when it needs it. Only the HUD is laid out again (its menu names the mode).
+        this.relaxed = !!on;
+        this.progression.set?.('relaxed', this.relaxed);
+        if (this.relaxed) this.chainEnd(this.chain.end());
+        if (this.scene.isActive(HUD_KEY)) this.scene.get(HUD_KEY).scene.restart({ main: this });
+        this.scene.resume();
     }
 
     /** Menu: forget the saved nest and coins and begin at the home reef again. */
