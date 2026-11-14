@@ -30,8 +30,8 @@ export const ROCK_LAYERS = [
     // socket: closed share in front of an island at least (its rocky underwater base: no far
     // view right in front of an island, spec 5.0c); it eases off into the open sea.
     // trenchWall: this layer carries the trench wall behind the descent (TRENCH_WALL).
-    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.45, dark: 0.92, depth: -9.5, socket: 0.85, trenchWall: true },
-    { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.3, dark: 0.95, depth: -7, clearRoute: true }
+    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.38, dark: 0.8, depth: -9.5, socket: 0.85, trenchWall: true },
+    { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.24, dark: 0.86, depth: -7, clearRoute: true }
 ];
 
 /** Layer chunk size (layer px) and its shading: coarse (soft), no sand, low contrast, unlit rims. */
@@ -39,8 +39,8 @@ export const LAYER_CHUNK = 960;
 export const LAYER_SHADE = {
     ...SHADE,
     rockSize: 248,       // not a power of two: the GPU clamps its edges (power-of-two textures repeat: seam lines)
-    node: 8, backSize: 0, sandReach: 0, relief: 0.45, bump: 0.12, grain: 0.14,
-    keyStrength: 0.55, bevel: 30, coreShade: 0.4
+    node: 8, backSize: 0, sandReach: 0, relief: 1.0, bump: 0.3, grain: 0.24,     // enough relief and grain to read as rock, not as haze (lagoon review)
+    keyStrength: 0.75, bevel: 40, coreShade: 0.5
 };
 
 /**
