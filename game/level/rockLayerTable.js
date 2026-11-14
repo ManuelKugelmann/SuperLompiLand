@@ -85,13 +85,30 @@ const Q = (() => {
 export const noiseQuantile = q => Q[Math.min(Q.length - 1, Math.max(0, Math.floor(q * Q.length)))];
 
 /**
+ * Slow zones along a long biome, so its background does not look the same for 80 000 px:
+ * each layer has its own zone noise (0..1, period about `scale` px). Low zones are open
+ * (a far view over sand flats, the ground ridge low), high ones closed (walls near, the ridge
+ * high). `socket` / `base`: the range the closed share is scaled through; `lift`: how far
+ * the ground ridge rises and sinks.
+ */
+export const ZONES = { scale: 18000, socket: [0.6, 1.05], base: [0.4, 1.5], lift: 0.16 };
+
+/** A layer's zone at x (0 = open stretch, 1 = closed stretch), smooth. */
+export function zoneAt(x, layer, cfg = ZONES) {
+    return smooth01(vnoise(x / cfg.scale, 1.3, layer.seed + 51) * 1.4 - 0.2);
+}
+
+/**
  * Closed share (0..1) of the rock layers at world x, blended across biome borders; with a
- * layer, its island socket raises it along the coasts (fading out into the open sea).
+ * layer, its island socket raises it along the coasts (fading out into the open sea), and
+ * the layer's zone opens or closes it in long stretches.
  */
 export function wallShare(x, layer) {
     const { a, b, t } = biomeBlendAt(x);
     const base = (a.rockWall || 0) * (1 - t) + (b.rockWall || 0) * t;
-    return Math.max(base, (layer?.socket || 0) * (1 - seaShare(x)));
+    if (!layer) return base;
+    const z = zoneAt(x, layer), lerp = ([lo, hi]) => lo + (hi - lo) * z;
+    return Math.min(1, Math.max(base * lerp(ZONES.base), (layer.socket || 0) * (1 - seaShare(x)) * lerp(ZONES.socket)));
 }
 
 /**
@@ -168,7 +185,7 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
             // Toward fully open the field is pushed far out of rock: walls go, only the deep
             // ground stays (sinking lower), so an open stretch never ends in a straight cut.
             const gone = smooth01((-0.55 - e) / 0.45);
-            const shift = layer.swing * e - 0.12 + (layer.open || 0) - gone * 0.9;
+            const shift = layer.swing * e - 0.12 + (layer.open || 0) - gone * 0.9 + ZONES.lift * (zoneAt(x, layer) * 2 - 1);
             // Only rock strong enough to carry a foot is shown: a thin ledge that would not reach
             // the floor is dropped whole. The detail comes from the fine field, but it is capped
             // by the coarse one the feet are carried from — what shows here always has a foot.
