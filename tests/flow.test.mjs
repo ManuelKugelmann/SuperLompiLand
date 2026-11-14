@@ -120,3 +120,13 @@ test('eddies too are still at the calm route', () => {
     const v = createFlow(SEED, cfg, () => e.y).at(e.x + FLOW.eddyRadius, e.y, 0, { x: 0, y: 0 });
     assert.ok(Math.hypot(v.x, v.y) < 0.01);
 });
+
+test('an eddy only exists where its ring is in open water and clear of the calm route', () => {
+    const all = flow.eddiesIn(WORLD_WEST, WORLD_END), e = all[0];
+    const blocked = createFlow(SEED, FLOW, null, (x, y) => !(Math.abs(x - e.x) < 400 && Math.abs(y - e.y) < 400));
+    assert.equal(blocked.eddiesIn(WORLD_WEST, WORLD_END).length, all.length - 1, 'rock on the ring: no eddy there');
+    assert.deepEqual(blocked.at(e.x + FLOW.eddyRadius, e.y, 0, { x: 0, y: 0 }).y, createFlow(SEED, { ...FLOW, eddyChance: 0 }).at(e.x + FLOW.eddyRadius, e.y, 0, { x: 0, y: 0 }).y);
+    const onRoute = createFlow(SEED, FLOW, () => e.y + FLOW.calm[1]);
+    assert.ok(onRoute.eddiesIn(WORLD_WEST, WORLD_END).length < all.length, 'too close to the route: none');
+    assert.equal(createFlow(SEED, FLOW, () => -99999, () => true).eddiesIn(WORLD_WEST, WORLD_END).length, all.length, 'open water far from the route: all of them');
+});

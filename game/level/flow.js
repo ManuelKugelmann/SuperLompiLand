@@ -61,12 +61,23 @@ export function streamY(s, x) {
 /**
  * @param calmY  optional: x -> y of the calm main route. Streams lose their pull near it,
  *               so the route stays calm even where a stream crosses it.
+ * @param isOpen optional: (x, y) -> open water? An eddy only exists where its whole ring is
+ *               in open water and clear of the calm route.
  */
-export function createFlow(seed, cfg = FLOW, calmY = null) {
+export function createFlow(seed, cfg = FLOW, calmY = null, isOpen = null) {
     const slots = new Map();
     const slot = i => { if (!slots.has(i)) slots.set(i, streamInSlot(i, seed, cfg)); return slots.get(i); };
     const eddies = new Map();
-    const eddy = i => { if (!eddies.has(i)) eddies.set(i, eddyOf(slot(i), seed, cfg)); return eddies.get(i); };
+    const fits = e => {
+        if (!e) return null;
+        if (calmY && Math.abs(e.y - calmY(e.x)) < cfg.calm[1] + cfg.eddyRadius) return null;      // it would be half muted
+        if (isOpen) for (let k = 0; k < 8; k++) {
+            const a = k * Math.PI / 4;
+            if (!isOpen(e.x + Math.cos(a) * cfg.eddyRadius * 1.2, e.y + Math.sin(a) * cfg.eddyRadius * 1.2)) return null;
+        }
+        return e;
+    };
+    const eddy = i => { if (!eddies.has(i)) eddies.set(i, fits(eddyOf(slot(i), seed, cfg))); return eddies.get(i); };
     // How much pull is left at (x, y): none inside the calm route, all of it away from it.
     const pull = (x, y) => {
         if (!calmY) return 1;
