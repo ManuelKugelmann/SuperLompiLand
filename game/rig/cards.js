@@ -48,21 +48,22 @@ export const CARDS = {
  *            tails and skirts lie beyond the body and swing both ways.
  */
 export const ROLES = {
-    tail:      { swing: 0.38, sweep: 0.04, wave: 0.1, k: 2.2, speed: 1, idle: 0.04 },
+    tail:      { swing: 0.38, sweep: 0.06, wave: 0.26, k: 2.2, speed: 1, idle: 0.04 },      // a visible beat in the picture: the bend (wave) grows toward the tip, the root stays put
     median:    { swing: 0.12, sweep: 0.03, wave: 0.07, k: 2.6, speed: 1, idle: 0.15 },
     pectoral:  { swing: 0.55, sweep: 0.08, wave: 0.06, k: 2.0, speed: 1.15, idle: 0.25, outward: true },
     // fold: the wing is painted spread; folded (m.fold 1, under water) it turns `angle` of the way
-    // back along the body and shrinks by `shrink` toward its root, spreading again in the air.
-    wing:      { swing: 0.12, sweep: 0.03, wave: 0.03, k: 1.6, speed: 0.55, idle: 0, outward: true, fold: { angle: 0.85, shrink: 0.5 } },
+    // back along the body, closes across its width like a fan (`narrow`) and only a little in length
+    // (`shrink`), trailing along the body; in the air it spreads again (user: not just rescaled).
+    wing:      { swing: 0.12, sweep: 0.03, wave: 0.03, k: 1.6, speed: 0.55, idle: 0, outward: true, fold: { angle: 0.95, shrink: 0.12, narrow: 0.62 } },
     flipper:   { swing: 0.35, sweep: 0.28, wave: 0.06, k: 1.8, speed: 0.55, idle: 0.08, outward: true },
     head:      { swing: 0.015, sweep: 0.008, wave: 0, k: 0, speed: 0.3, idle: 0.15 },   // steady (user: "less wobbly head")
     fan:       { swing: 0.05, sweep: 0.02, wave: 0.06, k: 3.0, speed: 0.9, idle: 0.25 },
     tentacles: { swing: 0.05, sweep: 0.03, wave: 0.14, k: 3.4, speed: 0.9, idle: 0.5 },
     curl:      { swing: 0.03, sweep: 0.04, wave: 0.1, k: 2.0, speed: 0.7, idle: 0.3 },
-    // Ray wings seen from the side beat up and down in the picture plane (sweep), bending from root to
-    // tip so the tips lag (wave); a manta glides at a steady effort, so most of the beat stays when idle
-    // (user: the manta glides stiffly; about 0.4 Hz at its effort).
-    flap:      { swing: 0.12, sweep: 0.34, wave: 0.26, k: 1.1, speed: 0.32, idle: 0.85 }
+    // Ray wings seen from the side beat up and down in the picture plane. The beat is a bend that grows
+    // from root to tip (wave; the tips lag) with only a little turn of the whole wing (sweep), so the
+    // root stays attached to the body (user: no gap at the wing roots); about 0.4 Hz at a manta's effort.
+    flap:      { swing: 0.1, sweep: 0.08, wave: 0.5, k: 1.0, speed: 0.32, idle: 0.85 }
 };
 
 /** Triangle strip over a (cols x rows)-cell grid (rows joined by degenerate triangles): node index per strip vertex. */
@@ -139,6 +140,27 @@ function foldTurn(card) {
     return card.foldTo;
 }
 
+/** The unit direction from a card's pivot to its middle (cached): the axis a folding wing closes across. */
+function mainDir(card) {
+    if (card.dir === undefined) {
+        let cx = 0, cy = 0;
+        for (let i = 0; i < card.n; i++) { cx += card.lx[i]; cy += card.ly[i]; }
+        const l = Math.hypot(cx, cy) || 1;
+        card.dir = [cx / l, cy / l];
+    }
+    return card.dir;
+}
+
+/** A folded point: closed across the card's main direction (q.nw), shortened along it (q.fl), then turned (q.fa); writes [x, y] into o. */
+function foldPoint(card, lx, ly, q, o) {
+    if (!q.nw && q.fl === 1 && !q.fa) { o[0] = lx; o[1] = ly; return o; }
+    const [dx, dy] = mainDir(card), u = (lx * dx + ly * dy) * q.fl, v = (-lx * dy + ly * dx) * (1 - q.nw);
+    const x = u * dx - v * dy, y = u * dy + v * dx, c = Math.cos(q.fa), sn = Math.sin(q.fa);
+    o[0] = x * c - y * sn; o[1] = x * sn + y * c;
+    return o;
+}
+const FP = [0, 0];
+
 /** Rotate (x, y, z) about the unit axis (ax, ay, 0) by angle a; writes into o. */
 function aboutAxis(x, y, z, ax, ay, a, o) {
     const c = Math.cos(a), s = Math.sin(a), d = (ax * x + ay * y) * (1 - c);
@@ -155,14 +177,14 @@ const P = [0, 0, 0], N = [0, 0, 0];
  * at: [x, y] where its pivot is now (the body's bend carries it); mirror: the far twin.
  */
 export function posePart(card, part, m, at, mirror, out, turn = 0) {
-    const q = motion(card, part, m, MOTION), { R, effort, ph, swing, fc, fsn } = q, [ax, ay] = part.axis;
+    const q = motion(card, part, m, MOTION), { R, effort, ph, swing } = q, [ax, ay] = part.axis;
     for (let i = 0; i < card.n; i++) {
         const t = card.t[i];
         // Fold first (in the picture plane, about the root), then swing about the hinge (depth
         // comes only from it, so it stays on its side), then stroke and undulation in the plane
         // (plus `turn`: the in-plane angle of the part it hangs on, see carryPoint).
-        const lx = card.lx[i] * fc - card.ly[i] * fsn, ly = card.lx[i] * fsn + card.ly[i] * fc;
-        aboutAxis(lx, ly, 0, ax, ay, swing, P);
+        foldPoint(card, card.lx[i], card.ly[i], q, FP);
+        aboutAxis(FP[0], FP[1], 0, ax, ay, swing, P);
         aboutAxis(0, 0, 1, ax, ay, swing, N);
         const a = q.sweep + turn + R.wave * effort * Math.sin(ph - R.k * t) * t;
         const ca = Math.cos(a), sa = Math.sin(a);
@@ -182,11 +204,11 @@ function motion(card, part, m, o) {
     const effort = (R.idle + (1 - R.idle) * m.drive) * part.amp;
     const ph = m.phase * R.speed + part.phase * Math.PI * 2;
     const beat = Math.sin(ph + 0.6);
-    const f = R.fold && m.fold ? m.fold : 0, fa = f ? R.fold.angle * f * foldTurn(card) : 0, fs = 1 - (f ? R.fold.shrink * f : 0);
+    const f = R.fold && m.fold ? m.fold : 0;
+    o.fa = f ? R.fold.angle * f * foldTurn(card) : 0; o.fl = 1 - (f ? R.fold.shrink * f : 0); o.nw = f ? (R.fold.narrow || 0) * f : 0;
     o.R = R; o.effort = effort; o.ph = ph;
     o.swing = R.swing * effort * (R.outward ? (0.5 + 0.5 * beat) * outwardSign(card, part) : beat);
     o.sweep = R.sweep * effort * Math.sin(ph);
-    o.fc = Math.cos(fa) * fs; o.fsn = Math.sin(fa) * fs;
     return o;
 }
 
@@ -197,7 +219,8 @@ function motion(card, part, m, o) {
  */
 export function carryPoint(card, part, m, at, lx, ly, turn, o) {
     const q = motion(card, part, m, MOTION), [ax, ay] = part.axis;
-    aboutAxis(lx * q.fc - ly * q.fsn, lx * q.fsn + ly * q.fc, 0, ax, ay, q.swing, P);
+    foldPoint(card, lx, ly, q, FP);
+    aboutAxis(FP[0], FP[1], 0, ax, ay, q.swing, P);
     const a = q.sweep + turn + q.R.wave * q.effort * Math.sin(q.ph - q.R.k);
     const ca = Math.cos(a), sa = Math.sin(a);
     o.x = at[0] + P[0] * ca - P[1] * sa; o.y = at[1] + P[0] * sa + P[1] * ca; o.a = a;

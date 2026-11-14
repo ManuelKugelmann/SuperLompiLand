@@ -1,4 +1,4 @@
-import { ROCK_LAYERS, LAYER_CHUNK, LAYER_SHADE } from './rockLayerTable.js';
+import { ROCK_LAYERS, LAYER_CHUNK, layerSize } from './rockLayerTable.js';
 import { materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import { LEVEL } from './LevelGenerator.js';
@@ -63,7 +63,7 @@ export default class RockLayers {
     }
 
     show(def, r) {
-        const scene = this.scene, L = LAYER_CHUNK, S = LAYER_SHADE.rockSize;
+        const scene = this.scene, L = LAYER_CHUNK, S = layerSize(def);
         const [cx, cy] = r.key.split(',').map(Number);
         const key = `rl:${def.id}:${r.key}`;
         if (scene.textures.exists(key)) scene.textures.remove(key);

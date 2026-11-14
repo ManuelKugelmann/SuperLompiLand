@@ -30,8 +30,9 @@ export const ROCK_LAYERS = [
     // socket: closed share in front of an island at least (its rocky underwater base: no far
     // view right in front of an island, spec 5.0c); it eases off into the open sea.
     // trenchWall: this layer carries the trench wall behind the descent (TRENCH_WALL).
+    // rockSize / sharp: the near layer is baked finer and not softened (user: the near rock read smeared; the far ones may stay soft).
     { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.38, dark: 0.8, depth: -9.5, socket: 0.85, trenchWall: true },
-    { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.24, dark: 0.86, depth: -7, clearRoute: true }
+    { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.24, dark: 0.86, depth: -7, clearRoute: true, rockSize: 376, sharp: true }
 ];
 
 /** Layer chunk size (layer px) and its shading: coarse (soft), no sand, low contrast, unlit rims. */
@@ -390,7 +391,7 @@ export function fogLayer(rgba, size, ox, oy, span, layer, deepTint = SHADE.deepT
         const k = skin.k[q] * LIP.afterFog;
         if (k > 0) for (let c = 0; c < 3; c++) rgba[q * 4 + c] += (skin.rgb[q * 3 + c] - rgba[q * 4 + c]) * k;
     }
-    softenLayer(rgba, size);
+    if (!layer.sharp) softenLayer(rgba, size);
     trenchSpecks(rgba, size, ox, oy, span);
     return rgba;
 }
@@ -461,9 +462,12 @@ export function dropLooseRock(rgba, size, cfg = LOOSE_ROCK) {
     return rgba;
 }
 
-/** One layer chunk's picture (RGBA, LAYER_SHADE.rockSize squared), baked with LAYER_MARGIN. */
+/** A layer's picture size (texels per side): its own rockSize (the near layer is baked finer), else LAYER_SHADE's. */
+export const layerSize = layer => layer.rockSize || LAYER_SHADE.rockSize;
+
+/** One layer chunk's picture (RGBA, layerSize squared), baked with LAYER_MARGIN. */
 export function layerPicture(field, seed, layer, cx, cy, M = LAYER_MARGIN) {
-    const S = LAYER_SHADE.rockSize, B = S + 2 * M, { ox, oy, span } = layerChunkRect(layer, cx, cy), step = span / S;
+    const S = layerSize(layer), B = S + 2 * M, { ox, oy, span } = layerChunkRect(layer, cx, cy), step = span / S;
     const bx = ox - M * step, by = oy - M * step, bspan = span * B / S;
     const { rock } = shadeChunk(field, seed, bx, by, bspan, { ...LAYER_SHADE, rockSize: B, grainAt: [cx * S - M, cy * S - M] });
     fogLayer(rock, B, bx, by, bspan, layer);
