@@ -8,6 +8,8 @@ import { musicClock, nowSeconds } from '../audio.js';
 
 const KEEP = 900;            // px beside the view within which elements exist
 const DEPTH = 3.4;
+/** Painted pad art (optional, public/img/props/<key>.webp, loaded by IntroScene). */
+export const PAD_ART = ['bo_pad_jelly', 'bo_pad_anemone'];
 
 function makeTextures(scene) {
     if (scene.textures.exists('bo_cannon')) return;
