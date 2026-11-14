@@ -18,7 +18,7 @@ export const SURF_LOOK = {
     hearWithin: 2600     // px: a breaker is heard this far
 };
 
-function ensureFallbacks(scene) {
+export function ensureFoam(scene) {
     if (!scene.textures.exists(SURF_ART.line.key)) {
         const tex = scene.textures.createCanvas(SURF_ART.line.key, 512, 64), c = tex.getContext();
         const g = c.createLinearGradient(0, 0, 0, 64);
@@ -46,7 +46,7 @@ const STATE = {};
 export default class SurfLayer {
     constructor(scene, surface) {
         this.scene = scene; this.surface = surface;
-        ensureFallbacks(scene);
+        ensureFoam(scene);
         const frames = scene.textures.get(SURF_ART.puffs.key).frameTotal - 1;      // without the base frame
         this.lines = Array.from({ length: SURF_LOOK.lines }, () => scene.add.image(0, 0, SURF_ART.line.key).setDepth(6.05).setVisible(false));
         this.crest = scene.add.image(0, 0, SURF_ART.line.key).setDepth(6.1).setVisible(false);
