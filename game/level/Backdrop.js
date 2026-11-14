@@ -60,7 +60,7 @@ function makeWaterline(scene) {
     if (!T.exists(S.key)) {
         const t = T.createCanvas(S.key, 8, S.fade), c = t.getContext();
         for (let y = 0; y < S.fade; y++) {
-            c.fillStyle = `rgba(${S.colour},${0.9 * (1 - y / S.fade) ** 1.6})`;
+            c.fillStyle = `rgba(${S.colour},${(1 - y / S.fade) ** 1.6})`;      // from full sea colour (it joins the flat colour above without a step)
             c.fillRect(0, y, 8, 1);
         }
         t.refresh();

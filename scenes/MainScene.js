@@ -54,6 +54,8 @@ import ContainerLayer from '../game/level/ContainerLayer.js';
 import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
+import { QUALITY, startTier, createAutotune } from '../game/quality.js';
+import { SWARMS } from '../game/ai/SwarmLayer.js';
 import FriendSchool from '../game/FriendSchool.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
@@ -512,7 +514,29 @@ export default class MainScene extends Phaser.Scene {
             this.mp = null;
         });
 
+        // Quality: ?quality=low|medium|high fixes a tier; else the saved one (medium on a phone, high on a desktop at first), tuned by the frame rate.
+        const asked = new URLSearchParams(window.location.search).get('quality'), fixed = QUALITY.tiers.includes(asked);
+        const tier = fixed ? asked : this.perfTour ? 'high' : startTier(this.progression.get?.('quality', null), this.sys.game.device.input.touch);
+        this.quality = { tier, fps: 60, auto: !fixed && !this.perfTour };
+        this.autotune = createAutotune(tier);
+        this.applyQuality(tier);
+
         this.mp = Multiplayer.create(this); // null unless a room code was chosen on the title
+    }
+
+    /**
+     * A quality tier's shares go to the layers that read them (quality.js): the caustics' strength (and at 0 its shader comes
+     * off the world's pictures), the share of every particle burst, the size of new shoals and how often shoals are simulated.
+     * `save` = remember it for the next start. The HUD reads `this.quality` ({ tier, fps, auto }).
+     */
+    applyQuality(tier, save = false) {
+        const q = QUALITY[tier];
+        this.quality.tier = tier;
+        this.level.setCaustics(q.caustics > 0);
+        this.particles.share = q.particles;
+        this.swarms.share = q.shoals;
+        SWARMS.simEvery = q.simEvery; SWARMS.midEvery = q.midEvery;
+        if (save) this.progression.set?.('quality', tier);
     }
 
     /** True if the pointer is on a HUD element (button, open menu). */
@@ -1669,7 +1693,11 @@ export default class MainScene extends Phaser.Scene {
         const sun = sunAt(SKY_START + this.time.now / 1000, stormShare(this.fish.sprite.x));      // the sky's share of light: day 1, night little, less under the storm
         this.waterLight.update(sun);
         // The net of light on rock, sand and props: in world space, as strong as the sun, in the water's hue.
-        updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun, biomeBlendAt(view.x).a.water[0]);
+        updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun * QUALITY[this.quality.tier].caustics, biomeBlendAt(view.x).a.water[0]);
+        // Quality: the frame rate decides (quality.js); a fixed tier (?quality=...) and the perf tour are left alone.
+        this.quality.fps = this.autotune.fps;
+        if (this.quality.auto) { const tier = this.autotune.step(delta); if (tier) this.applyQuality(tier, true); }
+        else this.autotune.step(delta);
         if (!this.surf) {
             const z = surfZones();
             if (sp.x < z.surge[1] + WORLD.weatherRange || (sp.x > z.reef[0] - WORLD.weatherRange && sp.x < z.reef[1] + WORLD.weatherRange)) this.surf = new SurfLayer(this, this.surface);

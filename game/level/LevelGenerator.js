@@ -193,6 +193,7 @@ export default class LevelGenerator {
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
         this.playerKey = getCharacter(scene.registry.get('character') || loadSelectedId())?.states.normal.key;      // the playable's picture
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
+        this.causticsOn = true;     // the quality tier may take the caustics' shader off the world's pictures (setCaustics)
         this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
         this.job = null;        // the chunk build in progress (build() is cut into steps)
         this.jobPics = null;    // ... and the worker's result it is built from
@@ -269,6 +270,13 @@ export default class LevelGenerator {
         a = back && rock ? { back, rock } : null;
         reg.set('chunkAtlases', a);
         return a;
+    }
+
+    /** The net of light on or off for every picture of the world, those there now and those to come (the lowest quality tier draws without its shader). */
+    setCaustics(on) {
+        if (!this.caustics || on === this.causticsOn) return;
+        this.causticsOn = on;
+        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.type === 'Image') { if (on) o.setPipeline(CAUSTICS); else o.resetPipeline(); }
     }
 
     /** A worker result that is used up (its chunk is built, or nobody needs it any more): its picture arrays go back to the worker to be written into again. */
@@ -537,7 +545,7 @@ export default class LevelGenerator {
         const chunk = { objects: [], bodies: [], textures: [], key: `${cx},${cy}` };
         this.chunks.set(chunk.key, chunk);
         // Every picture of the world's surfaces (rock, sand, growth, props, piles) catches the caustics (fx/CausticsPipeline.js).
-        const keep = o => { chunk.objects.push(o); if (this.caustics && o.type === 'Image') o.setPipeline(CAUSTICS); return o; };
+        const keep = o => { chunk.objects.push(o); if (this.caustics && this.causticsOn && o.type === 'Image') o.setPipeline(CAUSTICS); return o; };
         const has = key => s.textures.exists(key);
         const blend = biomeBlendAt(mid);
         const biome = zonedBiomeAt(blend.t < 0.5 ? blend.a : blend.b, mid);      // inside a sub-zone: its own mix of growth and props

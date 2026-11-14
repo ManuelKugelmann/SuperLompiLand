@@ -28,6 +28,7 @@ export const SWARMS = { perView: 2, inView: [1000, 520], ahead: [1150, 1400],   
     simEvery: 2,      // a shoal in sight is simulated every so many frames (shoals take turns); in between its fish glide on at their speed
     midEvery: 3,      // ... every so many when its middle is further than `mid` px from the view's middle (still in sight, but not where the child looks)
     mid: 620,
+    minCount: 10,     // a shoal has at least this many fish, whatever the quality tier's share
     maxStep: 0.1 };   // s: the longest time one simulation step covers (three frames at 30 a second)
 
 /** Texture size of one frame (px) for a species. */
@@ -117,6 +118,7 @@ export default class SwarmLayer {
      *   like the one sheltering in the ghost ship (spec 5.0e); they come on top of the roaming ones }
      */
     constructor(scene, env) {
+        this.share = 1;      // share of each new shoal's fish (quality tier)
         this.scene = scene;
         this.env = env;
         this.swarms = [];
@@ -125,20 +127,21 @@ export default class SwarmLayer {
 
     spawn(id, x, y, home = null) {
         const sp = SPECIES[id];
-        const sim = createSwarm({ count: sp.count, x, y, speed: sp.speed, maxSpeed: sp.speed * 3, ...sp.flock });
+        const count = Math.max(SWARMS.minCount, Math.round(sp.count * this.share));      // the quality tier's share of the shoal
+        const sim = createSwarm({ count, x, y, speed: sp.speed, maxSpeed: sp.speed * 3, ...sp.flock });
         const key = fishTexture(this.scene, id, sp);
         const blitter = this.scene.add.blitter(0, 0, key).setDepth(SWARMS.depth);
         if (sp.glow) blitter.setBlendMode(Phaser.BlendModes.ADD);
-        const bobs = blitter.createMultiple(sp.count, 0, true);
+        const bobs = blitter.createMultiple(count, 0, true);
         const { w, h } = frameSize(sp);
         // Per fish: a tail-beat phase and a slow sway, so a shoal never reads as a grid.
-        const phase = Float32Array.from({ length: sp.count }, () => Math.random() * Math.PI * 2);
+        const phase = Float32Array.from({ length: count }, () => Math.random() * Math.PI * 2);
         // Depth inside the shoal (fake 3D, spec 10.10b): bobs draw in index order, so
         // the first are the farthest; they take on the water colour and fade a little.
         const water = sp.glow ? 0x000000 : this.env.waterAt(x);
-        const deep = Math.min(1, sp.count / SWARMS.deepCount);   // a handful of fish has little depth
+        const deep = Math.min(1, count / SWARMS.deepCount);   // a handful of fish has little depth
         bobs.forEach((b, i) => {
-            const z = (1 - (i + 0.5) / sp.count) * deep;
+            const z = (1 - (i + 0.5) / count) * deep;
             b.setTint(mixColor(0xffffff, water, z * SWARMS.haze)).setAlpha(1 - z * SWARMS.fade);
         });
         this.swarms.push({ id, sim, blitter, bobs, w, h, phase, home, turnN: this.swarms.length });      // turnN: shoals take turns at simulating

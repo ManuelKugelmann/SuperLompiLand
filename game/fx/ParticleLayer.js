@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { createParticles, PARTICLES } from './particles.js';
+import { scaled } from '../quality.js';
+
+const COUNTED = new Set(['oil']);      // kinds whose number is part of the game's rules: never thinned
 
 // Draws the shared particle simulation (particles.js) with pooled Blitters: every
 // particle is a Bob, so there are no game objects or tweens per particle. Normal
@@ -48,6 +51,7 @@ const frameFor = size => {
 export default class ParticleLayer {
     /** @param env see particles.js step(): flowAt, isSolid, surfaceY (functions, swappable later) */
     constructor(scene, env = {}, { capacity = PARTICLES.capacity, depthNormal = 2.5, depthAdd = 4.5, depthGlow = 41, glowCap = 240 } = {}) {
+        this.share = 1;      // share of every burst that is spawned (quality tier)
         this.scene = scene;
         this.env = env;
         this.sim = createParticles({ capacity });
@@ -79,8 +83,14 @@ export default class ParticleLayer {
         return b;
     }
 
-    /** Spawn particles; see particles.js spawn() for options. */
-    spawn(id, x, y, n, opts) { return this.sim.spawn(id, x, y, n, opts); }
+    /**
+     * Spawn particles; see particles.js spawn() for options. `share` (the quality tier's, set by the scene) thins every
+     * burst, except the kinds the game's rules count (oil: how much of it is about decides what it does to the fish).
+     */
+    spawn(id, x, y, n = 1, opts) {
+        const count = this.share >= 1 || COUNTED.has(id) ? n : scaled(n, this.share, Math.random());
+        return count ? this.sim.spawn(id, x, y, count, opts) : 0;
+    }
 
     /** Exposure helper for hazards (spec 7.1). */
     densityAt(id, x, y, r) { return this.sim.densityAt(id, x, y, r); }
