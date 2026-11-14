@@ -5,6 +5,7 @@ import { createSwimmer, stepSwimmer } from '../ai/swimmer.js';
 import { createGrumpy, stepGrumpy, calmGrumpy } from '../ai/grumpy.js';
 import { createCrawler, stepCrawler } from '../ai/crawler.js';
 import { createReach } from './reach.js';
+import { createSpacing } from './spacing.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
@@ -17,7 +18,8 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 6,           // bump when generation changes what index a coin or friend gets
+    version: 6,
+    coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
@@ -143,6 +145,7 @@ export default class LevelGenerator {
         this.early = new Map();     // chunk key -> collision bodies laid down while the worker is busy
         this.chainBody = { active: false, x: 0, y: 0, vx: 0, vy: 0 };   // the swimmer, as the ropes see it
         this.chains = [];           // hanging chains: verlet ropes (rope.js) with the hazard as the weight at the end
+        this.coralSpacing = createSpacing(LEVEL.coralGap);
         this.lineEnd = { x: 0, y: 0 };
         this.brainEnv = { isOpen: (x, y) => this.isOpen(x, y, 0.05), t: 0, player: null, alarm: null };
         this.crawlEnv = { density: (x, y) => this.density(x, y), threshold: LEVEL.threshold, player: null };
@@ -422,11 +425,14 @@ export default class LevelGenerator {
             const up = { x: Math.sin(f.angle), y: -Math.cos(f.angle) };
             const roll = rng.frac();
             if (roll < biome.coral && corals < 5) {
-                const key = rng.pick(['coral_1', 'coral_2', 'coral_3'].filter(has));
-                if (!key) continue;
-                const img = keep(s.add.image(f.x, f.y, key).setOrigin(0.5, 0.92)
-                    .setScale(rng.realInRange(0.22, 0.42)).setRotation(f.angle).setDepth(rng.frac() < 0.3 ? 7 : -1));
-                if (rng.frac() < 0.5) img.setFlipX(true);
+                // Never the same coral twice within sight of each other (spacing.js). The random
+                // draws are taken either way, so everything placed after stays where it was.
+                const all = ['coral_1', 'coral_2', 'coral_3'].filter(has), fresh = this.coralSpacing.options(all, f.x, f.y);
+                const at = rng.frac(), scale = rng.realInRange(0.22, 0.42), front = rng.frac() < 0.3, flip = rng.frac() < 0.5;
+                if (!fresh.length) continue;
+                const key = fresh[Math.floor(at * fresh.length)];
+                this.coralSpacing.add(key, f.x, f.y);
+                keep(s.add.image(f.x, f.y, key).setOrigin(0.5, 0.92).setScale(scale).setRotation(f.angle).setDepth(front ? 7 : -1)).setFlipX(flip);
                 corals++;
             } else if (roll < biome.coral + biome.kelp && stalks < 6) {
                 this.addKelp(chunk, f, rng.between(300, 680), rng.frac() < 0.25 ? 7 : -4, rng);
