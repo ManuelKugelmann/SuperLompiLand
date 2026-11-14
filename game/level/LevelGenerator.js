@@ -17,6 +17,7 @@ import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
+import { SIZES } from '../scale.js';
 import {
     BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare, waterTone, zonedBiomeAt } from './biomes.js';
 
@@ -73,7 +74,10 @@ const FRIENDS = {
 // The painted boat hull an anchor chain hangs from (img/props/hull_bottom.webp): its top edge is
 // the waterline; `top` = world y of that edge (just under the surface), `keel` = picture px of
 // the keel where the chain is made fast, `scale` = its size.
-const HULL = { top: -6, keel: 330, scale: 0.75 };
+// hull_bottom (582 px wide: a boat's beam, bow-on) at true scale (scale.js); `clear` px of chain
+// stay between its keel and the anchor, so where an anchor hangs high the hull is drawn smaller
+// (never below `min`).
+const HULL = { top: -6, keel: 330, scale: SIZES.hullBeam / 582, min: 0.75, clear: 200 };
 
 // What grows on steep rock faces (biomes.js wallRate / wallLife): picture keys and width range
 // (px) per kind; at most `max` per chunk; `dropBoost` = extra rate at an island's drop-off.
@@ -770,10 +774,11 @@ export default class LevelGenerator {
             } else if (!rock && top > 40) {
                 // The painted hull's top edge is its waterline: it hangs from the surface, and the
                 // chain is made fast at its keel.
-                const painted = s.textures.exists('hull_bottom'), keel = painted ? HULL.top + HULL.keel * HULL.scale : 16;
+                const painted = s.textures.exists('hull_bottom');
+                const k = Math.max(HULL.min, Math.min(HULL.scale, (top - HULL.clear - HULL.top) / HULL.keel)), keel = painted ? HULL.top + HULL.keel * k : 16;
                 this.addChain(chunk, x, Math.min(keel, top - 40), top, img, h.size * 0.46);
                 chunk.objects.push(painted
-                    ? s.add.image(x, HULL.top, 'hull_bottom').setOrigin(0.5, 0).setScale(HULL.scale).setDepth(2.95)
+                    ? s.add.image(x, HULL.top, 'hull_bottom').setOrigin(0.5, 0).setScale(k).setDepth(2.4)
                     : s.add.image(x, 6, 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
             }
         } else if (h.tether || h.drift) {

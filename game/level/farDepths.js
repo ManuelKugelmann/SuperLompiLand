@@ -6,6 +6,7 @@
 // Pure (no Phaser): placement and looks; FarLayers.js draws. Tested in tests/farDepths.test.mjs.
 import { biomeBlendAt, floorY, isSea, waterTone } from './biomes.js';
 import { rng, mix } from './layerMath.js';
+import { SIZES } from '../scale.js';
 
 const FAR_WATER_LUMA = 128;     // brightness of the water far things fade into (its hue is the biome's)
 
@@ -28,7 +29,7 @@ const K = {
     kelp: [['kelp_stalk_1', 3, [700, 1300]], ['kelp_stalk_2', 3, [700, 1300]], ['kelp_stalk_3', 2, [600, 1100]]],
     corals: [['coral_1', 3, [300, 520]], ['coral_2', 3, [300, 520]], ['coral_3', 2, [260, 460]], ['coral_4', 2, [280, 480]], ['coral_5', 2, [280, 480]], ['seafan_1', 2, [280, 440]]],
     boulders: [['boulder_1', 1, [320, 700]], ['boulder_2', 1, [320, 700]], ['boulder_4', 1, [320, 700]], ['boulder_5', 1, [320, 700]]],
-    hulls: [['wreck_1', 2, [1300, 2000]], ['wreck_2', 2, [1300, 2000]], ['trawler_1', 1, [900, 1300]], ['cutter_1', 1, [800, 1100]]]
+    hulls: [['wreck_1', 2, SIZES.sailingWreck], ['wreck_2', 2, SIZES.sailingWreck], ['trawler_1', 1, SIZES.fishingBoat], ['cutter_1', 1, SIZES.fishingBoat]]
 };
 const pick = (...groups) => groups.flatMap(([g, w]) => K[g].map(([key, kw, size, hang]) => [key, kw * w, size, !!hang]));
 
