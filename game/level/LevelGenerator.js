@@ -32,7 +32,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 37,
+    version: 38,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -207,7 +207,8 @@ export default class LevelGenerator {
         makeNestTextures(scene);
         makeLineTexture(scene);
         makeMicroTextures(scene);
-        this.field = createField(LEVEL.seed);
+        // Where rock floats is worked out by the worker and given to this field (no stop in play); without a worker the field does it itself (below).
+        this.field = createField(LEVEL.seed, 'given');
         this.docks = docksSpot();
         this.storySpots = [...chapters().filter(c => c.friend), ...rescueSpots()].map(c => ({ x: c.x, y: this.field.routeY(c.x) }));      // friends' nets and small rescues
         this.storyStretches = chapters().filter(c => c.event).map(c => ({ x0: c.event.x - JOURNEY.eventClear, x1: c.event.endX + JOURNEY.eventClear }));
@@ -235,10 +236,14 @@ export default class LevelGenerator {
         const mats = this.loadMaterials();
         try {
             this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
-            this.worker.onmessage = e => { this.pending.delete(e.data.key); this.ready.push(e.data); };
+            this.worker.onmessage = e => {
+                for (const t of e.data.islands || []) this.field.setIslandTile(t.key, t.state, t.near);
+                this.pending.delete(e.data.key); this.ready.push(e.data);
+            };
             this.worker.onerror = () => { this.worker = null; this.pending.clear(); };   // fall back to the main thread
             if (mats) this.worker.postMessage({ materials: mats });
         } catch { this.worker = null; }
+        if (!this.worker) this.field.islandMode('own');
         const lang = scene.registry.get('currentLanguage') || 'de';
         const ground = x => { let y = floorY(x) + 260; while (y > 400 && this.density(x, y) > LEVEL.threshold) y -= 12; return y + 12; };
         const trench = BIOMES[BIOMES.length - 1];

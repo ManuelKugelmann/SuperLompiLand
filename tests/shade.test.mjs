@@ -62,7 +62,7 @@ test('faces looking up are brighter than faces looking down', () => {
     const T = FIELD.threshold, isCeiling = (x, y) => field.density(x, y) > T && field.density(x, y + 40) < T - 0.02;
     let cave = null;
     const c0 = Math.floor(BIOMES.find(b => b.id === 'reef').from / SPAN) + 2;      // the reef is rich in caves
-    for (let cx = c0; cx < c0 + 30 && !cave; cx++) {
+    for (let cx = c0; cx < c0 + 400 && !cave; cx++) {      // (rock that floats is gone from the world, so overhangs are rarer: cliffs and the built passages)
         for (let cy = 1; cy < 5 && !cave; cy++) {
             let n = 0;
             for (let x = 30; x < SPAN; x += 60) for (let y = 30; y < SPAN; y += 40) if (isCeiling(cx * SPAN + x, cy * SPAN + y)) n++;

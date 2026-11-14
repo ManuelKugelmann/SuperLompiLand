@@ -4,7 +4,8 @@
 //              { seed, key, ox, oy, span, n }
 //              { seed, key, layer, cx, cy }  a rock layer chunk behind the play plane (rockLayerTable.js)
 //              { recycle: [ArrayBuffer, ...] }  picture arrays the main thread is done with, to be written into again
-// Message out: { key, coarse, rock, back }   (typed arrays, transferred, not copied)
+// Message out: { key, coarse, rock, back, islands }   (typed arrays, transferred, not copied; islands: [{ key, state, near }],
+//              the floating-rock tiles round this chunk that were not sent before: the main thread's field is given them)
 //              { key, layer, rock }
 import { createField, chunkGrids } from './density.js';
 import { shadeChunk } from './shade.js';
@@ -12,6 +13,7 @@ import { setMaterials } from './materials.js';
 import { ROCK_LAYERS, layerField, layerPicture } from './rockLayerTable.js';
 
 let field = null, fieldSeed = null;
+const sentTiles = new Set();      // island tiles the main thread has been given
 const layerFields = new Map();      // "seed:layer" -> field
 
 // Picture arrays that came back, by size: two megabytes per chunk would otherwise be allocated and thrown away
@@ -40,8 +42,10 @@ self.onmessage = e => {
         return;
     }
     const { seed, key, ox, oy, span, n } = e.data;
-    if (fieldSeed !== seed) { field = createField(seed); fieldSeed = seed; }
+    if (fieldSeed !== seed) { field = createField(seed); fieldSeed = seed; sentTiles.clear(); }
+    const islands = field.islandTilesFor(ox, oy, span).filter(t => !sentTiles.has(t.key));
+    for (const t of islands) sentTiles.add(t.key);
     const coarse = chunkGrids(field, seed, ox, oy, span, n).fine;
     const { rock, back } = shadeChunk(field, seed, ox, oy, span, undefined, take);
-    self.postMessage({ key, coarse, rock, back }, [coarse.buffer, rock.buffer, back.buffer]);
+    self.postMessage({ key, coarse, rock, back, islands }, [coarse.buffer, rock.buffer, back.buffer]);
 };

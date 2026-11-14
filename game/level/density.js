@@ -25,6 +25,10 @@ export const FIELD = {
     nestEvery: 15000,             // along an island a nest lies every so many px (spec 5.0h) ...
     nestKeep: 2600,               // ... but this far away from the set pieces and the friends' nets
     nestBucket: 4096,             // px: nests are looked up by stretches of this length
+    node: 96,                     // px: the grid on which rock is checked for hanging together (the collision grid's own nodes)
+    islandTile: 40,               // nodes a side: floating rock is looked for tile by tile ...
+    islandHalo: 20,               // ... each with this many nodes of the world around it in view (a floating rock up to this big is found whole)
+    islandCap: 0.12,              // a floating rock's density is put this far under the threshold (it becomes water)
     terraceLump: 35               // px the finale's terraces are lumpy by
 };
 
@@ -124,7 +128,12 @@ export function nestSpots() {
 
 const NO_NESTS = [];
 
-export function createField(seed) {
+/**
+ * @param islands  'own' (default): floating rock is looked for here, on demand. 'given': only what
+ *                 setIslandTile() was told is used (the main thread gets it from the worker, so it
+ *                 never stops to work it out; until then a floating rock is still rock).
+ */
+export function createField(seed, islands = 'own') {
     let nests = null;
     // The nests whose dip or basin can reach x: looked up by stretch, so a long world with many nests costs nothing per sample.
     const nearBy = new Map(), nestsNear = x => nearBy.get(Math.floor(x / FIELD.nestBucket)) || NO_NESTS;
@@ -184,7 +193,7 @@ export function createField(seed) {
     let cave = null;
     const caveOf = () => cave || (cave = sideCave(routeY));      // needs the route, so it is worked out on first use
 
-    const density = (x, y, withNests = true) => {
+    const raw = (x, y, withNests = true) => {
         // Two broad octaves only: big soft blobs and winding passages, no jagged detail.
         let n = 0.72 * vnoise(x / 1000, y / 1000, seed) + 0.28 * vnoise(x / 420, y / 420, seed + 7);
         const col = columnAt(x), fy = col.fy;
@@ -295,6 +304,77 @@ export function createField(seed) {
         return n;
     };
 
+    // No stone floats (playtest: "stones can't just float in the water"): rock that hangs together with
+    // neither the seabed nor anything bigger (the lane cut it loose, or the noise left a blob in
+    // mid-water) is water. Worked out on the collision grid's nodes, a tile at a time with a wide
+    // look round it, so every sample of the field agrees: collision, pictures, where things grow.
+    const N = FIELD.node, TS = FIELD.islandTile, HALO = FIELD.islandHalo, T0 = FIELD.threshold;
+    const tiles = new Map();      // "ti,tj" -> { state: Uint8Array(TS * TS) (0 water, 1 rock that holds, 2 floating rock), near: any floating rock in or just round the tile }
+    const islandTile = (ti, tj) => {
+        const key = `${ti},${tj}`;
+        let tile = tiles.get(key);
+        if (tile || islands !== 'own') return tile || null;
+        const i0 = ti * TS - HALO, j0 = tj * TS - HALO, W = TS + 2 * HALO + 1, solid = new Uint8Array(W * W), holds = new Uint8Array(W * W), queue = [];
+        // What is built on purpose stands as it is: where the route runs through a wall (the reef crest's pass, the side cave), the rock
+        // over the passage hangs together with nothing in a side view, and it is meant to be there.
+        const built = setPieceStretches(), meant = x => built.some(([x0, x1]) => x >= x0 && x <= x1) || Math.abs(x - SHIP_X) < SET_PIECES.ship.pinnacleHalf + 2600;
+        for (let j = 0; j < W; j++) {
+            const y = (j0 + j) * N;
+            if (y <= 0) continue;      // nothing above the water
+            for (let i = 0; i < W; i++) {
+                const x = (i0 + i) * N, at = j * W + i;
+                if (raw(x, y) <= T0) continue;
+                solid[at] = 1;
+                // Held: on or under the seabed, or at the edge of what this look round can see (it may go on beyond).
+                if (y > floorY(x) || i === 0 || i === W - 1 || j === W - 1 || (j === 0 && y > N) || meant(x)) { holds[at] = 1; queue.push(at); }
+            }
+        }
+        for (let k = 0; k < queue.length; k++) {
+            const at = queue[k], i = at % W, j = (at - i) / W;
+            for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+                const ni = i + di, nj = j + dj, to = nj * W + ni;
+                if (ni < 0 || nj < 0 || ni >= W || nj >= W || !solid[to] || holds[to]) continue;
+                holds[to] = 1; queue.push(to);
+            }
+        }
+        const state = new Uint8Array(TS * TS);
+        let near = false;
+        for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
+            const at = j * W + i, floating = solid[at] && !holds[at], ti0 = i - HALO, tj0 = j - HALO;
+            if (floating && ti0 >= -2 && ti0 < TS + 2 && tj0 >= -2 && tj0 < TS + 2) near = true;
+            if (ti0 >= 0 && ti0 < TS && tj0 >= 0 && tj0 < TS) state[tj0 * TS + ti0] = floating ? 2 : solid[at];
+        }
+        tile = { state, near };
+        tiles.set(key, tile);
+        return tile;
+    };
+    /** 0 water, 1 rock that holds, 2 floating rock, at node (i, j); 0 where it is not known (yet). */
+    const nodeState = (i, j) => {
+        const ti = Math.floor(i / TS), tj = Math.floor(j / TS), tile = islandTile(ti, tj);
+        return tile ? tile.state[(j - tj * TS) * TS + (i - ti * TS)] : 0;
+    };
+    const density = (x, y, withNests = true) => {
+        const n = raw(x, y, withNests);
+        if (n <= T0 || !withNests || islands === 'none') return n;
+        const i = Math.floor(x / N), j = Math.floor(y / N), tile = islandTile(Math.floor(i / TS), Math.floor(j / TS));
+        if (!tile || !tile.near) return n;
+        // Rock that holds at a corner of this cell: this is its rock. Else, a floating rock at or next to a corner: water.
+        for (let dj = 0; dj <= 1; dj++) for (let di = 0; di <= 1; di++) if (nodeState(i + di, j + dj) === 1) return n;
+        for (let dj = -1; dj <= 2; dj++) for (let di = -1; di <= 2; di++) if (nodeState(i + di, j + dj) === 2) return T0 - FIELD.islandCap;
+        return n;
+    };
+    /** The island tiles a chunk at (ox, oy), `span` px wide, needs (with the nodes round it): [{ key, state, near }], worked out if need be. */
+    const islandTilesFor = (ox, oy, span) => {
+        const out = [], t = v => Math.floor(Math.floor(v / N) / TS);
+        for (let tj = t(oy - 2 * N); tj <= t(oy + span + 2 * N); tj++) for (let ti = t(ox - 2 * N); ti <= t(ox + span + 2 * N); ti++) {
+            const tile = islandTile(ti, tj);
+            if (tile) out.push({ key: `${ti},${tj}`, state: tile.state, near: tile.near });
+        }
+        return out;
+    };
+    /** A tile worked out elsewhere (the worker), for a field that is 'given' its islands. */
+    const setIslandTile = (key, state, near) => { if (!tiles.has(key)) tiles.set(key, { state, near }); };
+
     // The first nest right under the start pool (in the lagoon), then one every so often along
     // every island (the open sea has none: its bottom is far below the way across), the grand
     // nest at the end; each on the real seabed: start inside it and walk up.
@@ -319,7 +399,7 @@ export function createField(seed) {
         for (let i = Math.floor((n.x - r) / FIELD.nestBucket); i <= Math.floor((n.x + r) / FIELD.nestBucket); i++) { if (!nearBy.has(i)) nearBy.set(i, []); nearBy.get(i).push(n); }
     }
 
-    return { density, nests, routeY, cave: caveOf() };
+    return { density, nests, routeY, cave: caveOf(), islandTilesFor, setIslandTile, islandMode: mode => { islands = mode; } };
 }
 
 /**
