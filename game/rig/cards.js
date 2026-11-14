@@ -47,7 +47,7 @@ export const ROLES = {
     pectoral:  { swing: 0.55, sweep: 0.08, wave: 0.06, k: 2.0, speed: 1.15, idle: 0.25, outward: true },
     wing:      { swing: 0.12, sweep: 0.03, wave: 0.03, k: 1.6, speed: 0.55, idle: 0, outward: true },
     flipper:   { swing: 0.35, sweep: 0.28, wave: 0.06, k: 1.8, speed: 0.55, idle: 0.08, outward: true },
-    head:      { swing: 0.04, sweep: 0.02, wave: 0, k: 0, speed: 0.3, idle: 0.3 },
+    head:      { swing: 0.015, sweep: 0.008, wave: 0, k: 0, speed: 0.3, idle: 0.15 },   // steady (user: "less wobbly head")
     fan:       { swing: 0.05, sweep: 0.02, wave: 0.06, k: 3.0, speed: 0.9, idle: 0.25 },
     tentacles: { swing: 0.05, sweep: 0.03, wave: 0.14, k: 3.4, speed: 0.9, idle: 0.5 },
     curl:      { swing: 0.03, sweep: 0.04, wave: 0.1, k: 2.0, speed: 0.7, idle: 0.3 },
