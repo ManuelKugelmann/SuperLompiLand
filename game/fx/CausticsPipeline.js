@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import { SURFACE_CAUSTICS as C } from './causticsMath.js';
+import { DEPTH } from '../depths.js';
 
 /** Name under which the pipeline is registered; pictures that should catch caustics get it with setPipeline. */
 export const CAUSTICS = 'SurfaceCaustics';
+/** The same for ropes (part cards, bendable pictures): drawn as triangle strips. */
+export const CAUSTICS_ROPE = 'SurfaceCausticsRope';
 
 const TAU = (Math.PI * 2).toFixed(6), f = v => Number(v).toFixed(6);
 
@@ -45,6 +48,7 @@ uniform vec2 uScroll;      // the view's left edge wrapped to the pattern's peri
 uniform float uTime;
 uniform float uStrength;
 uniform float uSide;        // pictures a side in this texture: 1 for a picture of its own, more for an atlas of equal places
+uniform float uAll;         // 1: a thing in the water (catches the net on its sides too), 0: the ground (causticGround: top skin only)
 uniform vec3 uTint;
 varying vec2 outTexCoord;
 varying float outTintEffect;
@@ -99,18 +103,20 @@ void main () {
         float b = web(p * ${f(C.cells[1] / C.period)} + 7.3, ${f(C.cells[1])}, uTime * ${f(C.drift[1])});
         float light = min(1.0, a + 0.55 * b);
         float shaft = ${f(C.shaft.floor)} + ${f(1 - C.shaft.floor)} * smoothstep(-0.3, 0.7, sin((world.x + world.y * ${f(C.shaft.slant)}) * ${TAU} * ${f(C.shaft.bands)} / ${f(C.period)} + uTime * ${f(C.shaft.speed)}));
-        float catching = smoothstep(${f(C.lit[0])}, ${f(C.lit[1])}, l0) * clamp(1.0 - relief.y * ${f(C.facing)}, 0.0, 1.0);
-        // Only the top skin of a surface: where the picture is opaque well above this texel too, the light is gone.
+        float catching = smoothstep(mix(${f(C.lit[0])}, ${f(C.sides.lit)}, uAll), ${f(C.lit[1])}, l0) * clamp(1.0 - relief.y * ${f(C.facing)}, 0.0, 1.0);
+        // Only the top skin of a surface: where the picture is opaque well above this texel too, the light is gone
+        // (on the ground; a thing in the water keeps the net on its sides, softer).
         float cover = near(vec2(0.0, ${f(-C.skin[0])})).a * near(vec2(0.0, ${f(-C.skin[1])})).a;
-        catching *= 1.0 - 0.9 * cover;
+        catching *= (1.0 - 0.9 * cover * mix(1.0, ${f(C.sides.skin)}, uAll)) * mix(1.0, ${f(C.sides.gain)}, uAll);
         color.rgb += uTint * (light * shaft * depth * catching * uStrength * color.a);
     }
     gl_FragColor = color;
 }`;
 
 class CausticsPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
-    constructor(game) {
-        super({ game, name: CAUSTICS, vertShader: VERT, fragShader: FRAG });
+    constructor(game, rope = false) {
+        // A rope draws a triangle strip (GLenum 5), like Phaser's own RopePipeline.
+        super({ game, name: rope ? CAUSTICS_ROPE : CAUSTICS, vertShader: VERT, fragShader: FRAG, ...(rope ? { topology: 5, batchSize: 256 } : {}) });
         this.view = { x: 0, y: 0, t: 0, strength: 0, r: 1, g: 1, b: 1 };
     }
 
@@ -120,10 +126,11 @@ class CausticsPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
      * batched for the other kind is drawn first.
      */
     onBind(gameObject) {
-        const side = gameObject?.causticSide || 1;
-        if (side === this.side) return;
+        const side = gameObject?.causticSide || 1, all = gameObject?.causticGround ? 0 : 1;
+        if (side === this.side && all === this.all) return;
         this.flush();
         this.set1f('uSide', side); this.side = side;
+        this.set1f('uAll', all); this.all = all;
     }
 
     onPreRender() {
@@ -133,6 +140,7 @@ class CausticsPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
         this.set1f('uStrength', v.strength);
         this.set3f('uTint', v.r, v.g, v.b);
         this.set1f('uSide', 1); this.side = 1;
+        this.set1f('uAll', 0); this.all = 0;
     }
 }
 
@@ -141,7 +149,34 @@ export function installCaustics(game) {
     const pipes = game.renderer?.pipelines;
     if (!pipes || C.strength <= 0) return false;
     if (!pipes.has(CAUSTICS)) pipes.add(CAUSTICS, new CausticsPipeline(game));
+    if (!pipes.has(CAUSTICS_ROPE)) pipes.add(CAUSTICS_ROPE, new CausticsPipeline(game, true));
     return true;
+}
+
+/** Phaser's own pipelines for what may take the net of light (anything else keeps its own: glows, effects). */
+const PLAIN = { Image: 'MultiPipeline', Sprite: 'MultiPipeline', Rope: 'RopePipeline' };
+/** The depths that take it: from the props just behind the play plane to the front plants (not the water's fills and far layers, not effects; game/depths.js). */
+const CATCH = [DEPTH.bands.find(b => b.id === 'backProps').from, DEPTH.bands.find(b => b.id === 'front').to];
+
+/**
+ * The net of light on everything of the world under water (user: "caustic overlay on all assets"):
+ * props, plants, piers, wrecks, nests, creatures and the playables, not only the ground. Walks the
+ * scene's display list (call every few frames: things come and go) and puts each plain picture or
+ * rope that moves with the world (scroll factor 1: not parallax layers, not the HUD), draws
+ * normally (no glow) and lies in the CATCH depths on the caustics shader; `on` false takes it off again (lowest quality tiers).
+ * The shader itself fades the net out above the waterline and with depth. `o.noCaustics` opts out.
+ */
+export function catchCaustics(scene, on) {
+    const pipes = scene.game.renderer?.pipelines;
+    if (!pipes?.has(CAUSTICS_ROPE)) return;
+    for (const o of scene.children.list) {
+        const plain = PLAIN[o.type];
+        if (!plain) continue;
+        if (o.caustic) { if (!on) { o.setPipeline(plain); o.caustic = false; } continue; }
+        if (!on || o.noCaustics || o.pipeline?.name !== plain || o.blendMode !== 0 || o.depth < CATCH[0] || o.depth >= CATCH[1] || o.scrollFactorX !== 1 || o.scrollFactorY !== 1) continue;
+        o.setPipeline(o.type === 'Rope' ? CAUSTICS_ROPE : CAUSTICS);
+        o.caustic = true;
+    }
 }
 
 /**
@@ -149,11 +184,13 @@ export function installCaustics(game) {
  * is (0..1: the sky's share, night or storm dim the net) and the water's hue (0xRRGGBB).
  */
 export function updateCaustics(game, scrollX, scrollY, t, light = 1, hue = 0xffffff) {
-    const p = game.renderer?.pipelines?.get(CAUSTICS);
-    if (!p) return;
-    const v = p.view, w = C.warmth, ch = s => ((hue >> s) & 255) / 255;
-    v.x = ((scrollX % C.period) + C.period) % C.period; v.y = scrollY;
-    v.t = t % (Math.PI * 2000);
-    v.strength = C.strength * light;
-    v.r = ch(16) + (1 - ch(16)) * w; v.g = ch(8) + (1 - ch(8)) * w; v.b = ch(0) + (1 - ch(0)) * w;
+    for (const name of [CAUSTICS, CAUSTICS_ROPE]) {
+        const p = game.renderer?.pipelines?.get(name);
+        if (!p) continue;
+        const v = p.view, w = C.warmth, ch = s => ((hue >> s) & 255) / 255;
+        v.x = ((scrollX % C.period) + C.period) % C.period; v.y = scrollY;
+        v.t = t % (Math.PI * 2000);
+        v.strength = C.strength * light;
+        v.r = ch(16) + (1 - ch(16)) * w; v.g = ch(8) + (1 - ch(8)) * w; v.b = ch(0) + (1 - ch(0)) * w;
+    }
 }

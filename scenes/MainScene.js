@@ -87,7 +87,7 @@ import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport, slowSteps, watchParts, splitFrame } from '../game/perfTour.js';
 import { depthMeters } from '../game/level/depthMeters.js';
 import { ventSpot } from '../game/level/ventField.js';
-import { updateCaustics } from '../game/fx/CausticsPipeline.js';
+import { updateCaustics, catchCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
 import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
@@ -1790,6 +1790,8 @@ export default class MainScene extends Phaser.Scene {
         // The net of light on rock, sand and props: in world space, as strong as the sun, in the water's hue.
         updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun * QUALITY[this.quality.tier].caustics, biomeBlendAt(view.x).a.water[0]);
         // Nothing outside the picture is drawn (viewCull.js): after every layer has set its things where they are for this frame.
+        // ... and on everything else of the world under water (creatures, fish, props), as things come and go.
+        if (jumped || due(frame, checkEvery)) catchCaustics(this, QUALITY[this.quality.tier].caustics > 0);
         if (jumped || due(frame, checkEvery)) cullToView(this.children.list, this.cameras.main.worldView, this.cameras.main.id, { ...VIEW_CULL, pad: VIEW_CULL.pad + this.viewLead });
         // Quality: the frame rate decides (quality.js); a fixed tier (?quality=...) and the perf tour are left alone.
         this.quality.fps = this.autotune.fps;

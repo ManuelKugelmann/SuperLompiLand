@@ -576,7 +576,7 @@ export default class LevelGenerator {
         };
         const show = (tex, size, depth) => {
             tex.refresh();
-            keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth));
+            keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth)).causticGround = true;      // the net on its top skin only (CausticsPipeline)
         };
         if (!baked) { yield 'shade'; if (chunk.dead) return; }
         // With the atlases: each picture goes straight to its place in the shared texture, the rock in strips.
@@ -586,6 +586,7 @@ export default class LevelGenerator {
             const put = (atlas, i, depth) => {
                 const img = keep(s.add.image(ox, oy, atlas.key, String(i)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth));
                 img.causticSide = atlas.side;      // the caustics shader reads round each texel: only inside this picture's own place (CausticsPipeline)
+                img.causticGround = true;          // the net on its top skin only
                 return img;
             };
             A.back.upload(place[0], pics.back, 0, SHADE.backSize);

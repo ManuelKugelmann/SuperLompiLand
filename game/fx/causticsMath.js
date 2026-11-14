@@ -76,7 +76,7 @@ export function gradeMatrix(light, sat = 0.18, absorb = 0.35, exposure = 0) {
 // out per pixel in a shader (CausticsPipeline.js) from these numbers; the same rules are here as
 // plain functions, so they can be tested and read.
 export const SURFACE_CAUSTICS = {
-    strength: 0.5,        // how much light the net adds at its brightest (0 = off: nothing gets the shader)
+    strength: 0.5,      // how much light the net adds at its brightest (0 = off: nothing gets the shader)
     line: 0.085,          // width of the net's lines, in shares of a cell (edges of moving Voronoi cells: an organic web, not a grid)
     full: 1300,           // px under the surface down to which it is at full strength (the whole sunny lagoon floor) ...
     gone: 3000,           // ... and by which it has faded out
@@ -89,7 +89,10 @@ export const SURFACE_CAUSTICS = {
     lit: [0.22, 0.55],   // brightness of a surface from which it begins to catch the net, and from which it catches all of it
     facing: 6,            // how quickly the net fades on a face that looks down (brightness rising downward)
     shaft: { bands: 2, slant: 0.35, floor: 0.45, speed: 0.06 },   // light shafts: bands per period, their slant (px sideways per px down), the share of light between them, their drift
-    warmth: 0.5           // 0 = the net has the water's hue, 1 = it is white sunlight
+    warmth: 0.5,          // 0 = the net has the water's hue, 1 = it is white sunlight
+    // Things in the water (props, plants, creatures, the swimmer; CausticsPipeline catchCaustics) catch the net on
+    // their sides too, not only on their top skin: real caustics play over every lit face, softer where it turns away.
+    sides: { skin: 0.35, gain: 1.8, lit: 0.12 }   // how much of the top-skin rule they keep, how strong the net is on them, from which brightness they catch it
 };
 
 const smooth01 = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
