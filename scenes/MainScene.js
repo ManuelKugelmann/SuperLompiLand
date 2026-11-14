@@ -104,7 +104,8 @@ export default class MainScene extends Phaser.Scene {
         this.swarms = new SwarmLayer(this, {   // shoals of small fish around the view (spec 6.2)
             isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK),
             flowAt: this.particles.env.flowAt,
-            biomeAt: x => BIOMES[biomeIndexAt(x)].id
+            biomeAt: x => BIOMES[biomeIndexAt(x)].id,
+            waterAt: x => { const bl = biomeBlendAt(x); return mixColor(bl.a.water[0], bl.b.water[0], bl.t); }
         });
         this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)

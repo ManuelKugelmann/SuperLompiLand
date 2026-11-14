@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { createSwarm } from './boids.js';
+import { mixColor } from '../level/biomes.js';
 
 // Swarms and shoals of small fish (spec gamedesign §6.2, §6.2b): the boids
 // simulation (boids.js) drawn with one Blitter per swarm, so a swarm of a hundred
@@ -16,7 +17,9 @@ export const SPECIES = {
     lantern:    { count: 60, size: 18, body: 0x1d2b4a, belly: 0x2c4166, accent: 0x7fe9ff, speed: 75, glow: true, biomes: ['trench'] }
 };
 /** How many swarms around the camera, spawn and drop distances (px). */
-export const SWARMS = { perView: 2, spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6 };
+export const SWARMS = { perView: 2, spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6,
+    haze: 0.6,    // how far the farthest fish of a shoal blends into the water colour
+    fade: 0.3 };  // and how much it fades
 
 /** Texture size of one frame (px) for a species. */
 const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (sp.tall ? 1.25 : 0.8)) });
@@ -67,7 +70,7 @@ function mix(a, b, k) {
 }
 
 export default class SwarmLayer {
-    /** @param env { isOpen(x, y), flowAt(x, y, out) px/s, biomeAt(x) -> id } */
+    /** @param env { isOpen(x, y), flowAt(x, y, out) px/s, biomeAt(x) -> id, waterAt(x) -> water colour } */
     constructor(scene, env) {
         this.scene = scene;
         this.env = env;
@@ -85,6 +88,13 @@ export default class SwarmLayer {
         const { w, h } = frameSize(sp);
         // Per fish: a tail-beat phase and a slow sway, so a shoal never reads as a grid.
         const phase = Float32Array.from({ length: sp.count }, () => Math.random() * Math.PI * 2);
+        // Depth inside the shoal (fake 3D, spec 10.10b): bobs draw in index order, so
+        // the first are the farthest; they take on the water colour and fade a little.
+        const water = sp.glow ? 0x000000 : this.env.waterAt(x);
+        bobs.forEach((b, i) => {
+            const z = 1 - (i + 0.5) / sp.count;
+            b.setTint(mixColor(0xffffff, water, z * SWARMS.haze)).setAlpha(1 - z * SWARMS.fade);
+        });
         this.swarms.push({ id, sim, blitter, bobs, w, h, phase });
     }
 
