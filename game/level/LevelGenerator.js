@@ -37,9 +37,10 @@ export const LEVEL = {
     margin: 1,            // extra chunks generated around the view
     buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
     edgeBatch: 5,         // collision strips made per build step
-    coinBatch: 3,         // coins of a trail made per build step
+    coinBatch: 1,         // coins of a trail made per build step
     rockParts: 2,         // the rock picture of a chunk is this many textures, one under the other
-    canvasPool: 12,       // canvas textures of dropped chunks kept for the next ones, per size
+    canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
+    canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     rippleMax: 8,         // strips of rippled sand per chunk, at most
@@ -234,6 +235,21 @@ export default class LevelGenerator {
             { x: trench.from + 620, text: lang === 'de' ? 'Marianengraben' : 'Mariana Trench', arrow: '→' },
             { x: ABYSS.x - ABYSS.halfWidth * 1.9, text: lang === 'de' ? 'Marianengraben' : 'Mariana Trench', arrow: '↘' }
         ].map(sg => ({ ...sg, y: ground(sg.x) }));
+        // Pictures that are painted on a canvas once are made now, behind the start's fade, not in the
+        // frame that first needs them: the grand nest's (its chunk is the journey's last). Spare canvases
+        // for the chunks' own pictures follow right after the first view is built (update).
+        ensureGrandArch(scene);
+        if (scene.textures.exists('grand_garden')) ensureGardenGlow(scene);
+    }
+
+    /** Fills the pool of chunk canvases (canvasFor) up to LEVEL.canvasWarm chunks' worth: making a canvas uploads it once, a long step on a phone. */
+    warmCanvasPool() {
+        const t = this.scene.textures, pool = this.canvasPool();
+        const need = [[SHADE.backSize, SHADE.backSize, LEVEL.canvasWarm], [SHADE.rockSize, SHADE.rockSize / LEVEL.rockParts, LEVEL.canvasWarm * LEVEL.rockParts]];
+        for (const [w, h, count] of need) {
+            const list = pool[`${w}x${h}`] || (pool[`${w}x${h}`] = []);
+            while (list.length < count) { const key = `chunkpool:${w}x${h}:${pool.made = (pool.made || 0) + 1}`; t.createCanvas(key, w, h); list.push(key); }
+        }
     }
 
     /**
@@ -350,6 +366,7 @@ export default class LevelGenerator {
             const [cx, cy] = key.split(',').map(Number);
             if (!wanted(cx, cy)) this.dropEarly(key);
         }
+        if (!this.started) this.warmCanvasPool();      // after the first view has taken its canvases: the reserve for play
         this.started = true;
         this.viewReady = true;
         for (let cy = Math.max(0, Math.floor(camY / CH)); cy <= Math.floor((camY + H) / CH) && this.viewReady; cy++) {
@@ -839,7 +856,7 @@ export default class LevelGenerator {
     /** A dropped chunk's canvas texture goes back to the pool (up to LEVEL.canvasPool per size), else it is removed. */
     poolCanvas(key) {
         const t = this.scene.textures, pool = this.canvasPool(), src = t.get(key).source[0], size = `${src.width}x${src.height}`, list = pool[size] || (pool[size] = []);
-        if (list.length >= LEVEL.canvasPool) { t.remove(key); return; }
+        if (list.length >= LEVEL.canvasPool * (src.height < src.width ? LEVEL.rockParts : 1)) { t.remove(key); return; }
         const spare = `chunkpool:${size}:${pool.made = (pool.made || 0) + 1}`;
         t.renameTexture(key, spare);
         list.push(spare);
