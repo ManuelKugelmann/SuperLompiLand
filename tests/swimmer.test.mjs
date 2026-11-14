@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { angleTo, turnToward, wanderHeading, leash, avoid } from '../game/ai/steering.js';
-import { SWIMMER, createSwimmer, stepSwimmer } from '../game/ai/swimmer.js';
+import { SWIMMER, createSwimmer, stepSwimmer, nearestRock } from '../game/ai/swimmer.js';
 
 const open = () => true;
 const run = (a, seconds, env, each) => { for (let i = 0; i < seconds * 60; i++) { stepSwimmer(a, 1 / 60, { isOpen: open, player: null, alarm: null, ...env, t: (env.t0 || 0) + i / 60 }); each?.(a, i); } return a; };
@@ -97,4 +97,58 @@ test('it never swims into rock', () => {
         const a = createSwimmer({ x: 0, y: 0 }, { range: 900 }, seed);
         run(a, 90, { isOpen: cave }, s => assert.ok(cave(s.x, s.y), `seed ${seed}: left the water at ${s.x},${s.y}`));
     }
+});
+
+test('a breather goes up for air now and then, holds at the surface and comes back down', () => {
+    const sea = (x, y) => y > 0;
+    const a = createSwimmer({ x: 0, y: 900 }, { breathe: true, range: 300 }, 6);
+    let top = Infinity, breaths = 0, was = a.state, heldS = 0;
+    run(a, 200, { isOpen: sea }, s => {
+        top = Math.min(top, s.y);
+        if (s.state === 'breathe' && was !== 'breathe') breaths++;
+        if (s.state === 'breathe' && s.y <= SWIMMER.surfaceY + 8) heldS += 1 / 60;
+        was = s.state;
+        assert.ok(s.y > 0, 'never out of the water');
+    });
+    assert.ok(breaths >= 2, `breaths ${breaths}`);
+    assert.ok(top <= SWIMMER.surfaceY + 8, `reached ${top}`);
+    assert.ok(heldS > 1.5, `held ${heldS}`);
+    assert.ok(a.y > 300 || a.state === 'breathe', 'back in its home range between breaths');
+    const fish = run(createSwimmer({ x: 0, y: 900 }, { range: 300 }, 6), 200, { isOpen: sea });
+    assert.ok(fish.y > 400, 'others stay down');
+});
+
+test('a breather that cannot reach the surface gives up and carries on', () => {
+    const cave = (x, y) => y > 600;                      // a rock ceiling at 600
+    const a = createSwimmer({ x: 0, y: 900 }, { breathe: true, range: 250 }, 2);
+    a.air = 0;
+    let breathing = 0;
+    run(a, SWIMMER.breathGiveUpS + 5, { isOpen: cave }, s => { if (s.state === 'breathe') breathing += 1 / 60; assert.ok(s.y > 600); });
+    assert.ok(breathing > 5 && breathing <= SWIMMER.breathGiveUpS + 0.1, `tried for ${breathing}`);
+    assert.notEqual(a.state, 'breathe');
+});
+
+test('nearest rock: the closest wall within reach, a spot still in the water', () => {
+    const floor = (x, y) => y < 1000;
+    const p = nearestRock(floor, 0, 900, 220);
+    assert.ok(p && Math.abs(p.x) < 1 && p.y >= 960 && p.y < 1000, JSON.stringify(p));
+    assert.equal(nearestRock(floor, 0, 300, 220), null, 'none in reach');
+});
+
+test('an anchoring creature rests holding on to the rock, longer than others rest', () => {
+    const floor = (x, y) => y < 1000;
+    const a = createSwimmer({ x: 0, y: 880 }, { anchor: true, range: 150, speed: 0.6 }, 9);
+    let restS = 0, nearS = 0;
+    run(a, 240, { isOpen: floor }, s => {
+        if (s.state !== 'rest') return;
+        restS += 1 / 60;
+        if (s.hold && Math.hypot(s.x - s.hold.x, s.y - s.hold.y) < 14) nearS += 1 / 60;
+        assert.ok(floor(s.x, s.y));
+    });
+    assert.ok(restS > 30, `rested ${restS}`);
+    assert.ok(nearS > restS * 0.5, `at the rock for ${nearS} of ${restS}`);
+    const b = createSwimmer({ x: 0, y: 880 }, { range: 150, speed: 0.6 }, 9);
+    let plain = 0;
+    run(b, 240, { isOpen: floor }, s => { if (s.state === 'rest') plain += 1 / 60; });
+    assert.ok(restS > plain * 1.3, `anchored ${restS} vs ${plain}`);
 });

@@ -36,11 +36,12 @@ const CH = LEVEL.cell * LEVEL.cells;
 
 /** How each creature / object looks and moves. Sizes are display widths in px. */
 // `ai`: how a swimming creature behaves (game/ai/swimmer.js): own speed (px per step), home
-// range (px), turn rate (radians per step), shy (1 = normal; bigger = scared from further away).
+// range (px), turn rate (radians per step), shy (1 = normal; bigger = scared from further away),
+// breathe (goes up for air now and then), anchor (rests holding on to rock).
 const FRIENDS = {
-    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7 } },
+    friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7, breathe: true } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
-    friend_seahorse: { size: 120, bob: 26, anim: 'sway', ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2 } },
+    friend_seahorse: { size: 120, bob: 26, anim: 'sway', ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
     friend_starfish: { size: 170, ground: true, anim: 'wobble', crawl: { speed: 0.1, range: 160 } },
     friend_snail: { size: 160, ground: true, anim: 'wobble', crawl: { speed: 0.18, range: 240 } },
