@@ -193,7 +193,7 @@ const SOUNDS = {
             return buf;
         });
         const src = ctx.createBufferSource(), g = ctx.createGain();
-        src.buffer = creaks[Math.floor(Math.random() * creaks.length)]; src.playbackRate.value = 0.85 + Math.random() * 0.3; g.gain.value = 0.22 * k;
+        src.buffer = creaks[Math.floor(Math.random() * creaks.length)]; src.playbackRate.value = 0.85 + Math.random() * 0.3; g.gain.value = 0.4 * k;
         src.connect(g).connect(master);
         src.start();
     },
