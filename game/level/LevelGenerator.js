@@ -954,11 +954,30 @@ export default class LevelGenerator {
             const src = s.textures.get(NEST_ART).getSourceImage(), w = R * 2.5;
             chunk.objects.push(s.add.image(nest.x, nest.y + R * 0.06, NEST_ART).setOrigin(0.5, 0.62).setDisplaySize(w, w * src.height / src.width).setDepth(-1));
         } else this.drawnNest(chunk, nest, R);
+        if (nest.grand) this.drawGrandSetting(chunk, nest, R);
         // A soft column of light so the nest can be found from a distance.
         const beam = s.add.image(nest.x, nest.y - 880, s.textures.exists('bd_ray') ? 'bd_ray' : 'nest_shell').setOrigin(0.5, 0)
             .setDisplaySize(R * 1.5, 900).setFlipY(true).setTint(0xfff3b0).setAlpha(0.42).setDepth(-5).setBlendMode(Phaser.BlendModes.ADD);
         s.tweens.add({ targets: beam, alpha: 0.14, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         chunk.objects.push(beam);
+    }
+
+    /** The grand nest's arch and glowing garden (GRAND). */
+    drawGrandSetting(chunk, nest, R) {
+        const s = this.scene, G = GRAND;
+        ensureGrandArch(s);
+        const arch = s.add.image(nest.x, nest.y + R * G.archDrop, 'grand_arch').setOrigin(0.5, 0.97).setDepth(-1.5);
+        arch.setScale(R * G.arch / arch.width);
+        chunk.objects.push(arch);
+        if (!s.textures.exists('grand_garden')) return;
+        const place = (depth, blend, alpha) => {
+            const g = s.add.image(nest.x, nest.y + R * G.gardenDrop, 'grand_garden').setOrigin(0.5, 0.55).setDepth(depth).setBlendMode(blend).setAlpha(alpha);
+            chunk.objects.push(g.setScale(R * G.garden / g.width));
+            return g;
+        };
+        place(-0.5, Phaser.BlendModes.NORMAL, 1);
+        const glow = place(G.glowDepth, Phaser.BlendModes.ADD, G.glow);       // shines above the trench's darkness
+        s.tweens.add({ targets: glow, alpha: G.glow * 0.6, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
 
     /** The drawn nest (fallback without the painted one): raked sand and shells. */
@@ -1228,6 +1247,26 @@ export default class LevelGenerator {
 /** Nest pictures, made once: a disc of raked sand as a shaded relief, and a little shell. */
 /** The painted nest (img/nest.webp, loaded by the title screen). */
 export const NEST_ART = 'nest';
+
+/**
+ * The grand nest's setting (spec 5.0m): a coral arch of dark slate rock over it, and a glowing deep
+ * garden along its foot that shines in the dark trench (a second, added copy above the scene's
+ * darkness). Sizes in nest radii; `glow` = how strongly the garden shines.
+ */
+export const GRAND = { arch: 3.4, archDrop: 0.12, garden: 4.2, gardenDrop: 0.42, glow: 0.55, glowDepth: 41 };   // the garden lines the nest's front foot, in front of it (its glow never lies across the plate)
+export const GRAND_ART = { grand_arch: 'img/finale/grand_arch.webp', grand_garden: 'img/finale/grand_garden.webp' };
+
+/** A drawn arch when the painted one is missing: slate boulders along a half ring, coral dots on them. */
+function ensureGrandArch(scene) {
+    if (scene.textures.exists('grand_arch')) return;
+    const W = 600, H = 500, t = scene.textures.createCanvas('grand_arch', W, H), c = t.getContext();
+    for (let i = 0; i <= 16; i++) {
+        const a = Math.PI * (1 - i / 16), r = 46 + (i % 3) * 10, x = W / 2 + Math.cos(a) * (W / 2 - 70), y = H - 30 - Math.sin(a) * (H - 110);
+        c.fillStyle = i % 2 ? '#2a3448' : '#222b3d'; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+        c.fillStyle = i % 3 ? '#b02a6a' : '#7f3fbf'; c.beginPath(); c.arc(x + 10, y - r * 0.6, 9, 0, 7); c.fill();
+    }
+    t.refresh();
+}
 
 function makeNestTextures(scene) {
     if (scene.textures.exists('nest_sand')) return;
