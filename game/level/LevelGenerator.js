@@ -21,6 +21,7 @@ import { SHADE, shadeChunk } from './shade.js';
 import ChunkAtlas from './ChunkAtlas.js';
 import { treatCoinNear } from './RhythmLayer.js';
 import { spotsOf } from './worldMap.js';
+import { FLOW, createFlow, inStreamPath } from './flow.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import { SIZES } from '../scale.js';
@@ -200,6 +201,7 @@ export default class LevelGenerator {
         this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
         this.job = null;        // the chunk build in progress (build() is cut into steps)
         this.jobPics = null;    // ... and the worker's result it is built from
+        this.streams = createFlow(LEVEL.seed);      // the same streams the scene's water has (they come from the seed alone): hazards keep out of their way
         this.treats = spotsOf('treat');      // where the route's coin figures are (RhythmLayer): the chunks' own coin trails give way to them
         this.lean = null;       // x -> how far plants there lean with a swell of their place (east positive, in the surf surge's measure), or null
         this.stepMax = new Map();   // step name -> { ms, x }: the slowest it has been and where the view was (perf tour, ?debug=perf)
@@ -980,6 +982,8 @@ export default class LevelGenerator {
 
     addHazard(chunk, key, x, y, rng, angle = 0, placed = false) {
         const s = this.scene, h = HAZARDS[key];
+        // Never where a stream carries a swimmer, in its lane or just beyond its end (playtest: a current must not push into harm).
+        if (!placed && inStreamPath(x, y, this.streams.streamsIn(x - FLOW.clear.ahead - 300, x + 300))) return null;
         // The side cave holds exactly the one tangle that is put there on purpose (`placed`): its
         // tunnel is narrow, and a second hazard would close the way.
         const cave = this.field.cave;

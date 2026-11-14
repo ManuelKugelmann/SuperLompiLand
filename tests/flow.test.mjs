@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOW, createFlow, streamInSlot, streamY, carry, eddyOf } from '../game/level/flow.js';
+import { FLOW, createFlow, streamInSlot, streamY, carry, inStreamPath } from '../game/level/flow.js';
 import { createField, FIELD } from '../game/level/density.js';
 import { WORLD_WEST, WORLD_END } from '../game/level/biomes.js';
 
@@ -94,39 +94,32 @@ test('streams lose their pull at the calm route and keep it away from it', () =>
     assert.ok(Math.hypot(edge.x, edge.y) > 2 && Math.hypot(edge.x, edge.y) < Math.hypot(plain.x, plain.y) - 2, 'a soft edge');
 });
 
-test('some streams run out into an eddy: the water turns round its middle, fastest at its radius', () => {
-    const all = flow.streamsIn(WORLD_WEST, WORLD_END), eddies = all.map(s => eddyOf(s, SEED)).filter(Boolean);
-    assert.ok(eddies.length >= 2 && eddies.length < all.length, `${eddies.length} of ${all.length}`);
-    assert.deepEqual(flow.eddiesIn(WORLD_WEST, WORLD_END).length, eddies.length);
-    const calm = { ...FLOW, swell: 0, streamSpeed: 0 }, f = createFlow(SEED, calm);
-    for (const e of eddies.slice(0, 3)) {
-        const R = FLOW.eddyRadius, at = (dx, dy) => f.at(e.x + dx, e.y + dy, 0, { x: 0, y: 0 });
-        const right = at(R, 0), below = at(0, R), left = at(-R, 0);
-        // On the ring the water moves along it: clockwise for turn = 1.
-        assert.ok(right.y * e.turn > FLOW.eddySpeed * 0.8, `right of the middle: ${right.y}`);
-        assert.ok(below.x * e.turn < -FLOW.eddySpeed * 0.8);
-        assert.ok(left.y * e.turn < -FLOW.eddySpeed * 0.8);
-        assert.ok(Math.hypot(right.x, right.y) <= FLOW.eddySpeed * 1.05, 'never faster than its top speed');
-        assert.ok(right.x < 0, 'a little inward');
-        assert.ok(Math.hypot(...Object.values(at(R * 0.2, 0))) < FLOW.eddySpeed * 0.5, 'nearly still in the middle');
-        assert.deepEqual(at(R * 4, 0), { x: 0, y: 0 }, 'nothing far away');
-        assert.ok(e.y > FLOW.eddyRadius, 'under water');
+
+test('streams lead east steadily: nearly straight, the water always going east, and nothing turns round at their ends', () => {
+    const all = flow.streamsIn(WORLD_WEST, WORLD_END), calm = { ...FLOW, swell: 0 }, f = createFlow(SEED, calm);
+    assert.ok(all.length > 20);
+    assert.equal(flow.eddiesIn, undefined, 'no eddies');
+    for (const s of all.slice(0, 40)) {
+        let lo = Infinity, hi = -Infinity;
+        for (let x = s.x0; x <= s.x1; x += 50) {
+            const y = streamY(s, x), v = f.at(x, y, 0, { x: 0, y: 0 });
+            lo = Math.min(lo, y); hi = Math.max(hi, y);
+            assert.ok(v.x >= 0, 'never back west');
+            assert.ok(Math.abs(v.y) <= Math.abs(v.x) * 0.12 + 1e-9, `nearly level at ${Math.round(x)}: ${v.x.toFixed(1)}, ${v.y.toFixed(1)}`);
+        }
+        assert.ok(hi - lo <= FLOW.streamWave * 2 + 1e-6, 'a slight sway only');
+        // Just past its end the water is still (apart from the swell, switched off here).
+        assert.deepEqual(f.at(s.x1 + 300, streamY(s, s.x1), 0, { x: 0, y: 0 }), { x: 0, y: 0 });
     }
-    assert.ok(FLOW.eddySpeed < 12, 'slower than a swimmer: it carries, it never traps');
 });
 
-test('eddies too are still at the calm route', () => {
-    const e = flow.eddiesIn(WORLD_WEST, WORLD_END)[0], cfg = { ...FLOW, swell: 0, streamSpeed: 0 };
-    const v = createFlow(SEED, cfg, () => e.y).at(e.x + FLOW.eddyRadius, e.y, 0, { x: 0, y: 0 });
-    assert.ok(Math.hypot(v.x, v.y) < 0.01);
-});
-
-test('an eddy only exists where its ring is in open water and clear of the calm route', () => {
-    const all = flow.eddiesIn(WORLD_WEST, WORLD_END), e = all[0];
-    const blocked = createFlow(SEED, FLOW, null, (x, y) => !(Math.abs(x - e.x) < 400 && Math.abs(y - e.y) < 400));
-    assert.equal(blocked.eddiesIn(WORLD_WEST, WORLD_END).length, all.length - 1, 'rock on the ring: no eddy there');
-    assert.deepEqual(blocked.at(e.x + FLOW.eddyRadius, e.y, 0, { x: 0, y: 0 }).y, createFlow(SEED, { ...FLOW, eddyChance: 0 }).at(e.x + FLOW.eddyRadius, e.y, 0, { x: 0, y: 0 }).y);
-    const onRoute = createFlow(SEED, FLOW, () => e.y + FLOW.calm[1]);
-    assert.ok(onRoute.eddiesIn(WORLD_WEST, WORLD_END).length < all.length, 'too close to the route: none');
-    assert.equal(createFlow(SEED, FLOW, () => -99999, () => true).eddiesIn(WORLD_WEST, WORLD_END).length, all.length, 'open water far from the route: all of them');
+test('no hazard in a stream\'s way: its lane and the stretch beyond its end count as its path', () => {
+    const s = flow.streamsIn(WORLD_WEST, WORLD_END)[3], mid = (s.x0 + s.x1) / 2, y = streamY(s, mid);
+    assert.equal(inStreamPath(mid, y, [s]), true);
+    assert.equal(inStreamPath(mid, y + FLOW.clear.side - 5, [s]), true);
+    assert.equal(inStreamPath(mid, y + FLOW.clear.side + 5, [s]), false);
+    assert.equal(inStreamPath(s.x1 + FLOW.clear.ahead - 10, streamY(s, s.x1), [s]), true, 'where it lets a swimmer go');
+    assert.equal(inStreamPath(s.x1 + FLOW.clear.ahead + 10, streamY(s, s.x1), [s]), false);
+    assert.equal(inStreamPath(s.x0 - 400, y, [s]), false);
+    assert.equal(inStreamPath(mid, y, []), false);
 });

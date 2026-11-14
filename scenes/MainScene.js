@@ -219,7 +219,7 @@ export default class MainScene extends Phaser.Scene {
         this.rockLayers = new RockLayers(this);   // near and mid-range rock behind the play plane (needs the level's materials)
         this.density = (x, y) => this.level.density(x, y);
         // Currents and swell: one field for player and particles. Streams lose their pull at the calm route.
-        this.flow = createFlow(LEVEL.seed, FLOW, x => this.level.field.routeY(x), (x, y) => y > 60 && this.level.density(x, y) < LEVEL.threshold);
+        this.flow = createFlow(LEVEL.seed, FLOW, x => this.level.field.routeY(x));
         this.flowAt = { x: 0, y: 0 };
         this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
         this.swarms = new SwarmLayer(this, {   // shoals of small fish around the view (spec 6.2)
@@ -1563,15 +1563,8 @@ export default class MainScene extends Phaser.Scene {
                     const x = Phaser.Math.Between(Math.max(st.x0, wv.x - 200), Math.min(st.x1, wv.right + 200));
                     const y = streamY(st, x) + Phaser.Math.Between(-FLOW.streamWidth, FLOW.streamWidth) * 0.8;
                     // Only where the water really moves (a stream is muted where it meets the calm route).
-                    if (y > 40 && this.level.isOpen(x, y) && this.flow.at(x, y, 0, this.bubbleProbe || (this.bubbleProbe = { x: 0, y: 0 })).x > FLOW.streamSpeed * 0.3) this.particles.spawn('bubble', x, y, 1, { radius: 9, spread: 6 });
+                    if (y > 40 && this.level.isOpen(x, y) && this.flow.at(x, y, 0, this.bubbleProbe || (this.bubbleProbe = { x: 0, y: 0 })).x > FLOW.streamSpeed * 0.3) this.particles.mark('bubble', x, y, 1, { radius: 9, spread: 6 });
                 }
-            }
-            // Eddies show themselves the same way: a few bubbles ride round the ring.
-            for (const e of this.flow.eddiesIn(wv.x - 200, wv.right + 200)) {
-                const ang = Math.random() * Math.PI * 2, r = FLOW.eddyRadius * (0.6 + Math.random() * 0.7);
-                const x = e.x + Math.cos(ang) * r, y = e.y + Math.sin(ang) * r, probe = this.bubbleProbe || (this.bubbleProbe = { x: 0, y: 0 });
-                this.flow.at(x, y, 0, probe);
-                if (y > 40 && this.level.isOpen(x, y) && Math.hypot(probe.x, probe.y) > FLOW.eddySpeed * 0.4) this.particles.spawn('bubble', x, y, 1, { radius: 8, spread: 4 });
             }
             this.streamBubbles %= 1;
         }

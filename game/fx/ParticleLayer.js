@@ -92,6 +92,9 @@ export default class ParticleLayer {
         return count ? this.sim.spawn(id, x, y, count, opts) : 0;
     }
 
+    /** Particles that say something the player has to be able to read (a stream's drifting bubbles): never thinned by the quality tier. */
+    mark(id, x, y, n = 1, opts) { return this.sim.spawn(id, x, y, n, opts); }
+
     /** Exposure helper for hazards (spec 7.1). */
     densityAt(id, x, y, r) { return this.sim.densityAt(id, x, y, r); }
 
