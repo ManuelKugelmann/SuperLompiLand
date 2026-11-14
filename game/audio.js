@@ -15,7 +15,8 @@ export const musicClock = createClock();
 export const nowSeconds = () => performance.now() / 1000;
 
 const MUTE_KEY = 'sll_muted';
-let ctx = null, master = null, noiseBuf = null, creaks = null;
+let ctx = null, master = null, noiseBuf = null;
+const creaks = [];
 let muted = (() => { try { return window.localStorage.getItem(MUTE_KEY) === '1'; } catch { return false; } })();
 
 export const isMuted = () => muted;
@@ -60,6 +61,24 @@ function playSample(name, gain = 1, rate = 1) {
     return true;
 }
 
+/**
+ * The ghost ship's creaks are worked out in JavaScript (music/creak.js), which costs tens of ms each
+ * on a slow phone: measured as a 1.5 s freeze when the first one was made on arriving at the ship.
+ * So they are made ahead, one at a time with pauses, right after the sound starts (the title and the
+ * story are on screen then), and at half the sample rate, which a low wooden groan does not need more of.
+ */
+const CREAKS = { count: 3, firstMs: 2500, everyMs: 1200, rate: 0.5 };
+function prepareCreaks() {
+    const sr = Math.max(8000, Math.round(ctx.sampleRate * CREAKS.rate));
+    for (let i = 0; i < CREAKS.count; i++) {
+        setTimeout(() => {
+            const d = creakSamples(sr, 0.9 + Math.random() * 0.6), buf = ctx.createBuffer(1, d.length, sr);
+            buf.getChannelData(0).set(d);
+            creaks.push(buf);
+        }, CREAKS.firstMs + i * CREAKS.everyMs);
+    }
+}
+
 function ready() {
     if (muted) return false;
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -76,6 +95,7 @@ function ready() {
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
         loadSamples();
+        prepareCreaks();
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx.state !== 'closed';
@@ -286,14 +306,11 @@ const SOUNDS = {
     hop() { tone({ f: 400, to: 800, type: 'sine', dur: 0.12, vol: 0.16 }); },
     // Old timbers groaning in the swell (the ghost ship, spec 5.0e; music/creak.js makes the samples).
     creak(k = 1) {
-        // Three groans are made once (a few ms each) and played in turn, pitched a little apart.
-        if (!creaks) creaks = [0, 1, 2].map(() => {
-            const d = creakSamples(ctx.sampleRate, 0.9 + Math.random() * 0.6), buf = ctx.createBuffer(1, d.length, ctx.sampleRate);
-            buf.getChannelData(0).set(d);
-            return buf;
-        });
+        // Three groans, made ahead of time (prepareCreaks) and played in turn, pitched a little apart.
+        // None ready yet: this creak is skipped, nothing is ever worked out while the fish is at the ship.
+        if (!creaks.length) return;
         const src = ctx.createBufferSource(), g = ctx.createGain();
-        src.buffer = creaks[Math.floor(Math.random() * creaks.length)]; src.playbackRate.value = 0.85 + Math.random() * 0.3; g.gain.value = 0.4 * k;
+        src.buffer = creaks[Math.floor(Math.random() * creaks.length)]; src.playbackRate.value = 0.85 + Math.random() * 0.3; g.gain.value = 0.2 * k;      // it peaked at 0 dBFS at 0.4
         src.connect(g).connect(master);
         src.start();
     },
