@@ -6,6 +6,7 @@ export const STORM_LOOK = {
     sky: 0.6,          // how dark the sky gets in the middle of the storm
     gloom: 0.3,        // how much darker the water gets under it
     rain: 1100,        // px above the waterline the rain falls from
+    clouds: { key: 'storm_clouds', file: 'img/sky/storm_clouds.webp', scale: 1.25, foot: 30, drift: 14, parallax: 0.06 },   // the painted cloud bank over the storm (seen from above the water)
     rainSpeed: 1500,   // px per second
     slant: 0.35,       // the rain falls this much sideways (the wind blows west)
     // Seen from below:
@@ -204,6 +205,14 @@ export default class StormLayer {
         o.under = L.underside.map(u => scene.add.tileSprite(0, u.y, W + 400, u.h, SURF_ART.line.key).setOrigin(0, 0.5)
             .setDepth(6.4).setTint(u.tint).setVisible(false));
         o.rain = scene.add.tileSprite(0, -L.rain, W, L.rain, TEX.rain).setOrigin(0).setScrollFactor(0, 1).setDepth(-28.2).setVisible(false);
+        // The storm's cloud bank on the horizon: it stands over the storm and rises on the side of
+        // the view toward it, so the storm is seen coming from the water's surface too.
+        const cl = L.clouds;
+        if (scene.textures.exists(cl.key)) {
+            const ch = scene.textures.get(cl.key).getSourceImage().height * cl.scale;
+            o.clouds = scene.add.tileSprite(0, cl.foot, W, ch, cl.key).setOrigin(0, 1).setScrollFactor(0, 1).setTileScale(cl.scale, cl.scale)
+                .setDepth(-28.25).setVisible(false);
+        }
         const flyer = (key, frame) => {
             const f = scene.add.image(0, 0, key, frame).setDepth(6.3).setVisible(false);
             f.life = -R() * 2; f.vx = 0; f.spin = 0;
@@ -212,7 +221,7 @@ export default class StormLayer {
         const puffFrames = scene.textures.get(SURF_ART.puffs.key).frameTotal > 2;
         o.torn = Array.from({ length: L.torn }, (_, i) => flyer(SURF_ART.puffs.key, puffFrames ? i % 4 : undefined));
         o.debris = Array.from({ length: L.debris }, (_, i) => flyer(i % 2 ? TEX.weed : TEX.plank));
-        o.all = [...o.walls, ...o.under, o.rain, ...o.torn, ...o.debris];
+        o.all = [...o.walls, ...o.under, o.rain, ...o.torn, ...o.debris, ...(o.clouds ? [o.clouds] : [])];
         return o;
     }
 
@@ -261,6 +270,16 @@ export default class StormLayer {
         const set = this.stormSet;
         if (set) {
             for (const w of set.walls) w.setVisible(w.span[1] > camX - 200 && w.span[0] < camX + W + 200 && camY < L.wall.depth);
+            if (set.clouds) {
+                // Per side: how much storm lies at or beyond that edge of the view.
+                const left = Math.max(kl, stormShare(camX - W)), right = Math.max(kr, stormShare(camX + 2 * W));
+                const show = camY < 60 && Math.max(left, right) > 0.01;
+                set.clouds.setVisible(show);
+                if (show) {
+                    set.clouds.setAlpha(left, right, left, right);
+                    set.clouds.tilePositionX = (camX * L.clouds.parallax + t * L.clouds.drift) / L.clouds.scale;
+                }
+            }
             const wet = k > 0.01 && camY < 60;      // rain only where the sky is in view
             set.rain.setVisible(wet);
             if (wet) {
