@@ -17,6 +17,10 @@ export const BRANCH = {
     lean: 150,          // px the mouth and the exit lean toward each other on their way down
     soft: 38,           // px over which rock turns into open water at its walls (a worn edge, no cut)
     mouth: 190,         // half width of the mouth and of the exit, where the tunnel opens upward
+    rim: 280,           // px of ridge that stand at full height beyond each funnel
+    shoulder: 300,      // px over which the ridge's top rounds off into its flank
+    cap: 240,           // px over which the tunnel rounds off at each end
+    funnelWear: 34,     // px the funnels' middles wander on their way down
     ends: 420,          // px beyond mouth and exit over which the ridge falls away
     slope: 1.7,         // ... this steeply
     lump: 55,           // px the ridge's top rises and falls (noise added in density.js) ...
@@ -45,9 +49,12 @@ export function sideCave(routeY, cfg = BRANCH) {
 
 /** Depth of the ridge's upper face at x (before its lumps); Infinity away from the cave. */
 export function ridgeTop(cave, x, cfg = BRANCH) {
-    const out = Math.max(0, cave.x0 - cfg.mouth - x, x - cave.x1 - cfg.mouth);
-    if (out > cfg.ends * 4) return Infinity;
-    return cave.top + (out > 0 ? out * cfg.slope : 0);
+    // The ridge keeps its height for a `rim` beyond each funnel (no spire of rock between funnel
+    // and flank), then rounds off into the flank instead of breaking at a corner.
+    const past = Math.max(0, cave.x0 - cfg.mouth - cfg.rim - x, x - cave.x1 - cfg.mouth - cfg.rim);
+    if (past > cfg.ends * 4) return Infinity;
+    const out = past < cfg.shoulder ? past * past / (2 * cfg.shoulder) : past - cfg.shoulder / 2;
+    return cave.top + out * cfg.slope;
 }
 
 /** Depth of the tunnel's middle at x: it winds a little, like something the water wore out, not a corridor. */
@@ -61,7 +68,9 @@ export function tunnelHalf(cave, x, cfg = BRANCH) {
     if (x < cave.x0 - cfg.mouth || x > cave.x1 + cfg.mouth) return 0;
     const [cl, ch] = cfg.chamber, c = cave.x1 - cfg.mouth - cl / 2, k = Math.max(0, 1 - Math.abs(x - c) / (cl / 2)), u = x - cave.x0;
     const base = cfg.half + cfg.uneven * (Math.sin(u / 173 + 0.4) * 0.6 + Math.sin(u / 71) * 0.4);
-    return base + (ch - base) * Math.min(1, k * 2) * Math.min(1, k * 2);
+    // Rounded ends: the tunnel closes like the end of a pipe worn by water, not with a flat wall.
+    const end = Math.min(1, (x - (cave.x0 - cfg.mouth)) / cfg.cap, (cave.x1 + cfg.mouth - x) / cfg.cap), round = Math.sqrt(Math.max(0, end * (2 - end)));
+    return (base + (ch - base) * Math.min(1, k * 2) * Math.min(1, k * 2)) * round;
 }
 
 /**
@@ -76,8 +85,10 @@ export function caveAt(cave, x, y, top, cfg = BRANCH) {
     let d = half > 0 ? Math.abs(y - mid) - half : Infinity;
     if (y < cave.y + cfg.half) {
         const down = Math.max(0, y - top) / (cave.y - top);                     // 0 at the ridge's top .. 1 at the tunnel
-        const width = cfg.mouth * (1 - 0.35 * down);                              // narrower further down
-        for (const [mx, dir] of [[cave.x0, 1], [cave.x1, -1]]) d = Math.min(d, Math.abs(x - (mx + dir * cfg.lean * down)) - width);
+        // Narrower further down, and worn: the funnel's middle wanders and its width swells and shrinks on the way.
+        const width = cfg.mouth * (1 - 0.35 * down) * (1 + 0.14 * Math.sin(y / 67 + 0.8));
+        const wander = cfg.funnelWear * Math.sin(y / 96);
+        for (const [mx, dir] of [[cave.x0, 1], [cave.x1, -1]]) d = Math.min(d, Math.abs(x - (mx + dir * (cfg.lean * down + wander))) - width);
     }
     return d;
 }

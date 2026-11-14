@@ -21,7 +21,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 21,
+    version: 22,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -714,7 +714,7 @@ export default class LevelGenerator {
         // The side cave holds exactly the one tangle that is put there on purpose (`placed`): its
         // tunnel is narrow, and a second hazard would close the way.
         const cave = this.field.cave;
-        if (!placed && x > cave.x0 - 300 && x < cave.x1 + 300 && y > cave.top - 80) return null;
+        if (!placed && x > cave.x0 - 600 && x < cave.x1 + 600 && y > cave.top - 80) return null;
         // Danger is optional (spec 5.2c): nothing harmful on or near the calm main route.
         if (Math.abs(y - this.field.routeY(x)) < ROUTE.clear + h.r) return null;
         // Wonder first: nothing harmful along the stretch where a big story event passes (the whale and her ride).

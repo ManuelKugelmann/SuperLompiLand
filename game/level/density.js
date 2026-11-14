@@ -70,7 +70,7 @@ const DETOUR = { y: 0, k: 0 };
 
 const SHIP_X = ghostShip().x;      // the ghost ship's place (worked out once)
 const TRENCH_FROM = BIOMES[BIOMES.length - 1].from;
-const CAVE_REACH = BRANCH.mouth + BRANCH.ends * 4;      // how far beyond mouth and exit the side cave's ridge can reach
+const CAVE_REACH = BRANCH.mouth + BRANCH.rim + BRANCH.ends * 4;      // how far beyond mouth and exit the side cave's ridge can reach
 
 // Where the reef crest is and how far its slopes can reach (worked out once).
 const CREST_X = reefCrestX(), CREST_REACH = REEF_CREST.inset + REEF_CREST.half + 3000 / REEF_CREST.lagoonSlope;
@@ -190,7 +190,7 @@ export function createField(seed) {
             const cv = caveOf();
             if (x > cv.x0 - CAVE_REACH && x < cv.x1 + CAVE_REACH) {
                 // Lumps on its top, bigger bulges on the flanks beyond mouth and exit (no straight ramps).
-                const flank = Math.min(1, Math.max(0, cv.x0 - BRANCH.mouth - x, x - cv.x1 - BRANCH.mouth) / 250);
+                const flank = Math.min(1, Math.max(0, cv.x0 - BRANCH.mouth - BRANCH.rim - x, x - cv.x1 - BRANCH.mouth - BRANCH.rim) / 250);
                 const top = ridgeTop(cv, x) + BRANCH.lump * (vnoise(x / 230, 8.1, seed + 41) * 2 - 1) + BRANCH.bulge * flank * (vnoise(x / 180, 4.4, seed + 42) * 2 - 1);
                 const d = caveAt(cv, x, y, top);
                 if (d !== null) {

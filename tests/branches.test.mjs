@@ -42,7 +42,9 @@ test('it is a cave: rock above and below the tunnel, rock between mouth and exit
     assert.ok(caveAt(cave, mid, cave.top + 60, cave.top) > 50, 'well inside the rock');
     assert.equal(caveAt(cave, mid, cave.top - 50, cave.top), null);
     assert.equal(ridgeTop(cave, cave.x0 - 5000), Infinity);
-    assert.ok(ridgeTop(cave, cave.x1 + BRANCH.mouth + 300) > cave.top + 300, 'the ridge falls away at its ends');
+    assert.equal(ridgeTop(cave, cave.x1 + BRANCH.mouth + BRANCH.rim - 10), cave.top, 'a rim of ridge beyond the funnel');
+    assert.ok(ridgeTop(cave, cave.x1 + BRANCH.mouth + BRANCH.rim + 600) > cave.top + 500, 'then the ridge falls away');
+    assert.ok(ridgeTop(cave, cave.x1 + BRANCH.mouth + BRANCH.rim + 60) < cave.top + 20, 'over a rounded shoulder');
 });
 
 test('the clam has a chamber: the tunnel is higher there than elsewhere', () => {
