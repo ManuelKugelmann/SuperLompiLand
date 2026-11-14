@@ -75,3 +75,16 @@ test('an island gets a pillar behind it down to the seabed; a wide cave roof doe
     const b = backRockCover(roof, 0.5, x0, 1960, SPAN);
     assert.ok(cellAt(b, x0 + 480, 1960 + 760) < cellAt(a, x0 + 480, 1960 + 760), 'a cave roof makes no pillar');
 });
+
+test('a pillar under an island continues across the chunk border below it', () => {
+    const reef = BIOMES.find(b => b.id === 'reef'), x0 = Math.round((reef.from + 2000) / SPAN) * SPAN, oy = 1920;
+    const seabed = oy + SPAN + 700;
+    // An island just above the border between two stacked chunks, the seabed in the lower one.
+    const f = { density: (x, y) => (y > seabed || (Math.abs(x - (x0 + 480)) < 200 && y > oy + SPAN - 260 && y < oy + SPAN - 60)) ? 1 : 0 };
+    const up = backRockCover(f, 0.5, x0, oy, SPAN), lo = backRockCover(f, 0.5, x0, oy + SPAN, SPAN);
+    const cell = (r, top, y) => r.cov[Math.floor((y - top) / r.C + r.m) * r.N + Math.floor(480 / r.C + r.m)];
+    // just below the island, in the lower chunk, the pillar is there as in the upper chunk's margin
+    const y = oy + SPAN + 120;
+    assert.ok(Math.abs(cell(up, oy, y) - cell(lo, oy + SPAN, y)) < 0.05, `${cell(up, oy, y)} vs ${cell(lo, oy + SPAN, y)}`);
+    assert.ok(cell(lo, oy + SPAN, y) > 0.6);
+});

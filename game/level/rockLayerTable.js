@@ -56,8 +56,11 @@ export const SUPPORT = { reach: 1800, gap: 60, spread: 120, wobble: 260, grid: 1
  */
 export const SURFACE_CLEAR = { below: 300, fade: 420, push: 1.2, wander: 520 };
 
-/** Around the calm route: no near rock within `half` px of its middle, fading back in over `fade` px. */
-export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 0.9 };
+/**
+ * The calm route stays free of near rock: a route-clearing layer shows only rock below
+ * `half` px under the route's middle (plus up to `wander` px), fading in over `fade` px.
+ */
+export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 1.2, wander: 260 };
 
 /** Enclosure noise at world x (0..1): two octaves, so every biome sees many open and closed stretches. */
 const encNoise = (x, layer) => 0.62 * vnoise(x / layer.scale, layer.seed * 0.37, layer.seed)
@@ -163,15 +166,19 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
             // Below the cleared route band, feet come only from rock below it: a foot carried
             // through the band would be cut there and hang below it.
             if (route && layer.clearRoute) {
-                const ry = route(x) + clear.half + clear.fade * 0.5;
+                const ry = route(x) + clear.half;
                 if (y > ry) y0 = Math.max(y0, ry);
             }
             const v = Math.max(carry.columnMax(x + w, y0, y1),
                 carry.columnMax(x + w - sup.spread, y0, y1) - 0.02, carry.columnMax(x + w + sup.spread, y0, y1) - 0.02);
             d = Math.max(d, T - 0.05 + (sup.lift + 0.05) * smooth01((v + shift - lo) / sup.band));
             d -= surfacePush(x, y);                             // never up to the surface
+            // A route-clearing layer keeps only rock standing below the route band: anything above
+            // it would be cut along the band and left hanging (its foot may not cross the band).
+            // The edge wanders, so the tops below are not cut flat.
             if (route && layer.clearRoute) {
-                const off = Math.abs(y - route(x)), t = Math.min(1, Math.max(0, (off - clear.half) / clear.fade));
+                const edge = route(x) + clear.half + (0.7 * vnoise(x / 700, 2.3, layer.seed + 21) + 0.3 * vnoise(x / 180, 4.1, layer.seed + 23)) * clear.wander;
+                const t = Math.min(1, Math.max(0, (y - edge) / clear.fade));
                 d -= clear.push * (1 - t * t * (3 - 2 * t));
             }
             return d;

@@ -65,19 +65,19 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
         }
     }
 
-    // Width of the horizontal rock run each solid cell belongs to (0 = touches the grid edge:
-    // too wide to tell, never an island).
-    const runW = new Uint16Array(N * N);
-    for (let j = 0; j < N; j++) {
-        for (let i = 0; i < N;) {
-            if (!solid[j * N + i]) { i++; continue; }
-            let e = i;
-            while (e < N && solid[j * N + e]) e++;
-            const w = i === 0 || e === N ? 0 : e - i;
-            for (let k = i; k < e; k++) runW[j * N + k] = w;
-            i = e;
-        }
-    }
+    // Is the rock whose underside is at (x, yb) an island — water above it within island[1]
+    // and narrower than island[0]? Asked of the field itself (not of this chunk's grid), so
+    // every chunk gets the same answer and a pillar never stops at a chunk border.
+    const isIsland = (x, yb) => {
+        const rock = (px, py) => field.density(px, py) > threshold;
+        let thin = false;
+        for (let t = C; t <= cfg.island[1]; t += C) if (!rock(x, yb - t)) { thin = true; break; }
+        if (!thin) return false;
+        let w = C;
+        for (let dx = C; w < cfg.island[0] && rock(x - dx, yb); dx += C) w += C;
+        for (let dx = C; w < cfg.island[0] && rock(x + dx, yb); dx += C) w += C;
+        return w < cfg.island[0];
+    };
 
     const cov = new Float32Array(N * N);
     let any = false;
@@ -87,9 +87,10 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
         any = true;
         const y0 = oy + at(0);
         let rockY = -Infinity;                                   // world y of the nearest rock above
-        for (let y = y0 - cfg.scanStep; y >= y0 - R; y -= cfg.scanStep) {
+        for (let y = y0 - cfg.scanStep; y >= y0 - Math.max(R, cfg.pillar); y -= cfg.scanStep) {
             if (field.density(x, y) > threshold) { rockY = y; break; }
         }
+        let island = rockY > -Infinity && isIsland(x, rockY);
         // Nearest rock below every cell (within the grid, else looked up below it). Under an
         // island — a small piece of rock with water above it (not a cave roof or a big mass) —
         // the gap down to the rock below is a pillar behind, so the island never floats.
@@ -103,18 +104,16 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
             if (solid[j * N + i]) next = y0 + j * C;
             below[j] = next;
         }
-        let runTop = -Infinity, island = false;
         for (let j = 0; j < N; j++) {
             const y = y0 + j * C, k = j * N + i;
             if (solid[k]) {
-                if (j > 0 && !solid[k - N]) runTop = y;                      // the run starts below water
-                else if (j === 0) runTop = -Infinity;                       // runs on above the grid
                 rockY = y;
-                island = y - runTop < cfg.island[1] && runW[k] > 0 && runW[k] * C < cfg.island[0];
+                if (j === N - 1 || !solid[k + N]) island = isIsland(x, y);  // the run's underside
                 cov[k] = 1;
                 continue;
             }
             if (island && below[j] - rockY <= cfg.pillar) { cov[k] = 1; continue; }
+            if (y - rockY > R) { cov[k] = 0; continue; }
             const u = (y - rockY) / R;
             cov[j * N + i] = u >= 1 ? 0 : (1 - u) * (1 - u);
         }
