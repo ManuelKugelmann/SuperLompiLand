@@ -8,7 +8,10 @@ import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
 import ReefBookScene, { BOOK_KEY } from './ReefBookScene.js';
 import PlayStyleScene, { STYLE_KEY } from './PlayStyleScene.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
-import { CHARACTERS, loadSelectedId, saveSelectedId } from '../game/characters.js';
+import { CHARACTERS, getCharacter, loadSelectedId, saveSelectedId } from '../game/characters.js';
+import ProgressionManager from '../systems/ProgressionManager.js';
+import { fromCookie } from '../systems/savepoints.js';
+import { BIOMES } from '../game/level/biomes.js';
 import Rig from '../game/Rig.js';
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
@@ -121,6 +124,7 @@ export default class IntroScene extends Phaser.Scene {
         flushFeedbackQueue();
         this.buildTogether(lang);
         this.buildAmbient(lang);
+        this.buildSaves(lang);
         this.autoJoin();
 
         this.add.text(W - 24, H - 20, VERSION_TAG, {
@@ -197,6 +201,67 @@ export default class IntroScene extends Phaser.Scene {
         this.input.keyboard?.on('keydown-SPACE', () => this.start());
         this.carousel = { cy, SPACING };
         this.select(this.index);
+    }
+
+    /**
+     * Savepoints (user request): every nest reached is kept in a cookie
+     * (systems/savepoints.js). A "saves" button opens the list; a pick restores that
+     * nest's coins, character, freed friends and play style, then starts there.
+     */
+    buildSaves(lang) {
+        let saves = [];
+        try { saves = fromCookie(document.cookie); } catch { /* cookies blocked */ }
+        if (!saves.length) return;
+        const W = this.scale.width, de = lang === 'de';
+        const btn = this.add.text(W - 40, 50, de ? 'Spielstände' : 'Saves', {
+            fontFamily: 'Arial', fontStyle: 'bold', fontSize: '34px', color: '#ffffff', backgroundColor: '#1d6f9a', padding: { x: 22, y: 10 }
+        }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }).setDepth(20);
+        btn.on('pointerdown', () => this.openSaves(de, saves));
+    }
+
+    openSaves(de, saves) {
+        if (this.modal) return;
+        this.modal = true;
+        const W = this.scale.width, H = this.scale.height, ui = [];
+        const add = o => { ui.push(o); return o.setDepth(100); };
+        const close = () => { ui.forEach(o => o.destroy()); this.modal = false; };
+        add(this.add.rectangle(W / 2, H / 2, W, H, 0x04213a, 0.92).setInteractive()).on('pointerdown', close);
+        add(this.add.text(W / 2, H * 0.1, de ? 'Wo geht es weiter?' : 'Where do you continue?', {
+            fontFamily: 'Arial', fontStyle: 'bold', fontSize: '60px', color: '#ffffff', stroke: '#0a5c7a', strokeThickness: 10
+        }).setOrigin(0.5));
+        const rows = [...saves].sort((a, b) => b.n - a.n).slice(0, 8), top = H * 0.2, rowH = Math.min(86, (H * 0.68) / rows.length);
+        rows.forEach((s, i) => {
+            const y = top + i * rowH + rowH / 2;
+            const biome = BIOMES.find(b => b.id === s.b);
+            const place = biome ? (biome.name[de ? 'de' : 'en'] || biome.name.en) : (de ? `Nest ${s.n + 1}` : `Nest ${s.n + 1}`);
+            const who = getCharacter(s.ch)?.name || s.ch;
+            const row = add(this.add.rectangle(W / 2, y, Math.min(1100, W - 120), rowH - 12, 0x0d3b5c, 0.96)
+                .setStrokeStyle(3, 0x7fd3ff, 0.7).setInteractive({ useHandCursor: true }));
+            add(this.add.text(W / 2 - Math.min(520, W / 2 - 80), y, `${place}`, { fontFamily: 'Arial', fontStyle: 'bold', fontSize: '36px', color: '#ffffff' }).setOrigin(0, 0.5));
+            add(this.add.text(W / 2 + Math.min(520, W / 2 - 80), y, `${who} · ${s.c} ★ · ${s.j.length} ♥`, { fontFamily: 'Arial', fontSize: '30px', color: '#fff3b0' }).setOrigin(1, 0.5));
+            row.on('pointerdown', (p, x, yy, ev) => { ev?.stopPropagation(); this.loadSave(s); });
+        });
+        add(this.add.text(W / 2, H * 0.93, de ? 'Tippe auf einen Spielstand · daneben tippen schließt' : 'Tap a save · tap outside to close', {
+            fontFamily: 'Arial', fontSize: '28px', color: '#9fd9ea'
+        }).setOrigin(0.5));
+    }
+
+    /** Restore a savepoint into the saved progress, then start the journey there. */
+    loadSave(s) {
+        const p = new ProgressionManager();
+        p.init?.();
+        p.set?.('nest', s.n);
+        p.set?.('banked', s.c);
+        p.set?.('journey', s.j);
+        p.set?.('relaxed', s.r);
+        p.set?.('style_asked', true);
+        this.registry.set('character', s.ch);
+        saveSelectedId(s.ch);
+        this.modal = false;
+        // A save means the story was seen already: straight back into the water.
+        this.registry.set('room', null);
+        this.registry.set('ambient', false);
+        this.scene.start(SCENE_KEYS.MAIN);
     }
 
     /**

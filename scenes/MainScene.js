@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import ProgressionManager from '../systems/ProgressionManager.js';
+import { savepoint, addSavepoint, fromCookie, toCookie } from '../systems/savepoints.js';
 import WorldState from '../systems/worldState.js';
 import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
@@ -376,6 +377,14 @@ export default class MainScene extends Phaser.Scene {
         play(nest.grand ? 'win' : 'nest');
         this.progression.set?.('nest', this.nestIndex);
         this.progression.set?.('banked', this.banked);
+        // Every nest is a savepoint, kept in a cookie and offered on the title screen.
+        if (!nest.grand && !this.mp && !this.ambientMode) {
+            try {
+                const list = addSavepoint(fromCookie(document.cookie), savepoint({ nest: this.nestIndex, coins: this.banked,
+                    character: this.character.id, journey: this.journey.toJSON(), relaxed: this.relaxed, biome: BIOMES[biomeIndexAt(nest.x)].id }));
+                document.cookie = toCookie(list);
+            } catch { /* cookies blocked: the localStorage progress still works */ }
+        }
         if (nest.grand) {
             this.progression.set?.('nest', 0);
             this.progression.set?.('banked', 0);
