@@ -13,11 +13,13 @@ export const SPECIES = {
     anthias:    { count: 110, size: 26, body: 0xff8a5c, belly: 0xffc6ad, accent: 0xb36cff, speed: 85, flock: { separationR: 38, neighbourR: 95, weights: { cohesion: 0.35 } }, biomes: ['reef', 'beach'] },
     tang:       { count: 14, size: 40, body: 0xffd23f, belly: 0xfff0a0, accent: 0xffffff, speed: 55, tall: true, flock: { neighbourR: 140, separationR: 60, weights: { cohesion: 0.4 } }, biomes: ['reef', 'kelp', 'mangrove'] },
     fry:        { count: 70, size: 14, body: 0xbfe3f0, belly: 0xffffff, accent: 0x9bd0e6, speed: 70, stripe: true, flock: { separationR: 16, neighbourR: 50 }, biomes: ['mangrove', 'beach'] },
+    juvenile:   { count: 45, size: 18, body: 0xffd84a, belly: 0xfff3b0, accent: 0x2f5d8a, speed: 60, flock: { separationR: 22, neighbourR: 70, weights: { cohesion: 0.4 } }, biomes: ['beach'] },   // young yellow reef fish growing up in the lagoon
     silverside: { count: 150, size: 20, body: 0x8fb0c4, belly: 0xeaf4fa, accent: 0xdff2ff, speed: 105, stripe: true, biomes: ['blue', 'kelp', 'harbour', 'wreck'] },
     lantern:    { count: 60, size: 18, body: 0x1d2b4a, belly: 0x2c4166, accent: 0x7fe9ff, speed: 75, glow: true, biomes: ['trench'] }
 };
 /** How many swarms around the camera, spawn and drop distances (px). */
-export const SWARMS = { perView: 2, spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6,
+export const SWARMS = { perView: 2, inView: [1000, 520], ahead: [1150, 1400],   // inView: px to either side of the view's middle that count as "in view"; ahead: px in front of the fish where a shoal is set when none is in view
+    spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6,
     haze: 0.6,    // how far the farthest fish of a shoal blends into the water colour
     fade: 0.3,    // and how much it fades
     deepCount: 80 };  // shoals of this many fish or more get the full depth; smaller ones less
@@ -147,13 +149,17 @@ export default class SwarmLayer {
         }
         const biome = this.env.biomeAt(cx);
         const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(biome));
-        if (!native.length || this.swarms.filter(s => !s.home).length >= SWARMS.perView) return;
+        // One shoal should be in view most of the time: when none is, one more is set just ahead of the fish, so it swims into it.
+        const seen = this.swarms.some(s => { const c = s.sim.centre(); return Math.abs(c.x - cx) < SWARMS.inView[0] && Math.abs(c.y - cy) < SWARMS.inView[1]; });
+        const roaming = this.swarms.filter(s => !s.home).length;
+        if (!native.length || roaming >= SWARMS.perView + (seen ? 0 : 1)) return;
         // Prefer a species not already around: variety over repeats.
         const fresh = native.filter(id => !this.swarms.some(s => s.id === id));
         const kinds = fresh.length ? fresh : native;
         for (let tries = 0; tries < 10; tries++) {
             const a = Math.random() * Math.PI * 2, d = SWARMS.spawnMin + Math.random() * (SWARMS.spawnMax - SWARMS.spawnMin);
-            const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * 0.6;
+            const x = seen ? cx + Math.cos(a) * d : cx + (this.heading || 1) * (SWARMS.ahead[0] + Math.random() * (SWARMS.ahead[1] - SWARMS.ahead[0]));
+            const y = seen ? cy + Math.sin(a) * d * 0.6 : cy + (Math.random() - 0.5) * SWARMS.inView[1] * 1.4;
             if (y > 150 && this.env.isOpen(x, y) && this.env.isOpen(x + 120, y) && this.env.isOpen(x - 120, y)) {
                 this.spawn(kinds[Math.floor(Math.random() * kinds.length)], x, y);
                 return;
@@ -165,6 +171,7 @@ export default class SwarmLayer {
     update(dt, cx, cy, players) {
         this.checkAt -= dt * 1000;
         if (this.checkAt <= 0) { this.checkAt = SWARMS.checkMs; this.manage(cx, cy); }
+        if (players?.[0] && Math.abs(players[0].vx) > 40) this.heading = Math.sign(players[0].vx);      // which way the fish travels
         const env = { isOpen: this.env.isOpen, flowAt: this.env.flowAt, players };
         this.time = (this.time || 0) + dt;
         for (const s of this.swarms) {
