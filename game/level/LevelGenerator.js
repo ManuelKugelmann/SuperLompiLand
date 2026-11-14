@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import Creature from '../Creature.js';
+import { MICRO, microAt, microKey } from './microScatter.js';
+import { makeMicroTextures, MICRO_ORIGIN_Y } from './MicroArt.js';
 import { surgeShare, surgeWave } from './surf.js';
 import { JOURNEY, chapters } from '../journey.js';
 import { createReach } from './reach.js';
@@ -148,6 +150,7 @@ export default class LevelGenerator {
         // Painted once here, at start-up, so no chunk has to pay for them while playing.
         makeNestTextures(scene);
         makeLineTexture(scene);
+        makeMicroTextures(scene);
         this.field = createField(LEVEL.seed);
         this.storySpots = chapters().filter(c => c.friend).map(c => ({ x: c.x, y: this.field.routeY(c.x) }));
         this.storyStretches = chapters().filter(c => c.event).map(c => ({ x0: c.event.x - JOURNEY.eventClear, x1: c.event.endX + JOURNEY.eventClear }));
@@ -526,6 +529,23 @@ export default class LevelGenerator {
                 if (p.tint) img.setTint(p.tint);
                 // Passable things read as behind the play plane: hazed toward the biome's water.
                 else if (p.back) img.setTint(mix(0xffffff, mix(biome.water[0], 0x8fb4c0, 0.5), PROP_BACK_HAZE));
+            }
+        }
+
+        // --- Small ground cover: pebbles, shells, mussels, tufts (spec 5.5c) -----
+        {
+            // Own random stream, like the props: nothing else shifts.
+            const r = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}:micro`]), next = () => r.frac();
+            let placed = 0;
+            for (const f of floors) {
+                if (placed >= MICRO.max) break;
+                if (f.prop || reefCrest(f.x) > 0 && f.y < 400) continue;      // not under a prop; the crest's top belongs to the corals
+                const m = microAt(biome.id, f.angle, next);
+                if (!m) continue;
+                const img = keep(s.add.image(f.x, f.y + 4, microKey(m.kind, m.variant)).setOrigin(0.5, MICRO_ORIGIN_Y)
+                    .setRotation(f.angle).setDepth(0.9).setFlipX(m.flip));
+                img.setScale(m.width / img.width);
+                placed++;
             }
         }
 
