@@ -15,7 +15,7 @@ export const HUD = {
     switcherFirstMs: 14000,   // the control-scheme row stays this long on the very first run
     switcherMenuMs: 12000,    // ... and this long when called from the menu
     bannerAlpha: 0.85,        // announcements never cover the picture fully (spec 5.0j: faint and minimal)
-    mapRest: 0.3,             // the journey strip is the map (no minimap): faint at rest ...
+    mapRest: 0.5,             // the journey strip is the map (no minimap): soft at rest (readable on a small phone) ...
     mapShown: 0.9,            // ... clear for a while when something on it changes
     mapShowMs: 3500
 };
@@ -90,23 +90,23 @@ export default class HudScene extends Phaser.Scene {
         const toMap = x => this.mapX + Phaser.Math.Clamp((x - WORLD_WEST) / (WORLD_END - WORLD_WEST), 0, 1) * this.mapW;
         this.toMap = toMap;
         const mg = this.add.graphics();
-        mg.fillStyle(0x06343a, 0.55).fillRoundedRect(this.mapX - 10, this.mapY - 16, this.mapW + 20, 32, 14);
+        mg.fillStyle(0x06343a, 0.6).fillRoundedRect(this.mapX - 12, this.mapY - 24, this.mapW + 24, 48, 20);
         BIOMES.forEach(b => {
             const x0 = toMap(b.from), x1 = toMap(b.from + b.width);
-            mg.fillStyle(b.rock[1], 1).fillRect(x0, this.mapY - 7, Math.max(2, x1 - x0 - 2), 14);
+            mg.fillStyle(b.rock[1], 1).fillRect(x0, this.mapY - 11, Math.max(2, x1 - x0 - 2), 22);
         });
-        mg.fillStyle(0x0a1436, 1).fillTriangle(toMap(ABYSS.x) - 7, this.mapY + 7, toMap(ABYSS.x) + 7, this.mapY + 7, toMap(ABYSS.x), this.mapY + 20);
+        mg.fillStyle(0x0a1436, 1).fillTriangle(toMap(ABYSS.x) - 7, this.mapY + 11, toMap(ABYSS.x) + 7, this.mapY + 11, toMap(ABYSS.x), this.mapY + 26);
         this.nestDots = main.level.nests.map(n => n.grand
-            ? this.add.star(toMap(n.x), this.mapY, 5, 6, 13, 0xfff3b0).setStrokeStyle(2, 0x6b4a2b)
-            : this.add.circle(toMap(n.x), this.mapY, 6, 0xffffff, 0.5).setStrokeStyle(2, 0x06343a));
+            ? this.add.star(toMap(n.x), this.mapY, 5, 9, 19, 0xfff3b0).setStrokeStyle(2, 0x6b4a2b)
+            : this.add.circle(toMap(n.x), this.mapY, 9, 0xffffff, 0.5).setStrokeStyle(2, 0x06343a));
         // The friends waiting along the way: a ring where each one is, filled once it is freed.
         this.friendDots = main.journey.list.filter(c => c.friend).map(c => {
-            const dot = this.add.circle(toMap(c.x), this.mapY + 24, 8, 0xff6b9a, 0).setStrokeStyle(3, 0xffffff);
+            const dot = this.add.circle(toMap(c.x), this.mapY + 36, 11, 0xff6b9a, 0).setStrokeStyle(4, 0xffffff);
             dot.friendId = c.friend.id;
             return dot;
         });
         // You: a clear white disc on the strip itself (first-impression pass: the small arrow read as a scrollbar thumb).
-        this.mapYou = this.add.circle(0, this.mapY, 13, 0xffffff).setStrokeStyle(4, 0xff6b9a);
+        this.mapYou = this.add.circle(0, this.mapY, 20, 0xffffff).setStrokeStyle(6, 0xff6b9a);
         this.map = this.add.container(0, 0, [mg, ...this.nestDots, ...this.friendDots, this.mapYou]).setAlpha(HUD.mapRest);
         this.mapState = '';
 
@@ -190,7 +190,7 @@ export default class HudScene extends Phaser.Scene {
         // Playing together: every friend is a dot in their colour on the journey strip.
         for (const g of m.mp?.ghosts.values() ?? []) {
             if (!g.mapDot) {
-                g.mapDot = this.add.circle(0, this.mapY + 20, 8, g.color ?? 0xffffff, 1).setStrokeStyle(3, 0xffffff);
+                g.mapDot = this.add.circle(0, this.mapY + 36, 11, g.color ?? 0xffffff, 1).setStrokeStyle(3, 0xffffff);
                 this.map.add(g.mapDot);
             }
             g.mapDot.setVisible(!!g.pos);
