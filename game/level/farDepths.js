@@ -24,7 +24,8 @@ export const FAR = {
 // What stands far away per biome: [texture key, weight, width range in px at depth 1, hangs
 // from the surface (mangrove roots) instead of standing on the seabed].
 const K = {
-    roots: [['root_1', 1, [380, 620], true], ['root_2', 1, [420, 680], true], ['root_3', 1, [300, 480], true]],
+    // (no root_2: its painted mossy band read as a horizontal log across the stalks; user: "strange horizontal logs")
+    roots: [['root_1', 1, [380, 620], true], ['root_3', 1, [300, 480], true]],
     grass: [['seagrass_1', 1, [260, 420]]],
     kelp: [['kelp_stalk_1', 3, [700, 1300]], ['kelp_stalk_2', 3, [700, 1300]], ['kelp_stalk_3', 2, [600, 1100]]],
     corals: [['coral_1', 3, [300, 520]], ['coral_2', 3, [300, 520]], ['coral_3', 2, [260, 460]], ['coral_4', 2, [280, 480]], ['coral_5', 2, [280, 480]], ['seafan_1', 2, [280, 440]]],

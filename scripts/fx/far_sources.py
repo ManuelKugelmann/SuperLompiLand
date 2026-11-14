@@ -10,7 +10,7 @@ ROOT = sys.argv[1]
 IMG = os.path.join(ROOT, 'public', 'img')
 OUT = os.path.join(IMG, 'far')
 BAKE_W, BLUR, FADE, PAD = 220, 1.8, 0.38, 2
-KEYS = ['root_1', 'root_2', 'root_3', 'seagrass_1', 'kelp_stalk_1', 'kelp_stalk_2', 'kelp_stalk_3',
+KEYS = ['root_1', 'root_3', 'seagrass_1', 'kelp_stalk_1', 'kelp_stalk_2', 'kelp_stalk_3',
         'coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5', 'seafan_1',
         'boulder_1', 'boulder_2', 'boulder_4', 'boulder_5', 'wreck_1', 'wreck_2', 'trawler_1', 'cutter_1']
 
