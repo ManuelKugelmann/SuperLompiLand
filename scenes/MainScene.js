@@ -56,6 +56,7 @@ import SurfLayer from '../game/fx/SurfLayer.js';
 import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
 import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
 import WhaleSharkLayer from '../game/level/WhaleSharkLayer.js';
+import CoinGlow from '../game/fx/CoinGlow.js';
 import { slipAt } from '../game/level/whaleShark.js';
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
@@ -282,6 +283,7 @@ export default class MainScene extends Phaser.Scene {
         // Lighting layers (screen-fixed): ambient multiply + a soft vignette.
         this.ambient = this.add.rectangle(0, 0, W, H, 0xffffff).setOrigin(0).setScrollFactor(0).setDepth(40)
             .setBlendMode(Phaser.BlendModes.MULTIPLY);
+        this.coinGlow = new CoinGlow(this);
         if (!this.textures.exists('vignette')) {
             const tex = this.textures.createCanvas('vignette', 256, 144);
             const ctx = tex.getContext();
@@ -1483,8 +1485,10 @@ export default class MainScene extends Phaser.Scene {
                 this.particles.spawn('plankton', view.x - fv.x * 2.5, view.y - fv.y * 2.5, n, { radius: r * 0.8, spread: 25, vx: -fv.x * 6, vy: -fv.y * 6 });
             }
         }
-        this.ambient.setFillStyle(lightAt({ depth01, y: view.y, t: skyT, storm: stormShare(view.x), hue, deepHue: deep,
-            floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) }), 1);
+        const light = lightAt({ depth01, y: view.y, t: skyT, storm: stormShare(view.x), hue, deepHue: deep,
+            floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) });
+        this.ambient.setFillStyle(light, 1);
+        this.coinGlow.update(light);      // coins keep a gold glint where the light is dim (night, depth)
         // Inside the side cave the score closes in: it is played as if much deeper down.
         const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
         // The score plays as if deeper inside the cave, and partway at night (sparser, softer; spec 5.0k).
