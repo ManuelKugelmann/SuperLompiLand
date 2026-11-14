@@ -10,6 +10,8 @@ import SeaFarLayer from './SeaFarLayer.js';
  */
 /** Far fish schools are placed again once this far outside the picture (px). */
 const SCHOOL_MARGIN = { x: 700, y: 500 };
+/** Far fish come from one sheet: body widths (px) x tail-beat stretches, so a school is one Blitter. */
+const FAR_FISH = { widths: [16, 22, 29, 37], beats: [0.88, 1, 1.12], cell: { w: 46, h: 24 } };
 /**
  * Where far schools swim, among the far scenery (farDepths.js: an object at parallax s
  * draws at depth FarLayers.depthFor(s)): scroll = horizontal parallax, vscroll =
@@ -59,15 +61,18 @@ export default class Backdrop {
             const slot = SCHOOL_SLOTS[k % SCHOOL_SLOTS.length];
             const school = {
                 wx: null, wy: null, dir: k % 2 ? 1 : -1,
-                speed: Phaser.Math.FloatBetween(0.5, 1.1), slot, fish: []
+                speed: Phaser.Math.FloatBetween(0.5, 1.1), slot, fish: [],
+                blitter: scene.add.blitter(0, 0, 'bd_fish_sheet').setScrollFactor(0).setDepth(slot.depth)
             };
             const n = Phaser.Math.Between(7, 13);
             for (let i = 0; i < n; i++) {
-                const size = Phaser.Math.Between(16, 26) * slot.size;
                 // Soft, out-of-focus shapes: the farther school is smaller and fainter.
-                const body = scene.add.image(0, 0, 'bd_fish').setDisplaySize(size * 1.5, size * 0.75).setTint(0x0d4763).setScrollFactor(0).setDepth(slot.depth);
-                body.base = { sx: body.scaleX, sy: body.scaleY, alpha: slot.alpha };
-                school.fish.push({ body, ox: Phaser.Math.Between(-150, 150), oy: Phaser.Math.Between(-70, 70), phase: Math.random() * 6.28 });
+                const w = Phaser.Math.Between(16, 26) * slot.size * 1.5;
+                let size = 0;
+                while (size < FAR_FISH.widths.length - 1 && FAR_FISH.widths[size + 1] <= w) size++;
+                const body = school.blitter.create(0, 0, `f${size}_1`);
+                body.setTint(0x0d4763);
+                school.fish.push({ body, size, alpha: slot.alpha, ox: Phaser.Math.Between(-150, 150), oy: Phaser.Math.Between(-70, 70), phase: Math.random() * 6.28 });
             }
             this.schools.push(school);
         }
@@ -145,10 +150,15 @@ export default class Backdrop {
             sx = sc.wx - camX * f0;
             sy = sc.wy - camY * v0;
             const surfaceY = -camY * v0 + 60;   // the waterline as seen in this far layer
+            const { w: cw, h: ch } = FAR_FISH.cell;
             for (const f of sc.fish) {
-                f.body.setPosition(sx + f.ox + Math.sin(t * 0.7 + f.phase) * 18, sy + f.oy + Math.sin(t * 1.1 + f.phase) * 10);
-                f.body.setScale(sc.dir * f.body.base.sx * (1 + Math.sin(t * 9 + f.phase) * 0.12), f.body.base.sy);   // tail beat
-                f.body.setVisible(f.body.y > surfaceY).setAlpha(f.body.base.alpha * depthFade);
+                const beat = Math.sin(t * 9 + f.phase);   // tail beat
+                f.body.setFrame(`f${f.size}_${beat < -0.33 ? 0 : beat > 0.33 ? 2 : 1}`);
+                f.body.x = sx + f.ox + Math.sin(t * 0.7 + f.phase) * 18 - cw / 2;
+                f.body.y = sy + f.oy + Math.sin(t * 1.1 + f.phase) * 10 - ch / 2;
+                f.body.flipX = sc.dir < 0;
+                f.body.visible = f.body.y + ch / 2 > surfaceY;
+                f.body.alpha = f.alpha * depthFade;
             }
         }
         for (const b of this.bubbles) {
@@ -190,6 +200,15 @@ function makeSoft(scene) {
     fc.beginPath(); fc.ellipse(54, 24, 28, 11, 0, 0, Math.PI * 2); fc.fill();
     fc.beginPath(); fc.moveTo(30, 24); fc.lineTo(10, 12); fc.lineTo(14, 24); fc.lineTo(10, 36); fc.closePath(); fc.fill();
     fish.refresh();
+    // The same fish in a few sizes and tail-beat stretches, as frames of one sheet (the far schools).
+    const { widths, beats, cell } = FAR_FISH;
+    const sheet = scene.textures.createCanvas('bd_fish_sheet', cell.w * beats.length, cell.h * widths.length), sc = sheet.getContext();
+    widths.forEach((w, r) => beats.forEach((b, c) => {
+        const dw = w * b, dh = w * 0.5;
+        sc.drawImage(fish.getSourceImage(), c * cell.w + (cell.w - dw) / 2, r * cell.h + (cell.h - dh) / 2, dw, dh);
+        sheet.add(`f${r}_${c}`, 0, c * cell.w, r * cell.h, cell.w, cell.h);
+    }));
+    sheet.refresh();
 }
 
 function makeGradient(scene, key, h, stops) {
