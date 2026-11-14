@@ -482,6 +482,7 @@ export default class MainScene extends Phaser.Scene {
 
     /** Swam into a nest: coins are safe, this is the new restart point. */
     reachNest(nest) {
+        if (this.perfTour) return;      // the perf tour only measures: no cheers, questions or end screen
         const de = this.lang === 'de';
         const first = nest.index > this.nestIndex;
         if (first) this.nestIndex = nest.index;
