@@ -28,3 +28,13 @@ test('it glides to and fro above the lane, never stops dead, never snaps round, 
     assert.ok(turns >= 2, 'it comes about at the ends');
     assert.ok(Math.abs(top - MANTA.speed) < 1, `top speed ${top.toFixed(1)}`);
 });
+
+test('a manta glides over every part of the reef: the stretch nearest to the fish is the one it is on', () => {
+    const reef = BIOMES.find(b => b.id === 'reef'), spans = MANTA.ats.map(at => mantaSpan(reef.from + reef.width * at));
+    assert.equal(new Set(spans.map(s => s.x0)).size, MANTA.ats.length);
+    for (const s of spans) {
+        assert.ok(s.x0 > reef.from + 6000 && s.x1 < reef.from + reef.width - 6000, 'inside the reef, away from its blends');
+        const m = mantaAt(33, f.routeY, {}, MANTA, (s.x0 + s.x1) / 2);
+        assert.ok(m.x >= s.x0 && m.x <= s.x1);
+    }
+});

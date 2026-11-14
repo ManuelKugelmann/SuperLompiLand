@@ -40,6 +40,7 @@ import MantaLayer from '../game/ai/MantaLayer.js';
 import SeaArchLayer from '../game/level/SeaArchLayer.js';
 import RescueLayer, { RESCUES } from '../game/RescueLayer.js';
 import BloomLayer from '../game/level/BloomLayer.js';
+import RaftLayer from '../game/level/RaftLayer.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
@@ -212,6 +213,8 @@ export default class MainScene extends Phaser.Scene {
         this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y));
         // Moon jelly blooms drift across the route in the open seas (spec 5.0i).
         this.blooms = new BloomLayer(this, () => this.bookEntry('friend_jellyfish'));
+        // ... and at their surface float sargassum rafts; a skip off a wave sends flying fish out of the water.
+        this.rafts = new RaftLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('sargassum'));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.
@@ -319,7 +322,7 @@ export default class MainScene extends Phaser.Scene {
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
             // Chain moves: a fast jump out, a landing after real air time, a skip off a wave.
-            if (skim) this.chainMove('skim');
+            if (skim) { this.chainMove('skim'); this.rafts.skim(x, this.fish.sprite.body.velocity.x, this.time.now / 1000); }
             else if (!entering && speed >= CHAIN.minLeap) { this.airAt = this.time.now; this.chainMove('leap'); }
             else if (entering && this.airAt && this.time.now - this.airAt >= CHAIN.minAir) { this.airAt = 0; this.chainMove('landing'); }
             if (speed < 2 || this.time.now - (this.lastSplash || -999) < 180) return; // no plop for a gentle bob
@@ -1399,6 +1402,7 @@ export default class MainScene extends Phaser.Scene {
         this.beats?.update(sp, time / 1000, delta);
         this.rescues?.update(sp, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
+        this.rafts.update(sp, time / 1000);
         if (this.whale) {
             this.whale.update(sp, time / 1000, delta);
             const pull = this.whale.carry(sp, sp.body.velocity.x, sp.body.velocity.y);
