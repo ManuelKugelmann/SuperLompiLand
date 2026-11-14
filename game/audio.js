@@ -281,6 +281,12 @@ const SOUNDS = {
         voices[pick]();
     },
     nest() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.11, dur: 0.3, vol: 0.22 })); },
+    // The finale's reveal (spec 5.0m beat 3): past the last chimney the nest comes into view; one warm swell, a few bells rising.
+    reveal() {
+        const t = ctx.currentTime;
+        [130.81, 196, 261.63, 329.63, 392, 493.88].forEach((f, i) => pad(f, t + i * 0.12, 4.5, 0.3, master));
+        [523.25, 659.25, 783.99, 987.77].forEach((f, i) => bellNote(f, t + 1.2 + i * 0.35, master));
+    },
     win() { [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.13, dur: 0.5, vol: 0.22 })); },
     respawn() { tone({ f: 440, to: 220, type: 'sine', dur: 0.4, vol: 0.2 }); },
     flap() { noise({ dur: 0.09, vol: 0.1, from: 700, to: 1400, q: 1.2 }); },
@@ -360,7 +366,7 @@ export function updateWeatherSound(storm01, rush01) {
 }
 
 /** A soft pad voice: two slightly detuned triangles, slow attack and release. */
-function pad(hz, t, dur, gain = 1) {
+function pad(hz, t, dur, gain = 1, out = bus) {
     for (const cents of [-5, 5]) {
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = 'triangle';
@@ -370,14 +376,14 @@ function pad(hz, t, dur, gain = 1) {
         g.gain.linearRampToValueAtTime(MUSIC.padVol * gain, t + Math.min(1.5, dur * 0.3));
         g.gain.setValueAtTime(MUSIC.padVol * gain, t + dur * 0.7);
         g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.6);
-        o.connect(g).connect(bus);
+        o.connect(g).connect(out);
         o.start(t);
         o.stop(t + dur + 0.7);
     }
 }
 
 /** A gentle bell for the arpeggio (sine plus a quiet overtone, soft decay). */
-function bellNote(hz, t) {
+function bellNote(hz, t, out = bus) {
     [[1, 1], [2.01, 0.25]].forEach(([m, a]) => {
         const o = ctx.createOscillator(), g = ctx.createGain();
         o.type = 'sine';
@@ -385,7 +391,7 @@ function bellNote(hz, t) {
         g.gain.setValueAtTime(0.0001, t);
         g.gain.exponentialRampToValueAtTime(MUSIC.arpVol * a, t + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
-        o.connect(g).connect(bus);
+        o.connect(g).connect(out);
         o.start(t);
         o.stop(t + 1.5);
     });

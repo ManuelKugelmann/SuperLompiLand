@@ -56,6 +56,7 @@ import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { depthMeters } from '../game/level/depthMeters.js';
+import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
@@ -175,6 +176,7 @@ export default class MainScene extends Phaser.Scene {
         this.perf = { physics: { sum: 0, n: 0, max: 0 }, world: { sum: 0, n: 0, max: 0 } }; // see ?debug=perf
         this.debugOn = false;
         this.maxDepth = 0;
+        this.revealed = false;     // the finale's music swell has played (spec 5.0m)
 
         this.surface = new WaterSurface();   // spring columns: splashes make ripples that travel
         this.storm = null;                                 // dark sky, rain, and the look of the downwelling (spec 5.0c): built when one of them is near
@@ -1506,6 +1508,7 @@ export default class MainScene extends Phaser.Scene {
         this.discover(delta);
         if (!this.ambientMode) this.updateGuide(delta / 1000);
         if (!this.ambientMode && !this.perfTour) this.updateLostCue(delta / 1000);
+        if (!this.revealed && !this.ambientMode && !this.perfTour && this.fish.sprite.x > ventSpot().x1) { this.revealed = true; play('reveal'); }
 
         // Bubble trail when moving fast.
         const speed = Math.hypot(v.x, v.y);
