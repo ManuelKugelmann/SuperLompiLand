@@ -10,7 +10,9 @@ import { WEATHER, stormShare } from './weather.js';
 
 /** The swell alone: height (world y) at world x and time t (seconds). */
 export function waveY(x, t) {
-    return (Math.sin(x / 190 + t * 1.5) * 15 + Math.sin(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10) * surfAt(x) * (1 + WEATHER.storm.waves * stormShare(x));
+    // Long swell, medium waves, and a short chop on top (the chop gives the line its lively, sea-like edge).
+    return (Math.sin(x / 190 + t * 1.5) * 15 + Math.sin(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10
+        + Math.sin(x / 31 - t * 3.4) * 2.2 + Math.sin(x / 17 + t * 4.1) * 1) * surfAt(x) * (1 + WEATHER.storm.waves * stormShare(x));
 }
 
 export const SURFACE = {

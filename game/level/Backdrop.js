@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { mixColor, waterHue, atLuma, WATER_LIGHT } from './biomes.js';
+import { mixColor, waterHue, atLuma, WATER_LIGHT, surfAt } from './biomes.js';
 import SkyLayer from './SkyLayer.js';
 import SeaFarLayer from './SeaFarLayer.js';
 
@@ -14,8 +14,45 @@ const WATERLINE = {
     step: 32,      // px between two points of the wave line
     sea: { key: 'waterline_sea', level: 62, fade: 240, tint: 0x9be9ef, colour: '155,233,239' },      // sea colour down to world y `level`, then fading out over `fade` px
     back: { key: 'waterline_back', width: 6, alpha: 0.85, depth: 4.9 },
-    front: { key: 'waterline_front', width: 2, alpha: 0.4, depth: 6 }
+    front: { key: 'waterline_front', width: 2, alpha: 0.4, depth: 6 },
+    // The sea look (user: crests, foam, spray, breakers). Foam caps: a lace of foam on the line, thick
+    // on the crests and thinning in the troughs (`crest` px of height over the neighbours = full cap);
+    // foam streaks drifting just under the surface. Both are textured strips on a grid anchored to the
+    // world (their pattern repeats every `period` px), so they stay put while the camera moves.
+    caps: { key: 'waterline_caps', width: 12, period: 256, depth: 4.95, alpha: 0.95, below: 3, crest: 7, rest: 0.18 },
+    streaks: { key: 'waterline_streaks', width: 10, period: 512, depth: 4.85, alpha: 0.38, below: 15, drift: 16 },
+    // Spray where a surf crest breaks (surfAt above `surf`): now and then a few white droplets.
+    spray: { surf: 1.25, crest: 0.85, chance: 0.05, n: 3, speed: [160, 300] }
 };
+
+/** A foam strip `len` px long: one `period`-wide tile of foam (lace or streaks), repeated, so it lines up with the world grid. */
+function foamStrip(scene, key, len, cfg, kind) {
+    const T = scene.textures;
+    if (T.exists(key)) { if (T.get(key).source[0].width >= len) return; T.remove(key); }
+    const P = cfg.period, H = cfg.width, tile = document.createElement('canvas');
+    tile.width = P; tile.height = H;
+    const c = tile.getContext('2d');
+    let seed = kind === 'lace' ? 7 : 19;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    if (kind === 'lace') {
+        // Bubbly foam: many small blobs, dense along the top edge, breaking up below.
+        for (let i = 0; i < P * 1.6; i++) {
+            const x = rnd() * P, y = Math.pow(rnd(), 1.8) * H, r = 0.8 + rnd() * 2.2;
+            c.fillStyle = `rgba(255,255,255,${(0.45 + 0.55 * rnd()) * (1 - y / H * 0.6)})`;
+            for (const dx of [0, -P, P]) { c.beginPath(); c.ellipse(x + dx, y, r * 1.4, r, 0, 0, 7); c.fill(); }
+        }
+    } else {
+        // Streaks: long thin wisps of foam lying along the surface.
+        for (let i = 0; i < 14; i++) {
+            const x = rnd() * P, y = 2 + rnd() * (H - 4), w = 20 + rnd() * 70, h = 0.8 + rnd() * 1.4;
+            c.fillStyle = `rgba(255,255,255,${0.35 + 0.5 * rnd()})`;
+            for (const dx of [0, -P, P]) { c.beginPath(); c.ellipse(x + dx, y, w, h, 0, 0, 7); c.fill(); }
+        }
+    }
+    const t = T.createCanvas(key, Math.ceil(len / P) * P, H), ctx = t.getContext();
+    for (let x = 0; x < t.width; x += P) ctx.drawImage(tile, x, 0);
+    t.refresh();
+}
 
 /** The waterline's three pictures, painted once: the strip in which the sea colour fades downward, and the two white crest lines. */
 function makeWaterline(scene) {
@@ -89,6 +126,16 @@ export default class Backdrop {
         this.seaFade = scene.add.image(0, WATERLINE.sea.level, WATERLINE.sea.key).setOrigin(0, 0).setDepth(-28).setVisible(false);
         this.foamBack = band(WATERLINE.back.key, WATERLINE.back.depth, WATERLINE.back.alpha);
         this.foam = band(WATERLINE.front.key, WATERLINE.front.depth, WATERLINE.front.alpha);
+        // Foam caps and streaks (WATERLINE.caps / streaks): their own points on a world-anchored grid.
+        const grid = cfg => {
+            const n = Math.ceil((W + cfg.period * 2) / WATERLINE.step) + 1;
+            foamStrip(scene, cfg.key, (n - 1) * WATERLINE.step, cfg, cfg === WATERLINE.caps ? 'lace' : 'streaks');
+            const r = scene.add.rope(0, 0, cfg.key, null, Array.from({ length: n }, () => new Phaser.Math.Vector2()), true).setDepth(cfg.depth).setAlpha(cfg.alpha).setVisible(false);
+            r.alphaRow = new Array(n).fill(1);
+            return r;
+        };
+        this.caps = grid(WATERLINE.caps);
+        this.streaks = grid(WATERLINE.streaks);
 
         // The volcano's glow on the eastern horizon: always shows which way the journey goes.
         makeSoft(scene);
@@ -134,6 +181,33 @@ export default class Backdrop {
         }
     }
 
+    /**
+     * Lay a foam strip on the waves: points on the world grid (shifted by `drift` px, so it can drift),
+     * each its own alpha: full on a crest (higher than its neighbours by WATERLINE.caps.crest px),
+     * thin in a trough. Where a surf crest breaks, spray now and then.
+     */
+    foamLine(rope, cfg, camX, t, drift, surface) {
+        const step = WATERLINE.step, P = cfg.period, n = rope.points.length, base = Math.floor((camX - drift) / P) * P + drift - P;
+        const ys = this.foamYs || (this.foamYs = []), A = rope.alphaRow, C = WATERLINE.caps, SP = WATERLINE.spray;
+        for (let i = 0; i < n; i++) ys[i] = surface.heightAt(base + i * step, t);
+        for (let i = 0; i < n; i++) {
+            const x = base + i * step, y = ys[i];
+            let sum = 0, k = 0;
+            for (let j = Math.max(0, i - 3); j <= Math.min(n - 1, i + 3); j++) { sum += ys[j]; k++; }
+            const crest = Math.min(1, Math.max(0, (sum / k - y) / C.crest));       // 0 in a trough, 1 on a crest
+            rope.points[i].set(x, y + cfg.below);
+            if (cfg === C) {
+                A[i] = C.rest + (1 - C.rest) * crest * crest;
+                const surf = surfAt(x);
+                if (surf > SP.surf && crest > SP.crest && Math.random() < SP.chance) {
+                    const v = SP.speed[0] + Math.random() * (SP.speed[1] - SP.speed[0]);
+                    this.scene.particles?.spawn('spray', x, y - 4, SP.n, { radius: 10, spread: 70, vy: -v });
+                }
+            } else A[i] = 0.4 + 0.6 * (1 - crest);      // streaks lie in the troughs between crests
+        }
+        rope.setAlphas(A).setDirty();
+    }
+
     resetBubble(b, anywhere) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         const size = Phaser.Math.Between(14, 54);
@@ -158,7 +232,7 @@ export default class Backdrop {
         this.seaFar.update(camX, camY, dx, dy, this.scene.game.loop.delta);
         // Waterline: only when it is on screen.
         const shown = camY < 80, S = WATERLINE.sea;
-        for (const part of [this.seaFade, this.foamBack, this.foam]) part.setVisible(shown);
+        for (const part of [this.seaFade, this.foamBack, this.foam, this.caps, this.streaks]) part.setVisible(shown);
         this.sea.clear();
         if (shown) {
             // A wider view than the bands were made for (the window grew): more points.
@@ -178,6 +252,8 @@ export default class Backdrop {
             }
             this.foamBack.setDirty(); this.foam.setDirty();
             this.seaFade.setPosition(camX - 40, S.level).setDisplaySize(W + 80, S.fade);
+            this.foamLine(this.caps, WATERLINE.caps, camX, t, 0, surface);
+            this.foamLine(this.streaks, WATERLINE.streaks, camX, t, (t * WATERLINE.streaks.drift) % WATERLINE.streaks.period, surface);
         }
 
         const depthFade = Math.max(0.25, 1 - depth * 0.8);
