@@ -487,7 +487,11 @@ export default class MainScene extends Phaser.Scene {
     runPerfTour(delta, logicMs) {
         const tour = this.perfTour;
         if (tour.done) return;
-        tour.sample({ logicMs, chunkMs: this.level.buildMs.last, objects: this.children.list.length, tweens: this.tweens.getTweens().length });
+        // A chunk build counts in the frame it happened in (the last one's time stays on the counter;
+        // the builds right after a hop fall into the tour's skipped frames).
+        const built = this.level.buildMs.count !== this.perfBuilds;
+        this.perfBuilds = this.level.buildMs.count;
+        tour.sample({ logicMs, chunkMs: built ? this.level.buildMs.last : 0, objects: this.children.list.length, tweens: this.tweens.getTweens().length });
         if (tour.step(delta)) {
             const p = this.safeSpot(tour.x, this.level.field.routeY(tour.x));
             this.fish.place(p.x, p.y);
