@@ -44,19 +44,17 @@ test('still scenery is a small beat, not a landmark (spec 5.0n)', () => {
     assert.deepEqual(r.landmark.repeats, [{ kind: 'manta', x0: 20000 }], 'the same kind twice in a row is reported; scenery in between or after is not a landmark');
 });
 
-// Expected to fail until the mangrove's new set pieces (5.0n: jellyfish garden, root nursery) and the
-// reef's cleaner station are on the map: without the coral colonies the mangrove has gaps of 2.4 and
-// 3.4 minutes, and the reef passes the manta three times in a row.
-test('landmarks (spec 5.0l, 5.0n): one every 13 000-20 000 px, evenly, never the same kind twice in a row', { todo: 'waits for the 5.0n set pieces' }, () => {
+// Expected to fail until the last long stretches have a sight that acts (spec 5.0o): five ways
+// between landmarks are still over 25 000 px (the longest, 31 400 px, is the mangrove's end).
+test('landmarks (spec 5.0o): no way between two of them is longer than 25 000 px', { todo: 'five stretches are still 25 200-31 400 px' }, () => {
     const r = rhythm(map);
-    assert.ok(r.landmark.max <= RHYTHM.landmark[1], `longest way between two landmarks: ${Math.round(r.landmark.max)} px (${Math.round(r.seconds(r.landmark.max))} s)`);
-    assert.ok(r.landmark.ratio < RHYTHM.ratio, `longest / shortest landmark gap: ${r.landmark.ratio.toFixed(2)}`);
-    assert.deepEqual(r.landmark.repeats, [], 'no kind twice in a row');
+    assert.ok(r.landmark.max <= RHYTHM.gap, `longest way between two landmarks: ${Math.round(r.landmark.max)} px (${Math.round(r.seconds(r.landmark.max))} s)`);
 });
 
 test('landmarks are never crowded, and the journey begins and ends with one soon', () => {
     const r = rhythm(map);
     assert.ok(r.landmark.min >= RHYTHM.merge, `shortest: ${Math.round(r.landmark.min)} px`);
+    assert.deepEqual(r.landmark.repeats, [], 'no kind twice in a row');
     assert.ok(r.landmark.first <= RHYTHM.landmark[1] && r.landmark.last <= RHYTHM.landmark[1], 'the first landmark comes soon, the grand nest follows the last one soon');
 });
 

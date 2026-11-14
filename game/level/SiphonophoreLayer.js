@@ -39,11 +39,13 @@ export default class SiphonophoreLayer {
         const s = this.scene, L = SIPHON_LOOK;
         ensureTexture(s);
         const blitter = s.add.blitter(0, 0, BEAD).setDepth(L.depth).setBlendMode('ADD').setScale(L.bead / 64);
-        const strings = Array.from({ length: SIPHON.strings }, (_, k) => {
-            const str = stringAt(spot, k), tint = L.tints[k % L.tints.length];
-            return { str, routeY: this.routeY(str.x), bobs: Array.from({ length: SIPHON.beads }, () => blitter.create(0, 0).setTint(tint)), from: 0, at: null };
-        });
-        return { blitter, strings };
+        return { blitter, spot, strings: [] };      // its strings follow one per frame (update): together they were one long frame
+    }
+
+    /** The next string of a spot that is being built. */
+    addString(live) {
+        const k = live.strings.length, str = stringAt(live.spot, k), tint = SIPHON_LOOK.tints[k % SIPHON_LOOK.tints.length];
+        live.strings.push({ str, routeY: this.routeY(str.x), bobs: Array.from({ length: SIPHON.beads }, () => live.blitter.create(0, 0).setTint(tint)), from: 0, at: null });
     }
 
     update(fish, t) {
@@ -54,6 +56,7 @@ export default class SiphonophoreLayer {
             else if (live && d > L.far) { live.blitter.destroy(); this.live.delete(i); }
         });
         for (const [i, live] of this.live) {
+            if (live.strings.length < SIPHON.strings && this.scene.buildSlot()) this.addString(live);
             for (const s of live.strings) {
                 // The bead nearest the fish, if close enough, starts a wave of light (once it has rested).
                 let near = -1, best = SIPHON.wake;

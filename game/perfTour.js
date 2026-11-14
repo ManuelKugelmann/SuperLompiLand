@@ -82,29 +82,36 @@ export function slowSteps(steps, biomeAt, cfg = PERF_TOUR) {
 }
 
 /**
- * Times the `update` and `animate` of every part of `host` (its own properties that have one),
- * for the tour: returns { worst (Map name -> ms: the slowest call since the last reset), reset() }.
- * Only used with `?perftest=1`: it tells which layer a slow frame belongs to.
+ * Times the `update` and `animate` of every part of `host` (its own properties that have one), and
+ * whatever `extra` names ([[label, object, method], ...], e.g. the physics step), for the tour.
+ * Returns { frame (Map name -> ms spent in it since the last next()), next() }.
+ * Only used with `?perftest=1`: it tells which part a slow frame belongs to.
  */
-export function watchParts(host, now = () => performance.now()) {
-    const worst = new Map();
+export function watchParts(host, now = () => performance.now(), extra = []) {
+    const frame = new Map();
+    const watch = (key, part, fn) => {
+        const call = part[fn];
+        if (typeof call !== 'function') return;
+        part[fn] = function (...args) {
+            const t = now(), out = call.apply(this, args);
+            frame.set(key, (frame.get(key) || 0) + now() - t);
+            return out;
+        };
+    };
     for (const name of Object.keys(host)) {
         const part = host[name];
-        if (!part || typeof part !== 'object') continue;
-        for (const fn of ['update', 'animate']) {
-            const call = part[fn];
-            if (typeof call !== 'function') continue;
-            part[fn] = function (...args) {
-                const t = now(), out = call.apply(this, args), ms = now() - t, key = `${name}.${fn}`;
-                if (ms > (worst.get(key) || 0)) worst.set(key, ms);
-                return out;
-            };
-        }
+        if (part && typeof part === 'object') for (const fn of ['update', 'animate']) watch(`${name}.${fn}`, part, fn);
     }
-    return { worst, reset: () => worst.clear() };
+    for (const [label, part, fn] of extra) if (part) watch(label, part, fn);
+    return { frame, next: () => frame.clear() };
 }
 
-/** The slowest parts as text, slowest first: "name ms, name ms, ...". */
-export function slowParts(worst, count = 4) {
-    return [...worst].sort((a, b) => b[1] - a[1]).slice(0, count).map(([k, ms]) => `${k} ${ms.toFixed(0)}`).join(', ');
+/**
+ * A frame of `total` ms split into its parts, as text: the `count` slowest and what is left over
+ * ("rest": the host's own code between its parts): "529 ms = matter.step 400, level.update 20, rest 80".
+ */
+export function splitFrame(total, frame, count = 4) {
+    const parts = [...frame].sort((a, b) => b[1] - a[1]), named = parts.slice(0, count), rest = total - parts.reduce((sum, [, ms]) => sum + ms, 0);
+    return `${total.toFixed(0)} ms = ${[...named.map(([k, ms]) => `${k} ${ms.toFixed(0)}`), `rest ${Math.max(0, rest).toFixed(0)}`].join(', ')}`;
 }
+

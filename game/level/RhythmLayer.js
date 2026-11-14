@@ -41,6 +41,19 @@ export function treatCoins(index, x, routeY, cfg = RHYTHM_LOOK.treat) {
     });
 }
 
+/**
+ * Whether a coin figure has a coin within `gap` px of (x, y): `spots` = the figures' places
+ * ([{ x0 }], west to east), `routeY(x)` = depth of the calm route. For the chunks' own coin
+ * trails, which give way to a figure (two coins on one spot read as a glitch).
+ */
+export function treatCoinNear(x, y, gap, spots, routeY, cfg = RHYTHM_LOOK.treat) {
+    for (let i = 0; i < spots.length; i++) {
+        if (Math.abs(spots[i].x0 - x) > cfg.half + gap) continue;
+        for (const c of treatCoins(i, spots[i].x0, routeY, cfg)) if (Math.abs(c.x - x) < gap && Math.abs(c.y - y) < gap) return true;
+    }
+    return false;
+}
+
 export default class RhythmLayer {
     /** `routeY(x)` = depth of the calm route; `groundY(x)` = the seabed under it or null; `onCoin(x, y)`; `onSeen(id)` = a reef-book entry was met. */
     constructor(scene, routeY, groundY, onCoin, onSeen) {

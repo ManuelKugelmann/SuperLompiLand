@@ -29,6 +29,8 @@ import { nurserySpot } from './nursery.js';
 import { gardenSpot } from './jellyGarden.js';
 import { archerX } from './archerfish.js';
 import { siphonSpots } from './siphonophore.js';
+import { eelSpot } from './gardenEels.js';
+import { rayStart } from './stingray.js';
 import { channelSpot } from './surgeChannel.js';
 import { gannetSpot } from './gannets.js';
 import { sealSpot } from './seal.js';
@@ -46,7 +48,8 @@ export const SET_PIECE_KINDS = ['crest', 'cave', 'docks', 'arch', 'ship', 'frien
 export const RHYTHM = {
     cruise: 330,              // px per second a child swims along the route
     small: [2000, 4000],      // px between two things of any kind
-    landmark: [13000, 20000], // px between two landmarks
+    landmark: [13000, 20000], // px between two landmarks (what the fillers aim at)
+    gap: 25000,               // px: no way between two landmarks is longer than this (spec 5.0o: about 75 s)
     ratio: 2.5,               // the longest landmark gap is less than this many times the shortest
     merge: 9000,              // landmarks closer together than this play as one moment
     fill: 16500,              // the spacing aimed at where a long gap is filled with landmarks
@@ -61,7 +64,7 @@ export const SCENERY_KINDS = ['colony', 'arch'];
  * Kinds that are a landmark (spec 5.0n): what moves or answers the child (animals that act, toys,
  * rides, rescues, weather). Still scenery, however big, is not.
  */
-export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion', 'otter', 'ferry', 'seal', 'gannets', 'surge'].filter(k => !SCENERY_KINDS.includes(k));
+export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion', 'otter', 'ferry', 'seal', 'gannets', 'surge', 'garden_eels', 'stingray'].filter(k => !SCENERY_KINDS.includes(k));
 
 
 /** Landmarks merged into moments (those closer than `merge` play as one): [{ x0, x1, kinds }], west to east. */
@@ -141,6 +144,8 @@ export function worldMap() {
     span('jelly_garden', gardenSpot().x0, gardenSpot().x1);
     spot('archerfish', archerX());
     for (const sp of siphonSpots()) span('siphonophore', sp.x0, sp.x1);
+    span('garden_eels', eelSpot().x0, eelSpot().x1);
+    spot('stingray', rayStart());
     span('surge', channelSpot().x0, channelSpot().x1);
     span('gannets', gannetSpot().x0, gannetSpot().x1);
     span('seal', sealSpot().x0, sealSpot().x1);

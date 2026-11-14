@@ -69,7 +69,7 @@ import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
-import { createPerfTour, perfReport, slowSteps, watchParts, slowParts } from '../game/perfTour.js';
+import { createPerfTour, perfReport, slowSteps, watchParts, splitFrame } from '../game/perfTour.js';
 import { depthMeters } from '../game/level/depthMeters.js';
 import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics } from '../game/fx/CausticsPipeline.js';
@@ -648,10 +648,11 @@ export default class MainScene extends Phaser.Scene {
         const chunkMs = built ? this.level.buildMs.last : 0;
         const settling = !this.level.viewReady;
         // Which layer the slowest calls of a hop belong to: watched from the first tour frame on, noted while the view settles, kept per biome when it has.
-        this.perfParts ??= watchParts(this, () => performance.now());
-        if (!settling && this.perfHopping) (this.perfHops ??= []).push(`hop at ${Math.round(tour.x)} (${BIOMES[biomeIndexAt(tour.x)].id}): ${slowParts(this.perfParts.worst)}`);
-        if (!settling) this.perfParts.reset();
-        this.perfHopping = settling;
+        // Every part's time in this frame is known (and the physics step's); of a hop, the slowest frame is kept, split into who took what.
+        this.perfParts ??= watchParts(this, () => performance.now(), [['matter.step', this.matter.world, 'step']]);
+        if (settling && logicMs > (this.perfHop?.ms || 0)) this.perfHop = { ms: logicMs, text: splitFrame(logicMs, this.perfParts.frame) };
+        if (!settling && this.perfHop) { (this.perfHops ??= []).push(`hop at ${Math.round(tour.x)} (${BIOMES[biomeIndexAt(tour.x)].id}): ${this.perfHop.text}`); this.perfHop = null; }
+        this.perfParts.next();
         tour.sample({ logicMs: Math.max(0, logicMs - chunkMs), chunkMs, renderMs: this.perfRender?.ms || 0, objects: this.children.list.length, tweens: this.tweens.getTweens().length, settling });
         if (tour.step(delta, settling)) {
             const p = this.safeSpot(tour.x, this.level.field.routeY(tour.x));

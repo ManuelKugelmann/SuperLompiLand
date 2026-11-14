@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PERF_TOUR, createPerfTour, perfReport, slowSteps, watchParts, slowParts } from '../game/perfTour.js';
+import { PERF_TOUR, createPerfTour, perfReport, slowSteps, watchParts, splitFrame } from '../game/perfTour.js';
 
 const biomeAt = x => (x < 5000 ? 'beach' : 'reef');
 
@@ -74,14 +74,14 @@ test('build steps over the limit are named, slowest first, with the biome they h
     assert.match(lines[1], /paint rock.*12\.4 ms.*reef/);
 });
 
-test('watching a scene\u2019s parts: the slowest update of each is kept until reset, and the calls still work', () => {
+test('watching a scene: each part and the named extras are timed per frame, and a frame is split into who took what', () => {
     let clock = 0;
-    const host = { a: { update(v) { clock += 5; return v * 2; } }, b: { animate() { clock += 12; }, update() { clock += 1; } }, n: 3, nothing: null };
-    const w = watchParts(host, () => clock);
+    const host = { a: { update(v) { clock += 5; return v * 2; } }, b: { animate() { clock += 12; }, update() { clock += 1; } }, n: 3, nothing: null }, world = { step() { clock += 40; } };
+    const w = watchParts(host, () => clock, [['matter.step', world, 'step']]);
     assert.equal(host.a.update(4), 8);
-    host.b.animate(); host.b.update(); host.a.update(1);
-    assert.deepEqual([...w.worst].sort(), [['a.update', 5], ['b.animate', 12], ['b.update', 1]]);
-    assert.equal(slowParts(w.worst, 2), 'b.animate 12, a.update 5');
-    w.reset();
-    assert.equal(w.worst.size, 0);
+    host.b.animate(); host.b.update(); host.a.update(1); world.step();
+    assert.deepEqual([...w.frame].sort(), [['a.update', 10], ['b.animate', 12], ['b.update', 1], ['matter.step', 40]]);
+    assert.equal(splitFrame(100, w.frame, 2), '100 ms = matter.step 40, b.animate 12, rest 37');
+    w.next();
+    assert.equal(w.frame.size, 0);
 });

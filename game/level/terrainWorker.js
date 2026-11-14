@@ -3,6 +3,7 @@
 // Message in:  { materials }  once, the rock material tiles (see materials.js)
 //              { seed, key, ox, oy, span, n }
 //              { seed, key, layer, cx, cy }  a rock layer chunk behind the play plane (rockLayerTable.js)
+//              { recycle: [ArrayBuffer, ...] }  picture arrays the main thread is done with, to be written into again
 // Message out: { key, coarse, rock, back }   (typed arrays, transferred, not copied)
 //              { key, layer, rock }
 import { createField, chunkGrids } from './density.js';
@@ -13,8 +14,23 @@ import { ROCK_LAYERS, LAYER_SHADE, layerField, layerChunkRect, fogLayer } from '
 let field = null, fieldSeed = null;
 const layerFields = new Map();      // "seed:layer" -> field
 
+// Picture arrays that came back, by size: two megabytes per chunk would otherwise be allocated and thrown away
+// again and again, and the main thread's garbage collector stops the game to clear them.
+const spare = new Map(), SPARE_MAX = 12;
+const take = bytes => {
+    const buf = spare.get(bytes)?.pop();
+    return buf ? new Uint8ClampedArray(buf).fill(0) : new Uint8ClampedArray(bytes);
+};
+
 self.onmessage = e => {
     if (e.data.materials) { setMaterials(e.data.materials); return; }
+    if (e.data.recycle) {
+        for (const buf of e.data.recycle) {
+            const list = spare.get(buf.byteLength) || [];
+            if (list.length < SPARE_MAX) { list.push(buf); spare.set(buf.byteLength, list); }
+        }
+        return;
+    }
     if (e.data.layer !== undefined) {
         const { seed, key, layer, cx, cy } = e.data, L = ROCK_LAYERS[layer], id = `${seed}:${layer}`;
         if (fieldSeed !== seed) { field = createField(seed); fieldSeed = seed; }
@@ -28,6 +44,6 @@ self.onmessage = e => {
     const { seed, key, ox, oy, span, n } = e.data;
     if (fieldSeed !== seed) { field = createField(seed); fieldSeed = seed; }
     const coarse = chunkGrids(field, seed, ox, oy, span, n).fine;
-    const { rock, back } = shadeChunk(field, seed, ox, oy, span);
+    const { rock, back } = shadeChunk(field, seed, ox, oy, span, undefined, take);
     self.postMessage({ key, coarse, rock, back }, [coarse.buffer, rock.buffer, back.buffer]);
 };

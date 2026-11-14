@@ -100,7 +100,7 @@ const smooth = (a, b, v) => { const t = v <= a ? 0 : v >= b ? 1 : (v - a) / (b -
  * Shade one chunk.
  * @returns { rock, back }  Uint8ClampedArray RGBA, SHADE.rockSize² and SHADE.backSize²
  */
-export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
+export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE, take = null) {
     const S = cfg.rockSize, node = cfg.node, M = S / node, W = M + 3;   // one extra sample all around
     const ws = span / M;                       // world px per density sample
     const T = FIELD.threshold;
@@ -190,7 +190,8 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
     const [deepR, deepG, deepB] = cfg.deepTint;
     const [bncR, bncG, bncB] = cfg.bounce, [keyR, keyG, keyB] = cfg.key;
     const skyR = cfg.sky[0] - bncR, skyG = cfg.sky[1] - bncG, skyB = cfg.sky[2] - bncB;
-    const rock = new Uint8ClampedArray(S * S * 4);
+    // `take(bytes)` = a zeroed array of that size to write into (one a finished chunk gave back), when the caller has such.
+    const rock = take ? take(S * S * 4) : new Uint8ClampedArray(S * S * 4);
 
     for (let py = 0; py < S; py++) {
         const fy = (py + 0.5) / node + 1, j = Math.floor(fy), v = fy - j;
@@ -276,7 +277,7 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
     // Back picture: cave walls behind the water, back rock under overhangs (backRock.js) and
     // shade that gathers next to rock. Back rock is unlit, darker and fogged toward the
     // biome's water, so it never reads as something to bump into.
-    const B = cfg.backSize, bn = S / B, back = new Uint8ClampedArray(B * B * 4);
+    const B = cfg.backSize, bn = S / B, back = take ? take(B * B * 4) : new Uint8ClampedArray(B * B * 4);
     const br = backRockCover(field, T, ox, oy, span), bc = br.cov, BN = br.N, bk = span / B / br.C, b0 = br.m - 0.5;   // also the distance to rock
     const fogCol = new Float32Array(B * 3);
     if (br.any) {

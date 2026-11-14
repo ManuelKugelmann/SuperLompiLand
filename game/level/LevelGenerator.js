@@ -19,6 +19,8 @@ import { getCharacter, loadSelectedId } from '../characters.js';
 import { coralSize } from './coralSizes.js';
 import { SHADE, shadeChunk } from './shade.js';
 import ChunkAtlas from './ChunkAtlas.js';
+import { treatCoinNear } from './RhythmLayer.js';
+import { spotsOf } from './worldMap.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import { SIZES } from '../scale.js';
@@ -192,6 +194,8 @@ export default class LevelGenerator {
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
         this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
         this.job = null;        // the chunk build in progress (build() is cut into steps)
+        this.jobPics = null;    // ... and the worker's result it is built from
+        this.treats = spotsOf('treat');      // where the route's coin figures are (RhythmLayer): the chunks' own coin trails give way to them
         this.lean = null;       // x -> how far plants there lean with a swell of their place (east positive, in the surf surge's measure), or null
         this.stepMax = new Map();   // step name -> { ms, x }: the slowest it has been and where the view was (perf tour, ?debug=perf)
         this.started = false;   // the first update builds what is on screen at once (behind the start's fade); later jumps go through the worker
@@ -259,6 +263,12 @@ export default class LevelGenerator {
         a = back && rock ? { back, rock } : null;
         reg.set('chunkAtlases', a);
         return a;
+    }
+
+    /** A worker result that is used up (its chunk is built, or nobody needs it any more): its picture arrays go back to the worker to be written into again. */
+    recycle(r) {
+        if (!r || !this.worker || !r.rock?.buffer.byteLength) return;
+        this.worker.postMessage({ recycle: [r.rock.buffer, r.back.buffer] }, [r.rock.buffer, r.back.buffer]);
     }
 
     /** Fills the pool of chunk canvases (canvasFor) up to LEVEL.canvasWarm chunks' worth: making a canvas uploads it once, a long step on a phone. */
@@ -332,7 +342,7 @@ export default class LevelGenerator {
         const step = () => {
             worked = true;
             const t = performance.now(), r = this.job.next(), now = performance.now();
-            if (r.done) this.job = null;
+            if (r.done) { this.job = null; this.recycle(this.jobPics); this.jobPics = null; }
             // The slowest each kind of step has been, and where: a step runs to its end, so one heavy step is one long frame.
             const worst = this.stepMax.get(r.value);
             if (r.value && (!worst || now - t > worst.ms)) this.stepMax.set(r.value, { ms: now - t, x: camX + W / 2 });
@@ -366,8 +376,8 @@ export default class LevelGenerator {
             if (!this.job) {
                 const r = this.ready.shift();
                 const [cx, cy] = r.key.split(',').map(Number);
-                if (!wanted(cx, cy) || this.chunks.has(r.key)) { this.dropEarly(r.key); continue; }
-                this.job = this.build(cx, cy, r);
+                if (!wanted(cx, cy) || this.chunks.has(r.key)) { this.dropEarly(r.key); this.recycle(r); continue; }
+                this.job = this.build(cx, cy, r); this.jobPics = r;
             }
             budget = step();
         }
@@ -921,6 +931,7 @@ export default class LevelGenerator {
 
     addCoin(chunk, x, y, chunkKey, index) {
         if (y < LEVEL.coinTop || !this.reachable(x, y)) return;      // its number stays taken, so the others keep theirs
+        if (treatCoinNear(x, y, LEVEL.coinGap, this.treats, this.field.routeY)) return;      // a coin figure on the route has a coin there (two on one spot read as a glitch)
         // The story's net scenes stand free: no coins in front of a friend who waits for help.
         for (const c of this.storySpots) if ((c.x - x) ** 2 + (c.y - y) ** 2 < JOURNEY.clear ** 2) return;
         // Coins never lead into harm: none within reach of a hazard or along its chain (coinClear.js).
