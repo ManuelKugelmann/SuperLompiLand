@@ -28,6 +28,7 @@ import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
+import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { surgeAt, breakerAt, ripAt } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
 import { WEATHER, stormShare, stormAt, downAt } from '../game/level/weather.js';
@@ -216,6 +217,10 @@ export default class MainScene extends Phaser.Scene {
         // HUD (menu, scheme switcher, puff button, counters) runs as its own
         // scene on top — see HudScene.
         if (this.ambientMode) this.startAmbient();
+        if (new URLSearchParams(window.location.search).get('perftest')) {
+            this.relaxed = true;
+            this.perfTour = createPerfTour(LEVEL.spawn.x, this.level.nests[this.level.nests.length - 1].x, x => BIOMES[biomeIndexAt(x)].id);
+        }
         else this.scene.launch(HUD_KEY, { main: this });
         // Phaser lets the top scene swallow input for the scenes below, and it
         // also swallows the first tap after a HUD button was touched. Turn that
@@ -430,6 +435,27 @@ export default class MainScene extends Phaser.Scene {
         } else if (ev === 'ride') {
             play('whale');
         }
+    }
+
+    /** `?perftest=1`: hop along the whole calm route and report the worst numbers per biome (game/perfTour.js). */
+    runPerfTour(delta, logicMs) {
+        const tour = this.perfTour;
+        if (tour.done) return;
+        tour.sample({ logicMs, chunkMs: this.level.buildMs.last, objects: this.children.list.length, tweens: this.tweens.getTweens().length });
+        if (tour.step(delta)) {
+            const p = this.safeSpot(tour.x, this.level.field.routeY(tour.x));
+            this.fish.place(p.x, p.y);
+            this.fish.sprite.setVelocity(0, 0);
+            this.camX = p.x - this.scale.width / 2; this.camY = p.y - this.scale.height / 2;
+        }
+        if (!tour.done) return;
+        const rows = tour.rows(), lines = perfReport(rows);
+        window.__perftest = rows;      // for automated runs
+        console.log(lines.join('
+'));
+        this.add.text(40, 120, lines.join('
+'), { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
+            .setScrollFactor(0).setDepth(99);
     }
 
     /** Time counted in waves: the sea breathes with the music, one wave every two bars. */
@@ -1205,6 +1231,7 @@ export default class MainScene extends Phaser.Scene {
         for (const [k, ms] of [['physics', t1 - t0], ['world', t2 - t1]]) {
             const a = this.perf[k]; a.sum += ms; a.n++; if (ms > a.max) a.max = ms;
         }
+        if (this.perfTour) this.runPerfTour(delta, t2 - t0);
 
         // Announce a biome when the fish swims into it.
         const bi = biomeIndexAt(sp.x);

@@ -213,6 +213,7 @@ Handy while developing (add to the URL):
 |---|---|
 | `?at=<biome>` or `?at=x,y` | start at a biome's landmark or at a point |
 | `?debug=perf` | frame budget, chunk build times, object counts |
+| `?perftest=1` | hops along the whole calm route and reports, per biome, the worst logic time, chunk build time, object and tween counts against the budgets |
 | `?debug=flow` | currents as arrows, the calm route as a green line |
 | `?debug=ai` | every creature shows what it is doing |
 | `?tune=key:value,...` | override movement numbers, e.g. `?tune=waterDrag:0.5,thrust:0.0009` |
