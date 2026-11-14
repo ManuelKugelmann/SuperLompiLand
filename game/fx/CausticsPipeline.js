@@ -52,11 +52,22 @@ varying vec2 outPos;
 
 float luma(vec4 c) { return dot(c.rgb, vec3(0.3, 0.59, 0.11)); }
 
-// One layer: a square net of bright lines, warped so its cells swell and shrink like light under waves.
-float net(vec2 p, float t) {
-    p += 0.9 * vec2(sin(p.y * 0.5 + t), sin(p.x * 0.5 - t * 0.8));
-    float v = sin(p.x) * sin(p.y);
-    return pow(1.0 - abs(v), ${f(C.sharp)});
+// One layer of the web: the edges of Voronoi cells whose centres wander, the classic look of
+// light focused by waves (an organic web, not a grid). p is in cells; n = cells per period, so
+// the web tiles at the wrap (the warp uses whole waves per period for the same reason).
+vec2 hash2(vec2 c) { c = vec2(dot(c, vec2(127.1, 311.7)), dot(c, vec2(269.5, 183.3))); return fract(sin(c) * 43758.5453); }
+float web(vec2 p, float n, float t) {
+    p += 0.3 * vec2(sin(p.y * 0.9 + t * 0.6), sin(p.x * ${TAU} * 3.0 / n + t * 0.5));
+    vec2 g = floor(p), q = fract(p);
+    float d1 = 8.0, d2 = 8.0;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 o = vec2(float(x), float(y)), c = g + o;
+        vec2 h = hash2(vec2(mod(c.x, n), c.y));
+        vec2 r = o + 0.5 + 0.4 * sin(t + ${TAU} * h) - q;
+        float d = dot(r, r);
+        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+    }
+    return 1.0 - smoothstep(0.0, ${f(C.line)}, sqrt(d2) - sqrt(d1));
 }
 
 void main () {
@@ -72,14 +83,13 @@ void main () {
     if (uStrength > 0.0 && depth > 0.0 && texture.a > 0.02) {
         // The picture's own relief: how its brightness changes sideways and downward.
         float l0 = luma(texture) / texture.a;
-        float lx = luma(texture2D(uMainSampler, outTexCoord + vec2(0.004, 0.0))) / texture.a;
-        float ly = luma(texture2D(uMainSampler, outTexCoord + vec2(0.0, 0.004))) / texture.a;
+        float lx = luma(texture2D(uMainSampler, outTexCoord + vec2(${f(C.relief)}, 0.0))) / texture.a;
+        float ly = luma(texture2D(uMainSampler, outTexCoord + vec2(0.0, ${f(C.relief)}))) / texture.a;
         vec2 relief = vec2(lx - l0, ly - l0);
         vec2 p = world + relief * ${f(C.wrap)};
-        float k1 = ${TAU} * ${f(C.cells[0])} / ${f(C.period)}, k2 = ${TAU} * ${f(C.cells[1])} / ${f(C.period)};
-        float a = net(p * k1, uTime * ${f(C.drift[0])});
-        float b = net(vec2(p.x + p.y, p.x - p.y) * k2 * 0.5, uTime * ${f(C.drift[1])});
-        float light = a * (0.45 + 0.55 * b) + 0.3 * b;
+        float a = web(p * ${f(C.cells[0] / C.period)}, ${f(C.cells[0])}, uTime * ${f(C.drift[0])});
+        float b = web(p * ${f(C.cells[1] / C.period)} + 7.3, ${f(C.cells[1])}, uTime * ${f(C.drift[1])});
+        float light = min(1.0, a + 0.55 * b);
         float shaft = ${f(C.shaft.floor)} + ${f(1 - C.shaft.floor)} * smoothstep(-0.3, 0.7, sin((world.x + world.y * ${f(C.shaft.slant)}) * ${TAU} * ${f(C.shaft.bands)} / ${f(C.period)} + uTime * ${f(C.shaft.speed)}));
         float catching = smoothstep(${f(C.lit[0])}, ${f(C.lit[1])}, l0) * clamp(1.0 - relief.y * ${f(C.facing)}, 0.0, 1.0);
         color.rgb += uTint * (light * shaft * depth * catching * uStrength * color.a);

@@ -77,13 +77,14 @@ export function gradeMatrix(light, sat = 0.18, absorb = 0.35, exposure = 0) {
 // plain functions, so they can be tested and read.
 export const SURFACE_CAUSTICS = {
     strength: 0.5,        // how much light the net adds at its brightest (0 = off: nothing gets the shader)
-    sharp: 3,             // how thin the net's lines are (the higher, the thinner)
-    full: 600,            // px under the surface down to which it is at full strength ...
-    gone: 1800,           // ... and by which it has faded out
+    line: 0.085,          // width of the net's lines, in shares of a cell (edges of moving Voronoi cells: an organic web, not a grid)
+    full: 1300,           // px under the surface down to which it is at full strength (the whole sunny lagoon floor) ...
+    gone: 3000,           // ... and by which it has faded out
     period: 4096,         // px after which the whole pattern repeats (the shader works with x wrapped to it)
-    cells: [12, 20],      // net cells per period, for the two layers that are laid over each other (even numbers)
-    drift: [0.7, 0.9],    // how fast each layer moves (radians per second of its warp)
-    wrap: 190,            // px the net is pushed along a surface's relief per unit of brightness change: it bends over bumps
+    cells: [24, 36],      // net cells per period for the two layers laid over each other (~170 and ~115 px; even numbers)
+    drift: [0.55, 0.75],  // how fast each layer's cells move (radians per second)
+    wrap: 70,             // px the net is pushed along a surface's relief per unit of brightness change: it bends over bumps
+    relief: 0.012,        // texture-space step for reading the relief (wide enough that fine paint detail does not speckle)
     lit: [0.08, 0.4],    // brightness of a surface from which it begins to catch the net, and from which it catches all of it
     facing: 6,            // how quickly the net fades on a face that looks down (brightness rising downward)
     shaft: { bands: 2, slant: 0.35, floor: 0.45, speed: 0.06 },   // light shafts: bands per period, their slant (px sideways per px down), the share of light between them, their drift
