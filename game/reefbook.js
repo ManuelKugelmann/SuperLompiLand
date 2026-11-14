@@ -63,7 +63,7 @@ export const ENTRIES = [
     { id: 'glow_jelly', kind: 'creature', image: 'glow_jelly',
         name: { de: 'Leuchtqualle', en: 'Glowing jelly' },
         fact: { de: 'In der dunklen Tiefe machen viele Tiere ihr eigenes Licht, um zu jagen oder sich zu verstecken.', en: 'In the dark deep many animals make their own light, to hunt or to hide.' } },
-    { id: 'cleaner_station', kind: 'place', image: 'cleaner_grouper',
+    { id: 'cleaner_station', kind: 'place', image: 'friend_grouper',
         name: { de: 'Putzerstation', en: 'Cleaner station' },
         fact: { de: 'Große Fische warten hier geduldig mit offenem Maul, bis kleine Putzerfische sie sauber knabbern.', en: 'Big fish wait here patiently with open mouths while little cleaner fish nibble them clean.' } },
     { id: 'ghost_ship', kind: 'place', image: 'ghost_ship',

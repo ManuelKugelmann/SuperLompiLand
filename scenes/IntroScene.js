@@ -30,6 +30,7 @@ import { STORY_ART } from './StoryScene.js';
 import { STORM_LOOK } from '../game/fx/StormLayer.js';
 import { MICRO, MICRO_KINDS, microKey } from '../game/level/microScatter.js';
 import { SEABIRD_ART } from '../game/ai/SeabirdLayer.js';
+import { CLEANER_ART } from '../game/ai/CleanerLayer.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -107,6 +108,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);
         if (!this.textures.exists(SURF_ART.puffs.key)) this.load.spritesheet(SURF_ART.puffs.key, SURF_ART.puffs.file, { frameWidth: SURF_ART.puffs.frame, frameHeight: SURF_ART.puffs.frame });
         for (const key of SEABIRD_ART) if (!this.textures.exists(key)) this.load.image(key, `img/${key}.webp`);
+        for (const [key, file] of CLEANER_ART) if (!this.textures.exists(key)) this.load.image(key, file);
         // Painted ground cover (MicroArt.js paints the ones missing).
         for (const kind of MICRO_KINDS) for (let v = 0; v < MICRO.variants; v++) { const key = microKey(kind, v); if (!this.textures.exists(key)) this.load.image(key, `img/micro/${key}.webp`); }
         for (const a of [STORY_ART.back, STORY_ART.ash, STORM_LOOK.clouds]) if (!this.textures.exists(a.key)) this.load.image(a.key, a.file);

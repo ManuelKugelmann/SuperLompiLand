@@ -20,6 +20,9 @@ export const CLEANER_LOOK = {
     depth: 3.4
 };
 
+/** Painted art (preloaded by the intro scene when present): [key, file]. */
+export const CLEANER_ART = [['friend_grouper', 'img/friend_grouper.png'], ['school_wrasse', 'img/school/wrasse.webp']];
+
 function ensureArt(scene) {
     const tex = scene.textures;
     if (!tex.exists('cleaner_grouper')) {
