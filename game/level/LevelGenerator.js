@@ -5,6 +5,7 @@ import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
+import { mix } from './backLayersMath.js';
 import {
     BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup } from './biomes.js';
 
@@ -61,13 +62,14 @@ const HAZARDS = {
  * texture keys, display width range (px), how much of its height sinks into the
  * ground, how far below that rock must lie under both ends (`reach`, share of the height),
  * the steepest floor it stands on (radians), its depth (behind the rock
- * = half buried, the rock in front hides the keel), at most how many per chunk, and
+ * = half buried, the rock in front hides the keel; `back` = hazed toward the water: what is
+ * passable must read as behind the play plane), at most how many per chunk, and
  * `sway` for plants (rooted, swaying with the water and pushed aside by the fish).
  */
 export const PROPS = {
-    boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.2, reach: 0.15, flat: 0.4, depth: -1, max: 2 },
-    barrel: { keys: ['barrel_1', 'barrel_2'], width: [110, 170], sink: 0.14, reach: 0.15, flat: 0.45, depth: -1, max: 2 },
-    crate: { keys: ['crate_1'], width: [130, 190], sink: 0.12, reach: 0.15, flat: 0.35, depth: -1, max: 1 },
+    boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.32, reach: 0.15, flat: 0.4, depth: -3, back: true, max: 2 },
+    barrel: { keys: ['barrel_1', 'barrel_2'], width: [110, 170], sink: 0.24, reach: 0.15, flat: 0.45, depth: -3, back: true, max: 2 },
+    crate: { keys: ['crate_1'], width: [130, 190], sink: 0.22, reach: 0.15, flat: 0.35, depth: -3, back: true, max: 1 },
     // Hulls share one slot per chunk, and only every third chunk column has one, so they never overlap.
     wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
     trawler: { keys: ['trawler_1', 'cutter_1'], width: [880, 1150], sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
@@ -77,7 +79,7 @@ export const PROPS = {
     // generated pile, soft-edged), `above` = share of the deck above the waterline.
     pier: { keys: ['pier_deck', 'pier_pile_mid', 'pier_band', 'pier_foot'], width: [1300, 1600], surface: true, every: 4, chance: 0.5, max: 1,
         piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileWood: 0.7, above: 0.2, depth: -3, tint: 0xc4d0d4 },
-    rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.2, reach: 0.2, flat: 0.35, depth: -1, max: 1 },
+    rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.3, reach: 0.2, flat: 0.35, depth: -3, back: true, max: 1 },
     // Generated art (FLUX.2 klein, Replicate): plants between the kelp stalks.
     seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, reach: 0.2, flat: 0.6, depth: -1, max: 2, sway: 0.6 },
     seafan: { keys: ['seafan_1'], width: [200, 330], sink: 0.08, reach: 0.2, flat: 0.6, depth: -1, max: 1, sway: 0.25 },
@@ -88,6 +90,7 @@ export const PROPS = {
 /** Painted kelp stalks (generated art, public/img/plants/); the procedural 'kelp' strip is the fallback. */
 export const KELP_STALKS = ['kelp_stalk_1', 'kelp_stalk_2', 'kelp_stalk_3'];
 const KELP_BACK_TINT = 0x5f8f86;   // stalks behind the play plane: hazier, toward the water colour
+const PROP_BACK_HAZE = 0.5;        // how far passable seabed props shift toward the water colour
 
 // One turn of the colour wheel, saturated and bright, looked up instead of converted every frame.
 const RAINBOW = Array.from({ length: 96 }, (_, i) => Phaser.Display.Color.HSVToRGB(i / 96, 0.75, 1).color);
@@ -423,6 +426,8 @@ export default class LevelGenerator {
                 img.setScale(w / tex.width).setRotation(angle).setDepth(p.depth);
                 if (rng.frac() < 0.5) img.setFlipX(true);
                 if (p.tint) img.setTint(p.tint);
+                // Passable things read as behind the play plane: hazed toward the biome's water.
+                else if (p.back) img.setTint(mix(0xffffff, mix(biome.water[0], 0x8fb4c0, 0.5), PROP_BACK_HAZE));
             }
         }
 
