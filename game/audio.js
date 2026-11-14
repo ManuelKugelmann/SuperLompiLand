@@ -183,6 +183,8 @@ const SOUNDS = {
     // Whale song: two long calls that slide, with a high answer.
     whale() { tone({ f: 170, to: 330, dur: 1.5, vol: 0.24 }); tone({ f: 330, to: 150, at: 1.3, dur: 1.9, vol: 0.22 }); tone({ f: 660, to: 880, at: 2.2, dur: 0.9, vol: 0.08 }); },
     hop() { tone({ f: 400, to: 800, type: 'sine', dur: 0.12, vol: 0.16 }); },
+    // A seabird calls before it dives (spec 5.0d): two harsh, falling croaks.
+    cry() { [0, 0.16].forEach((at, i) => { tone({ f: 980 - i * 120, to: 620 - i * 80, type: 'sawtooth', dur: 0.13, vol: 0.07, at }); noise({ dur: 0.12, vol: 0.05, from: 1800, to: 900, q: 2, at }); }); },
     splash(strength = 1) {
         // Soft and airy; a hard dive is only a little louder than a gentle one.
         const v = Math.min(0.14, 0.04 + strength * 0.006);

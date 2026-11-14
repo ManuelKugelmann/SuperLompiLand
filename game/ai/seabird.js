@@ -40,7 +40,7 @@ function prey(p, b, env) {
 }
 
 function pickTarget(b, env) {
-    if (b.cooldown <= 0) {
+    if (b.cooldown <= 0 && env.mayHunt !== false) {
         const players = env.players || (env.player ? [env.player] : []);
         let best = null, bd = Infinity;
         for (const p of players) {
@@ -58,7 +58,7 @@ function pickTarget(b, env) {
 
 /**
  * Advance by dt. env: { surfaceY(x), player: the local fish | null, players: everyone (optional),
- * shoals: [{x, y}] (optional), covered(x, y) (optional) }. A player is { x, y, puffed?, big? }.
+ * shoals: [{x, y}] (optional), covered(x, y) (optional), mayHunt: false keeps it off players (optional) }. A player is { x, y, puffed?, big? }.
  * Returns 'aim' when a dive is announced, 'dive' when it starts, 'splash' when it enters the
  * water, 'hit' once when it touches the local player, 'bounce' off a puffed one, 'strike' at a
  * shoal, else null.
@@ -87,7 +87,7 @@ export function stepSeabird(b, dt, env) {
             b.aim.x = p.x; b.aim.y = Math.min(p.y, env.surfaceY(p.x) + c.depth);
             const dx = b.aim.x - b.x, dy = b.aim.y - b.y, d = Math.hypot(dx, dy) || 1;
             b.vx = dx / d * c.diveSpeed; b.vy = dy / d * c.diveSpeed;
-            b.state = 'dive'; b.timer = 0; b.struck = false; event = 'dive';
+            b.state = 'dive'; b.timer = 0; b.struck = false; b.splashed = false; event = 'dive';
             if (b.target.kind === 'player') b.cooldown = c.playerCooldownS;
         }
     } else if (b.state === 'dive') {
@@ -95,7 +95,7 @@ export function stepSeabird(b, dt, env) {
         if (b.y >= sy) { const k = Math.exp(-c.waterDrag * dt); b.vx *= k; b.vy *= k; }
         b.x += b.vx * dt; b.y += b.vy * dt;
         const nsy = env.surfaceY(b.x);
-        if (wasAbove && b.y >= nsy) event = 'splash';
+        if (wasAbove && b.y >= nsy && !b.splashed) { b.splashed = true; event = 'splash'; }
         if (!b.struck) {
             const players = env.players || (env.player ? [env.player] : []);
             for (const p of players) {

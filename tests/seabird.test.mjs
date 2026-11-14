@@ -87,3 +87,11 @@ test('cooldown: at most one dive at the player every few seconds', () => {
     assert.equal(seen.filter(e => e === 'dive').length, 1);
     assert.equal(shadowX(createSeabird(0, surfaceY)), 0);
 });
+
+test('mayHunt false keeps it on the shoals; a dive splashes once', () => {
+    const b = createSeabird(0, surfaceY);
+    const seen = run(b, { surfaceY, player: { x: 60, y: 70 }, shoals: [{ x: 120, y: 90 }], mayHunt: false }, 3);
+    assert.ok(!seen.includes('hit'));
+    assert.ok(seen.includes('strike'));
+    assert.equal(seen.filter(e => e === 'splash').length, 1);
+});

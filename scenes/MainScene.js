@@ -11,6 +11,7 @@ import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
 import ParticleLayer from '../game/fx/ParticleLayer.js';
 import SwarmLayer from '../game/ai/SwarmLayer.js';
+import SeabirdLayer from '../game/ai/SeabirdLayer.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
@@ -129,6 +130,16 @@ export default class MainScene extends Phaser.Scene {
             waterAt: x => { const bl = biomeBlendAt(x); return mixColor(bl.a.water[0], bl.b.water[0], bl.t); }
         });
         this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
+        // Gannets over the island coasts dive after shoals and after a fish near the surface (spec 5.0d).
+        this.seabirds = new SeabirdLayer(this, {
+            surfaceY: x => this.surface.heightAt(x, this.time.now / 1000),
+            // Rock between the fish and the surface hides it (the air above is not "open" water).
+            covered: (x, y) => {
+                const top = this.surface.heightAt(x, this.time.now / 1000) + 20;
+                for (let k = y - 50; k > top; k -= 60) if (!this.level.isOpen(x, k)) return true;
+                return false;
+            }
+        }, (ev, x, y) => this.seabirdEvent(ev, x, y));
         this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
         // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
         this.journey = createJourney(this.progression.get?.('journey', []) || []);
@@ -233,10 +244,7 @@ export default class MainScene extends Phaser.Scene {
 
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
         // A grumpy's shove (ai/grumpy.js, spec 7.1): half a heart, never the last half; relaxed play only gets the push.
-        this.events.on('grumpy-hit', ({ x, y }) => {
-            if (this.relaxed || this.health <= GRUMPY_HIT) { this.fish.hit(new Phaser.Math.Vector2(x, y)); return; }
-            this.hurt(x, y, GRUMPY_HIT);
-        });
+        this.events.on('grumpy-hit', ({ x, y }) => this.softHit(x, y));
         this.events.on('fish-special', ({ x, y }) => { this.beats?.special(x, y); this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
@@ -291,6 +299,7 @@ export default class MainScene extends Phaser.Scene {
             saveNow();
             this.particles.destroy();
             this.swarms.destroy();
+            this.seabirds.destroy();
             this.boosters.destroy();
             this.speedLines.destroy();
             this.events.off('fish-special');
@@ -371,6 +380,25 @@ export default class MainScene extends Phaser.Scene {
             this.tweens.add({ targets: heart, x: x + Math.cos(a) * 230, y: y + Math.sin(a) * 180 - 60, alpha: 0, duration: 1300, ease: 'Sine.easeOut', onComplete: () => heart.destroy() });
         }
         this.events.emit('journey-free', ch);
+    }
+
+    /** An animal's shove or peck (grumpy, seabird): half a heart, never the last half; relaxed play only gets the push. */
+    softHit(x, y) {
+        if (this.relaxed || this.health <= GRUMPY_HIT) { this.fish.hit(new Phaser.Math.Vector2(x, y)); return; }
+        this.hurt(x, y, GRUMPY_HIT);
+    }
+
+    /** A seabird's hunt, as it happens (game/ai/SeabirdLayer.js, spec 5.0d). */
+    seabirdEvent(ev, x, y) {
+        const near = Math.abs(x - this.fish.sprite.x) < 1400;
+        if (ev === 'aim' && near) play('cry');
+        else if (ev === 'splash') {
+            this.surface.splash(x, 4, 2.5);
+            if (near) play('splash', 1.4);
+            this.particles.spawn('bubble', x, y + 30, 10, { radius: 14, spread: 30 });
+        } else if (ev === 'strike') this.swarms.startle(x, y);
+        else if (ev === 'hit') { this.softHit(x, y); this.particles.spawn('bubble', x, y, 8, { radius: 12, spread: 40 }); }
+        else if (ev === 'bounce') { play('boing'); this.swarms.startle(x, y); }
     }
 
     /** The great whale's story, as it happens (game/Whale.js). */
@@ -1063,6 +1091,13 @@ export default class MainScene extends Phaser.Scene {
         players.length = 0; players.push(pl);
         for (const g of this.mp?.ghosts.values() ?? []) if (g.pos) players.push({ x: g.pos.x, y: g.pos.y, vx: g.pos.vx * 60, vy: g.pos.vy * 60 });
         this.swarms.update(delta / 1000, view.x, view.y, players);
+        const bird = this.birdPlayer || (this.birdPlayer = { x: 0, y: 0, puffed: false, big: false });
+        bird.x = view.x; bird.y = view.y; bird.puffed = this.fish.posed; bird.big = (this.character.fright || 1) > 1.5;
+        const shoals = this.shoalSpots || (this.shoalSpots = []);
+        shoals.length = 0;
+        for (const s of this.swarms.swarms) shoals.push(s.sim.centre());
+        const local = this.ambientMode ? null : bird;
+        this.seabirds.update(delta / 1000, view.x, local, local ? [local, ...players.slice(1)] : [], shoals);
         this.oilExposure(delta / 1000);
         this.bobCoins();
         this.discover(delta);
