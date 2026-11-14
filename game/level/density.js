@@ -51,6 +51,9 @@ export const ROUTE = {
  * Build the world's density field for a seed.
  * Returns { density(x, y, withNests = true), nests, routeY(x) }.
  */
+/** How the abyss shaft's walls wander with depth (px): `bend` over `scale`, `rough` over `roughScale`; `reach` covers both. */
+const ABYSS_BEND = { bend: 600, scale: 700, rough: 140, roughScale: 160, reach: 380 };
+
 const smooth01 = v => { const t = v <= 0 ? 0 : v >= 1 ? 1 : v; return t * t * (3 - 2 * t); };
 
 /**
@@ -190,8 +193,10 @@ export function createField(seed) {
         }
         // Keep the abyss shaft swimmable all the way down. Its sides wander with depth and fade
         // out softly (top, bottom and sideways): never a cut box in the rock.
-        if (y > 4000 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 1.4) {
-            const ax = (x - ABYSS.x + (vnoise(y / 600, 7.3, seed + 41) - 0.5) * 360) / (ABYSS.halfWidth * 0.75);
+        // Big lazy bends plus rough detail, so its walls read as rock and not as one lit column.
+        if (y > 4000 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 1.4 + ABYSS_BEND.reach) {
+            const bend = (vnoise(y / ABYSS_BEND.scale, 7.3, seed + 41) - 0.5) * ABYSS_BEND.bend + (vnoise(y / ABYSS_BEND.roughScale, 3.9, seed + 43) - 0.5) * ABYSS_BEND.rough;
+            const ax = (x - ABYSS.x + bend) / (ABYSS.halfWidth * 0.75);
             n -= 0.6 * smooth01((1.35 - Math.abs(ax)) / 0.5) * smooth01((y - 4000) / 400) * smooth01((fy - 150 - y) / 200);
         }
         // The reef crest: solid coral from just under the surface down, whatever the noise says.
