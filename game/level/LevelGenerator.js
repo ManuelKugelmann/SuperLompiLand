@@ -622,8 +622,8 @@ export default class LevelGenerator {
                 if (!front) root.setTint(0x6f8f86);
                 // Roots belong to a tree: its trunk and canopy stand above the waterline
                 // (painted art `root_top_1..2` when loaded, else the procedural one).
-                const tree = s.textures.exists('root_top_1') ? `root_top_${1 + (k % 2)}` : 'root_top';
-                const top = keep(s.add.image(x, -34, tree).setOrigin(0.5, 1)
+                const painted = s.textures.exists('root_top_1'), tree = painted ? `root_top_${1 + (k % 2)}` : 'root_top';
+                const top = keep(s.add.image(x, painted ? 6 : -34, tree).setOrigin(0.5, 1)    // painted roots end right at the waterline
                     .setScale(root.scaleX * 1.25).setDepth(front ? 7.4 : -7.1).setFlipX(root.flipX));
                 if (!front) top.setTint(0xa9c4b4);
             }
