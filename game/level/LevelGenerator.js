@@ -64,8 +64,15 @@ export const PROPS = {
     boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.2, flat: 0.7, depth: -1, max: 2 },
     barrel: { keys: ['barrel_1', 'barrel_2'], width: [110, 170], sink: 0.14, flat: 0.45, depth: -1, max: 2 },
     crate: { keys: ['crate_1'], width: [130, 190], sink: 0.12, flat: 0.35, depth: -1, max: 1 },
-    // `every`: only in every third chunk column, so hulls never overlap.
-    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, flat: 0.3, depth: -3, max: 1, every: 3, tint: 0xb6c6cc }
+    // Hulls share one slot per chunk, and only every third chunk column has one, so they never overlap.
+    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
+    trawler: { keys: ['trawler_1', 'cutter_1'], width: [880, 1150], sink: 0.22, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
+    rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.2, flat: 0.35, depth: -1, max: 1 },
+    // Generated art (FLUX.2 klein, Replicate), static plants between the swaying kelp.
+    seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, flat: 0.6, depth: -1, max: 2 },
+    seafan: { keys: ['seafan_1'], width: [200, 330], sink: 0.08, flat: 0.6, depth: -1, max: 1 },
+    anemone: { keys: ['anemone_1'], width: [130, 210], sink: 0.1, flat: 0.7, depth: -1, max: 2 },
+    kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, flat: 0.5, depth: -1, max: 2 }
 };
 
 // One turn of the colour wheel, saturated and bright, looked up instead of converted every frame.
@@ -340,7 +347,8 @@ export default class LevelGenerator {
             const rng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}:props`]);
             const count = Math.floor(biome.propRate) + (rng.frac() < biome.propRate % 1 ? 1 : 0);
             const used = {};
-            const exists = g => PROPS[g] && (used[g] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
+            const slot = g => PROPS[g].slot || g;
+            const exists = g => PROPS[g] && (used[slot(g)] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
             for (let k = 0; k < count; k++) {
                 const group = pickWeighted(rng, biome.props, exists);
                 if (!group) break;
@@ -352,10 +360,10 @@ export default class LevelGenerator {
                 const rockUnder = (x, y) => { for (let d = 0; d <= h * 0.5; d += 40) if (this.density(x, y + d) > T) return true; return false; };
                 const below = f => f.y + h * p.sink * 0.8;
                 const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat
-                    && rockUnder(f.x - w * 0.36, below(f)) && rockUnder(f.x + w * 0.36, below(f)));
+                    && rockUnder(f.x - w * 0.45, below(f)) && rockUnder(f.x + w * 0.45, below(f)));
                 if (!spot) continue;
                 spot.prop = true;
-                used[group] = (used[group] || 0) + 1;
+                used[slot(group)] = (used[slot(group)] || 0) + 1;
                 const img = keep(s.add.image(spot.x, spot.y, key).setOrigin(0.5, 1 - p.sink));
                 img.setScale(w / tex.width).setRotation(spot.angle * 0.6).setDepth(p.depth);
                 if (rng.frac() < 0.5) img.setFlipX(true);
