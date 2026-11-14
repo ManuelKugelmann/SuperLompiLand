@@ -3,8 +3,9 @@ import { WEATHER, stormShare, stormSpan, downwelling } from '../level/weather.js
 import { ensureFoam, SURF_ART } from './SurfLayer.js';
 
 export const STORM_LOOK = {
-    sky: 0.6,          // how dark the sky gets in the middle of the storm
-    gloom: 0.3,        // how much darker the water gets under it
+    // Darkness only by depth (spec 5.0h): the storm shows itself by colour, shadow bands and churn.
+    sky: 0.55,         // how overcast the sky gets in the middle of the storm (a grey, not a darkening)
+    churn: 0x5d7f76,   // the storm's churned grey-green water: its walls and the side of the view toward it shift to this hue
     rain: 1100,        // px above the waterline the rain falls from
     clouds: { key: 'storm_clouds', file: 'img/sky/storm_clouds.webp', scale: 1.25, foot: 30, drift: 14, parallax: 0.06 },   // the painted cloud bank over the storm (seen from above the water)
     rainSpeed: 1500,   // px per second
@@ -19,8 +20,8 @@ export const STORM_LOOK = {
     tornSpeed: [520, 880],
     debris: 6,         // planks and seaweed tumbling west
     debrisSpeed: [260, 520],
-    edge: 0.75,        // how dark the side of the view toward the storm gets (its edge reads from afar)
-    wall: { alpha: 0.72, out: 2200, depth: 2200 },   // the wall of darker water standing at each end of the storm: alpha, px it reaches out, px deep
+    edge: 0.6,         // how strongly the side of the view toward the storm turns to its churned hue (its edge reads from afar)
+    wall: { alpha: 0.5, out: 2200, depth: 2200 },    // the wall of churned water standing at each end of the storm: alpha, px it reaches out, px deep
     // The downwelling:
     bubbleMs: 70,      // one burst of bubbles in each column this often
     bubbleSpeed: 420,  // px per second they stream down (or up)
@@ -144,7 +145,8 @@ function bake(scene) {
     }
     if (!T.exists(TEX.edge)) {
         const tex = T.createCanvas(TEX.edge, 256, 4), c = tex.getContext(), g = c.createLinearGradient(0, 0, 256, 0);
-        g.addColorStop(0, 'rgba(10,20,32,0)'); g.addColorStop(1, 'rgba(10,20,32,1)');
+        const hue = STORM_LOOK.churn, rgb = `${hue >> 16 & 255},${hue >> 8 & 255},${hue & 255}`;
+        g.addColorStop(0, `rgba(${rgb},0)`); g.addColorStop(1, `rgba(${rgb},1)`);
         c.fillStyle = g; c.fillRect(0, 0, 256, 4);
         tex.refresh();
     }
@@ -167,9 +169,8 @@ export default class StormLayer {
         const W = scene.scale.width, H = scene.scale.height, L = STORM_LOOK;
         this.span = stormSpan();
         // Behind the waterline: over the sky, clouds and horizon, under the sea's top edge.
-        this.sky = scene.add.rectangle(0, 0, W, H, 0x1c2733, 0).setOrigin(0).setScrollFactor(0).setDepth(-28.3).setVisible(false);
-        // In front of the world: the light goes out of the water too, more on the storm's side.
-        this.gloom = scene.add.rectangle(0, 0, W, H, 0x0e1a26, 0).setOrigin(0).setScrollFactor(0).setDepth(6.5).setVisible(false);
+        this.sky = scene.add.rectangle(0, 0, W, H, 0x8e9ca4, 0).setOrigin(0).setScrollFactor(0).setDepth(-28.3).setVisible(false);
+        // In front of the world: the side of the view toward the storm takes its churned hue.
         this.edge = scene.add.image(0, 0, TEX.edge).setOrigin(0).setScrollFactor(0).setDisplaySize(W, H).setDepth(6.49).setVisible(false);
         this.bands = scene.add.tileSprite(0, 0, W, H, TEX.bands).setOrigin(0).setScrollFactor(0).setDepth(5.65).setVisible(false);
         this.bands.setTileScale(H / 256, H / 256);   // one tile tall (stretched over the view), so it only repeats sideways
@@ -184,7 +185,7 @@ export default class StormLayer {
     /** The storm's own things: walls of dark water at its ends, the churned underside, rain, torn foam and debris. */
     buildStorm() {
         const scene = this.scene, W = scene.scale.width, L = STORM_LOOK, R = this.rand, o = {};
-        const sw = L.wall, rampEnd = WEATHER.storm.ramp, C = 0x08121e;
+        const sw = L.wall, rampEnd = WEATHER.storm.ramp, C = L.churn;
         const stops = [[0, 0], [0.22, 0.2], [0.4, 0.85], [0.6, 1], [1, 0.38]];   // across: share of the width, alpha
         // A wall of darker water at each end of the storm (world space): its edge is a place you see
         // coming. Drawn once as gradient quads (no stretched texture, so no edge seams).
@@ -257,7 +258,6 @@ export default class StormLayer {
         const kl = stormShare(camX), kr = stormShare(camX + W), k = stormShare(camX + W / 2);
         const near = Math.max(kl, kr), on = near > 0.01;
         this.sky.setVisible(k > 0.01).setAlpha(L.sky * k);
-        this.gloom.setVisible(on).setAlpha(L.gloom * Math.min(kl, kr));
         // The side toward the storm is darker: the light dims ahead (as far as a view beyond
         // the screen's edge) before you get there.
         const ahead = stormShare(camX + W * 2), behind = stormShare(camX - W);
