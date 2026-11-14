@@ -6,7 +6,7 @@ import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY } from './bi
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
-    spawn: { x: 0, y: 700 },      // start pool, kept free of rock
+    spawn: { x: 0, y: 420 },      // start pool in the shallow lagoon, kept free of rock
     maxDepth: 5600,               // deepest regular seabed (the abyss goes further)
     nestRadius: 230,              // half width of the sand basin a nest lies in
     nestRim: 16                   // how far its rim stands above the middle
@@ -93,10 +93,9 @@ export function createField(seed) {
         return n;
     };
 
-    // One nest per biome start (not the beach) plus the grand nest at the end,
-    // each sitting on the real seabed: start inside it and walk up to its surface.
-    const xs = BIOMES.slice(1).map(b => b.from + 260);
-    xs[0] = FIELD.spawn.x;                    // home reef: right under the start pool
+    // The first nest right under the start pool (in the lagoon), one per later biome start,
+    // the grand nest at the end; each on the real seabed: start inside it and walk up.
+    const xs = [FIELD.spawn.x, ...BIOMES.slice(1).map(b => b.from + 260)];
     xs.push(WORLD_END - 300);
     nests = xs.map((x, index) => {
         let y = floorY(x) + 260;

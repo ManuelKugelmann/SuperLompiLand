@@ -30,7 +30,8 @@ test('friends are never listed as hazards', () => {
 
 test('biomeIndexAt picks the biome containing x', () => {
     assert.equal(biomeIndexAt(WORLD_WEST - 5000), 0);
-    assert.equal(biomeIndexAt(0), BIOMES.findIndex(b => b.id === 'reef'));
+    assert.equal(BIOMES[biomeIndexAt(0)].id, 'beach', 'the journey starts in the shallow lagoon');
+    assert.deepEqual(BIOMES.slice(1, 3).map(b => b.id), ['mangrove', 'reef'], 'then mangroves and the coral reef');
     assert.equal(biomeIndexAt(WORLD_END + 5000), BIOMES.length - 1);
 });
 

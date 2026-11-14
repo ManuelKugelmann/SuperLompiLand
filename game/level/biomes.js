@@ -1,5 +1,6 @@
-// The journey runs west -> east. West of the home reef is a shallow, safe
-// lagoon; every biome further east is deeper and a little more dangerous.
+// The journey runs west -> east. It starts in a shallow, safe lagoon behind the
+// beach; the mangroves and the coral reef follow, and every biome further east is
+// deeper and a little more dangerous.
 // A Lompi nest (checkpoint) sits on the seabed at the start of each biome and
 // the grand nest at the very end.
 //
@@ -18,17 +19,18 @@
 //   coins    coin trails per chunk                        friends / hazards: weighted spawn tables
 //   friendRate / hazardRate: chance per chunk
 //   props    scenery on the seabed (groups in LevelGenerator PROPS)   propRate: props per chunk
-// How wide each biome is (world px). The home reef starts 2500 px west of the
-// start pool at x = 0; everything else follows from these widths.
-const WIDTHS = { beach: 7000, reef: 8000, mangrove: 9000, kelp: 10000, blue: 14000, wreck: 10000, harbour: 10000, trench: 12000 };
-export const WORLD_WEST = -2500 - WIDTHS.beach;
+// How wide each biome is (world px). The lagoon starts 6500 px west of the start
+// pool at x = 0; everything else follows from these widths.
+const WIDTHS = { beach: 11500, mangrove: 9000, reef: 8000, kelp: 10000, blue: 14000, wreck: 10000, harbour: 10000, trench: 12000 };
+export const WORLD_WEST = -6500;
 
 const ROCK_REEF = [0xf3dba0, 0xd2ae6c, 0x9c7a54, 0x6a5748, 0x4b4350];
 
 export const BIOMES = [
     {
-        // Sandy beach: seagrass meadows and a few rocks; corals only here and there (sign-off S3).
-        id: 'beach', name: { de: 'Sandstrand', en: 'Sandy Beach' },
+        // The shallow lagoon behind the beach, where the journey starts: seagrass meadows and a
+        // few rocks; corals only here and there (sign-off S3).
+        id: 'beach', name: { de: 'Flache Lagune', en: 'Shallow Lagoon' },
         rock: [0xfff0c0, 0xf2d894, 0xd9b877, 0xb89868, 0x937a5c], water: [0x7ff0e0, 0.22], open: 0.2,
         backRock: 400,
         rockWall: 0.15,
@@ -37,19 +39,9 @@ export const BIOMES = [
         friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, urchin: 1 }, hazards: {}
     },
     {
-        id: 'reef', name: { de: 'Heimatriff', en: 'Home Reef' },
-        rock: ROCK_REEF, water: [0x3fd0e8, 0.0], open: 0.0,
-        backRock: 900,
-        rockWall: 0.45,
-        coral: 0.6, kelp: 0.12, coins: 2, friendRate: 0.4, hazardRate: 0.12,
-        props: { boulder: 2, seafan: 2, anemone: 2, seagrass: 1 }, propRate: 1.5,
-        friends: { friend_starfish: 2, friend_snail: 2, friend_turtle: 1, friend_seahorse: 1, urchin: 2 },
-        hazards: { spikes: 1 }
-    },
-    {
         // Shallow, sheltered, full of roots to weave through. `roots` = mangrove
         // roots hanging from the surface, some in front of the fish, most behind.
-        id: 'mangrove', name: { de: 'Mangroven-Lagune', en: 'Mangrove Lagoon' },
+        id: 'mangrove', name: { de: 'Mangroven', en: 'Mangroves' },
         rock: [0xe8d9a6, 0xbfae77, 0x8f8257, 0x665d44, 0x474233], water: [0x4fb98a, 0.22], open: 0.22,
         backRock: 400,
         rockWall: 0.6,
@@ -57,6 +49,16 @@ export const BIOMES = [
         props: { boulder: 1, barrel: 1, seagrass: 3, rowboat: 1 }, propRate: 1.3,
         friends: { friend_seahorse: 2, friend_snail: 2, friend_nudibranch: 2, friend_turtle: 1, friend_starfish: 1, urchin: 1 },
         hazards: { hazard_net: 1 }
+    },
+    {
+        id: 'reef', name: { de: 'Korallenriff', en: 'Coral Reef' },
+        rock: ROCK_REEF, water: [0x3fd0e8, 0.0], open: 0.0,
+        backRock: 900,
+        rockWall: 0.45,
+        coral: 0.6, kelp: 0.12, coins: 2, friendRate: 0.4, hazardRate: 0.12,
+        props: { boulder: 2, seafan: 2, anemone: 2, seagrass: 1 }, propRate: 1.5,
+        friends: { friend_starfish: 2, friend_snail: 2, friend_turtle: 1, friend_seahorse: 1, urchin: 2 },
+        hazards: { spikes: 1 }
     },
     {
         // Cold water: anemones and sea fans, no reef corals.
@@ -149,7 +151,7 @@ export function mixColor(c1, c2, t) {
 
 const FLOOR_SLOPE = (5600 - 1050) / (BIOMES[BIOMES.length - 1].from - WORLD_WEST);
 
-const BEACH_END = BIOMES[1].from;          // where the beach hands over to the home reef
+const BEACH_END = BIOMES[1].from;          // where the lagoon hands over to the mangroves
 export const SHORE = WORLD_WEST + 1500;   // west of this the sand is above the water
 
 /** How much higher the waves run here: surf builds up over the shallow beach. */
@@ -164,7 +166,7 @@ export const ABYSS = { x: BIOMES[BIOMES.length - 1].from + 5200, halfWidth: 650,
 export function floorY(x) {
     // Full depth is reached where the deep trench begins.
     let base = clamp(1050 + (x - WORLD_WEST) * FLOOR_SLOPE, 1000, 5600);
-    // The beach: the sand rises gently toward the west until it leaves the water.
+    // The lagoon: the sand rises gently toward the west until it leaves the water.
     if (x < BEACH_END) {
         const t = clamp((x - SHORE) / (BEACH_END - SHORE), 0, 1);
         base = -70 + (1050 + (BEACH_END - WORLD_WEST) * FLOOR_SLOPE + 70) * Math.pow(t, 1.15);

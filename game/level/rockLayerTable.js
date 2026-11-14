@@ -25,7 +25,7 @@ export const ROCK_LAYERS = [
     // dark = tint multiply on top; depth = draw order.
     // clearRoute: keep the calm main route free (the play field is open water there; a wall
     // drawn over it would read as solid, gamedesigner 2026-11-14).
-    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1700, fog: 0.45, dark: 0.92, depth: -9.5 },
+    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.45, dark: 0.92, depth: -9.5 },
     { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.3, dark: 0.95, depth: -7, clearRoute: true }
 ];
 

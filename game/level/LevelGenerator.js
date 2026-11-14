@@ -59,7 +59,7 @@ const HAZARDS = {
     // Keys are historical; what they show now: spikes = wreck scrap, hazard_buoy =
     // leaking oil drum, mine = lost anchor on its chain, hazard_net = ghost net.
     spikes: { size: 240, r: 62, place: 'floor', lift: 26 },
-    hazard_buoy: { size: 170, r: 74, place: 'floor', lift: 104 },
+    hazard_buoy: { size: 170, r: 64, place: 'floor', lift: 38 },   // the oil comes from its crack (OIL.crack in MainScene)
     // The lost anchor hangs on its chain from a hull at the surface: the chain runs all the way up.
     // An anchor hangs on a chain of at most `reach` px (from a hull at the surface or from rock
     // above); where that is not possible there is no anchor.

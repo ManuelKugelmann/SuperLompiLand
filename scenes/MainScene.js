@@ -36,7 +36,8 @@ const STEP_MS = 1000 / 60;
 
 /** World tunables. */
 /** Leaking oil drums (spec 7.1): how often they puff and how much. */
-const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5 };
+// `crack`: where the oil leaves the drum, in shares of its displayed size from its centre.
+const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5, crack: [0.19, -0.34] };
 /** Plumes at the trench's vents: how often, how many smoke and steam particles. */
 const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 /** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
@@ -553,7 +554,9 @@ export default class MainScene extends Phaser.Scene {
             if (h.key !== 'hazard_buoy' || !h.img.active) continue;
             const { x, y } = h.img;
             if (x < cam.scrollX - m || x > cam.scrollX + cam.width + m || y < cam.scrollY - m || y > cam.scrollY + cam.height + m) continue;
-            this.particles.spawn('oil', x, y - h.r * 0.9, OIL.perPulse, { radius: 18, spread: 18, vy: -40 });
+            const ox = OIL.crack[0] * h.img.displayWidth, oy = OIL.crack[1] * h.img.displayWidth;
+            const c = Math.cos(h.img.rotation), s = Math.sin(h.img.rotation);
+            this.particles.spawn('oil', x + ox * c - oy * s, y + ox * s + oy * c, OIL.perPulse, { radius: 12, spread: 8, vy: -40 });
         }
     }
 
