@@ -5,8 +5,7 @@ import { FIELD, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted
-} from './biomes.js';
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup } from './biomes.js';
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
@@ -359,9 +358,14 @@ export default class LevelGenerator {
             const count = Math.floor(biome.propRate) + (rng.frac() < biome.propRate % 1 ? 1 : 0);
             const used = {};
             const slot = g => PROPS[g].slot || g;
+            // The biome's landmark comes first where the player arrives (biomes.js), on any floor
+            // that can carry it; the every-third-column rule is for the random ones.
+            const must = landmarkGroup(cx, CH);
             const exists = g => PROPS[g] && (used[slot(g)] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
-            for (let k = 0; k < count; k++) {
-                const group = pickWeighted(rng, biome.props, exists);
+            for (let k = must ? -1 : 0; k < count; k++) {
+                const forced = k < 0;
+                if (forced && !PROPS[must].keys.some(has)) continue;
+                const group = forced ? must : pickWeighted(rng, biome.props, exists);
                 if (!group) break;
                 const p = PROPS[group];
                 const key = rng.pick(p.keys.filter(has));
@@ -370,7 +374,7 @@ export default class LevelGenerator {
                 // Never floating: rock must lie under both ends, below the buried part.
                 const rockUnder = (x, y) => { for (let d = 0; d <= h * 0.5; d += 40) if (this.density(x, y + d) > T) return true; return false; };
                 const below = f => f.y + h * p.sink * 0.8;
-                const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat
+                const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat * (forced ? 2 : 1)
                     && rockUnder(f.x - w * 0.45, below(f)) && rockUnder(f.x + w * 0.45, below(f)));
                 if (!spot) continue;
                 spot.prop = true;

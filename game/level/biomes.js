@@ -44,7 +44,7 @@ export const BIOMES = [
         // roots hanging from the surface, some in front of the fish, most behind.
         id: 'mangrove', name: { de: 'Mangroven-Lagune', en: 'Mangrove Lagoon' },
         rock: [0xe8d9a6, 0xbfae77, 0x8f8257, 0x665d44, 0x474233], water: [0x4fb98a, 0.22], open: 0.22,
-        coral: 0.25, kelp: 0.3, coins: 3, friendRate: 0.55, hazardRate: 0.1, roots: 4,
+        coral: 0.25, kelp: 0.3, coins: 3, friendRate: 0.55, hazardRate: 0.1, roots: 4, spot: 'surface',
         props: { boulder: 1, barrel: 1, seagrass: 3, rowboat: 1 }, propRate: 1.3,
         friends: { friend_seahorse: 2, friend_snail: 2, friend_nudibranch: 2, friend_turtle: 1, friend_starfish: 1, urchin: 1 },
         hazards: { hazard_net: 1 }
@@ -69,6 +69,7 @@ export const BIOMES = [
         rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.1,
         coral: 0.12, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.55,
         props: { wreck: 5, trawler: 3, rowboat: 1, barrel: 2, crate: 1, boulder: 1, anemone: 1 }, propRate: 2.4,
+        landmark: 'wreck',
         friends: { friend_starfish: 1, friend_seahorse: 1, urchin: 1 },
         hazards: { mine: 4, hazard_buoy: 2, spikes: 2 }
     },
@@ -77,6 +78,7 @@ export const BIOMES = [
         rock: [0xb7b9b0, 0x8d9088, 0x676b66, 0x4a4e4c, 0x353838], water: [0x6f8f3a, 0.26], open: 0.08,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
         props: { trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
+        landmark: 'trawler',
         friends: { friend_snail: 1, friend_nudibranch: 1 },
         hazards: { hazard_net: 4, hazard_buoy: 3, mine: 2, spikes: 2 }
     },
@@ -173,5 +175,23 @@ export function spotFor(spec) {
     const b = BIOMES.find(bi => bi.id === spec);
     if (!b) return null;
     const x = b.from + b.width / 2;
+    // Where the biome shows what it is: under the roots at the surface, beside its landmark
+    // on the seabed, otherwise in mid-water.
+    if (b.spot === 'surface') return { x, y: Math.min(380, floorY(x) * 0.5) };
+    if (b.landmark) return { x, y: floorY(x) - LANDMARK.above };
     return { x, y: Math.max(400, floorY(x) * 0.55) };
+}
+
+// A biome's landmark (`landmark` = a prop group: the wreck in the ship graveyard, the trawler
+// in the harbour) is guaranteed where the player arrives: in the chunk column of the biome's
+// entry and in the one of its `?at=` spot.
+export const LANDMARK = { entry: 1500, above: 360 };
+
+/** The landmark prop group that the chunk column `cx` must show, or null. */
+export function landmarkGroup(cx, chunk, cfg = LANDMARK) {
+    for (const b of BIOMES) {
+        if (!b.landmark) continue;
+        if (cx === Math.floor((b.from + cfg.entry) / chunk) || cx === Math.floor((b.from + b.width / 2) / chunk)) return b.landmark;
+    }
+    return null;
 }
