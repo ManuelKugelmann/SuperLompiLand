@@ -86,7 +86,7 @@ export default class HudScene extends Phaser.Scene {
 
         // Journey strip: the whole trip west -> east at a glance. Biome colours,
         // nests as dots, the grand nest as a star, the abyss as a notch, you as the arrow.
-        this.mapX = this.scale.width - 560; this.mapW = 520; this.mapY = 132;
+        this.mapX = this.scale.width - 560; this.mapW = 520; this.mapY = 156;      // below the control-scheme icons (y 64, 84 px)
         const toMap = x => this.mapX + Phaser.Math.Clamp((x - WORLD_WEST) / (WORLD_END - WORLD_WEST), 0, 1) * this.mapW;
         this.toMap = toMap;
         const mg = this.add.graphics();
