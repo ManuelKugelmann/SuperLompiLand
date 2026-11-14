@@ -2,13 +2,13 @@
 // slowly at first and faster as the wood bends; every slip is a short scrape of noise that rings
 // three low wooden modes. The intervals jitter, because friction never ticks evenly (an even
 // train reads as an electric buzz). Tuned by listening with earshot: a weak match for "a ship
-// hull creaking" (z +2.0), 87 % against buzz / frog / engine.
+// hull creaking" (z +2.4, rank 8 of 322), 99 % against buzz / frog / engine.
 
 export const CREAK = {
-    mode: [230, 370],      // Hz range of the lowest wooden mode (the others at ~2.2x and ~3.8x)
+    mode: [170, 280],      // Hz range of the lowest wooden mode (the others at ~2.2x and ~3.8x)
     decay: [0.05, 0.03, 0.018],   // s ring time per mode
-    rate: [5, 35],         // slips per second at the start and at the end of a groan
-    scrapeS: 0.004         // s of friction noise in each slip
+    rate: [3, 25],         // slips per second at the start and at the end of a groan
+    scrapeS: 0.009         // s of friction noise in each slip
 };
 
 /** Mono samples (peak 1) of one groan, `dur` s at sample rate `sr`. */
