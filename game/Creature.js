@@ -9,6 +9,7 @@ export const CREATURE = {
     grow: 0.18,        // share of the way to its new size per frame (curling in, puffing up)
     turn: 0.08,        // radians per step the nose may turn
     calmRadius: 320,   // px: a special this close calms a grumpy before it shoves
+    lookWithin: 650,   // px: closer than this, its eyes follow the swimmer (rig/RigEyes.js)
     beatSharpness: 3.5 // how hard a pulsing body snaps on the music's beat
 };
 
@@ -74,6 +75,8 @@ export default class Creature {
         if (!seen) return event;
         this.size += (p.size - this.size) * CREATURE.grow;
         this.rig.zoom = this.size;
+        const pl = water.player;
+        this.rig.lookAt?.(pl && Math.hypot(pl.x - p.x, pl.y - p.y) < CREATURE.lookWithin ? pl : null);
         this.rig.draw({
             x: p.x, y: p.y, vx: p.vx, vy: p.vy, frames: dt > 0 ? dt * 60 : 1, effort: p.effort,
             facing: p.dir, turn: CREATURE.turn, lean: p.lean,

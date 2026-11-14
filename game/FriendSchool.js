@@ -43,6 +43,7 @@ export default class FriendSchool {
                 f.rig = createRig(this.scene, f.character, f.x, f.y, SCHOOL_LOOK.depth);
             }
             const frames = Math.max(dt * 60, 0.01);
+            f.rig.lookAt({ x: fish.x, y: fish.y });      // friends keep an eye on Lompi (rig/RigEyes.js)
             f.rig.draw({ x: f.x, y: f.y, vx: (f.x - ox) / frames, vy: (f.y - oy) / frames, frames, effort: 0.6, turn: 0.1 });
         });
     }
