@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## The finale: down the vent staircase to the grand nest, where the freed friends wait
+
+[`51d8537`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/51d8537) · 2026-11-14 18:39
+
+![The finale: down the vent staircase to the grand nest, where the freed friends wait](27-the-finale-down-the-vent-staircase-to-the-grand-.jpg)
+
 ## The opening story in words: a caption per beat, one tap per beat
 
 [`e74b467`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/e74b467) · 2026-11-14 17:16
