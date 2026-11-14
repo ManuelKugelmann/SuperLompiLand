@@ -51,6 +51,7 @@ export default class CardRig {
         this.facing = 1;
         this.angle = 0;
         this.phase = 0;
+        this.spread = 0;
         this.zoom = 1;
         this.shown = true;
         this.turning = null;
@@ -125,7 +126,7 @@ export default class CardRig {
     }
 
     /** Same parameters as Rig.draw (position, velocity, effort, squash, turn rate, facing, lean, beat). */
-    draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, lean = 0, beat }) {
+    draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, lean = 0, beat, spread = 0 }) {
         const view = this.view, set = this.sets[this.state], [W, H] = set.size;
         view.x = x; view.y = y;
         const speed = Math.hypot(vx, vy);
@@ -173,7 +174,9 @@ export default class CardRig {
             bend = (u, v, o) => { const t = 1 - u; o.x = 0; o.y = Math.sin(ph - t * 2.6) * amp * 0.35 * t * t; };
         }
 
-        const m = { phase: ph, drive };
+        // Wings open in the air and fold back in the water, over a few frames (CARDS.spreadRate).
+        this.spread += (spread - this.spread) * Math.min(1, CARDS.spreadRate * frames);
+        const m = { phase: ph, drive, fold: 1 - this.spread };
         const pv = { yaw, facing: flip, rotation, sx, sy, x: 0, y: 0, dist: CARDS.persp * W, fade: false, dark: 1 };   // vertices are relative to the rope
         const at = [0, 0];
         for (const e of set.entries) {

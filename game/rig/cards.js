@@ -22,6 +22,7 @@ export const CARDS = {
     edgeFade: [0.05, 0.3],  // a fin fades out as it turns edge-on (|normal z| from .. to)
     backside: 0.78,         // a fin seen from behind (through it) is a little darker
     twin: { shift: [-0.035, -0.05], dark: 0.66, z: -0.6 },   // far twin of a paired fin
+    spreadRate: 0.12,       // share per 60 Hz step by which wings open or fold
     turnMs: 300,            // a turn-around (nose swings toward the viewer, through edge-on)
     sway: 0.012,            // idle yaw rocking (radians) ...
     swayMore: 0.03,         // ... plus this much at full effort
@@ -45,7 +46,9 @@ export const ROLES = {
     tail:      { swing: 0.38, sweep: 0.04, wave: 0.1, k: 2.2, speed: 1, idle: 0.04 },
     median:    { swing: 0.12, sweep: 0.03, wave: 0.07, k: 2.6, speed: 1, idle: 0.15 },
     pectoral:  { swing: 0.55, sweep: 0.08, wave: 0.06, k: 2.0, speed: 1.15, idle: 0.25, outward: true },
-    wing:      { swing: 0.12, sweep: 0.03, wave: 0.03, k: 1.6, speed: 0.55, idle: 0, outward: true },
+    // fold: the wing is painted spread; folded (m.fold 1, under water) it turns `angle` of the way
+    // back along the body and shrinks by `shrink` toward its root, spreading again in the air.
+    wing:      { swing: 0.12, sweep: 0.03, wave: 0.03, k: 1.6, speed: 0.55, idle: 0, outward: true, fold: { angle: 0.85, shrink: 0.5 } },
     flipper:   { swing: 0.35, sweep: 0.28, wave: 0.06, k: 1.8, speed: 0.55, idle: 0.08, outward: true },
     head:      { swing: 0.015, sweep: 0.008, wave: 0, k: 0, speed: 0.3, idle: 0.15 },   // steady (user: "less wobbly head")
     fan:       { swing: 0.05, sweep: 0.02, wave: 0.06, k: 3.0, speed: 0.9, idle: 0.25 },
@@ -117,6 +120,17 @@ export function outwardSign(card, part) {
     return card.out * (part.z >= 0 ? 1 : -1);
 }
 
+/** The in-plane turn (radians) that lays a card back along the body: its middle toward the tail (-x). */
+function foldTurn(card) {
+    if (card.foldTo === undefined) {
+        let cx = 0, cy = 0;
+        for (let i = 0; i < card.n; i++) { cx += card.lx[i]; cy += card.ly[i]; }
+        const a = Math.atan2(cy, cx), back = a >= 0 ? Math.PI : -Math.PI;
+        card.foldTo = back - a;
+    }
+    return card.foldTo;
+}
+
 /** Rotate (x, y, z) about the unit axis (ax, ay, 0) by angle a; writes into o. */
 function aboutAxis(x, y, z, ax, ay, a, o) {
     const c = Math.cos(a), s = Math.sin(a), d = (ax * x + ay * y) * (1 - c);
@@ -129,7 +143,7 @@ const P = [0, 0, 0], N = [0, 0, 0];
 
 /**
  * Pose a part card for this frame into out.{x,y,z,nx,ny,nz} (picture space, centre origin).
- * m: { phase, drive } of the rig; part: { role, axis:[ax,ay], amp, phase, z (px) };
+ * m: { phase, drive, fold (0 spread .. 1 folded) } of the rig; part: { role, axis:[ax,ay], amp, phase, z (px) };
  * at: [x, y] where its pivot is now (the body's bend carries it); mirror: the far twin.
  */
 export function posePart(card, part, m, at, mirror, out) {
@@ -140,11 +154,14 @@ export function posePart(card, part, m, at, mirror, out) {
     const swing = R.swing * effort * (R.outward ? (0.5 + 0.5 * beat) * outwardSign(card, part) : beat);
     const sweep = R.sweep * effort * Math.sin(ph);
     const [ax, ay] = part.axis;
+    const f = R.fold && m.fold ? m.fold : 0, fa = f ? R.fold.angle * f * foldTurn(card) : 0, fs = 1 - (f ? R.fold.shrink * f : 0);
+    const fc = Math.cos(fa) * fs, fsn = Math.sin(fa) * fs;
     for (let i = 0; i < card.n; i++) {
         const t = card.t[i];
-        // Swing about the hinge first (depth comes only from it, so it stays on its side),
-        // then stroke and undulation in the picture plane.
-        aboutAxis(card.lx[i], card.ly[i], 0, ax, ay, swing, P);
+        // Fold first (in the picture plane, about the root), then swing about the hinge (depth
+        // comes only from it, so it stays on its side), then stroke and undulation in the plane.
+        const lx = card.lx[i] * fc - card.ly[i] * fsn, ly = card.lx[i] * fsn + card.ly[i] * fc;
+        aboutAxis(lx, ly, 0, ax, ay, swing, P);
         aboutAxis(0, 0, 1, ax, ay, swing, N);
         const a = sweep + R.wave * effort * Math.sin(ph - R.k * t) * t;
         const ca = Math.cos(a), sa = Math.sin(a);

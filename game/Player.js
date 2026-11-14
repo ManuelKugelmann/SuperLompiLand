@@ -385,7 +385,7 @@ export default class Player {
             y: Phaser.Math.Linear(this.prev.y, this.cur.y, alpha),
             vx: held ? 0 : bv.x - this.flow.x, vy: held ? 0 : bv.y - this.flow.y,
             frames, effort: this.effort, squash: this.squash, turn: this.move.turn,
-            flowX: this.flow.x, flowY: this.flow.y
+            flowX: this.flow.x, flowY: this.flow.y, spread: this.inAir ? 1 : 0
         });
         // Protective glow while a shield or the short puff invincibility is active.
         const safe = this.shield > 0 || this.guard > 0;
