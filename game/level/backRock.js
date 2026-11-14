@@ -16,8 +16,8 @@ export const BACK_ROCK = {
     margin: 8,         // cells computed beyond each chunk side (the blur needs them; no seams)
     blur: 4,           // box blur radius in cells (two passes sideways, one down)
     scanStep: 48,      // world px between the samples that look for rock above and below the grid
-    pillar: 2200,      // under an island, rock below closer than this: the gap between is a pillar
-    island: [1100, 1200]   // an island is narrower [0] and thinner [1] than this (world px), with water above
+    pillar: 1600,      // under an island, rock below closer than this: the gap between is a pillar
+    island: [700, 1000]    // an island is narrower [0] and thinner [1] than this (world px), with water above
 };
 
 /** Reach (world px) of back rock at world x, blended across biome borders. */
@@ -87,7 +87,9 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
         any = true;
         const y0 = oy + at(0);
         let rockY = -Infinity;                                   // world y of the nearest rock above
-        for (let y = y0 - cfg.scanStep; y >= y0 - Math.max(R, cfg.pillar); y -= cfg.scanStep) {
+        // On the grid's own lattice (world-aligned, C px): every chunk samples the same rows,
+        // so neighbours find the same underside and decide the same way.
+        for (let y = y0 - C; y >= y0 - Math.max(R, cfg.pillar); y -= C) {
             if (field.density(x, y) > threshold) { rockY = y; break; }
         }
         let island = rockY > -Infinity && isIsland(x, rockY);
