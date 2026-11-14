@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { SET_PIECES, ghostShip, pinnacleTop } from './setPieces.js';
-import { boxHitsCircle, fadeStep } from './occluders.js';
+import { boxHitsCircle } from './occluders.js';
 
 /** The painted ghost ship (loaded by the title screen): its outside, its inside, and where things are in the picture. */
 export const SHIP_FILES = {
@@ -21,6 +21,7 @@ export const SET_LOOK = {
     debrisFall: 38,         // px per second
     debrisSpan: [380, 1500],   // from just under the churned layer down to the ship's keel line (below it is rock), then again from the top
     debrisWithin: 2600,     // px from the ship within which they are shown
+    hullThin: 0.62,         // the hull's alpha while the fish is behind its planking (it stays a solid ship)
     portSize: 170,          // the painted ship's lit portholes: size and brightness of their flicker
     portAlpha: 0.5,
     beaconTint: 0xffd9a0,
@@ -77,14 +78,40 @@ export default class SetPieceLayer {
         const x0 = ship.x - keelX * k, y0 = ship.keelY - keelY * k;      // the picture's top left corner in the world
         const at = (px, py) => [x0 + px * k, y0 + py * k];
         const [ix, iy, iw, ih] = art.inside;
-        s.add.image(...at(ix, iy), 'ghost_ship_inside').setOrigin(0).setDisplaySize(iw * k, ih * k).setDepth(2.6);
-        this.front = s.add.image(x0, y0, 'ghost_ship').setOrigin(0).setScale(k).setDepth(7.5);
-        this.box = { x0, y0, x1: x0 + art.front[0] * k, y1: y0 + art.front[1] * k };
+        s.add.image(...at(ix, iy), this.softInside(art)).setOrigin(0).setDisplaySize(iw * k, ih * k).setDepth(2.6);
+        // In front of the fish, but below the band of foreground things the scene thins on its own (7 to 8): this one decides for itself.
+        this.front = s.add.image(x0, y0, 'ghost_ship').setOrigin(0).setScale(k).setDepth(6.9);
+        // The hull proper (portholes down to the keel, stern to bow) and the hole in it, in the world.
+        const portY = Math.min(...art.lanterns.map(l => l[1])) - 60;
+        this.hull = { x0: x0 + art.keel[0] * k - 120, y0: y0 + portY * k, x1: x0 + art.keel[2] * k + 160, y1: y0 + keelY * k };
+        this.hole = { x: x0 + hx * k, y: y0 + hy * k, rx: art.hole[2] * k, ry: art.hole[3] * k };
         for (const [px, py] of art.lanterns) {
             this.lanterns.push(s.add.image(...at(px, py), 'bd_glow').setDisplaySize(SET_LOOK.portSize, SET_LOOK.portSize).setTint(0xffc97a)
-                .setBlendMode(Phaser.BlendModes.ADD).setDepth(7.6));
+                .setBlendMode(Phaser.BlendModes.ADD).setDepth(6.95));
         }
         this.lanternAlpha = SET_LOOK.portAlpha;
+    }
+
+    /**
+     * The ship's inside with its edges melted away: it is only ever meant to be seen through
+     * the hole, but while the hull thins (the fish is behind it) its square outline would show.
+     * Baked once: the picture kept inside an ellipse a little larger than the hole, feathered.
+     */
+    softInside(art) {
+        const tex = this.scene.textures, key = 'ghost_ship_inside_soft';
+        if (tex.exists(key)) return key;
+        const src = tex.get('ghost_ship_inside').getSourceImage(), w = src.width, h = src.height;
+        const canvas = tex.createCanvas(key, w, h), c = canvas.getContext();
+        c.drawImage(src, 0, 0);
+        const cx = art.hole[0] - art.inside[0], cy = art.hole[1] - art.inside[1], rx = art.hole[2] * 1.3, ry = art.hole[3] * 1.35;
+        c.globalCompositeOperation = 'destination-in';
+        c.save(); c.translate(cx, cy); c.scale(1, ry / rx);
+        const g = c.createRadialGradient(0, 0, rx * 0.72, 0, 0, rx);
+        g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        c.fillStyle = g; c.fillRect(-w, -h * 2, w * 2, h * 4);
+        c.restore();
+        canvas.refresh();
+        return key;
     }
 
     /** Without the painted ship: a wreck we have, turned level, its hull across the lane, behind the fish. */
@@ -107,7 +134,12 @@ export default class SetPieceLayer {
     update(t, fish, radius, dt) {
         this.lanterns.forEach((l, i) => l.setAlpha(this.lanternAlpha * (0.72 + 0.28 * Math.sin(t * 1.3 + i * 2.1) * Math.sin(t * 3.7 + i))));
         this.beacon.setAlpha(SET_LOOK.beaconAlpha * (0.8 + 0.2 * Math.sin(t * 0.7)));
-        if (this.front) this.front.setAlpha(fadeStep(this.front.alpha, 1, boxHitsCircle(this.box, fish.x, fish.y, radius), dt));
+        if (this.front) {
+            // The hull thins a little only while the fish is behind solid planking; in the hole it is seen anyway.
+            const hidden = boxHitsCircle(this.hull, fish.x, fish.y, radius) && ((fish.x - this.hole.x) / this.hole.rx) ** 2 + ((fish.y - this.hole.y) / this.hole.ry) ** 2 > 1;
+            const want = hidden ? SET_LOOK.hullThin : 1, k = 1 - Math.exp(-dt * 9);
+            this.front.setAlpha(this.front.alpha + (want - this.front.alpha) * k);
+        }
         this.sink(t, fish);
     }
 

@@ -187,7 +187,7 @@ export function createField(seed) {
             // Broad lumps on its flanks (none under the keel, which must lie in its hollow) and small knobs everywhere.
             // Lumps and knobs on its flanks; under the keel only small dips (the bed never rises into the lane).
             const P = SET_PIECES.ship, flank = Math.min(1, Math.max(0, (Math.abs(x - SHIP_X) - P.pinnacleHalf) / 300));
-            const top = pinnacleTop(x) + P.lump * flank * (vnoise(x / 400, 5.3, seed + 31) * 2 - 1)
+            const top = pinnacleTop(x) + P.lump * flank * (vnoise(x / 400, 5.3, seed + 31) * 2 - 1 + 0.5 * (vnoise(x / 170, 1.7, seed + 33) * 2 - 1))
                 + P.knobs * (flank * (vnoise(x / 90, 2.9, seed + 32) * 2 - 1) + (1 - flank) * 0.5 * vnoise(x / 90, 2.9, seed + 32));
             if (y > top) n += (FIELD.crestRock - n) * smooth01((y - top) / 80);
         }

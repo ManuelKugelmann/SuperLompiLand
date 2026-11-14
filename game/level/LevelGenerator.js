@@ -21,7 +21,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 18,
+    version: 19,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -497,10 +497,12 @@ export default class LevelGenerator {
             // The biome's landmark comes first where the player arrives (biomes.js), on any floor
             // that can carry it; the every-third-column rule is for the random ones.
             const must = landmarkGroup(cx, CH);
-            const exists = g => PROPS[g] && !PROPS[g].surface && (used[slot(g)] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
+            // No other hull beside the ghost ship: on its pinnacle the wreck and boat props stay away.
+            const byShip = Math.abs(mid - ghostShip().x) < SET_PIECES.ship.pinnacleHalf + CH;
+            const exists = g => PROPS[g] && !PROPS[g].surface && !(byShip && slot(g) === 'hull') && (used[slot(g)] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
             for (let k = must && !PROPS[must]?.surface ? -1 : 0; k < count; k++) {
                 const forced = k < 0;
-                if (forced && !PROPS[must].keys.some(has)) continue;
+                if (forced && (!PROPS[must].keys.some(has) || (byShip && slot(must) === 'hull'))) continue;      // the ghost ship is this place's landmark
                 const group = forced ? must : pickWeighted(rng, biome.props, exists);
                 if (!group) break;
                 const p = PROPS[group];
