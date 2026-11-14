@@ -35,6 +35,31 @@ const MASTER = { threshold: -20, knee: 8, ratio: 4, attack: 0.004, release: 0.25
 // Fallback when play('coin') is called without a streak note: C major pentatonic.
 const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
 
+/**
+ * Recorded sounds (CC0, _ref/cc0/<name>/SOURCE): fetched and decoded once when audio starts; until
+ * then, or if a file is missing, the synthesized version plays instead. Paths are relative (base per branch).
+ */
+const SAMPLE_FILES = { splash_a: 'sfx/splash_a.mp3', splash_b: 'sfx/splash_b.mp3' };
+const samples = {};
+function loadSamples() {
+    for (const [name, url] of Object.entries(SAMPLE_FILES)) {
+        fetch(url).then(r => (r.ok ? r.arrayBuffer() : Promise.reject(r.status)))
+            .then(b => ctx.decodeAudioData(b)).then(buf => { samples[name] = buf; })
+            .catch(() => { /* missing: the synthesized sound stays */ });
+    }
+}
+
+/** Play a recorded sound: gain, playback rate (pitch). False when it is not loaded. */
+function playSample(name, gain = 1, rate = 1) {
+    const buf = samples[name];
+    if (!buf) return false;
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf; src.playbackRate.value = rate; g.gain.value = gain;
+    src.connect(g).connect(master);
+    src.start();
+    return true;
+}
+
 function ready() {
     if (muted) return false;
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -50,6 +75,7 @@ function ready() {
         noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        loadSamples();
     }
     if (ctx.state === 'suspended') ctx.resume();
     return ctx.state !== 'closed';
@@ -315,6 +341,10 @@ const SOUNDS = {
     // A seabird calls before it dives (spec 5.0d): two harsh, falling croaks.
     cry() { [0, 0.16].forEach((at, i) => { tone({ f: 980 - i * 120, to: 620 - i * 80, type: 'sawtooth', dur: 0.13, vol: 0.07, at }); noise({ dur: 0.12, vol: 0.05, from: 1800, to: 900, q: 2, at }); }); },
     splash(strength = 1) {
+        // A recorded splash (CC0; tester: the synthesized one popped like bubble wrap), one of two at
+        // random, a little higher or lower each time; a hard dive a little louder. Synthesized below as the fallback.
+        const pick = Math.random() < 0.5 ? 'splash_a' : 'splash_b', gain = Math.min(0.7, 0.3 + strength * 0.035);
+        if (playSample(pick, gain, 0.9 + Math.random() * 0.2)) return;
         // A real splash (tester: the old one "popped like bubble wrap"): a soft body of water noise and a
         // dense cloud of tiny bubbles (dozens in a few tenths of a second, each a quick rising chirp), so
         // no single pop stands out. Every part fades in; a hard dive is a little louder and fuller.
