@@ -141,7 +141,7 @@ export default class IntroScene extends Phaser.Scene {
     /** Character carousel: swipe, arrows or tap a neighbour to choose; tap the middle one or GO to start. */
     buildCarousel(lang) {
         const W = this.scale.width, H = this.scale.height;
-        const cy = H * 0.52, SPACING = 430;
+        const cy = H * 0.52, SPACING = 430, ARROW_OFF = 292;
         this.index = Math.max(0, CHARACTERS.findIndex(c => c.id === loadSelectedId()));
         this.slot = this.index; // animated, fractional position
 
@@ -166,15 +166,16 @@ export default class IntroScene extends Phaser.Scene {
         // "There are more fish": a round button in each gap beside the chosen character, on a
         // dark backing so it reads against water and fish alike; it nudges gently toward its side.
         const arrow = (x, label, step) => {
-            const back = this.add.circle(x, cy, 50, 0x06343a, 0.62).setStrokeStyle(4, 0xffffff, 0.85).setDepth(20)
+            const back = this.add.circle(x, cy, 42, 0x06343a, 0.62).setStrokeStyle(4, 0xffffff, 0.85).setDepth(20)
                 .setInteractive({ useHandCursor: true });
-            const t = this.add.text(x, cy - 8, label, { fontFamily: 'Arial', fontSize: '84px', color: '#ffffff', fontStyle: 'bold' })
+            const t = this.add.text(x, cy - 7, label, { fontFamily: 'Arial', fontSize: '70px', color: '#ffffff', fontStyle: 'bold' })
                 .setOrigin(0.5).setDepth(21);
             back.on('pointerdown', () => this.select(this.index + step));
             this.tweens.add({ targets: [back, t], x: x + step * 8, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         };
-        arrow(W / 2 - SPACING / 2, '‹', -1);
-        arrow(W / 2 + SPACING / 2, '›', 1);
+        // Between the chosen fish (drawn up to 360 px wide) and its neighbours (430 px away).
+        arrow(W / 2 - ARROW_OFF, '‹', -1);
+        arrow(W / 2 + ARROW_OFF, '›', 1);
 
         const go = this.add.text(W / 2, H * 0.905, lang === 'de' ? 'Los geht\u2019s!' : 'Let\u2019s go!', {
             fontFamily: 'Arial', fontSize: '52px', color: '#06343a', fontStyle: 'bold',
