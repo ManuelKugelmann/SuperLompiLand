@@ -7,6 +7,7 @@
 //   rock     terrain colour bands, rim -> core          water   tint laid over the backdrop [colour, alpha]
 //   open     how much rock is removed (0 = cave-rich, 0.3 = wide open water)
 //   backRock reach (world px) of the rock behind the play plane under overhangs (0 = none: endless open water)
+//   rockWall share of the near/mid rock layers that is closed wall (0 = all open water; rockLayerTable.js)
 //   coral    chance that a floor spot gets coral          kelp    chance that it gets a kelp stalk
 //   Friends are the sea's own creatures (anglerfish and urchins included).
 //   Hazards are what the volcano's eruption and people left behind, all of
@@ -30,6 +31,7 @@ export const BIOMES = [
         id: 'beach', name: { de: 'Sandstrand', en: 'Sandy Beach' },
         rock: [0xfff0c0, 0xf2d894, 0xd9b877, 0xb89868, 0x937a5c], water: [0x7ff0e0, 0.22], open: 0.2,
         backRock: 400,
+        rockWall: 0.15,
         coral: 0.12, kelp: 0.1, coins: 2, friendRate: 0.5, hazardRate: 0,
         props: { boulder: 2, seagrass: 5, anemone: 1 }, propRate: 2.0,
         friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, urchin: 1 }, hazards: {}
@@ -38,6 +40,7 @@ export const BIOMES = [
         id: 'reef', name: { de: 'Heimatriff', en: 'Home Reef' },
         rock: ROCK_REEF, water: [0x3fd0e8, 0.0], open: 0.0,
         backRock: 900,
+        rockWall: 0.45,
         coral: 0.6, kelp: 0.12, coins: 2, friendRate: 0.4, hazardRate: 0.12,
         props: { boulder: 2, seafan: 2, anemone: 2, seagrass: 1 }, propRate: 1.5,
         friends: { friend_starfish: 2, friend_snail: 2, friend_turtle: 1, friend_seahorse: 1, urchin: 2 },
@@ -49,6 +52,7 @@ export const BIOMES = [
         id: 'mangrove', name: { de: 'Mangroven-Lagune', en: 'Mangrove Lagoon' },
         rock: [0xe8d9a6, 0xbfae77, 0x8f8257, 0x665d44, 0x474233], water: [0x4fb98a, 0.22], open: 0.22,
         backRock: 400,
+        rockWall: 0.6,
         coral: 0.25, kelp: 0.3, coins: 3, friendRate: 0.55, hazardRate: 0.1, roots: 4, spot: 'surface',
         props: { boulder: 1, barrel: 1, seagrass: 3, rowboat: 1 }, propRate: 1.3,
         friends: { friend_seahorse: 2, friend_snail: 2, friend_nudibranch: 2, friend_turtle: 1, friend_starfish: 1, urchin: 1 },
@@ -59,6 +63,7 @@ export const BIOMES = [
         id: 'kelp', name: { de: 'Tangwald', en: 'Kelp Forest' },
         rock: [0xc9d08a, 0x9fae62, 0x6f8250, 0x4d5f44, 0x384238], water: [0x2f9a5c, 0.26], open: 0.05,
         backRock: 900,
+        rockWall: 0.25,
         coral: 0, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
         props: { boulder: 3, kelpclump: 3, anemone: 2, seafan: 1 }, propRate: 1.8,
         friends: { friend_seahorse: 3, friend_nudibranch: 3, friend_snail: 1, urchin: 1 },
@@ -68,6 +73,7 @@ export const BIOMES = [
         id: 'blue', name: { de: 'Blaues Meer', en: 'Open Blue' },
         rock: [0xd9e2ee, 0xa9b8cc, 0x7d8fa8, 0x5a6a84, 0x414c63], water: [0x1b5fd0, 0.24], open: 0.3,
         backRock: 0,
+        rockWall: 0,
         coral: 0.15, kelp: 0.05, coins: 3, friendRate: 0.45, hazardRate: 0.25,
         props: { boulder: 1, seafan: 1 }, propRate: 0.6,
         friends: { friend_jellyfish: 4, friend_turtle: 2 }, hazards: { mine: 2, hazard_buoy: 1 }
@@ -76,6 +82,7 @@ export const BIOMES = [
         id: 'wreck', name: { de: 'Schiffsfriedhof', en: 'Ship Graveyard' },
         rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.1,
         backRock: 1200,
+        rockWall: 0.55,
         coral: 0.12, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.55,
         props: { wreck: 5, trawler: 3, rowboat: 1, barrel: 2, crate: 1, boulder: 1, anemone: 1 }, propRate: 2.4,
         landmark: 'wreck',
@@ -86,6 +93,7 @@ export const BIOMES = [
         id: 'harbour', name: { de: 'Hafen', en: 'Harbour' },
         rock: [0xb7b9b0, 0x8d9088, 0x676b66, 0x4a4e4c, 0x353838], water: [0x6f8f3a, 0.26], open: 0.08,
         backRock: 600,
+        rockWall: 0.25,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
         props: { pier: 1, trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
         landmark: 'pier', spot: 'surface',   // the pier stands at the waterline
@@ -97,6 +105,7 @@ export const BIOMES = [
         id: 'trench', name: { de: 'Tiefsee', en: 'Deep Trench' },
         rock: [0x7f86c4, 0x5b5f9c, 0x434576, 0x303158, 0x21213f], water: [0x1a0f4a, 0.42], open: 0.04,
         backRock: 1400,
+        rockWall: 0.7,
         coral: 0, kelp: 0, coins: 4, friendRate: 0.25, hazardRate: 0.5,
         props: { boulder: 2, anemone: 1 }, propRate: 0.8,
         friends: { friend_jellyfish: 2, friend_nudibranch: 1, enemy_angler: 4, urchin: 1 },

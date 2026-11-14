@@ -1,19 +1,20 @@
-import { ROCK_LAYERS, LAYER_CHUNK, LAYER_SHADE, layerChunkRect } from './rockLayerTable.js';
+import { ROCK_LAYERS, LAYER_CHUNK, LAYER_SHADE } from './rockLayerTable.js';
 import { materialTiles } from './materials.js';
-import { biomeBlendAt } from './biomes.js';
 import { mix } from './layerMath.js';
 import { LEVEL } from './LevelGenerator.js';
 
 /**
  * Near and mid-range rock behind the play plane (rockLayerTable.js): per layer, chunks of a
  * second procedural rock field shaded in the terrain worker (stone materials, soft unlit
- * rims), shown as plain images with the layer's scroll factor, darkened and fogged toward
- * the water. At most one chunk is put on screen per frame; nothing is redrawn while
+ * rims, fog toward the water baked in), shown as plain images with the layer's scroll factor,
+ * fading in. At most one chunk is put on screen per frame; nothing is redrawn while
  * playing. Without a worker the layers stay empty (the game looks fine without them).
  *
  *   create():  this.rockLayers = new RockLayers(this)   (after the LevelGenerator: it needs the materials)
  *   update():  this.rockLayers.update(camX, camY)
  */
+const FADE_IN_MS = 600;     // a new chunk fades in over this long (never pops in with hard edges)
+
 export default class RockLayers {
     constructor(scene) {
         this.scene = scene;
@@ -46,7 +47,7 @@ export default class RockLayers {
             for (const [id, c] of l.chunks) {
                 const [cx, cy] = id.split(',').map(Number);
                 if (cx >= x0 - 1 && cx <= x1 + 1 && cy >= y0 - 1 && cy <= y1 + 1) continue;
-                if (c !== 'pending') { c.img.destroy(); scene.textures.remove(c.key); }
+                if (c !== 'pending') { scene.tweens.killTweensOf(c.img); c.img.destroy(); scene.textures.remove(c.key); }
                 l.chunks.delete(id);
             }
         });
@@ -67,12 +68,10 @@ export default class RockLayers {
         const tex = scene.textures.createCanvas(key, S, S);
         tex.context.putImageData(new ImageData(new Uint8ClampedArray(r.rock.buffer), S, S), 0, 0);
         tex.refresh();
-        // Fog toward the water of the biome this chunk shows, and darker: further back, unlit.
-        const { ox, span } = layerChunkRect(def, cx, cy);
-        const water = mix(biomeBlendAt(ox + span / 2).a.water[0], 0x2a9fc8, 0.5);
-        const tint = mix(mix(0xffffff, water, def.fog), 0x000000, 1 - def.dark);
+        // The fog toward the water is baked in by the worker (fogLayer); a slight darkening on top.
         const img = scene.add.image(cx * L, cy * L, key).setOrigin(0).setScrollFactor(def.s)
-            .setDisplaySize(L + 1, L + 1).setDepth(def.depth).setTint(tint);
+            .setDisplaySize(L + 1, L + 1).setDepth(def.depth).setTint(mix(0xffffff, 0x000000, 1 - def.dark)).setAlpha(0);
+        scene.tweens.add({ targets: img, alpha: 1, duration: FADE_IN_MS });
         return { img, key };
     }
 

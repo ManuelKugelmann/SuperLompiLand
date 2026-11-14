@@ -8,7 +8,7 @@
 import { createField, chunkGrids } from './density.js';
 import { shadeChunk } from './shade.js';
 import { setMaterials } from './materials.js';
-import { ROCK_LAYERS, LAYER_SHADE, layerField, layerChunkRect } from './rockLayerTable.js';
+import { ROCK_LAYERS, LAYER_SHADE, layerField, layerChunkRect, fogLayer } from './rockLayerTable.js';
 
 let field = null, fieldSeed = null;
 const layerFields = new Map();      // "seed:layer" -> field
@@ -17,9 +17,11 @@ self.onmessage = e => {
     if (e.data.materials) { setMaterials(e.data.materials); return; }
     if (e.data.layer !== undefined) {
         const { seed, key, layer, cx, cy } = e.data, L = ROCK_LAYERS[layer], id = `${seed}:${layer}`;
-        if (!layerFields.has(id)) layerFields.set(id, layerField(createField(seed + L.seed), L));
+        if (fieldSeed !== seed) { field = createField(seed); fieldSeed = seed; }
+        if (!layerFields.has(id)) layerFields.set(id, layerField(createField(seed + L.seed), L, { route: x => field.routeY(x) }));
         const { ox, oy, span } = layerChunkRect(L, cx, cy);
         const { rock } = shadeChunk(layerFields.get(id), seed + L.seed, ox, oy, span, LAYER_SHADE);
+        fogLayer(rock, LAYER_SHADE.rockSize, ox, oy, span, L);
         self.postMessage({ key, layer, rock }, [rock.buffer]);
         return;
     }
