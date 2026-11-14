@@ -85,7 +85,7 @@ import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport, slowSteps, watchParts, splitFrame } from '../game/perfTour.js';
-import { depthMeters } from '../game/level/depthMeters.js';
+import { depthMeters, createDepthBell } from '../game/level/depthMeters.js';
 import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics, catchCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
@@ -1854,6 +1854,10 @@ export default class MainScene extends Phaser.Scene {
         }
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
+        // Depth is felt (spec 5.0w): past a depth mark a lower bell rings and the HUD's depth line glows.
+        this.depthBell ??= createDepthBell();
+        const mark = this.depthBell.step(this.depthMeters());
+        if (mark >= 0 && !this.ambientMode && !this.perfTour) { play('deeper', mark); this.depthMarkAt = time; }
         const t2 = performance.now();
         for (const [k, ms] of [['physics', t1 - t0], ['world', t2 - t1]]) {
             const a = this.perf[k]; a.sum += ms; a.n++; if (ms > a.max) a.max = ms;

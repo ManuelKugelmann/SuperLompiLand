@@ -208,6 +208,12 @@ export default class HudScene extends Phaser.Scene {
             const line = place ? `${this.depthLabel} ${m.depthMeters()} m · ${place}` : `${this.depthLabel} ${m.depthMeters()} m`;
             if (line !== this.shownDepth) { this.shownDepth = line; this.depthText.setText(line); }
         }
+        if (m.depthMarkAt && m.depthMarkAt !== this.shownMark) {      // a depth mark was passed: the depth line glows (spec 5.0w)
+            this.shownMark = m.depthMarkAt;
+            this.tweens.killTweensOf(this.depthText);
+            this.depthText.setScale(1).setTint(0xfff3b0);
+            this.tweens.add({ targets: this.depthText, scale: 1.12, duration: 260, yoyo: true, ease: 'Sine.easeOut', onComplete: () => this.depthText.clearTint() });
+        }
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
         const now = performance.now();

@@ -410,6 +410,13 @@ const SOUNDS = {
     respawn() { tone({ f: 440, to: 220, type: 'sine', dur: 0.4, vol: 0.2 }); },
     flap() { noise({ dur: 0.09, vol: 0.1, from: 700, to: 1400, q: 1.2 }); },
     tap() { tone({ f: 880, type: 'sine', dur: 0.06, vol: 0.12 }); },
+    /** Going down past depth mark i (game/level/depthMeters.js): a soft bell, a step lower every mark. */
+    deeper(i = 0) {
+        const f = 523.25 * Math.pow(0.8909, i * 2);      // two semitones lower per mark
+        tone({ f, type: 'sine', dur: 1.4, vol: 0.12 });
+        tone({ f: f * 2.01, type: 'sine', dur: 0.8, vol: 0.03 });
+        tone({ f: f / 2, type: 'triangle', at: 0.05, dur: 1.6, vol: 0.05 });
+    },
     rumble() { tone({ f: 55, to: 38, type: 'sawtooth', dur: 1.6, vol: 0.3 }); noise({ dur: 1.6, vol: 0.25, from: 180, to: 70, q: 0.4 }); },
     boom() { noise({ dur: 1.2, vol: 0.5, from: 900, to: 60, q: 0.3 }); tone({ f: 90, to: 30, type: 'sine', dur: 0.9, vol: 0.4 }); }
 };

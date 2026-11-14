@@ -21,3 +21,12 @@ test('deeper always reads deeper', () => {
         last = m;
     }
 });
+
+test('a depth mark rings once going down, again only after coming back up well above it', async () => {
+    const { createDepthBell, DEPTH_MARKS } = await import('../game/level/depthMeters.js');
+    const bell = createDepthBell(), rings = [];
+    for (const m of [0, 5, 9, 10, 11, 9, 10, 12, 15, 21, 19, 21, 6, 12, 120]) { const i = bell.step(m); if (i >= 0) rings.push(DEPTH_MARKS.at[i]); }
+    // 10 at the first pass; not again at 9 -> 10; 20 once; back up to 6 m (above 0.7 x 10) re-arms 10;
+    // a jump from 12 to 120 m passes 50 and 100: the deepest one rings.
+    assert.deepEqual(rings, [10, 20, 10, 100]);
+});

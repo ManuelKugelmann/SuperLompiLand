@@ -14,3 +14,27 @@ export function depthMeters(y, table = DEPTH_SCALE) {
     const m = m0 + (m1 - m0) * (y - y0) / (y1 - y0);
     return m >= 100 ? Math.round(m / 10) * 10 : Math.round(m);
 }
+
+/**
+ * Depth marks (spec 5.0w "depth must be felt"): going down past one of these metres rings a bell that is
+ * lower every mark, and the HUD's depth line glows. A mark rings again only after Lompi has come back
+ * up above `rearm` of it, so swimming along a mark's depth does not ring it over and over.
+ */
+export const DEPTH_MARKS = { at: [10, 20, 50, 100, 200, 500, 1000, 2000, 3000], rearm: 0.7 };
+
+/** A bell keeper: step(metres) returns the index of the mark just passed going down, else -1. */
+export function createDepthBell(cfg = DEPTH_MARKS) {
+    const armed = cfg.at.map(() => true);
+    let last = 0;
+    return {
+        step(m) {
+            let rang = -1;
+            cfg.at.forEach((mark, i) => {
+                if (!armed[i] && m < mark * cfg.rearm) armed[i] = true;
+                if (armed[i] && last < mark && m >= mark) { armed[i] = false; rang = i; }
+            });
+            last = m;
+            return rang;
+        }
+    };
+}
