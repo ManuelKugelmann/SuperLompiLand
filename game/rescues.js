@@ -18,7 +18,9 @@ export const RESCUES = {
     freeRadius: 170,     // px: swimming this close frees it ...
     specialRadius: 420,  // ... and so does a special this close
     // What it is caught in and who that is (the reef-book entry it stamps), taken in turn along the way.
-    traps: [{ trap: 'ring', kind: 'friend_parrotfish' }, { trap: 'bottle', kind: 'hermit_crab' }, { trap: 'bag', kind: 'friend_turtle' }]
+    // `ground`: it lies on the seabed under the route (only along the islands: out at sea the bottom is far too deep).
+    traps: [{ trap: 'ring', kind: 'friend_parrotfish' }, { trap: 'bottle', kind: 'hermit_crab', ground: true }, { trap: 'bag', kind: 'friend_turtle' }],
+    groundReach: 1300    // px below the route within which a ground trap finds its seabed (else it hangs on the route)
 };
 
 /** Stretches of the world [x0, x1] where no small rescue stands. */
@@ -39,10 +41,13 @@ let SPOTS = null;
 export function rescueSpots(cfg = RESCUES) {
     if (cfg === RESCUES && SPOTS) return SPOTS;
     const keep = keepOuts(cfg), out = [];
+    let turn = 0;
     for (let at = FIELD.spawn.x + cfg.first, i = 0; at < WORLD_END - cfg.every / 2; at += cfg.every, i++) {
         let x = at;
         for (const [x0, x1] of keep) if (x > x0 && x < x1) x = x1;
-        out.push({ id: `r${i}`, x, ...cfg.traps[i % cfg.traps.length], biome: BIOMES[biomeIndexAt(x)].id });
+        const b = BIOMES[biomeIndexAt(x)];
+        if (b.zone === 'sea' && cfg.traps[turn % cfg.traps.length].ground) turn++;      // nothing lies on the bottom of the open sea
+        out.push({ id: `r${i}`, x, ...cfg.traps[turn++ % cfg.traps.length], biome: b.id });
     }
     if (cfg === RESCUES) SPOTS = out;
     return out;

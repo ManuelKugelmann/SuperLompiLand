@@ -210,7 +210,7 @@ export default class MainScene extends Phaser.Scene {
         // The rocky shore's set piece (spec 5.0g): the sea arch, with its arc of coins for a jump through it.
         this.arch = new SeaArchLayer(this, seaArch(), inAir => this.throughArch(inAir), (x, y) => this.coinTaken(x, y));
         // Small rescues between the chapters (spec 5.0i): an animal in a bit of net every so often on the route.
-        this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y));
+        this.rescues = this.ambientMode ? null : new RescueLayer(this, x => this.level.field.routeY(x), (x, y) => this.seabedBelow(x, y), this.progression.get?.('rescues', []) || [], (spot, x, y) => this.smallRescue(spot, x, y), (x, y) => this.coinTaken(x, y));
         // Moon jelly blooms drift across the route in the open seas (spec 5.0i).
         this.blooms = new BloomLayer(this, () => this.bookEntry('friend_jellyfish'));
         // ... and at their surface float sargassum rafts; a skip off a wave sends flying fish out of the water.
@@ -546,6 +546,12 @@ export default class MainScene extends Phaser.Scene {
         console.log(text);
         this.add.text(40, 120, text, { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
             .setScrollFactor(0).setDepth(99);
+    }
+
+    /** The seabed straight below (x, y) within a rescue's reach, or null (open water all the way). */
+    seabedBelow(x, y) {
+        for (let at = y; at < y + RESCUES.groundReach; at += 20) if (!this.level.isOpen(x, at, 0)) return at;
+        return null;
     }
 
     /** A small animal is out of its bit of net (RescueLayer): a few coins, a cheer, its stamp in the reef book. */
@@ -1138,13 +1144,7 @@ export default class MainScene extends Phaser.Scene {
         this.coins += coinWorth(note.multiplier, !this.relaxed && this.chain.flow);
         play('coin', note);
         this.streakFx(x, y, note);
-        for (let i = 0; i < 5; i++) {           // sparkle
-            const a = (i / 5) * Math.PI * 2 + Math.random();
-            const star = this.add.star(x, y, 4, 4, 11, 0xffffff).setDepth(3);
-            this.tweens.add({ targets: star, x: x + Math.cos(a) * 70, y: y + Math.sin(a) * 70, alpha: 0, angle: 180, scale: 0.3, duration: 380, onComplete: () => star.destroy() });
-        }
-        const pop = this.add.circle(x, y, 30, 0xfff3b0, 0.8).setDepth(3);
-        this.tweens.add({ targets: pop, scale: 2.6, alpha: 0, duration: 260, onComplete: () => pop.destroy() });
+        this.particles.spawn('glint', x, y, 6, { spread: 70 });      // pooled sparkle: nothing of a taken coin stays behind
     }
 
     /** Something hurt the fish from (x, y). Returns true when it went down. */
@@ -1418,7 +1418,7 @@ export default class MainScene extends Phaser.Scene {
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
-        this.rescues?.update(sp, time / 1000, delta);
+        this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.rafts.update(sp, time / 1000);
         if (this.whale) {
