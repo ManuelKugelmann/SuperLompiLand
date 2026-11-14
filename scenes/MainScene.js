@@ -12,6 +12,7 @@ import WaterLight from '../game/fx/WaterLight.js';
 import ParticleLayer from '../game/fx/ParticleLayer.js';
 import SwarmLayer from '../game/ai/SwarmLayer.js';
 import SeabirdLayer from '../game/ai/SeabirdLayer.js';
+import DeepGlowLayer from '../game/level/DeepGlowLayer.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
@@ -158,6 +159,8 @@ export default class MainScene extends Phaser.Scene {
         });
         this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         // Gannets over the island coasts dive after shoals and after a fish near the surface (spec 5.0d).
+        // Light of its own in the deep: glowing jellies, strings and plankton sparks (spec 5.0e).
+        this.deepGlow = new DeepGlowLayer(this, (x, y) => this.level.isOpen(x, y, OPEN_SLACK));
         this.seabirds = new SeabirdLayer(this, {
             surfaceY: x => this.surface.heightAt(x, this.time.now / 1000),
             // Rock between the fish and the surface hides it (the air above is not "open" water).
@@ -334,6 +337,7 @@ export default class MainScene extends Phaser.Scene {
             this.particles.destroy();
             this.swarms.destroy();
             this.seabirds.destroy();
+            this.deepGlow.destroy();
             this.boosters.destroy();
             this.speedLines.destroy();
             this.events.off('fish-special');
@@ -1200,6 +1204,7 @@ export default class MainScene extends Phaser.Scene {
         for (const s of this.swarms.swarms) shoals.push(s.sim.centre());
         const local = this.ambientMode ? null : bird;
         this.seabirds.update(delta / 1000, view.x, local, local ? [local, ...players.slice(1)] : [], shoals);
+        this.deepGlow.update(this.cameras.main.worldView, this.time.now / 1000);
         this.oilExposure(delta / 1000);
         this.bobCoins();
         this.discover(delta);
