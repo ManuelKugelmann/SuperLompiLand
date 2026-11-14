@@ -55,6 +55,7 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import GrandNestLayer from '../game/level/GrandNestLayer.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
+import SeaLionLayer from '../game/level/SeaLionLayer.js';
 import { GRAND_NEST } from '../game/level/grandNest.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
@@ -244,6 +245,8 @@ export default class MainScene extends Phaser.Scene {
         this.setPieces = new SetPieceLayer(this, this.level.nests[this.level.nests.length - 1], this.level.nests.slice(0, -1));
         // The root nursery in the mangrove (spec 5.0n): a cloud of fry that parts round the fish, and two lemon shark pups.
         this.nursery = new NurseryLayer(this, x => this.level.field.routeY(x), () => this.character.id === 'shark', () => this.bookEntry('nursery'));
+        // The rocky shore's sea lion pup (spec 5.0o): shoots past, loops round the fish twice, goes up for air.
+        this.seaLion = new SeaLionLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('sea_lion'));
         // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
         this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
@@ -1645,6 +1648,7 @@ export default class MainScene extends Phaser.Scene {
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);
+        this.seaLion.update(sp, this.fish.facing, time / 1000, delta / 1000);
         this.baitBalls.update(sp, this.fish.view, this.fish.radius, time / 1000);
         this.rafts.update(sp, time / 1000);
         this.meadow.update(sp, this.fish.radius, time / 1000, delta);
