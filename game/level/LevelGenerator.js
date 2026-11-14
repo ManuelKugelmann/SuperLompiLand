@@ -817,6 +817,22 @@ export default class LevelGenerator {
     /** The pufferfish sand circle: concentric ridges, radial grooves, a ring of shells. */
     drawNest(chunk, nest) {
         const s = this.scene, R = nest.grand ? 300 : 210;
+        if (s.textures.exists(NEST_ART)) {
+            // The painted nest: a pufferfish's sand circle, its rim decorated with shells, coral
+            // bits and pebbles, lying in the basin the terrain keeps level for it.
+            const src = s.textures.get(NEST_ART).getSourceImage(), w = R * 2.5;
+            chunk.objects.push(s.add.image(nest.x, nest.y + R * 0.06, NEST_ART).setOrigin(0.5, 0.62).setDisplaySize(w, w * src.height / src.width).setDepth(-1));
+        } else this.drawnNest(chunk, nest, R);
+        // A soft column of light so the nest can be found from a distance.
+        const beam = s.add.image(nest.x, nest.y - 880, s.textures.exists('bd_ray') ? 'bd_ray' : 'nest_shell').setOrigin(0.5, 0)
+            .setDisplaySize(R * 1.5, 900).setFlipY(true).setTint(0xfff3b0).setAlpha(0.42).setDepth(-5).setBlendMode(Phaser.BlendModes.ADD);
+        s.tweens.add({ targets: beam, alpha: 0.14, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        chunk.objects.push(beam);
+    }
+
+    /** The drawn nest (fallback without the painted one): raked sand and shells. */
+    drawnNest(chunk, nest, R) {
+        const s = this.scene;
         makeNestTextures(s);
         // Raked sand: a shaded relief seen at the game's low camera angle, lying in the
         // basin the terrain keeps level for it (density.js).
@@ -832,11 +848,6 @@ export default class LevelGenerator {
                 .setDisplaySize(size, size * 0.8).setTint(tints[i % tints.length]).setRotation(((i * 53) % 7 - 3) * 0.12).setDepth(far ? -0.9 : -0.8);
             chunk.objects.push(shell);
         }
-        // A soft column of light so the nest can be found from a distance.
-        const beam = s.add.image(nest.x, nest.y - 880, s.textures.exists('bd_ray') ? 'bd_ray' : 'nest_shell').setOrigin(0.5, 0)
-            .setDisplaySize(R * 1.5, 900).setFlipY(true).setTint(0xfff3b0).setAlpha(0.42).setDepth(-5).setBlendMode(Phaser.BlendModes.ADD);
-        s.tweens.add({ targets: beam, alpha: 0.14, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-        chunk.objects.push(beam);
     }
 
     addVent(chunk, key, f, height, rng) {
@@ -1074,6 +1085,9 @@ export default class LevelGenerator {
 }
 
 /** Nest pictures, made once: a disc of raked sand as a shaded relief, and a little shell. */
+/** The painted nest (img/nest.webp, loaded by the title screen). */
+export const NEST_ART = 'nest';
+
 function makeNestTextures(scene) {
     if (scene.textures.exists('nest_sand')) return;
     const W = 512, H = 160, tex = scene.textures.createCanvas('nest_sand', W, H), ctx = tex.getContext();

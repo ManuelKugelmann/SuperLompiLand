@@ -64,7 +64,8 @@ const IMAGES = {
     puffer_inflated_body: 'puffer_inflated_body.png', puffer_inflated_fin: 'puffer_inflated_fin.png',
     whale: 'whale.webp',   // the humpback (game/Whale.js; part cards in img/parts)
     whale_net: 'whale_net.webp',   // the ghost net over her (scripts/fx/net.py)
-    beat_net: 'beat_net.webp'      // the net a friend is caught in (scripts/fx/net_ball.py)
+    beat_net: 'beat_net.webp',     // the net a friend is caught in (scripts/fx/net_ball.py)
+    nest: 'nest.webp'              // the painted nest (LevelGenerator NEST_ART)
 };
 
 export default class IntroScene extends Phaser.Scene {
