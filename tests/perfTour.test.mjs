@@ -53,10 +53,12 @@ test('frames after a hop, while the view is not complete, are the hop\'s cost: k
     t.step(PERF_TOUR.warmMs);      // past the warm-up (this hops once)
     t.step(PERF_TOUR.skipMs);
     assert.equal(t.step(PERF_TOUR.stayMs, true), false, 'no hop while the view is still being built');
-    t.sample({ logicMs: 5, chunkMs: 120, objects: 100, tweens: 5, settling: true });
-    t.sample({ logicMs: 2, chunkMs: 6, objects: 100, tweens: 5 });
+    t.sample({ logicMs: 5, chunkMs: 120, renderMs: 300, objects: 100, tweens: 5, settling: true });
+    t.sample({ logicMs: 2, chunkMs: 6, renderMs: 7, objects: 100, tweens: 5 });
     const r = t.rows()[0];
     assert.equal(r.hopMs, 125);
+    assert.equal(r.hopRenderMs, 300, 'what drawing took during the hop is kept apart too');
+    assert.equal(r.renderMs, 7);
     assert.equal(r.chunkMs, 6, 'the steady numbers do not include it');
     assert.equal(r.frames, 1);
     let hopped = false;

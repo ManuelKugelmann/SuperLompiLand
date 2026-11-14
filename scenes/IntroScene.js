@@ -32,6 +32,7 @@ import { BLOOM_ART } from '../game/level/BloomLayer.js';
 import { CONTROL_ART } from '../game/ui/ControlSwitcher.js';
 import { COLONY_ART, SHARK_ART } from '../game/level/RhythmLayer.js';
 import { PUP_ART } from '../game/level/NurseryLayer.js';
+import { SEAL_ART } from '../game/level/SealLayer.js';
 import { FERRY_ART } from '../game/level/FerryLayer.js';
 import { SEA_OTTER_ART } from '../game/level/SeaOtterLayer.js';
 import { SEA_LION_ART } from '../game/level/SeaLionLayer.js';
@@ -138,7 +139,7 @@ export default class IntroScene extends Phaser.Scene {
         for (const [key, file] of Object.entries(SHIP_FILES.images)) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.cache.json.exists(SHIP_FILES.json[0])) this.load.json(SHIP_FILES.json[0], SHIP_FILES.json[1]);
         for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART, ...VENT_ART, ...GARDEN_ART, ...FAR_ART, ...ARCHER_ART, ...EEL_ART, ...RAY_ART, ...SIPHON_ART, ...CONTAINER_ART, ...DOLPHIN_ART, ...OCTOPUS_ART, ...SANDBAR_ART, ...GRAND_ART, ...CONTROL_ART, ...COLONY_ART, ...SHARK_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
-        for (const [key, file] of Object.entries({ ...PUP_ART, ...SEA_LION_ART, ...SEA_OTTER_ART, ...FERRY_ART })) if (!this.textures.exists(key)) this.load.image(key, file);      // the coder's sights (a line of its own: fewer merge conflicts)
+        for (const [key, file] of Object.entries({ ...PUP_ART, ...SEAL_ART, ...SEA_LION_ART, ...SEA_OTTER_ART, ...FERRY_ART })) if (!this.textures.exists(key)) this.load.image(key, file);      // the coder's sights (a line of its own: fewer merge conflicts)
         if (!this.textures.exists(MANTA_ART.key)) this.load.image(MANTA_ART.key, MANTA_ART.file);
         if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);

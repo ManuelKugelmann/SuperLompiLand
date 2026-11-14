@@ -19,7 +19,7 @@ export const SEA_OTTER = {
     crackS: 0.42,        // s between two taps on the shell
     taps: 4,             // taps in a row, then a pause as long
     bob: 7,              // px it bobs on the swell
-    length: 270,         // px long (about one and a half fish)
+    length: 380,         // px long (over two fish: an otter is a big animal, and it has to read on a phone)
     near: 1700,          // px from the fish within which it exists
     seen: 650            // px at which it goes into the reef book
 };

@@ -57,6 +57,7 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import GrandNestLayer from '../game/level/GrandNestLayer.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
+import SealLayer from '../game/level/SealLayer.js';
 import FerryLayer from '../game/level/FerryLayer.js';
 import SeaOtterLayer from '../game/level/SeaOtterLayer.js';
 import SeaLionLayer from '../game/level/SeaLionLayer.js';
@@ -255,6 +256,8 @@ export default class MainScene extends Phaser.Scene {
         this.seaOtter = new SeaOtterLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), x => this.level.field.routeY(x), () => this.bookEntry('sea_otter'));
         // The harbour's ferry (spec 5.0o): passes overhead, its shadow sweeps the water and its wash carries the fish along.
         this.ferry = new FerryLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), x => this.level.field.routeY(x), () => this.bookEntry('ferry'));
+        // The harbour's sleeping seal (spec 5.0o): its eyes open and its head turns after the fish, then it sleeps again.
+        this.seal = new SealLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('seal'));
         // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
         this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
@@ -369,6 +372,11 @@ export default class MainScene extends Phaser.Scene {
         if (new URLSearchParams(window.location.search).get('perftest')) {
             this.relaxed = true;
             this.perfTour = createPerfTour(LEVEL.spawn.x, this.level.nests[this.level.nests.length - 1].x, x => BIOMES[biomeIndexAt(x)].id);
+            // What drawing a frame takes (the first draw of a big picture uploads it): measured round the renderer's own work.
+            const render = this.perfRender = { at: 0, ms: 0 }, pre = () => { render.at = performance.now(); }, post = () => { render.ms = performance.now() - render.at; };
+            this.game.events.on(Phaser.Core.Events.PRE_RENDER, pre);
+            this.game.events.on(Phaser.Core.Events.POST_RENDER, post);
+            this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.game.events.off(Phaser.Core.Events.PRE_RENDER, pre); this.game.events.off(Phaser.Core.Events.POST_RENDER, post); });
         }
         else this.scene.launch(HUD_KEY, { main: this });
         // Phaser lets the top scene swallow input for the scenes below, and it
@@ -627,7 +635,7 @@ export default class MainScene extends Phaser.Scene {
         this.perfBuilds = this.level.buildMs.count;
         const chunkMs = built ? this.level.buildMs.last : 0;
         const settling = !this.level.viewReady;
-        tour.sample({ logicMs: Math.max(0, logicMs - chunkMs), chunkMs, objects: this.children.list.length, tweens: this.tweens.getTweens().length, settling });
+        tour.sample({ logicMs: Math.max(0, logicMs - chunkMs), chunkMs, renderMs: this.perfRender?.ms || 0, objects: this.children.list.length, tweens: this.tweens.getTweens().length, settling });
         if (tour.step(delta, settling)) {
             const p = this.safeSpot(tour.x, this.level.field.routeY(tour.x));
             this.fish.place(p.x, p.y);
@@ -1660,6 +1668,7 @@ export default class MainScene extends Phaser.Scene {
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);
+        this.seal.update(sp, time / 1000, delta / 1000);
         this.ferry.update(sp, this.fish.facing, time / 1000, delta);
         this.seaOtter.update(sp, this.fish.facing, time / 1000, delta / 1000);
         this.seaLion.update(sp, this.fish.facing, time / 1000, delta / 1000);
