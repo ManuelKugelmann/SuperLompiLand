@@ -1136,7 +1136,7 @@ export default class MainScene extends Phaser.Scene {
         if (this.ambientMode) return;
         // One at a time: a second discovery waits until the first note has faded.
         const now = this.time.now, wait = Math.max(0, (this.toastFree || 0) - now);
-        this.toastFree = now + wait + 3400;
+        this.toastFree = now + wait + 3700;      // the note fades out by 3 600 ms: the next starts after, never across it
         if (wait > 0) { this.time.delayedCall(wait, () => this.showBookToast(e)); return; }
         this.showBookToast(e);
     }
