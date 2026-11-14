@@ -24,18 +24,23 @@ const STREAK = 'front_streak';
  * it fading downward. Its middle column is the seam.
  */
 function ensureTextures(scene) {
+    // Both pictures are worked out per pixel into one block of image data (a gradient object per
+    // column, as before, took tens of ms on a phone in the frame the front was first built).
     if (!scene.textures.exists(STREAK)) {
         // A thin soft streak, tapered at both ends: water moving fast, seen side-on.
-        const W = 256, H = 12, t = scene.textures.createCanvas(STREAK, W, H), c = t.getContext();
+        const W = 256, H = 12, t = scene.textures.createCanvas(STREAK, W, H), c = t.getContext(), img = c.createImageData(W, H), px = img.data;
         for (let x = 0; x < W; x++) {
-            const a = Math.sin(Math.PI * x / (W - 1)) ** 1.5, g = c.createLinearGradient(0, 0, 0, H);
-            g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, `rgba(255,255,255,${a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
-            c.fillStyle = g; c.fillRect(x, 0, 1, H);
+            const a = Math.sin(Math.PI * x / (W - 1)) ** 1.5;
+            for (let y = 0; y < H; y++) {
+                const v = (y + 0.5) / H, i = (y * W + x) * 4;      // clear at top and bottom, full in the middle
+                px[i] = px[i + 1] = px[i + 2] = 255; px[i + 3] = Math.round(255 * a * (1 - Math.abs(v - 0.5) * 2));
+            }
         }
+        c.putImageData(img, 0, 0);
         t.refresh();
     }
     if (scene.textures.exists('front_haze')) return;
-    const D = FRONT_DRAW, W = 512, H = 256, t = scene.textures.createCanvas('front_haze', W, H), c = t.getContext();
+    const D = FRONT_DRAW, W = 512, H = 256, t = scene.textures.createCanvas('front_haze', W, H), c = t.getContext(), img = c.createImageData(W, H), px = img.data;
     const edge = FRONT_LOOK.edge / 2 / FRONT_LOOK.haze;            // each side's share of the seam's width
     for (let x = 0; x < W; x++) {
         const u = (x + 0.5) / W * 2 - 1;                              // -1 far west .. 0 the seam .. 1 far east
@@ -43,10 +48,13 @@ function ensureTextures(scene) {
         const [r, g, b, top] = u < 0 ? D.tannin : D.clear;
         // Full strength right up to the seam (fronts are sharp lines of colour), thinning far off.
         const a = top * across * (u < 0 ? 1 - 0.35 * Math.max(0, -u - 0.5) / 0.5 : 1 - 0.7 * u);
-        const grad = c.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, `rgba(${r},${g},${b},${a})`); grad.addColorStop(0.55, `rgba(${r},${g},${b},${a * 0.75})`); grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
-        c.fillStyle = grad; c.fillRect(x, 0, 1, H);
+        for (let y = 0; y < H; y++) {
+            // Downward: full at the top, three quarters at 55 % of the way, clear at the bottom.
+            const v = (y + 0.5) / H, k = v < 0.55 ? 1 - 0.25 * v / 0.55 : 0.75 * (1 - (v - 0.55) / 0.45), i = (y * W + x) * 4;
+            px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = Math.round(255 * Math.max(0, a * k));
+        }
     }
+    c.putImageData(img, 0, 0);
     t.refresh();
 }
 
