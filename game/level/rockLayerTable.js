@@ -38,9 +38,10 @@ export const LAYER_SHADE = {
  * Rock never floats: the density of rock above is carried down `steps` x `step` virtual px,
  * losing only `fall` per step, and its foot spreads by `spread` px per step (a slope, not a
  * vertical cut) with a little wobble. `grid` is the low-pass cell (virtual px): shapes
- * smaller than about two cells (specks) vanish.
+ * smaller than about two cells (specks) vanish. What is carried down is smoothed further
+ * (`carryGrid`), so the feet are broad slopes and towers on top don't repeat as battlements.
  */
-export const SUPPORT = { step: 150, steps: 12, fall: 0.003, spread: 40, wobble: 40, grid: 110 };
+export const SUPPORT = { step: 150, steps: 12, fall: 0.003, spread: 40, wobble: 40, grid: 110, carryGrid: 280 };
 
 /** Around the calm route: no near rock within `half` px of its middle, fading back in over `fade` px. */
 export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 0.9 };
@@ -107,7 +108,7 @@ export function lowPass(base, g) {
  * with `clearRoute` stays out of the route band (ROUTE_CLEAR).
  */
 export function layerField(base, layer, { route = null, sup = SUPPORT, clear = ROUTE_CLEAR } = {}) {
-    const soft = lowPass(base, sup.grid);
+    const soft = lowPass(base, sup.grid), carry = lowPass(base, sup.carryGrid);
     return {
         density(x, y) {
             const e = enclosure(x, layer);
@@ -116,7 +117,7 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
             const w = (vnoise(x / 260, y / 260, layer.seed + 5) - 0.5) * sup.wobble;
             for (let k = 1; k <= sup.steps; k++) {
                 const yy = y - k * sup.step, dx = k * sup.spread, f = k * sup.fall;
-                d = Math.max(d, soft.density(x + w, yy) - f, soft.density(x + w - dx, yy) - f, soft.density(x + w + dx, yy) - f);
+                d = Math.max(d, carry.density(x + w, yy) - f, carry.density(x + w - dx, yy) - f, carry.density(x + w + dx, yy) - f);
             }
             d += layer.swing * e - 0.12;
             if (route && layer.clearRoute) {
