@@ -79,6 +79,7 @@ export default class Rig {
         this.spine = { ...CARDS.spine, ...character.spine };   // the spine wave, shared with the card rigs (CARDS.spine)
         this.spineT = makeSpine();
         this.spinePh = 0;
+        this.spineAmp = 0;
         this.zoom = 1;          // extra scale on top of the character's size
         this.shown = true;
         this.views = {};
@@ -218,15 +219,16 @@ export default class Rig {
             scaleX *= swell; scaleY *= swell;
             bend = still;
         } else {
-            // Fish: the spine wave (sideways, head to tail; CARDS.spine) seen a little from behind, so
-            // the rear swings along the body; a smaller S-curve in the picture plane rides on top.
-            const T = this.spineT, sp = this.spine;
-            spineTable(this.spinePh, raw, sp, T);
+            // Fish: the spine wave (CARDS.spine). A flat picture cannot turn in depth, so it shows what
+            // the side view keeps of the 3D bend: the rear reads shorter as far as it turns, and the small
+            // S in the picture plane. Sea mammals (spine.plane) beat up and down: the picture-plane wave.
+            const T = this.spineT, sp = this.spine, spine = sp.tail > 0, k = left ? -1 : 1;
+            this.spineAmp += (Math.min(1, raw / sp.full) - this.spineAmp) * (1 - Math.exp(-frames / 60 / sp.ease));
+            if (spine) spineTable(this.spinePh, this.spineAmp, sp, T);
             bend = (u, v, out) => {
                 const t = left ? u : 1 - u;
-                spineAt(T, t, SPINE);
-                out.x = (SPINE.dx + SPINE.z * sp.tilt) * w * (left ? -1 : 1);
-                out.y = Math.sin(ph - t * 2.6) * amp * t * t * sp.lift;
+                if (spine) { spineAt(T, t, SPINE); out.x = SPINE.dx * w * k; out.y = SPINE.z * w * sp.lift; } else { out.x = 0; out.y = 0; }
+                if (sp.plane) out.y += Math.sin(ph - t * 2.6) * amp * t * t;
             };
         }
         view.setScale(scaleX, scaleY);

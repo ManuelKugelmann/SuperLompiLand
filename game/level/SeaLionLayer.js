@@ -44,7 +44,7 @@ export default class SeaLionLayer {
         if (this.start === null) {
             if (!inSpot || t < this.next || !this.scene.buildSlot()) return;
             ensureTexture(this.scene);
-            this.rig = createRig(this.scene, { states: { normal: { key: KEY, width: SEA_LION.length, wiggle: 10 } }, anim: 'swim', soft: 0.6 }, fish.x, fish.y, SEA_LION_LOOK.depth);
+            this.rig = createRig(this.scene, { states: { normal: { key: KEY, width: SEA_LION.length, wiggle: 10 } }, anim: 'swim', spine: { tail: 0, plane: true }, soft: 0.6 }, fish.x, fish.y, SEA_LION_LOOK.depth);
             this.start = t; this.dir = heading >= 0 ? 1 : -1; this.last = null;
         }
         const p = seaLionAt(t - this.start, fish.x, fish.y, this.dir, this.surfaceY(fish.x), this.p);

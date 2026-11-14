@@ -33,46 +33,61 @@ export const CARDS = {
     swayMore: 0.03,         // ... plus this much at full effort
     driveCurve: 1.6,        // effort is eased in: light swimming moves little, only real effort moves a lot
     cycle: [0.04, 0.3],     // swim cycle speed (radians per step) at rest and at full effort
-    // A fish swims by a wave running down its spine, head to tail (user: "their spine bends back and
-    // forth when moving, that's their propelling"). The bend is sideways (toward and away from the
-    // viewer): in side view the rear half swings in depth, foreshortens and turns in the light.
-    // Defaults; a character profile may override any of them with its own `spine`.
+    // A fish swims by a wave running down its spine (user: "their spine bends back and forth, that's
+    // their propelling"; "3d rig should make real fish tail swings possible"). The spine bends sideways
+    // (toward and away from the viewer) as a real 3D curve that keeps its length: the front is nearly
+    // rigid, the bend grows steeply in the rear third, the tail fin yaws a quarter beat behind the
+    // stalk. Speed changes the beat rate, hardly the size. Defaults for a tail-driven fish; a profile
+    // overrides any of them with its own `spine` (a rigid body: tail 0; an eel: long wave, shape < 1).
     spine: {
-        wave: 1.0,          // wave length in body lengths (eel-like < 1 < tuna-like)
-        tail: 0.26,         // sideways swing at the tail, body lengths, at full effort
-        tilt: 0.4,          // we see the fish a little from behind or ahead (3/4): this share of the sideways swing shows along the body
-        head: 0.08,         // share of that left at the head (the head yaws a little too)
-        lift: 0.6,          // share of the picture-plane S-curve (the character's wiggle) kept on top
-        rate: 1             // beat speed relative to the swim cycle
+        wave: 0.7,          // wave length in body lengths (shark-like 0.6-0.8, eel 1.5+)
+        tail: 0.13,         // sideways swing at the tail, body lengths (0: a rigid body, no spine wave)
+        shape: 2.5,         // amplitude envelope s^shape, s = 0 head .. 1 tail (eel < 1: the whole body)
+        head: 0.03,         // the head's counter-yaw, share of the tail swing
+        anchor: 0.3,        // the point of the spine that stays in place (about the centre of mass)
+        lift: 0.22,         // a small up-and-down S in the picture plane, share of the sideways swing
+        full: 0.2,          // effort from which the swing is full (cruising already swims properly)
+        ease: 0.3,          // s over which the swing follows effort (gliding settles softly)
+        lag: Math.PI / 2,   // the tail fin follows the stalk this far behind (a quarter beat)
+        finSwing: 0.35,     // share of its own beat a tail fin keeps on top of the spine's yaw
+        rate: 1,            // beat speed relative to the swim cycle
+        plane: false        // also beat up and down in the picture plane by the profile's wiggle (whales, sea mammals: flukes)
     }
 };
 
 /** Samples along the spine for spineTable / spineAt. */
-const SPINE_N = 16;
+const SPINE_N = 24;
 
-/** A spine table to fill each frame: per sample sideways offset, turn of the body there, and how much shorter it looks up to there. */
+/** A spine table to fill each frame: per sample the sideways offset, the body's yaw there, and how far it moved toward the head. */
 export function makeSpine() { return { z: new Float32Array(SPINE_N + 1), a: new Float32Array(SPINE_N + 1), dx: new Float32Array(SPINE_N + 1) }; }
 
 /**
- * The travelling spine wave at phase `ph`, `amp` (0..1 of the full swing), for a spine config
- * (CARDS.spine). Along s = 0 (head) .. 1 (tail), in body lengths: z sideways (toward the viewer),
- * a the yaw of the body there (radians, about the vertical; x points to the head), dx how far
- * that point has moved toward the head because the bent spine keeps its length.
+ * The bent spine at phase `ph` and swing `amp` (0..1) for a spine config (CARDS.spine), along
+ * s = 0 (head) .. 1 (tail), in body lengths: the bend angle follows the travelling wave, the curve
+ * is integrated from it (so it keeps its length: it only looks shorter as far as it turns), and it
+ * is shifted so the anchor point stays put. Per sample: z sideways (toward the viewer), a the yaw
+ * of the body there (radians about the vertical; x points to the head), dx how far that point
+ * moved toward the head.
  */
 export function spineTable(ph, amp, cfg, t) {
-    const k = 2 * Math.PI / cfg.wave, ds = 1 / SPINE_N;
+    const k = 2 * Math.PI / cfg.wave, ds = 1 / SPINE_N, A = cfg.tail * amp;
+    // Slope of the wanted sideways shape, z(s) = A (s^shape sin(ph - k s) - head (1 - s)^2 sin(ph - k)).
     for (let i = 0; i <= SPINE_N; i++) {
-        const s = i * ds, env = cfg.head + (1 - cfg.head) * s * s;
-        t.z[i] = cfg.tail * amp * env * Math.sin(ph - k * s);
+        const s = i * ds, e = Math.pow(s, cfg.shape), de = s > 0 ? cfg.shape * e / s : 0;
+        const slope = A * (de * Math.sin(ph - k * s) - e * k * Math.cos(ph - k * s) + cfg.head * 2 * (1 - s) * Math.sin(ph - k));
+        t.a[i] = Math.atan(slope);                       // the spine's angle away from straight (toward the tail)
     }
-    let short = 0;
-    for (let i = 0; i <= SPINE_N; i++) {
-        const lo = Math.max(0, i - 1), hi = Math.min(SPINE_N, i + 1);
-        const dzds = (t.z[hi] - t.z[lo]) / ((hi - lo) * ds);
-        t.a[i] = Math.atan(-dzds);                          // x runs to the head, s to the tail
-        if (i > 0) short += (1 - Math.cos(t.a[i])) * ds;
-        t.dx[i] = short;
+    // Integrate: z and how far along the rest axis each point lies.
+    let z = 0, x = 0;
+    t.z[0] = 0; t.dx[0] = 0;
+    for (let i = 1; i <= SPINE_N; i++) {
+        const m = (t.a[i] + t.a[i - 1]) / 2;
+        z += Math.sin(m) * ds; x += Math.cos(m) * ds;
+        t.z[i] = z; t.dx[i] = i * ds - x;                // dx: how much shorter the spine reads up to here
     }
+    const f = cfg.anchor * SPINE_N, j = Math.min(SPINE_N - 1, Math.floor(f)), r = f - j;
+    const z0 = t.z[j] + (t.z[j + 1] - t.z[j]) * r, d0 = t.dx[j] + (t.dx[j + 1] - t.dx[j]) * r;
+    for (let i = 0; i <= SPINE_N; i++) { t.z[i] -= z0; t.dx[i] -= d0; t.a[i] = -t.a[i]; }   // a: yaw with x toward the head
 }
 
 /** Read the spine table at s (0 head .. 1 tail) into o.z, o.a, o.dx (body lengths, radians). */
@@ -81,6 +96,17 @@ export function spineAt(t, s, o) {
     o.z = t.z[i] + (t.z[i + 1] - t.z[i]) * r;
     o.a = t.a[i] + (t.a[i + 1] - t.a[i]) * r;
     o.dx = t.dx[i] + (t.dx[i + 1] - t.dx[i]) * r;
+}
+
+/** Turn a posed part about the vertical axis through (px, pz) by `a` (the spine's yaw at its root), shifted by dz in depth. */
+export function yawPart(card, out, px, a, dz) {
+    const ca = Math.cos(a), sa = Math.sin(a);
+    for (let i = 0; i < card.n; i++) {
+        const X = out.x[i] - px, Z = out.z[i];
+        out.x[i] = px + X * ca - Z * sa; out.z[i] = X * sa + Z * ca + dz;
+        const nx = out.nx[i], nz = out.nz[i];
+        out.nx[i] = nx * ca - nz * sa; out.nz[i] = nx * sa + nz * ca;
+    }
 }
 
 /**
@@ -288,9 +314,9 @@ export function poseBody(card, bend, size, out) {
     for (let i = 0; i < card.n; i++) {
         const x = card.pivot[0] + card.lx[i], y = card.pivot[1] + card.ly[i];
         bend(x / W + 0.5, y / H + 0.5, o);
-        // A sideways bend (o.z, o.a: the spine wave) moves the point in depth and turns its surface.
-        const ca = Math.cos(o.a), sa = Math.sin(o.a), nx = card.nx[i], nz = card.nz[i];
-        out.x[i] = x + o.x; out.y[i] = y + o.y; out.z[i] = card.z[i] + o.z;
+        // A sideways bend (o.z, o.a: the spine wave) moves the point in depth and turns its cross-section.
+        const ca = Math.cos(o.a), sa = Math.sin(o.a), nx = card.nx[i], nz = card.nz[i], zb = card.z[i];
+        out.x[i] = x + o.x - zb * sa; out.y[i] = y + o.y; out.z[i] = zb * ca + o.z;
         out.nx[i] = nx * ca - nz * sa; out.ny[i] = card.ny[i]; out.nz[i] = nx * sa + nz * ca;
         out.rz[i] = card.z[i];
         out.rnx[i] = card.nx[i]; out.rny[i] = card.ny[i]; out.rnz[i] = card.nz[i];

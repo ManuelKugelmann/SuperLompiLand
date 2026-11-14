@@ -44,11 +44,11 @@ export const schoolArt = id => ({ key: `school_${id}`, file: `img/school/${id}.w
 
 /**
  * Frames from a painted side view (facing right, tail at the left), drawn in thin vertical
- * strips posed by the spine wave the rigs use (CARDS.spine): the rear swings along the body
- * (seen a little from behind) with a small up-and-down S on top. The picture fills `fill` of
- * the frame, so the swing stays inside it.
+ * strips posed by the spine wave the rigs use (CARDS.spine), as the side view keeps it: the rear
+ * reads shorter as far as it turns, with the small up-and-down S. The picture fills `fill` of the
+ * frame, so the pose stays inside it.
  */
-const STRIP_POSE = { fill: 0.88, lift: 0.07 };
+const STRIP_POSE = { fill: 0.92 };
 function paintedFrames(c, img, w, h) {
     const strips = 16, sw = img.width / strips, sp = CARDS.spine, T = makeSpine(), o = {}, k0 = 2 * Math.PI / sp.wave;
     const pw = w * STRIP_POSE.fill, left = w - pw;
@@ -58,8 +58,8 @@ function paintedFrames(c, img, w, h) {
         for (let k = 0; k < strips; k++) {
             const s = 1 - (k + 0.5) / strips;                          // 0 at the head .. 1 at the tail
             spineAt(T, s, o);
-            const dx = (o.dx + o.z * sp.tilt) * pw, dy = beat * s * s * h * STRIP_POSE.lift;
-            c.drawImage(img, k * sw, 0, sw + 0.5, img.height, ox + left * 0.6 + k * pw / strips + dx, dy, pw / strips + 0.6, h);
+            const dx = o.dx * pw, dy = o.z * pw * sp.lift;
+            c.drawImage(img, k * sw, 0, sw + 0.5, img.height, ox + left * 0.5 + k * pw / strips + dx, dy, pw / strips + 0.6, h);
         }
     });
 }

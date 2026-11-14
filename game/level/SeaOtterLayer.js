@@ -55,7 +55,7 @@ export default class SeaOtterLayer {
             ensureTextures(this.scene);
             const s = this.scene, float = s.add.image(this.spot.x, 0, FLOAT).setDepth(SEA_OTTER_LOOK.floatDepth);
             float.setScale(SEA_OTTER.length / float.width);
-            const rig = createRig(s, { states: { normal: { key: SWIM, width: SEA_OTTER.length, wiggle: 9 } }, anim: 'swim', soft: 0.6 }, this.spot.x, 0, SEA_OTTER_LOOK.depth);
+            const rig = createRig(s, { states: { normal: { key: SWIM, width: SEA_OTTER.length, wiggle: 9 } }, anim: 'swim', spine: { tail: 0, plane: true }, soft: 0.6 }, this.spot.x, 0, SEA_OTTER_LOOK.depth);
             this.built = { float, rig };
         }
         const B = this.built, x0 = this.spot.x;

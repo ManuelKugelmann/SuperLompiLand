@@ -21,6 +21,7 @@ export const CHARACTERS = [
     {
         id: 'lompi', name: 'Lompi', blurb: { de: 'Bläst sich auf und bleibt stehen', en: 'Puffs up and stops dead' },
         special: 'puff', soft: 0.6,
+        spine: { tail: 0 },      // a boxy puffer: rigid body, only its fins and tail fin beat
         states: {
             normal: { key: 'puffer_normal', width: 170, radius: 56, air: 0.03, bounce: 0.35, wiggle: 30 },
             inflated: { key: 'puffer_inflated', width: 255, radius: 98, air: 0.2, bounce: 0.75, wiggle: 9 }

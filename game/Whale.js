@@ -85,7 +85,7 @@ function ensureDrape(scene) {
     tex.refresh();
 }
 
-const profile = width => ({ states: { normal: { key: KEY, width, wiggle: 40 } }, anim: 'swim', soft: 0.25, upright: true });      // upright: she swims level, whatever her speed
+const profile = width => ({ states: { normal: { key: KEY, width, wiggle: 40 } }, anim: 'swim', spine: { tail: 0, plane: true }, soft: 0.25, upright: true });      // upright: she swims level, whatever her speed
 const SPOT = { x: 0, y: 0 }, PULL = { x: 0, y: 0 };
 
 /**

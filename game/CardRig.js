@@ -2,7 +2,7 @@ import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import { CHARACTERS } from './characters.js';
-import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt } from './rig/cards.js';
+import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
 
 /** Where the part cards come from (scripts/parts/bake.py). */
 export const PARTS = { json: 'parts', url: 'img/parts/', texture: key => `parts_${key}` };
@@ -39,7 +39,7 @@ class CardView {
     get displayHeight() { return this.frame.height * this.baseScale; }
 }
 
-const BEND = { x: 0, y: 0, z: 0, a: 0 }, SP = { z: 0, a: 0, dx: 0 };
+const BEND = { x: 0, y: 0, z: 0, a: 0 }, SP = { z: 0, a: 0, dx: 0 }, FIN = { z: 0, a: 0, dx: 0 };
 
 /**
  * A playable drawn as 2.5D part cards (game/rig/cards.js): the same API as Rig, so Player,
@@ -59,7 +59,9 @@ export default class CardRig {
         this.phase = 0;
         this.spine = { ...CARDS.spine, ...character.spine };   // the spine wave (CARDS.spine), per profile
         this.spineT = makeSpine();
+        this.finT = makeSpine();      // the same wave a quarter beat behind: where the tail fin is
         this.spinePh = 0;
+        this.spineAmp = 0;
         this.spread = 0;
         this.zoom = 1;
         this.shown = true;
@@ -189,8 +191,8 @@ export default class CardRig {
         if (!this.turning) yaw = (CARDS.sway + CARDS.swayMore * drive) * Math.sin(ph * 0.31);
 
         // Body motion per style (the same styles as Rig): bend in picture px, plus pumping and rocking.
-        const amp = view.wiggle * drive, style = this.char.anim || 'swim';
-        let bend;
+        const style = this.char.anim || 'swim';
+        let bend, spine = false;
         if (style === 'pulse') {
             const push = beat ?? Math.sin(ph * 0.9), pump = 0.02 + drive * 0.07;
             sx *= 1 + push * pump; sy *= 1 - push * pump * 1.3;
@@ -204,15 +206,17 @@ export default class CardRig {
             sy *= 1 - stroke * 0.025 * (0.1 + drive);
             bend = (u, v, o) => { o.x = 0; o.y = 0; };
         } else {
-            // The spine wave (sideways, head to tail, growing toward the tail; CARDS.spine) drives the
-            // swimming; a smaller S-curve in the picture plane and the steering lag ride on top.
+            // The spine wave (CARDS.spine): the body bends sideways as a real 3D curve, each cross-section
+            // turned with it; a small S in the picture plane and the steering lag ride on top. Its size
+            // follows effort softly (full from a cruise on), the speed sets only the beat rate.
             const T = this.spineT, sp = this.spine;
-            spineTable(this.spinePh, raw, sp, T);         // raw effort: cruising already shows the wave, gliding is still
+            spine = sp.tail > 0;
+            this.spineAmp += (Math.min(1, raw / sp.full) - this.spineAmp) * (1 - Math.exp(-frames / 60 / sp.ease));
+            if (spine) { spineTable(this.spinePh, this.spineAmp, sp, T); spineTable(this.spinePh - sp.lag, this.spineAmp, sp, this.finT); }
             bend = (u, v, o) => {
                 const t = 1 - u;
-                spineAt(T, t, SP);
-                o.x = (SP.dx + SP.z * sp.tilt) * W; o.z = SP.z * W; o.a = SP.a;
-                o.y = (Math.sin(ph - t * 2.6) * amp * 0.35 * sp.lift + steerBend) * t * t;
+                if (spine) { spineAt(T, t, SP); o.x = SP.dx * W; o.z = SP.z * W; o.a = SP.a; } else o.x = 0;
+                o.y = (spine ? SP.z * W * sp.lift : 0) + (sp.plane ? Math.sin(ph - t * 2.6) * view.wiggle * drive * 0.35 : 0) * t * t + steerBend * t * t;
             };
         }
 
@@ -235,8 +239,15 @@ export default class CardRig {
                 at[0] = px + BEND.x + (e.shift?.[0] || 0); at[1] = py + BEND.y + (e.shift?.[1] || 0);
             }
             e.at = e.at || [0, 0]; e.at[0] = at[0]; e.at[1] = at[1]; e.turn = turn;
-            posePart(e.card, e.part, m, at, !!e.mirror, e.posed, turn);
-            if (!p && BEND.z) for (let i = 0; i < e.card.n; i++) e.posed.z[i] += BEND.z;     // a fin rides the spine wave in depth
+            if (spine && !p) {
+                // On the spine: the part turns with the body where it sits (a tail fin a quarter beat
+                // behind its stalk, keeping a share of its own beat), in real depth.
+                const tail = e.part.role === 'tail';
+                const part = tail ? (e.spinePart ||= { ...e.part, amp: e.part.amp * this.spine.finSwing }) : e.part;
+                posePart(e.card, part, m, at, !!e.mirror, e.posed, turn);
+                spineAt(tail ? this.finT : this.spineT, 0.5 - px / W, FIN);
+                yawPart(e.card, e.posed, at[0], FIN.a, BEND.z);
+            } else posePart(e.card, e.part, m, at, !!e.mirror, e.posed, turn);
         }
         for (const e of set.entries) {
             pv.fade = !e.body; pv.dark = e.dark ?? 1;

@@ -66,21 +66,23 @@ test('a fin turning edge-on fades out', () => {
     assert.ok(Math.max(...a) < 0.05);
 });
 
-test('spine wave: still at rest, grows head to tail, travels to the tail, keeps the spine length', async () => {
+test('spine wave: still at rest, rigid front, travels to the tail, keeps the spine length', async () => {
     const { CARDS, makeSpine, spineTable, spineAt } = await import('../game/rig/cards.js');
-    const t = makeSpine(), o = {};
-    spineTable(1.3, 0, CARDS.spine, t);
-    spineAt(t, 1, o);
-    assert.equal(o.z, 0); assert.equal(o.dx, 0);
-    // Largest swing over a cycle: small at the head, full at the tail.
-    const peak = s => { let m = 0; for (let k = 0; k < 64; k++) { spineTable(k / 64 * 2 * Math.PI, 1, CARDS.spine, t); spineAt(t, s, o); m = Math.max(m, Math.abs(o.z)); } return m; };
-    assert.ok(peak(0) < 0.2 * peak(1));
-    assert.ok(Math.abs(peak(1) - CARDS.spine.tail) < 0.01);
-    // The crest moves toward the tail as the phase advances.
-    const crest = ph => { spineTable(ph, 1, { ...CARDS.spine, head: 1 }, t); let best = 0, at = 0; for (let i = 0; i <= 16; i++) if (t.z[i] > best) { best = t.z[i]; at = i; } return at; };
-    assert.ok(crest(Math.PI / 2 + 1) > crest(Math.PI / 2));
-    // A bent spine looks shorter toward the tail, never longer.
-    spineTable(0.7, 1, CARDS.spine, t);
-    spineAt(t, 1, o);
-    assert.ok(o.dx > 0 && o.dx < 0.1);
+    const t = makeSpine(), o = {}, sp = CARDS.spine;
+    spineTable(1.3, 0, sp, t);
+    for (const s of [0, 0.5, 1]) { spineAt(t, s, o); assert.ok(Math.abs(o.z) < 1e-9 && Math.abs(o.dx) < 1e-9 && Math.abs(o.a) < 1e-9); }
+    // Over a cycle: the head nearly still, the swing grows steeply toward the tail, and stays a sane size.
+    const peak = (s, key) => { let m = 0; for (let k = 0; k < 64; k++) { spineTable(k / 64 * 2 * Math.PI, 1, sp, t); spineAt(t, s, o); m = Math.max(m, Math.abs(o[key])); } return m; };
+    assert.ok(peak(0, 'a') < 0.06, 'head yaw ' + peak(0, 'a'));
+    assert.ok(peak(0.5, 'z') < 0.3 * peak(1, 'z'));
+    assert.ok(peak(1, 'z') > 0.08 && peak(1, 'z') < 0.2, 'tail swing ' + peak(1, 'z'));
+    assert.ok(peak(1, 'a') < 0.95, 'tail angle ' + peak(1, 'a'));
+    // The bend travels toward the tail as the phase advances (the angle at the rear peaks later further back).
+    const when = s => { let best = -1, at = 0; for (let k = 0; k < 64; k++) { spineTable(k / 64 * 2 * Math.PI, 1, sp, t); spineAt(t, s, o); if (o.a > best) { best = o.a; at = k; } } return at; };
+    assert.notEqual(when(0.7), when(1));
+    // The bent spine keeps its length: its points stay a body length apart along the curve.
+    spineTable(0.7, 1, sp, t);
+    let len = 0, px = 0, pz = 0;
+    for (let i = 1; i <= 64; i++) { spineAt(t, i / 64, o); const x = -i / 64 + o.dx, z = o.z; spineAt(t, (i - 1) / 64, o); const x0 = -(i - 1) / 64 + o.dx; len += Math.hypot(x - x0, z - o.z); }
+    assert.ok(Math.abs(len - 1) < 0.01, 'length ' + len);
 });

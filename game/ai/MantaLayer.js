@@ -22,7 +22,7 @@ export default class MantaLayer {
         const p = mantaAt(t, this.routeY, POSE, MANTA, fish.x), near = Math.abs(p.x - fish.x) < this.scene.scale.width * 1.2 && Math.abs(p.y - fish.y) < this.scene.scale.height * 1.2;
         if (!this.rig) {
             if (!near || !this.scene.textures.exists(MANTA_ART.key) || !this.scene.buildSlot()) return;      // made when it first comes into view (and only with its picture)
-            this.rig = createRig(this.scene, { states: { normal: { key: MANTA_ART.key, width: MANTA.width, wiggle: 10 } }, anim: 'swim', soft: 0.5, upright: true }, p.x, p.y, 3.6);
+            this.rig = createRig(this.scene, { states: { normal: { key: MANTA_ART.key, width: MANTA.width, wiggle: 10 } }, anim: 'swim', spine: { tail: 0 }, soft: 0.5, upright: true }, p.x, p.y, 3.6);      // a ray flies on its wings: no spine wave
         }
         this.rig.setVisible(near);
         if (!near) return;

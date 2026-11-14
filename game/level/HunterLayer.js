@@ -12,6 +12,8 @@ import { due, everyOf } from '../throttle.js';
 export const HUNTER_LOOK = { depth: 3.8, wag: 0.07, wagHz: 5, bubbleS: 0.12 };
 
 const KEY = 'barracuda';      // a painted picture under this key (head right) replaces the drawn one
+/** The painted barracuda (scripts/fx/fish_cut.py; loaded by the title screen). */
+export const HUNTER_ART = { [KEY]: 'img/barracuda.webp' };
 
 function ensureTexture(scene) {
     if (scene.textures.exists(KEY)) return;
