@@ -27,6 +27,8 @@ export const LEVEL = {
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
+    rippleMax: 8,         // strips of rippled sand per chunk, at most
+    rippleWidth: 220,     // px: a strip is at least this wide (or as wide as its piece of floor)
     kelpMinDepth: 420,    // no kelp where the water is shallower than this
     propHeadroom: 50,     // a prop's top stays at least this far under the surface
     liveView: 0.95,       // creatures and plants within this many screen sizes of the fish (to either side) are animated
@@ -536,6 +538,18 @@ export default class LevelGenerator {
             }
         }
 
+        // --- Rippled sand on the lagoon's flat floor (spec 5.5c "ground surface") ----
+        if (biome.id === 'beach' && s.textures.exists('sand_ripples')) {
+            let strips = 0;
+            for (const f of floors) {
+                if (strips >= LEVEL.rippleMax) break;
+                if (Math.abs(f.angle) > 0.35 || this.nests.some(n => Math.abs(n.x - f.x) < 320)) continue;      // flat sand only, and not in a nest's basin
+                const img = keep(s.add.image(f.x, f.y, 'sand_ripples').setOrigin(0.5, 0.1).setRotation(f.angle).setDepth(0.85));
+                img.setScale(Math.max(LEVEL.rippleWidth, f.len * 1.15) / img.width);
+                strips++;
+            }
+        }
+
         // --- Small ground cover: pebbles, shells, mussels, tufts (spec 5.5c) -----
         {
             // Own random stream, like the props: nothing else shifts.
@@ -654,7 +668,7 @@ export default class LevelGenerator {
         const len = Math.hypot(b.x - a.x, b.y - a.y);
         chunk.bodies.push(this.scene.matter.add.rectangle(mx + nx * 26, my + ny * 26, len + 8, 52,
             { isStatic: true, angle: ang, friction: 0.05 }));
-        if (ny > 0.8 && len > 45) floors.push({ x: mx, y: my, angle: b.x > a.x ? ang : ang + Math.PI });
+        if (ny > 0.8 && len > 45) floors.push({ x: mx, y: my, angle: b.x > a.x ? ang : ang + Math.PI, len });
         else if (walls && Math.abs(nx) > 0.7 && len > 40) walls.push({ x: mx, y: my, angle: Math.atan2(-nx, ny) });   // grows out along the face's normal
     }
 
