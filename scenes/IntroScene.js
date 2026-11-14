@@ -12,7 +12,7 @@ import { CHARACTERS, getCharacter, loadSelectedId, saveSelectedId } from '../gam
 import ProgressionManager from '../systems/ProgressionManager.js';
 import { fromCookie } from '../systems/savepoints.js';
 import { BIOMES } from '../game/level/biomes.js';
-import Rig from '../game/Rig.js';
+import { createRig, loadParts } from '../game/CardRig.js';
 import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
@@ -92,6 +92,7 @@ export default class IntroScene extends Phaser.Scene {
             if (!this.textures.exists(key)) this.load.image(key, file);
         }
         if (!this.cache.json.exists('fins')) this.load.json('fins', 'img/fins.json');
+        if (!this.cache.json.exists('parts')) loadParts(this);   // 2.5D part cards of the playables
     }
 
     create() {
@@ -151,7 +152,7 @@ export default class IntroScene extends Phaser.Scene {
 
         this.cards = CHARACTERS.map((c, i) => {
             // The same animated rig as in the game, over an invisible tap area.
-            const rig = new Rig(this, c, W / 2, cy, 1);
+            const rig = createRig(this, c, W / 2, cy, 1);
             const frame = rig.view.frame;
             rig.fit = Math.min(360 / frame.width, 300 / frame.height) / rig.view.baseScale;
             rig.hit = this.add.zone(W / 2, cy, 360, 300).setInteractive({ useHandCursor: true });

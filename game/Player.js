@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { CHARACTERS, MOTION, glideLift, skim } from './characters.js';
 import { FLIGHT, fly } from './flight.js';
 import { SPECIALS, canUse, chainStep } from './specials.js';
-import Rig from './Rig.js';
+import { createRig } from './CardRig.js';
 import { play } from './audio.js';
 
 /** Tunables — physics feel is adjusted here (velocities are px per physics step). */
@@ -90,7 +90,7 @@ export default class Player {
         // `rig` is what you see. `sprite` is the physics body (invisible, advanced
         // in fixed 60 Hz steps); the rig is drawn every frame at a position
         // interpolated between the last two steps, so motion is smooth at any refresh rate.
-        this.rig = new Rig(scene, character, x, y);
+        this.rig = createRig(scene, character, x, y);
         this.sprite = scene.matter.add.sprite(x, y, this.rig.view.texture.key).setVisible(false);
         this.aura = scene.add.circle(x, y, 80, 0xfff3b0, 0.12).setStrokeStyle(5, 0xfff3b0, 0.8).setDepth(4.9).setVisible(false);
         this.prev = new Phaser.Math.Vector2(x, y);

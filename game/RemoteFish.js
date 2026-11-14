@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { getCharacter, motionOf } from './characters.js';
 import { PLAYER } from './Player.js';
-import Rig from './Rig.js';
+import { createRig } from './CardRig.js';
 import { SnapshotBuffer } from '../net/snapshots.js';
 import { edgeMarker } from '../net/edgeMarker.js';
 
@@ -77,7 +77,7 @@ export default class RemoteFish {
         if (char !== this.char) {
             this.rig?.destroy();
             this.char = char;
-            this.rig = new Rig(this.scene, char, 0, 0, 4.8).setVisible(false);
+            this.rig = createRig(this.scene, char, 0, 0, 4.8).setVisible(false);
         }
         this.stateName = char.states[stateName] ? stateName : 'normal';
         this.rig.setState(this.stateName);

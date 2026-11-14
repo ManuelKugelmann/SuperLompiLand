@@ -1,0 +1,63 @@
+{
+    "_doc": "Part cards per playable picture (picture px, origin top-left). Read by scripts/parts/bake.py. body: the picture the body card is cut from (default: the key). Each part: role (motion, game/rig/cards.js), poly (the card's outline, generous into the body where it hides behind it), root (two points across where it joins the body; the pivot is their middle), front (drawn over the body; the body under it is filled from its surroundings), under (body area under a front part to fill), z (depth in body bulges: + toward the viewer), amp/phase (motion multipliers). image/at: a part that already exists as its own picture, placed at `at`. core: removed from every part (the body proper). pair: a paired fin painted only on the near side; the game adds its far twin behind the body. Median fins (dorsal, anal, ridges) exist once, on the midline (z 0).",
+    "puffer_normal": {
+        "body": "puffer_normal_body",
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,112],[72,118],[104,155],[104,226],[72,264],[0,264]], "root": [[88,150],[88,228]], "z": 0 },
+            { "name": "dorsal", "role": "median", "poly": [[96,56],[176,72],[198,100],[184,132],[152,148],[106,144],[96,110]], "root": [[184,96],[152,142]], "z": 0, "phase": 0.6 },
+            { "name": "anal", "role": "median", "poly": [[106,226],[152,226],[178,250],[162,294],[110,294]], "root": [[128,230],[172,258]], "z": 0, "phase": 1.1 },
+            { "name": "pectoral", "role": "pectoral", "image": "puffer_normal_fin", "at": [216,155], "pivot": [310,188], "front": true, "pair": true, "z": 0.8 }
+        ]
+    },
+    "puffer_inflated": {
+        "body": "puffer_inflated_body",
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,198],[62,204],[94,240],[94,292],[62,318],[0,314]], "root": [[80,232],[80,300]], "z": 0, "amp": 0.6 },
+            { "name": "farfin", "role": "pectoral", "poly": [[452,168],[512,168],[512,282],[468,282],[452,240]], "root": [[462,180],[462,270]], "z": -0.4, "phase": 0.5, "amp": 0.7 },
+            { "name": "pectoral", "role": "pectoral", "image": "puffer_inflated_fin", "at": [65,245], "pivot": [175,264], "front": true, "z": 0.8 }
+        ]
+    },
+    "player_shark": {
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,230],[58,238],[84,248],[90,304],[72,304],[68,360],[22,360],[26,302],[0,264]], "root": [[74,248],[74,302]], "z": 0 },
+            { "name": "dorsal2", "role": "median", "poly": [[42,164],[86,180],[108,208],[102,236],[70,242],[54,214]], "root": [[62,228],[102,222]], "z": 0, "phase": 0.9 },
+            { "name": "dorsal", "role": "median", "poly": [[150,0],[244,20],[300,108],[276,136],[200,144],[168,158],[150,60]], "root": [[176,142],[284,116]], "z": 0, "amp": 0.6, "phase": 0.4 },
+            { "name": "farfin", "role": "pectoral", "poly": [[326,296],[424,296],[468,348],[504,424],[466,424],[426,390],[344,334]], "root": [[338,304],[420,304]], "z": -0.5, "phase": 0.5, "amp": 0.7 },
+            { "name": "pectoral", "role": "pectoral", "poly": [[256,258],[274,286],[256,306],[180,352],[100,394],[80,384],[112,338],[150,298],[200,270]], "root": [[240,264],[264,296]], "front": true, "under": [[148,282],[256,260],[264,298],[148,302]], "z": 0.8 }
+        ]
+    },
+    "player_flyingfish": {
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,100],[76,112],[116,178],[132,188],[132,238],[108,244],[64,292],[10,304],[0,304],[0,290],[48,240],[70,212],[28,150],[0,120]], "root": [[122,188],[122,238]], "z": 0 },
+            { "name": "dorsal", "role": "median", "poly": [[288,0],[356,0],[408,30],[438,62],[426,88],[322,92],[296,40]], "root": [[310,80],[426,70]], "z": 0, "phase": 0.6 },
+            { "name": "pelvic", "role": "median", "poly": [[150,224],[216,230],[202,270],[184,270]], "root": [[158,228],[212,230]], "z": -0.3, "phase": 1.3 },
+            { "name": "anal", "role": "median", "poly": [[298,238],[398,236],[392,292],[336,292],[300,292]], "root": [[304,242],[392,240]], "z": -0.3, "phase": 1.6 },
+            { "name": "wing", "role": "wing", "poly": [[0,30],[60,34],[150,46],[232,78],[300,100],[346,118],[352,150],[332,182],[300,196],[250,192],[170,182],[148,160],[98,120],[38,84],[0,54]], "root": [[332,114],[318,192]], "front": true, "pair": true, "under": [[150,194],[300,90],[352,108],[352,198],[150,202]], "z": 0.8 }
+        ]
+    },
+    "player_firefish": {
+        "core": [[300,168],[380,158],[470,178],[512,226],[512,302],[470,332],[380,338],[300,334],[240,332],[180,322],[160,270],[172,214],[230,204]],
+        "parts": [
+            { "name": "fan", "role": "fan", "poly": [[0,0],[440,0],[440,175],[300,170],[230,206],[172,216],[160,270],[180,322],[240,334],[300,336],[440,336],[440,467],[0,467]], "root": [[200,230],[200,320]], "z": -0.2 }
+        ]
+    },
+    "friend_turtle": {
+        "parts": [
+            { "name": "rear", "role": "flipper", "poly": [[0,150],[62,146],[132,168],[144,200],[124,230],[80,240],[26,232],[0,200]], "root": [[126,170],[132,216]], "z": -0.2, "amp": 0.6, "phase": 1.2 },
+            { "name": "farflipper", "role": "flipper", "poly": [[366,192],[422,194],[478,236],[506,292],[486,310],[436,296],[390,254]], "root": [[372,198],[402,234]], "z": -0.5, "phase": 0.5 },
+            { "name": "head", "role": "head", "poly": [[330,38],[350,8],[400,0],[470,8],[512,58],[512,162],[470,192],[420,198],[380,188],[344,172],[318,130]], "root": [[338,52],[334,166]], "front": true, "under": [[322,44],[350,44],[350,168],[322,168]], "z": 0.5 },
+            { "name": "flipper", "role": "flipper", "poly": [[110,313],[146,246],[196,186],[232,136],[270,124],[296,150],[286,204],[246,246],[196,296],[150,313]], "root": [[244,134],[286,176]], "front": true, "under": [[198,168],[292,138],[302,204],[220,224]], "z": 0.8 }
+        ]
+    },
+    "friend_jellyfish": {
+        "parts": [
+            { "name": "tentacles", "role": "tentacles", "poly": [[0,196],[377,170],[377,512],[0,512]], "root": [[40,200],[300,184]], "z": -0.1 }
+        ]
+    },
+    "friend_seahorse": {
+        "parts": [
+            { "name": "fin", "role": "median", "poly": [[0,238],[18,198],[60,188],[96,226],[100,300],[84,326],[30,320],[0,292]], "root": [[90,214],[96,302]], "z": 0.1, "amp": 1.4 },
+            { "name": "tail", "role": "curl", "poly": [[16,330],[226,330],[226,512],[16,512]], "root": [[40,334],[222,334]], "z": 0 }
+        ]
+    }
+}
