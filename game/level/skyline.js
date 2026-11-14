@@ -45,7 +45,7 @@ export const NEAR_COAST = {
     scroll: 0.72,          // share of the camera's movement (near, but behind the play plane)
     width: 1400,           // px of one piece at size 1
     size: [0.85, 1.2],
-    gap: [0.15, 1.1],      // gap after a piece, in piece widths
+    gap: [0.05, 0.55],     // gap after a piece, in piece widths (small: the island shows on most jumps)
     edge: 0.08,            // share of the biome left free at both ends (its neighbours' coasts take over)
     biomes: ['reef', 'kelp', 'harbour', 'shore']
 };
@@ -59,11 +59,12 @@ export function nearCoastItems(biomes = BIOMES, cfg = NEAR_COAST) {
         const r = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
         // A piece of on-screen width w covers w / scroll of world x (it moves slower than the camera).
         const x1 = b.from + b.width * (1 - cfg.edge);
-        let x = b.from + b.width * cfg.edge;
+        let x = b.from + b.width * cfg.edge, flip = r() < 0.5;
         while (true) {
             const size = cfg.size[0] + r() * (cfg.size[1] - cfg.size[0]), span = cfg.width * size / cfg.scroll;
             if (x + span > x1) break;
-            out.push({ kind: `coast_${b.id}`, x: x + span / 2, scroll: cfg.scroll, size, flip: r() < 0.5 });
+            flip = r() < 0.75 ? !flip : flip;      // mostly alternating: neighbours never all face the same way
+            out.push({ kind: `coast_${b.id}`, x: x + span / 2, scroll: cfg.scroll, size, flip });
             x += span * (1 + cfg.gap[0] + r() * (cfg.gap[1] - cfg.gap[0]));
         }
     }
