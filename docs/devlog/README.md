@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## The opening story in words: a caption per beat, one tap per beat
+
+[`e74b467`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/e74b467) · 2026-11-14 17:16
+
+![The opening story in words: a caption per beat, one tap per beat](26-the-opening-story-in-words-a-caption-per-beat-on.jpg)
+
 ## Light from the sky, caustics on the sand, rainbow fish, a bait ball and a glowing night
 
 [`9ba8bd9`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9ba8bd9) · 2026-11-14 16:10

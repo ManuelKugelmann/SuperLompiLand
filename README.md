@@ -5,9 +5,9 @@
 <!-- devlog:start -->
 ## Dev log
 
-**A world ten times as long: sea arch, small rescues, jelly blooms** — [`dea67e2`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/dea67e2) · 2026-11-14 14:28
+**The opening story in words: a caption per beat, one tap per beat** — [`e74b467`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/e74b467) · 2026-11-14 17:16
 
-![A world ten times as long: sea arch, small rescues, jelly blooms](docs/devlog/24-a-world-ten-times-as-long-sea-arch-small-rescues.jpg)
+![The opening story in words: a caption per beat, one tap per beat](docs/devlog/26-the-opening-story-in-words-a-caption-per-beat-on.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
