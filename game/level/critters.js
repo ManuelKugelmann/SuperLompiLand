@@ -58,7 +58,7 @@ export function makeCritter(scene, key, x, y, width, anim = 'wobble', opts = {})
             }
             obj.setDirty();
         } else if (anim === 'sway') {
-            const amp = obj.frame.width * 0.05;
+            const amp = obj.frame.width * 0.05 * (opts.amp ?? 1);
             const pts = obj.points, n = pts.length - 1;
             for (let i = 0; i <= n; i++) {
                 const f = opts.root === 'bottom' ? 1 - i / n : i / n;

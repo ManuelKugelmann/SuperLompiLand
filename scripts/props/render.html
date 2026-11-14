@@ -44,7 +44,8 @@ function weather(root, growth, tint) {
     });
 }
 
-window.renderModel = async ({ url, yaw = 90, pitch = 0, roll = 0, size = 1024, growth = 0.6, tint = '#c8c0b0', elev = 4, pick = null, hide = [] }) => {
+window.renderModel = async ({ url, yaw = 90, pitch = 0, roll = 0, size = 1024, growth = 0.6, tint = '#c8c0b0', elev = 4, pick = null, hide = [], exposure = 1.05 }) => {
+    renderer.toneMappingExposure = exposure;
     const gltf = cache[url] || (cache[url] = await new GLTFLoader().loadAsync(url));
     let model = gltf.scene.clone(true);
     const gone = [];

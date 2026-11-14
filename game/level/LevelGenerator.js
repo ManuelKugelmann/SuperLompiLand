@@ -58,22 +58,24 @@ const HAZARDS = {
 /**
  * Scenery on the seabed, rendered from CC0 models (public/img/props/). Per group:
  * texture keys, display width range (px), how much of its height sinks into the
- * ground (rock must lie under both ends), the steepest floor it stands on (radians), its depth (behind the rock
- * = half buried, the rock in front hides the keel) and at most how many per chunk.
+ * ground, how far below that rock must lie under both ends (`reach`, share of the height),
+ * the steepest floor it stands on (radians), its depth (behind the rock
+ * = half buried, the rock in front hides the keel), at most how many per chunk, and
+ * `sway` for plants (rooted, swaying with the water and pushed aside by the fish).
  */
 export const PROPS = {
-    boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.2, flat: 0.7, depth: -1, max: 2 },
-    barrel: { keys: ['barrel_1', 'barrel_2'], width: [110, 170], sink: 0.14, flat: 0.45, depth: -1, max: 2 },
-    crate: { keys: ['crate_1'], width: [130, 190], sink: 0.12, flat: 0.35, depth: -1, max: 1 },
+    boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.2, reach: 0.15, flat: 0.4, depth: -1, max: 2 },
+    barrel: { keys: ['barrel_1', 'barrel_2'], width: [110, 170], sink: 0.14, reach: 0.15, flat: 0.45, depth: -1, max: 2 },
+    crate: { keys: ['crate_1'], width: [130, 190], sink: 0.12, reach: 0.15, flat: 0.35, depth: -1, max: 1 },
     // Hulls share one slot per chunk, and only every third chunk column has one, so they never overlap.
-    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
-    trawler: { keys: ['trawler_1', 'cutter_1'], width: [880, 1150], sink: 0.22, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
-    rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.2, flat: 0.35, depth: -1, max: 1 },
-    // Generated art (FLUX.2 klein, Replicate), static plants between the swaying kelp.
-    seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, flat: 0.6, depth: -1, max: 2 },
-    seafan: { keys: ['seafan_1'], width: [200, 330], sink: 0.08, flat: 0.6, depth: -1, max: 1 },
-    anemone: { keys: ['anemone_1'], width: [130, 210], sink: 0.1, flat: 0.7, depth: -1, max: 2 },
-    kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, flat: 0.5, depth: -1, max: 2 }
+    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
+    trawler: { keys: ['trawler_1', 'cutter_1'], width: [880, 1150], sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
+    rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.2, reach: 0.2, flat: 0.35, depth: -1, max: 1 },
+    // Generated art (FLUX.2 klein, Replicate): plants between the kelp stalks.
+    seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, reach: 0.2, flat: 0.6, depth: -1, max: 2, sway: 0.6 },
+    seafan: { keys: ['seafan_1'], width: [200, 330], sink: 0.08, reach: 0.2, flat: 0.6, depth: -1, max: 1, sway: 0.25 },
+    anemone: { keys: ['anemone_1'], width: [130, 210], sink: 0.1, reach: 0.2, flat: 0.7, depth: -1, max: 2, sway: 0.35 },
+    kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, reach: 0.2, flat: 0.5, depth: -1, max: 2, sway: 0.7 }
 };
 
 /** Painted kelp stalks (generated art, public/img/plants/); the procedural 'kelp' strip is the fallback. */
@@ -372,15 +374,28 @@ export default class LevelGenerator {
                 const tex = s.textures.get(key).getSourceImage();
                 const w = rng.realInRange(p.width[0], p.width[1]), h = w * tex.height / tex.width;
                 // Never floating: rock must lie under both ends, below the buried part.
-                const rockUnder = (x, y) => { for (let d = 0; d <= h * 0.5; d += 40) if (this.density(x, y + d) > T) return true; return false; };
+                const rockUnder = (x, y) => { for (let d = 0; d <= h * p.reach; d += 20) if (this.density(x, y + d) > T) return true; return false; };
                 const below = f => f.y + h * p.sink * 0.8;
                 const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat * (forced ? 2 : 1)
                     && rockUnder(f.x - w * 0.45, below(f)) && rockUnder(f.x + w * 0.45, below(f)));
                 if (!spot) continue;
                 spot.prop = true;
                 used[slot(group)] = (used[slot(group)] || 0) + 1;
+                const angle = spot.angle * 0.6;
+                if (p.sway) {
+                    // Rooted mesh: the middle sits half the visible height above the ground.
+                    const lift = h * (0.5 - p.sink);
+                    const plant = makeCritter(s, key, spot.x + Math.sin(angle) * lift, spot.y - Math.cos(angle) * lift, w, 'sway',
+                        { root: 'bottom', amp: p.sway, speed: rng.realInRange(0.5, 0.8), scaleY: h / tex.height });
+                    plant.setRotation(angle).setDepth(p.depth);
+                    plant.isPlant = true;
+                    plant.bend = 0;
+                    keep(plant);
+                    this.animated.push(plant);
+                    continue;
+                }
                 const img = keep(s.add.image(spot.x, spot.y, key).setOrigin(0.5, 1 - p.sink));
-                img.setScale(w / tex.width).setRotation(spot.angle * 0.6).setDepth(p.depth);
+                img.setScale(w / tex.width).setRotation(angle).setDepth(p.depth);
                 if (rng.frac() < 0.5) img.setFlipX(true);
                 if (p.tint) img.setTint(p.tint);
             }
