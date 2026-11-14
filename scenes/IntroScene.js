@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
+import GameMenu, { MENU } from '../game/ui/GameMenu.js';
 import cardImg from '../assets/card_preview.png';
 import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
@@ -203,7 +203,7 @@ export default class IntroScene extends Phaser.Scene {
             this.perfSum = 0; this.perfN = 0;
         }
 
-        new BurgerMenu(this, 60, 60, [
+        new GameMenu(this, this.scale.height * MENU.button * 0.6, this.scale.height * MENU.button * 0.6, [
             { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => this.scene.start(STORY_KEY) },
             ...feedbackMenuItems(lang, () => ({ screen: 'title' })),
             soundMenuItem(lang, () => this.scene.restart()),
@@ -382,11 +382,11 @@ export default class IntroScene extends Phaser.Scene {
         this.modal = false; // fresh title screen (the scene object is reused)
         const W = this.scale.width, H = this.scale.height, de = lang === 'de';
         const label = { fontFamily: 'Arial', fontStyle: 'bold' };
-        const btn = this.add.text(W - 150, H * 0.905, de ? 'Zusammen' : 'Together', {
+        const btn = this.add.text(W - 180, H * 0.905, de ? 'Zusammen' : 'Together', {
             ...label, fontSize: '40px', color: '#ffffff', backgroundColor: '#1d8fb5', padding: { x: 30, y: 14 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
         // Offline: the button greys out and explains itself; solo play is unaffected (spec).
-        const offlineNote = this.add.text(W - 150, H * 0.905 - 62, de ? 'Kein Internet' : 'No internet', {
+        const offlineNote = this.add.text(W - 180, H * 0.905 - 62, de ? 'Kein Internet' : 'No internet', {
             ...label, fontSize: '26px', color: '#ffd0d0', stroke: '#0a3f6e', strokeThickness: 5
         }).setOrigin(0.5).setVisible(false);
         const online = () => navigator.onLine !== false;

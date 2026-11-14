@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
+import GameMenu, { MENU } from '../game/ui/GameMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
 import { heartRow, textStyle } from '../game/ui/kit.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
@@ -99,7 +99,7 @@ export default class HudScene extends Phaser.Scene {
             fontFamily: 'Arial', fontSize: '44px', color: '#fff3b0', stroke: '#06243d', strokeThickness: 3, shadow: { offsetY: 3, color: '#031a2c', blur: 14, fill: true }
         }).setOrigin(0.5).setAlpha(0);
 
-        new BurgerMenu(this, 60, 60, [
+        new GameMenu(this, this.scale.height * MENU.button * 0.6, this.scale.height * MENU.button * 0.6, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
             { label: de ? 'RIFFBUCH' : 'REEF BOOK', color: 0x1d6f9a, callback: () => main.openBook() },
             { label: de ? 'STEUERUNG' : 'CONTROLS', color: 0x1d6f9a, callback: () => showSwitcher(HUD.switcherMenuMs) },
