@@ -57,6 +57,7 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import GrandNestLayer from '../game/level/GrandNestLayer.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
+import GannetLayer from '../game/level/GannetLayer.js';
 import SealLayer from '../game/level/SealLayer.js';
 import FerryLayer from '../game/level/FerryLayer.js';
 import SeaOtterLayer from '../game/level/SeaOtterLayer.js';
@@ -66,7 +67,7 @@ import { edgeMarker } from '../net/edgeMarker.js';
 import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
-import { createPerfTour, perfReport, slowSteps } from '../game/perfTour.js';
+import { createPerfTour, perfReport, slowSteps, watchParts, slowParts } from '../game/perfTour.js';
 import { depthMeters } from '../game/level/depthMeters.js';
 import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics } from '../game/fx/CausticsPipeline.js';
@@ -258,6 +259,8 @@ export default class MainScene extends Phaser.Scene {
         this.ferry = new FerryLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), x => this.level.field.routeY(x), () => this.bookEntry('ferry'));
         // The harbour's sleeping seal (spec 5.0o): its eyes open and its head turns after the fish, then it sleeps again.
         this.seal = new SealLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('seal'));
+        // Gannets behind the sea arch (spec 5.0o): they plunge in ahead of the fish one after the other and swim up with a catch.
+        this.gannets = new GannetLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), () => this.bookEntry('gannet'));
         // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
         this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
@@ -639,6 +642,11 @@ export default class MainScene extends Phaser.Scene {
         this.perfBuilds = this.level.buildMs.count;
         const chunkMs = built ? this.level.buildMs.last : 0;
         const settling = !this.level.viewReady;
+        // Which layer the slowest calls of a hop belong to: watched from the first tour frame on, noted while the view settles, kept per biome when it has.
+        this.perfParts ??= watchParts(this, () => performance.now());
+        if (!settling && this.perfHopping) (this.perfHops ??= []).push(`hop at ${Math.round(tour.x)} (${BIOMES[biomeIndexAt(tour.x)].id}): ${slowParts(this.perfParts.worst)}`);
+        if (!settling) this.perfParts.reset();
+        this.perfHopping = settling;
         tour.sample({ logicMs: Math.max(0, logicMs - chunkMs), chunkMs, renderMs: this.perfRender?.ms || 0, objects: this.children.list.length, tweens: this.tweens.getTweens().length, settling });
         if (tour.step(delta, settling)) {
             const p = this.safeSpot(tour.x, this.level.field.routeY(tour.x));
@@ -648,7 +656,8 @@ export default class MainScene extends Phaser.Scene {
         }
         if (!tour.done) return;
         const steps = slowSteps(this.level.stepMax, x => BIOMES[biomeIndexAt(x)].id);
-        const rows = tour.rows(), lines = [...perfReport(rows), ...steps];
+        const rows = tour.rows(), lines = [...perfReport(rows), ...steps, ...(this.perfHops || [])];
+        window.__perfhops = this.perfHops || [];
         window.__perftest = rows;      // for automated runs
         window.__perfsteps = [...this.level.stepMax].map(([name, v]) => ({ name, ms: v.ms, x: v.x }));
         const text = lines.join(String.fromCharCode(10));
@@ -1672,6 +1681,7 @@ export default class MainScene extends Phaser.Scene {
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);
+        this.gannets.update(sp, this.fish.facing, time / 1000);
         this.seal.update(sp, time / 1000, delta / 1000);
         this.ferry.update(sp, this.fish.facing, time / 1000, delta);
         this.seaOtter.update(sp, this.fish.facing, time / 1000, delta / 1000);

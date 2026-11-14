@@ -80,3 +80,31 @@ export function slowSteps(steps, biomeAt, cfg = PERF_TOUR) {
     return [...steps].filter(([, v]) => v.ms > cfg.slowStepMs).sort((a, b) => b[1].ms - a[1].ms)
         .map(([name, v]) => `slow build step: ${name.padEnd(18)} ${v.ms.toFixed(1).padStart(7)} ms  (${biomeAt(v.x)}, x ${Math.round(v.x)})`);
 }
+
+/**
+ * Times the `update` and `animate` of every part of `host` (its own properties that have one),
+ * for the tour: returns { worst (Map name -> ms: the slowest call since the last reset), reset() }.
+ * Only used with `?perftest=1`: it tells which layer a slow frame belongs to.
+ */
+export function watchParts(host, now = () => performance.now()) {
+    const worst = new Map();
+    for (const name of Object.keys(host)) {
+        const part = host[name];
+        if (!part || typeof part !== 'object') continue;
+        for (const fn of ['update', 'animate']) {
+            const call = part[fn];
+            if (typeof call !== 'function') continue;
+            part[fn] = function (...args) {
+                const t = now(), out = call.apply(this, args), ms = now() - t, key = `${name}.${fn}`;
+                if (ms > (worst.get(key) || 0)) worst.set(key, ms);
+                return out;
+            };
+        }
+    }
+    return { worst, reset: () => worst.clear() };
+}
+
+/** The slowest parts as text, slowest first: "name ms, name ms, ...". */
+export function slowParts(worst, count = 4) {
+    return [...worst].sort((a, b) => b[1] - a[1]).slice(0, count).map(([k, ms]) => `${k} ${ms.toFixed(0)}`).join(', ');
+}

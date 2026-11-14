@@ -37,6 +37,7 @@ export const LEVEL = {
     margin: 1,            // extra chunks generated around the view
     buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
     buildRushMs: 9,       // ... and this much while a chunk in view is not complete yet (a hole in the picture is worse than a slower frame)
+    earlyPerFrame: 3,     // chunks that get their early collision per frame
     edgeBatch: 2,         // collision strips made per build step
     coinBatch: 1,         // coins of a trail made per build step
     rockParts: 4,         // the rock picture of a chunk is this many textures, one under the other
@@ -332,9 +333,11 @@ export default class LevelGenerator {
                 // No worker: one at a time on the main thread, in steps.
                 if (!this.job && budget) { this.job = this.build(missing[0][0], missing[0][1]); budget = step(); }
             } else {
+                let solid = 0;
                 for (const [cx, cy] of missing) {             // ask the worker for the maths
                     const key = `${cx},${cy}`;
-                    if (!this.early.has(key)) this.solidNow(cx, cy, key);      // solid at once, whatever the worker's state
+                    // Solid soon, whatever the worker's state: nearest first, a few per frame (after a jump a whole view is missing at once).
+                    if (!this.early.has(key) && solid < LEVEL.earlyPerFrame) { this.solidNow(cx, cy, key); solid++; }
                     if (this.pending.has(key) || this.ready.some(r => r.key === key)) continue;
                     this.pending.add(key);
                     this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells });

@@ -4,7 +4,7 @@ export const FERRY_LOOK = {
     hullDepth: 6.3,      // the hull lies in the waterline, in front of the world
     shadowDepth: 5.6,    // its shadow falls through the water in front of the play plane (soft, never hiding the fish)
     shadowDeep: 1900,    // px down the shadow reaches
-    bubbleMs: 22,        // ms between bubbles of the wash
+    bubbleMs: 45,        // ms between bubbles of the wash (the white band carries the look; the bubbles only make it live)
     washDepth: 4.2,      // the wash's white band lies just behind the fish
     washAlpha: 0.5,
     propSpin: 14,        // rad/s the propeller turns
@@ -121,7 +121,7 @@ export default class FerryLayer {
             this.bubbleIn = K.bubbleMs;
             const s = Math.random() ** 1.6 * F.wash.length, x = L.hx - L.pass.dir * (F.hull[0] / 2 + s);
             const y = washY(s, L.surface, L.route) + (Math.random() - 0.5) * F.wash.half * 1.4;
-            this.scene.particles?.spawn('bubble', x, y, 3, { radius: 11, spread: 34, vx: L.pass.dir * 120 });
+            this.scene.particles?.spawn('bubble', x, y, 2, { radius: 11, spread: 34, vx: L.pass.dir * 120 });
         }
         if (!this.seen && Math.abs(fish.x - L.hx) < F.seen) { this.seen = true; this.onSeen(); }
     }

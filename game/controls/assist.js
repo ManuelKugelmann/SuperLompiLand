@@ -23,7 +23,7 @@ export const ASSIST = {
         diveDir: 0.5     // ... and for schemes that steer by a direction: the downward share of it from which it counts as a dive
     },
     lane: {
-        below: 250,      // px under the calm lane's lower edge from which a depth the player did not choose is eased back up
+        below: 120,      // px under the calm lane's lower edge from which a depth the player did not choose is eased back up
         stop: 0,         // ... and px under that edge at which the easing, once started, ends
         above: 400,      // the mirror: px over the lane's upper edge from which a depth the player did not choose is eased back down ...
         sink: 40,        // ... by this many px per second, to the upper edge itself
