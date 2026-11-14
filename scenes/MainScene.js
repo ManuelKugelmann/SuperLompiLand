@@ -55,6 +55,7 @@ import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
+import { depthMeters } from '../game/level/depthMeters.js';
 import { updateCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
@@ -886,7 +887,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     depthMeters() {
-        return Math.max(0, Math.round(this.fish.sprite.y / 100));
+        return depthMeters(this.fish.sprite.y);
     }
 
     switchScheme(id) {
