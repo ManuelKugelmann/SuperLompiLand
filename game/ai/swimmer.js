@@ -142,7 +142,9 @@ export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
     const before = a.heading;
     a.heading = turnToward(a.heading, want, turn * steps);
     if (a.state === 'greet') a.turned += angleTo(before, a.heading);
-    a.v += (speed - a.v) * Math.min(1, 0.06 * steps);
+    // It eases into and out of its pace; arriving for a breath it stops short, so it does not
+    // drift on up to the waterline.
+    a.v += (speed - a.v) * Math.min(1, (a.state === 'breathe' && speed === 0 ? 0.35 : 0.06) * steps);
     const nx = a.x + Math.cos(a.heading) * a.v * steps, ny = a.y + Math.sin(a.heading) * a.v * steps;
     if (env.isOpen(nx, ny)) { a.x = nx; a.y = ny; } else a.v = 0;      // never into rock
 

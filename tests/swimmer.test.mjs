@@ -159,8 +159,10 @@ test('the breath is reached even when open water ends just under the waterline, 
     for (const seed of [1, 2, 3]) {
         const a = createSwimmer({ x: 0, y: 195 }, { breathe: true, range: 400, speed: 1.3, turn: 0.03 }, seed);
         a.air = 0;
-        let top = Infinity, reachedAt = null;
-        run(a, 12, { isOpen: sea }, (s, i) => { top = Math.min(top, s.y); if (reachedAt === null && s.y <= SWIMMER.surfaceY + 8) reachedAt = i / 60; });
+        let top = Infinity, reachedAt = null, heldS = 0;
+        run(a, 12, { isOpen: sea }, (s, i) => { if (s.state === 'breathe') top = Math.min(top, s.y); if (reachedAt === null && s.y <= SWIMMER.surfaceY + 8) reachedAt = i / 60; if (s.state === 'breathe' && s.y <= SWIMMER.surfaceY + 8) heldS += 1 / 60; });
         assert.ok(reachedAt !== null && reachedAt < 8, `seed ${seed}: stalled at ${top}`);
+        assert.ok(top > SWIMMER.surfaceY - 14, `seed ${seed}: drifted on up to ${top}`);
+        assert.ok(heldS > SWIMMER.breathHoldS - 0.3 && heldS < SWIMMER.breathHoldS + 1.5, `seed ${seed}: held its breath position for ${heldS}`);
     }
 });
