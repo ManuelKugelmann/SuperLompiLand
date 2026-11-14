@@ -19,10 +19,14 @@ test('every playable friend but Lompi waits in exactly one chapter', () => {
     assert.deepEqual(ids, CHARACTERS.filter(c => c.id !== 'lompi').map(c => c.id).sort());
 });
 
-test('the first and the last chapter have no rescue: one starts the trip, one ends it', () => {
-    const list = chapters();
-    assert.equal(list[0].friend, null);
+test('the first friend waits within half a minute of the start, on the calm route; the last chapter has no rescue: it ends the trip', () => {
+    const list = chapters(), first = list[0];
+    assert.ok(first.friend, 'the lagoon has a friend to free');
+    // At cruise speed (about 330 px a second) half a minute is about 10 000 px.
+    assert.ok(first.x > 4000 && first.x < 10000, `first friend at ${first.x}`);
     assert.equal(list[list.length - 1].friend, null);
+    assert.equal(list.filter(c => c.friend).length, 6, 'six friends in all');
+    assert.equal(new Set(list.filter(c => c.friend).map(c => c.friend.id)).size, 6, 'each one once');
 });
 
 test('freeing a friend is news once, is kept, and turns the goal into "onward"', () => {

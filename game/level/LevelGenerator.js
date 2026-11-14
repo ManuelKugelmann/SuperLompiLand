@@ -28,7 +28,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 33,
+    version: 34,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -49,7 +49,8 @@ export const LEVEL = {
     coinGap: 92,          // minimum distance between two coins
     coinStep: 110,        // distance between the coins of a trail
     trailChance: 0.13,    // chance of a coin trail in a chunk, per point of the biome's `coins` value
-    laneBand: 260         // px: trails on the main route stay within this band around its middle
+    laneBand: 260,        // px: trails on the main route stay within this band around its middle
+    coinTop: 250          // px under the surface above which no chunk coin lies: near the surface that part of the view is the HUD's band (counter, hearts)
 };
 const CH = LEVEL.cell * LEVEL.cells;
 
@@ -755,7 +756,7 @@ export default class LevelGenerator {
     }
 
     addCoin(chunk, x, y, chunkKey, index) {
-        if (!this.reachable(x, y)) return;      // its number stays taken, so the others keep theirs
+        if (y < LEVEL.coinTop || !this.reachable(x, y)) return;      // its number stays taken, so the others keep theirs
         // The story's net scenes stand free: no coins in front of a friend who waits for help.
         for (const c of this.storySpots) if ((c.x - x) ** 2 + (c.y - y) ** 2 < JOURNEY.clear ** 2) return;
         // Coins never lead into harm: none within reach of a hazard or along its chain (coinClear.js).

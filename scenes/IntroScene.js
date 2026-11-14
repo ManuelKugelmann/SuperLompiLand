@@ -29,6 +29,7 @@ import { DOCKS_ART } from '../game/level/DocksLayer.js';
 import { ARCH_ART } from '../game/level/SeaArchLayer.js';
 import { RESCUE_ART } from '../game/RescueLayer.js';
 import { BLOOM_ART } from '../game/level/BloomLayer.js';
+import { CONTROL_ART } from '../game/ui/ControlSwitcher.js';
 import { RAFT_ART } from '../game/level/RaftLayer.js';
 import { MEADOW_ART } from '../game/level/MeadowLayer.js';
 import { WHALE_SHARK_ART } from '../game/level/WhaleSharkLayer.js';
@@ -125,7 +126,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.textures.exists('hull_bottom')) this.load.image('hull_bottom', 'img/props/hull_bottom.webp');
         for (const [key, file] of Object.entries(SHIP_FILES.images)) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.cache.json.exists(SHIP_FILES.json[0])) this.load.json(SHIP_FILES.json[0], SHIP_FILES.json[1]);
-        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART, ...VENT_ART, ...CONTAINER_ART, ...DOLPHIN_ART, ...OCTOPUS_ART, ...SANDBAR_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
+        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART, ...VENT_ART, ...CONTAINER_ART, ...DOLPHIN_ART, ...OCTOPUS_ART, ...SANDBAR_ART, ...CONTROL_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.textures.exists(MANTA_ART.key)) this.load.image(MANTA_ART.key, MANTA_ART.file);
         if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);
@@ -250,9 +251,9 @@ export default class IntroScene extends Phaser.Scene {
         this.nameText = this.add.text(W / 2, H * 0.74, '', {
             fontFamily: 'Arial', fontSize: '64px', color: '#ffffff', fontStyle: 'bold', stroke: '#0a5c7a', strokeThickness: 10
         }).setOrigin(0.5);
-        this.blurbText = this.add.text(W / 2, H * 0.805, '', {
-            fontFamily: 'Arial', fontSize: '34px', color: '#eafcff', stroke: '#0a3f6e', strokeThickness: 6
-        }).setOrigin(0.5);
+        this.blurbText = this.add.text(W / 2, H * 0.81, '', {
+            fontFamily: 'Arial', fontSize: '48px', color: '#eafcff', stroke: '#0a3f6e', strokeThickness: 7
+        }).setOrigin(0.5).setShadow(0, 4, 'rgba(4,30,52,0.55)', 10, true, true);
         this.lang = lang;
 
         // "There are more fish": a round button in each gap beside the chosen character, on a

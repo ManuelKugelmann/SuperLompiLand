@@ -20,8 +20,10 @@ export const JOURNEY = {
 
 /** Per biome: who waits there (a character id) and what the chapter asks, in a child's words. */
 const CHAPTERS = {
-    beach: { goal: { de: 'Schwimm nach Osten, dem roten Leuchten nach', en: 'Swim east, toward the red glow' } },
-    mangrove: { friend: 'seahorse', goal: { de: 'Jemand hängt zwischen den Wurzeln fest', en: 'Someone is stuck among the roots' } },
+    // The first friend waits close to the start (`x` = world x instead of the usual place in the biome): within half a minute
+    // of the first stroke the child sees what the journey is about.
+    beach: { friend: 'seahorse', x: 7600, goal: { de: 'Ganz in der Nähe zappelt jemand im Netz', en: 'Someone is wriggling in a net close by' } },
+    mangrove: { goal: { de: 'Weiter nach Osten, zwischen den Wurzeln hindurch', en: 'On east, in between the roots' } },
     reef: { friend: 'jellyfish', goal: { de: 'Am Riff zappelt etwas im Netz', en: 'Something wriggles in a net on the reef' } },
     kelp: { friend: 'turtle', goal: { de: 'Im Tangwald ruft jemand um Hilfe', en: 'Someone calls for help in the kelp' } },
     blue: { friend: 'flyingfish', event: { id: 'whale', from: 0.68, length: 3520 }, goal: { de: 'Draußen im Blau treibt ein Netz', en: 'A net drifts out in the blue' } },
@@ -40,7 +42,7 @@ export function chapters(biomes = BIOMES, cfg = JOURNEY) {
         return {
             index, id: b.id, name: b.name, goal: c.goal || ONWARD,
             friend: CHARACTERS.find(ch => ch.id === c.friend) || null,
-            x: b.from + b.width * cfg.at,
+            x: c.x ?? b.from + b.width * cfg.at,
             event: c.event ? { id: c.event.id, x: b.from + b.width * c.event.from, endX: b.from + b.width * c.event.from + c.event.length } : null
         };
     });

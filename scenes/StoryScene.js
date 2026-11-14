@@ -1,3 +1,4 @@
+import { createTimeline } from '../game/timeline.js';
 import Phaser from 'phaser';
 import { play } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
@@ -22,7 +23,8 @@ export function storySeen() {
  *   1 calm reef  2 the ground rumbles  3 the volcano erupts, above and under
  *   water  4 dark things sink out of the ash, the friends scatter  5 Lompi
  *   looks east and puffs up  6 the water clears; a red glow stays in the east.
- * A tap skips to the end. Shown once on a fresh save; replayable from the title menu.
+ * A tap goes on to the next beat; the button in the corner (or Escape) skips to the end.
+ * Shown once on a fresh save; replayable from the title menu.
  */
 export default class StoryScene extends Phaser.Scene {
     constructor() {
@@ -50,17 +52,29 @@ export default class StoryScene extends Phaser.Scene {
         this.flash = this.add.rectangle(0, 0, W, H, 0xff4a1a, 0).setOrigin(0).setDepth(50);
 
         // --- Beats ---------------------------------------------------------
-        const at = (ms, fn) => this.time.delayedCall(ms, () => { if (!this.done) fn(); });
-        at(1500, () => { this.cameras.main.shake(1400, 0.006); play('rumble'); });                    // 2 rumble
-        at(1900, () => this.friends.forEach(f => this.tweens.add({ targets: f, angle: -10, duration: 300, yoyo: true })));
-        at(3000, () => this.erupt());                                             // 3 eruption
-        at(4500, () => this.fallout());                                           // 4 dark things, friends scatter
-        at(6000, () => this.resolve());                                           // 5 Lompi puffs up
-        at(7600, () => this.tweens.add({ targets: this.glow, alpha: 0.4, duration: 500 }));  // 6 the glow stays
-        at(8400, () => this.finish());
+        // They play by themselves; a tap goes on to the next beat at once (one tap, one beat). Only
+        // the small button in the corner leaves the story.
+        this.timeline = createTimeline([
+            { at: 1500, run: () => { this.cameras.main.shake(1400, 0.006); play('rumble'); } },                    // 2 rumble
+            { at: 1900, run: () => this.friends.forEach(f => this.tweens.add({ targets: f, angle: -10, duration: 300, yoyo: true })) },
+            { at: 3000, run: () => this.erupt() },                                             // 3 eruption
+            { at: 4500, run: () => this.fallout() },                                           // 4 dark things, friends scatter
+            { at: 6000, run: () => this.resolve() },                                           // 5 Lompi puffs up
+            { at: 7600, run: () => this.tweens.add({ targets: this.glow, alpha: 0.4, duration: 500 }) },  // 6 the glow stays
+            { at: 8400, run: () => this.finish() }
+        ]);
+        const de = (this.registry.get('currentLanguage') || 'de') === 'de';
+        const skip = this.add.text(W - 28, H - 24, de ? 'Überspringen' : 'Skip', {
+            fontFamily: 'Arial', fontSize: '30px', color: '#ffffff', backgroundColor: '#00000055', padding: { x: 18, y: 10 }
+        }).setOrigin(1, 1).setScrollFactor(0).setDepth(60).setAlpha(0.75).setInteractive({ useHandCursor: true });
+        skip.on('pointerdown', (p, x, y, ev) => { ev?.stopPropagation(); this.skipped = true; this.finish(); });
+        this.skipped = false;
+        this.input.on('pointerdown', () => { if (!this.skipped && !this.done) this.timeline.next(); });
+        this.input.keyboard?.on('keydown', e => { if (this.done) return; if (e.key === 'Escape') this.finish(); else this.timeline.next(); });
+    }
 
-        this.input.once('pointerdown', () => this.finish());
-        this.input.keyboard?.once('keydown', () => this.finish());
+    update(time, delta) {
+        if (!this.done) this.timeline.step(delta);
     }
 
     /** The painted stage: one picture of the volcano island above and below the water, cover on the sand, corals. */
