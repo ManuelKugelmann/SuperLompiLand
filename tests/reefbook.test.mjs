@@ -45,3 +45,10 @@ test('entries by kind carry their found flag', () => {
     assert.equal(left.find(e => e.id === 'mine').found, false);
     assert.equal(book.entries().length, ENTRIES.length);
 });
+
+test('every shoal species has a reef book entry', async () => {
+    const src = (await import('node:fs')).readFileSync(new URL('../game/ai/SwarmLayer.js', import.meta.url), 'utf8');
+    const ids = [...src.slice(src.indexOf('SPECIES = {'), src.indexOf('};', src.indexOf('SPECIES = {'))).matchAll(/^\s+(\w+):\s+\{ count/gm)].map(m => m[1]);
+    assert.ok(ids.length >= 5, `found ${ids}`);
+    for (const id of ids) assert.equal(entryFor(`school_${id}`)?.kind, 'creature', id);
+});

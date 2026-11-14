@@ -568,6 +568,7 @@ export default class MainScene extends Phaser.Scene {
         const ids = [BIOMES[biomeIndexAt(p.x)].id];
         for (const f of this.level.friends) if (f.key && near(f)) ids.push(f.key);
         for (const h of this.level.hazards) if (h.key && near(h)) ids.push(h.key);
+        for (const s of this.swarms.near(p.x, p.y, BOOK.seePx)) ids.push(`school_${s}`);
         for (const id of ids) {
             const e = this.reefBook.discover(id);
             if (!e) continue;
