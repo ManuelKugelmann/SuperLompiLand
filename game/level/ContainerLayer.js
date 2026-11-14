@@ -1,9 +1,9 @@
-import { CONTAINERS, containerSpan, containerField } from './containers.js';
+import { CONTAINERS, containerSpan, containerField, containerCoins } from './containers.js';
 import BonusCoins from './BonusCoins.js';
 
 export const CONTAINER_LOOK = {
     near: 3400, far: 5200,   // px from the field at which it is built, and beyond which it is removed
-    depth: 2.4,          // behind the fish: it swims in front of a container's far wall, through its open ends
+    depth: 2.4,          // behind the fish: it swims in front of a container's far wall, through the open one's ends
     coinDepth: 2.6,
     paints: [['#a8452f', '#7c2f20'], ['#2f6f9a', '#214d6c'], ['#3d8a6e', '#2a614d']],   // rust red, sea blue, green: [side, shade]
     seen: 900            // px from a container at which the field counts as seen (reef book)
@@ -14,7 +14,7 @@ const key = i => `container_${i}`;
 /** The painted containers (loaded by the title screen; container_2's doors hang open); drawn procedurally while missing. */
 export const CONTAINER_ART = Object.fromEntries([0, 1, 2].map(i => [key(i), `img/container_${i}.webp`]));
 
-/** Fallback pictures, one per paint: a corrugated steel box seen from the side, both ends open, weed along its lower edge. */
+/** Fallback pictures, one per paint: a corrugated steel box seen from the side, weed along its lower edge (painted files under the same keys replace them). */
 function ensureTextures(scene) {
     CONTAINER_LOOK.paints.forEach(([side, shade], i) => {
         if (scene.textures.exists(key(i))) return;
@@ -34,47 +34,52 @@ function ensureTextures(scene) {
 }
 
 /**
- * What the container field looks like (level/containers.js says where the containers hang):
- * one picture each, rocking in the swell, and a line of coins through the ones the route runs
- * through. Built only while the fish is near. `onCoin(x, y)` for every coin taken, `onSeen()`
- * once at first sight.
+ * What the container field looks like (level/containers.js says where the containers float):
+ * one picture each, lying in the water's surface and rocking with it, a soft shadow under each,
+ * and the field's coins. Built only while the fish is near. `surfaceY(x)` = height of the water
+ * surface, `onCoin(x, y)` for every coin taken, `onSeen()` once at first sight.
  */
 export default class ContainerLayer {
-    constructor(scene, routeY, onCoin, onSeen) {
-        this.scene = scene; this.onCoin = onCoin; this.onSeen = onSeen; this.seen = false;
+    constructor(scene, routeY, surfaceY, onCoin, onSeen) {
+        this.scene = scene; this.surfaceY = surfaceY; this.onCoin = onCoin; this.onSeen = onSeen; this.seen = false;
         this.span = containerSpan();
-        this.boxes = containerField(routeY);
+        this.boxes = containerField();
+        this.coinSpots = containerCoins(routeY);
         ensureTextures(scene);
-        this.live = null;      // { imgs: [image per container], coins: [BonusCoins] }
-        this.taken = new Set();      // coins taken stay gone for this run ("container id:coin number")
+        this.live = null;      // { imgs, shadows, coins }
+        this.taken = new Set();      // coins taken stay gone for this run (their number in coinSpots)
     }
 
     build() {
         const s = this.scene, L = CONTAINER_LOOK, [len, h] = CONTAINERS.size;
-        const imgs = this.boxes.map(b => s.add.image(b.x, b.y, key(b.paint)).setDisplaySize(len, h).setRotation(b.tilt).setDepth(L.depth));
-        const coins = this.boxes.filter(b => b.through).map(b => {
-            const left = b.coins.map((p, k) => ({ ...p, k })).filter(p => !this.taken.has(`${b.id}:${p.k}`));
-            return new BonusCoins(s, left, L.coinDepth, (x, y) => { const p = left.find(q => q.x === x && q.y === y); if (p) this.taken.add(`${b.id}:${p.k}`); this.onCoin(x, y); });
-        });
-        return { imgs, coins };
+        const imgs = this.boxes.map(b => s.add.image(b.x, b.y, key(b.paint)).setDisplaySize(len, h).setRotation(b.tilt).setDepth(L.depth + (b.stacked ? 0.01 : 0)));
+        // A soft dark patch in the water under each floating one.
+        const shadows = this.boxes.map(b => b.stacked ? null : s.add.image(b.x, b.y + h * 0.75, 'bd_glow').setDisplaySize(len * 1.1, h * 1.3).setTint(0x041018).setAlpha(CONTAINERS.shadow).setDepth(L.depth - 0.1));
+        const left = this.coinSpots.map((p, k) => ({ ...p, k })).filter(p => !this.taken.has(p.k));
+        const coins = new BonusCoins(s, left, L.coinDepth, (x, y) => { const p = left.find(q => q.x === x && q.y === y); if (p) this.taken.add(p.k); this.onCoin(x, y); });
+        return { imgs, shadows, coins };
     }
 
     /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s. */
     update(fish, radius, t) {
         const L = CONTAINER_LOOK, sp = this.span;
-        if (this.live && (fish.x < sp.x0 - L.far || fish.x > sp.x1 + L.far)) { for (const o of this.live.imgs) o.destroy(); for (const c of this.live.coins) c.destroy(); this.live = null; }
+        if (this.live && (fish.x < sp.x0 - L.far || fish.x > sp.x1 + L.far)) {
+            for (const o of [...this.live.imgs, ...this.live.shadows]) o?.destroy();
+            this.live.coins.destroy(); this.live = null;
+        }
         if (!this.live) {
             if (fish.x < sp.x0 - L.near || fish.x > sp.x1 + L.near || !this.scene.buildSlot()) return;
             this.live = this.build();
         }
-        const [bob, rock] = CONTAINERS.bob;
+        const half = CONTAINERS.size[0] * 0.3;
         this.live.imgs.forEach((img, i) => {
             const b = this.boxes[i];
-            // The ones the fish swims through keep still enough for their coins; the others rise and fall in the swell.
-            if (!b.through) img.setY(b.y + Math.sin(t * 0.7 + i * 1.9) * bob);
-            img.setRotation(b.tilt + Math.sin(t * 0.5 + i * 2.3) * rock * (b.through ? 0.3 : 1));
-            if (!this.seen && Math.hypot(fish.x - b.x, fish.y - b.y) < L.seen) { this.seen = true; this.onSeen(); }
+            // It lies in the surface: it rises and falls with the water under its middle and tips with the slope between its ends.
+            const mid = this.surfaceY(b.x), slope = Math.atan2(this.surfaceY(b.x + half) - this.surfaceY(b.x - half), half * 2);
+            img.setY(mid + b.y).setRotation(b.tilt + slope * 0.6 + Math.sin(t * 0.5 + i * 2.3) * CONTAINERS.rock);
+            this.live.shadows[i]?.setY(mid + b.y + CONTAINERS.size[1] * 0.75);
+            if (!this.seen && Math.hypot(fish.x - b.x, fish.y - (mid + b.y)) < L.seen) { this.seen = true; this.onSeen(); }
         });
-        for (const c of this.live.coins) c.update(fish, radius, t);
+        this.live.coins.update(fish, radius, t);
     }
 }

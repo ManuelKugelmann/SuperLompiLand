@@ -1,9 +1,9 @@
 // The lost container field (pure, no Phaser; spec 5.0i/5.0j world map, hazards 7.1: realistic
 // and inanimate): off the harbour, at the end of the kelp island, a handful of shipping
-// containers that went overboard drift half sunk in the water, tilted, doors open. They hang
-// in the calm route's lane (the open water between the rock): two
-// of them lie on the route with both ends open, and the fish swims straight through them along
-// a line of coins. They are pictures behind the fish: nothing to bump into, nothing that hurts.
+// containers that went overboard float half sunk at the surface, tilted, rocking in the swell,
+// one lying on top of another. One has both ends open: the fish swims through its sunken half
+// along a line of coins. More coins hang in a row under each, and a trail of coins leads up to
+// the field from the calm route below. They are pictures: nothing to bump into, nothing that hurts.
 
 import { BIOMES } from './biomes.js';
 
@@ -11,17 +11,22 @@ export const CONTAINERS = {
     biome: 'kelp',
     at: 0.922,           // where in the biome the field's middle lies (share of the width): off the harbour, where ships lose them
     size: [980, 400],    // px length and height of one container as drawn
-    // Each container: px from the field's middle, px above (-) or below (+) the calm route, tilt (radians),
-    // which paint it wears (index into the look's colours), and whether the route runs through it.
+    // Each container: px from the field's middle, the share of its height under the waterline, its tilt
+    // (radians), which paint it wears (index into the look's colours), `open` = both ends open (the fish
+    // swims through), `on` = it lies on top of the container with that index instead of floating.
     boxes: [
-        { dx: -1350, dy: -190, tilt: 0.22, paint: 0, through: false },
-        { dx: -600, dy: 20, tilt: -0.06, paint: 1, through: true },
-        { dx: 150, dy: 200, tilt: 0.3, paint: 2, through: false },
-        { dx: 800, dy: -10, tilt: 0.08, paint: 0, through: true },
-        { dx: 1500, dy: -180, tilt: -0.25, paint: 1, through: false }
+        { dx: -1500, sunk: 0.55, tilt: 0.1, paint: 0 },
+        { dx: -350, sunk: 0.62, tilt: -0.05, paint: 2, open: true },      // paint 2 is the picture with its doors open
+        { dx: 800, sunk: 0.5, tilt: 0.14, paint: 1 },
+        { dx: 2000, sunk: 0.6, tilt: -0.12, paint: 0 },
+        { dx: 900, tilt: -0.2, paint: 0, on: 2 }
     ],
-    coins: 5,            // coins in a line through each container the route runs through
-    bob: [14, 0.02]      // px each rises and falls, and radians it rocks, in the swell
+    through: 5,          // coins in a line through the open container's sunken half
+    under: 3,            // coins in a row under each floating container ...
+    underGap: 130,       // ... this far under its bottom
+    trail: 6,            // coins that lead up from the calm route to the field's west end
+    rock: 0.05,          // radians each rocks in the swell
+    shadow: 0.3          // darkness of the shadow in the water under each
 };
 
 let SPAN = null;
@@ -29,27 +34,43 @@ let SPAN = null;
 /** The field's stretch of the world: { x (middle), x0, x1 }. */
 export function containerSpan(cfg = CONTAINERS) {
     if (cfg === CONTAINERS && SPAN) return SPAN;
-    const b = BIOMES.find(bi => bi.id === cfg.biome), x = b.from + b.width * cfg.at, half = Math.max(...cfg.boxes.map(o => Math.abs(o.dx))) + cfg.size[0] / 2;
-    const span = { x, x0: x - half, x1: x + half };
+    const b = BIOMES.find(bi => bi.id === cfg.biome), x = b.from + b.width * cfg.at;
+    const span = { x, x0: x + Math.min(...cfg.boxes.map(o => o.dx)) - cfg.size[0] / 2, x1: x + Math.max(...cfg.boxes.map(o => o.dx)) + cfg.size[0] / 2 };
     if (cfg === CONTAINERS) SPAN = span;
     return span;
 }
 
 /**
- * The containers in the world: [{ id, x, y, tilt, paint, through, coins: [{ x, y }] }]. `routeY(x)` =
- * depth of the calm route. A container the route runs through lies along the route there, and
- * its coins run through it from end to end.
+ * The containers: [{ id, x, y, tilt, paint, open, stacked }]. `y` = how far the container's
+ * middle lies under the water surface there (negative: above it); whoever draws it adds the
+ * surface's own height. A stacked one lies on the container below it, out of the water.
  */
-export function containerField(routeY, cfg = CONTAINERS) {
-    const s = containerSpan(cfg), [len] = cfg.size;
-    return cfg.boxes.map((o, i) => {
-        const x = s.x + o.dx, y = routeY(x) + o.dy;
-        // Along the route's own slope when the fish goes through it; else as it happens to hang.
-        const tilt = o.through ? Math.atan2(routeY(x + len / 2) - routeY(x - len / 2), len) + o.tilt * 0.5 : o.tilt;
-        const coins = !o.through ? [] : Array.from({ length: cfg.coins }, (_, k) => {
-            const u = (k / (cfg.coins - 1) - 0.5) * len * 0.8;
-            return { x: x + Math.cos(tilt) * u, y: y + Math.sin(tilt) * u };
-        });
-        return { id: `container${i}`, x, y, tilt, paint: o.paint, through: o.through, coins };
-    });
+export function containerField(cfg = CONTAINERS) {
+    const s = containerSpan(cfg), h = cfg.size[1];
+    const float = o => h * (o.sunk - 0.5);
+    return cfg.boxes.map((o, i) => ({
+        id: `container${i}`, x: s.x + o.dx, tilt: o.tilt, paint: o.paint, open: !!o.open, stacked: o.on !== undefined,
+        y: o.on === undefined ? float(o) : float(cfg.boxes[o.on]) - h * 0.92
+    }));
+}
+
+/**
+ * The field's coins, for a calm surface at y 0: [{ x, y }]. A trail up from the calm route, a
+ * row under each floating container, and a line through the open one's sunken half.
+ */
+export function containerCoins(routeY, cfg = CONTAINERS) {
+    const s = containerSpan(cfg), [len, h] = cfg.size, out = [], boxes = containerField(cfg);
+    const from = { x: s.x0 - 900, y: routeY(s.x0 - 900) - 130 }, first = boxes[0], to = { x: first.x - len * 0.3, y: first.y + h / 2 + cfg.underGap };
+    for (let i = 0; i < cfg.trail; i++) { const u = i / cfg.trail; out.push({ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u }); }
+    for (const b of boxes) {
+        if (b.stacked) continue;
+        if (b.open) {
+            // Through its sunken half, along its axis, a little under the waterline.
+            const dy = Math.max(60, (b.y + h / 2) * 0.5);
+            for (let k = 0; k < cfg.through; k++) { const u = (k / (cfg.through - 1) - 0.5) * len * 0.8; out.push({ x: b.x + Math.cos(b.tilt) * u, y: dy + Math.sin(b.tilt) * u }); }
+        } else {
+            for (let k = 0; k < cfg.under; k++) out.push({ x: b.x + (k - (cfg.under - 1) / 2) * len * 0.3, y: b.y + h / 2 + cfg.underGap });
+        }
+    }
+    return out;
 }

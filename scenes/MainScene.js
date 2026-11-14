@@ -244,8 +244,8 @@ export default class MainScene extends Phaser.Scene {
         // Two dolphins early in the lagoon blow bubble rings to swim through (a coin and a chain move each).
         this.dolphins = new DolphinLayer(this, x => this.level.field.routeY(x), (x, y) => { this.coinTaken(x, y); this.chainMove('ring'); }, kind => this.bookEntry(kind));
         this.meadow = new MeadowLayer(this, x => this.level.field.routeY(x), x => this.seabedBelow(x, this.level.field.routeY(x)), (x, y) => this.coinTaken(x, y), kind => this.bookEntry(kind));
-        // Lost shipping containers drifting half sunk off the harbour; the route runs through two of them.
-        this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'));
+        // Lost shipping containers floating half sunk at the surface off the harbour; coins lead up to them from the route.
+        this.containers = new ContainerLayer(this, x => this.level.field.routeY(x), x => this.surface.heightAt(x, this.time.now / 1000), (x, y) => this.coinTaken(x, y), () => this.bookEntry('container_field'));
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
         // Start at the last nest reached (kept across sessions), else the start pool.

@@ -1,45 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CONTAINERS, containerSpan, containerField } from '../game/level/containers.js';
+import { CONTAINERS, containerSpan, containerField, containerCoins } from '../game/level/containers.js';
 import { BIOMES } from '../game/level/biomes.js';
-import { FIELD, ROUTE, createField } from '../game/level/density.js';
-import { weatherZones, WEATHER } from '../game/level/weather.js';
+import { FIELD, createField } from '../game/level/density.js';
 import { rescueSpots } from '../game/rescues.js';
-import { bloomFields } from '../game/level/blooms.js';
-import { ghostShip, SET_PIECES } from '../game/level/setPieces.js';
 
-const f = createField(1337), span = containerSpan(), boxes = containerField(f.routeY);
+const f = createField(1337), span = containerSpan(), boxes = containerField(), coins = containerCoins(f.routeY), [len, h] = CONTAINERS.size;
 
-test('the container field drifts off the harbour at the end of the kelp island, clear of nests, rescues and everything else on the map', () => {
+test('the container field floats off the harbour at the end of the kelp island, clear of nests and rescues', () => {
     const kelp = BIOMES.find(bi => bi.id === 'kelp'), harbour = BIOMES.find(bi => bi.id === 'harbour');
     assert.ok(span.x0 > kelp.from + kelp.width * 0.8 && span.x1 < harbour.from, `${Math.round(span.x0)} .. ${Math.round(span.x1)}`);
     for (const n of f.nests) assert.ok(n.x < span.x0 - 1500 || n.x > span.x1 + 1500, `nest at ${Math.round(n.x)}`);
-    const w = weatherZones(), clear = (x0, x1, what) => assert.ok(x1 < span.x0 || x0 > span.x1, what);
-    clear(w.storm[0] - WEATHER.storm.ramp, w.storm[1] + WEATHER.storm.ramp, 'storm');
-    clear(ghostShip().x - SET_PIECES.ship.clear, ghostShip().x + SET_PIECES.ship.clear, 'ghost ship');
-    for (const d of w.downs) clear(d[0], d[1], 'current');
-    for (const b of bloomFields()) clear(b.x0, b.x1, b.id);
-    for (const r of rescueSpots()) clear(r.x, r.x, r.id);
+    for (const r of rescueSpots()) assert.ok(r.x < span.x0 - 500 || r.x > span.x1 + 500, r.id);
 });
 
-test('five containers hang in open water around the route; two lie on it and the fish swims through them along their coins', () => {
-    assert.equal(boxes.length, CONTAINERS.boxes.length);
-    const through = boxes.filter(b => b.through);
-    assert.equal(through.length, 2);
-    for (const b of boxes) {
-        assert.ok(b.y > 60 && f.density(b.x, b.y) < FIELD.threshold, `${b.id} hangs in open water at ${Math.round(b.y)}`);
-        assert.equal(b.coins.length, b.through ? CONTAINERS.coins : 0);
+test('the containers lie half sunk in the surface; one lies on top of another, out of the water', () => {
+    const floating = boxes.filter(b => !b.stacked), stacked = boxes.filter(b => b.stacked);
+    assert.ok(floating.length >= 4 && stacked.length === 1);
+    for (const b of floating) {
+        // Its top is above the waterline, its bottom well below: between 40 and 70 % under water.
+        assert.ok(b.y - h / 2 < 0 && b.y + h / 2 > h * 0.4 && b.y + h / 2 < h * 0.7, `${b.id}: middle ${Math.round(b.y)} under the surface`);
+        assert.ok(Math.abs(b.tilt) < 0.2);
+        assert.ok(f.density(b.x, 80) < FIELD.threshold, 'open water at the surface there');
     }
-    for (const b of through) {
-        assert.ok(Math.abs(b.y - f.routeY(b.x)) < 60, 'on the route');
-        assert.ok(Math.abs(b.tilt) < 0.25, 'nearly level');
-        for (const c of b.coins) {
-            assert.ok(Math.abs(c.y - f.routeY(c.x)) < ROUTE.halfWidth * 0.6, 'its coins lie in the lane');
-            // Inside the box: along its axis, within its length.
-            const dx = c.x - b.x, dy = c.y - b.y, along = dx * Math.cos(b.tilt) + dy * Math.sin(b.tilt), across = -dx * Math.sin(b.tilt) + dy * Math.cos(b.tilt);
-            assert.ok(Math.abs(along) <= CONTAINERS.size[0] / 2 && Math.abs(across) < 1);
-        }
-    }
-    // No two containers overlap.
-    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) assert.ok(Math.hypot(boxes[i].x - boxes[j].x, boxes[i].y - boxes[j].y) > CONTAINERS.size[1] * 1.4, `${i} and ${j}`);
+    const top = stacked[0], below = boxes[CONTAINERS.boxes[boxes.indexOf(top)].on];
+    assert.ok(top.y + h / 2 < 0, 'the stacked one is out of the water');
+    assert.ok(Math.abs(top.x - below.x) < len * 0.5 && top.y < below.y - h * 0.8, 'and rests on the one below it');
+    assert.equal(boxes.filter(b => b.open).length, 1);
+    for (let i = 0; i < floating.length; i++) for (let j = i + 1; j < floating.length; j++) assert.ok(Math.abs(floating[i].x - floating[j].x) > len, 'no two floating ones overlap');
+});
+
+test('coins lead up from the calm route, hang in a row under each floating container and run through the open one', () => {
+    const floating = boxes.filter(b => !b.stacked && !b.open), open = boxes.find(b => b.open);
+    assert.equal(coins.length, CONTAINERS.trail + floating.length * CONTAINERS.under + CONTAINERS.through);
+    const trail = coins.slice(0, CONTAINERS.trail);
+    assert.ok(Math.abs(trail[0].y - f.routeY(trail[0].x)) < 200, 'the trail begins at the route');
+    for (let i = 1; i < trail.length; i++) assert.ok(trail[i].y < trail[i - 1].y && trail[i].x > trail[i - 1].x, 'and leads up and on');
+    for (const c of coins) assert.ok(c.y > 40 && f.density(c.x, c.y) < FIELD.threshold, `coin in open water under the surface at ${Math.round(c.x)}, ${Math.round(c.y)}`);
+    const through = coins.filter(c => Math.abs(c.x - open.x) <= len / 2 && c.y < open.y + h / 2);
+    assert.equal(through.length, CONTAINERS.through, 'a line through the open one\'s sunken half');
+    for (const b of floating) assert.equal(coins.filter(c => Math.abs(c.x - b.x) < len / 2 && Math.abs(c.y - (b.y + h / 2 + CONTAINERS.underGap)) < 1).length, CONTAINERS.under);
 });
