@@ -107,3 +107,21 @@ test('no layer rock at the water surface (it would be cut straight at the water 
         for (let x = -6000; x < 64000; x += 300) assert.ok(f.density(x, 60) < T, `${L.id} at ${x}`);
     }
 });
+
+test('nothing hangs below the cleared bands: rock always reaches down to more rock or the seabed', () => {
+    const main = createField(1337);
+    for (const L of ROCK_LAYERS) {
+        const f = layerField(createField(1337 + L.seed), L, { route: x => main.routeY(x) });
+        let floating = 0;
+        for (let x = -6000; x < 64000; x += 470) {
+            for (let y = 300; y < 4600; y += 40) {
+                if (!(f.density(x, y) > T && f.density(x, y + 40) < T)) continue;      // a rock bottom edge
+                // water below it: does rock come again further down (a real cave), or never (floating)?
+                let again = false;
+                for (let yy = y + 80; yy < 6000; yy += 80) if (f.density(x, yy) > T) { again = true; break; }
+                if (!again) floating++;
+            }
+        }
+        assert.ok(floating < 6, `${L.id}: ${floating} rock bottoms with only water below`);
+    }
+});

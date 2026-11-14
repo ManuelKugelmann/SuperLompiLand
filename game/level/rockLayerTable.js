@@ -131,26 +131,41 @@ export function lowPass(base, g) {
  * with `clearRoute` stays out of the route band (ROUTE_CLEAR).
  */
 export function layerField(base, layer, { route = null, sup = SUPPORT, clear = ROUTE_CLEAR } = {}) {
-    const soft = lowPass(base, sup.grid), carry = lowPass(base, sup.carryGrid);
+    // The surface clearance acts on the field itself, before the low pass and the carrying:
+    // a piece removed near the surface takes its foot with it (no slab left hanging below).
+    const surfacePush = y => {
+        if (y >= SURFACE_CLEAR.below + SURFACE_CLEAR.fade) return 0;
+        const t = Math.max(0, (y - SURFACE_CLEAR.below) / SURFACE_CLEAR.fade);
+        return SURFACE_CLEAR.push * (1 - t * t * (3 - 2 * t));
+    };
+    const cleared = { density: (x, y) => base.density(x, y) - surfacePush(y) };
+    const soft = lowPass(cleared, sup.grid), carry = lowPass(cleared, sup.carryGrid);
     return {
         density(x, y) {
             const e = enclosure(x, layer);
             if (e <= -0.999) return -1;                         // open: nothing behind
             const shift = layer.swing * e - 0.12 + (layer.open || 0);
-            let d = soft.density(x, y) + shift;
+            // Only rock strong enough to carry a foot is shown: a thin ledge that would not reach
+            // the floor is dropped whole. The detail comes from the fine field, but it is capped
+            // by the coarse one the feet are carried from — what shows here always has a foot.
+            const lo = T + sup.minCarry;
+            let d = Math.min(soft.density(x, y) + shift - (sup.minCarry + sup.band * 0.5),
+                T + (carry.density(x, y) + shift - lo) * 2);
             // The strongest rock in the stretch above (centre and both sides of the foot): once it
             // is clearly rock, this point is too — a flat foot, smooth in x and y.
             const w = (vnoise(x / 700, y / 380, layer.seed + 5) - 0.5) * sup.wobble + (vnoise(x / 160, y / 260, layer.seed + 8) - 0.5) * sup.wobble * 0.12;   // meandering sides
-            const y0 = y - sup.reach, y1 = y - sup.gap;
+            let y0 = y - sup.reach;
+            const y1 = y - sup.gap;
+            // Below the cleared route band, feet come only from rock below it: a foot carried
+            // through the band would be cut there and hang below it.
+            if (route && layer.clearRoute) {
+                const ry = route(x) + clear.half + clear.fade * 0.5;
+                if (y > ry) y0 = Math.max(y0, ry);
+            }
             const v = Math.max(carry.columnMax(x + w, y0, y1),
                 carry.columnMax(x + w - sup.spread, y0, y1) - 0.02, carry.columnMax(x + w + sup.spread, y0, y1) - 0.02);
-            const lo = T + sup.minCarry;
             d = Math.max(d, T - 0.05 + (sup.lift + 0.05) * smooth01((v + shift - lo) / sup.band));
-            // Never up to the surface: a layer's rock would be cut straight at the water line.
-            if (y < SURFACE_CLEAR.below + SURFACE_CLEAR.fade) {
-                const t = Math.max(0, (y - SURFACE_CLEAR.below) / SURFACE_CLEAR.fade);
-                d -= SURFACE_CLEAR.push * (1 - t * t * (3 - 2 * t));
-            }
+            d -= surfacePush(y);                                // never up to the surface
             if (route && layer.clearRoute) {
                 const off = Math.abs(y - route(x)), t = Math.min(1, Math.max(0, (off - clear.half) / clear.fade));
                 d -= clear.push * (1 - t * t * (3 - 2 * t));
