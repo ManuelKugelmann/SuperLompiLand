@@ -106,7 +106,7 @@ export default class Backdrop {
         this.dark.setAlpha(Phaser.Math.Clamp((camY + H / 2 - 2200) / 3400, 0, 1) * 0.7);
         // Each biome colours the water; neighbours fade into each other.
         const bl = biomeBlendAt(camX + W / 2);
-        this.tint.setFillStyle(waterHue(camX + W / 2), WATER_LIGHT.amount);      // hue only: darkness comes from depth (spec 5.0h)
+        this.tint.setFillStyle(waterHue(camX + W / 2), WATER_LIGHT.backdrop);      // hue only: darkness comes from depth (spec 5.0h)
 
         const t = this.scene.time.now / 1000;
 

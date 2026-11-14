@@ -175,7 +175,26 @@ export function biomeBlendAt(x) {
  * brightness. Every water colour is brought to the same luminance, and laid over the view by the
  * same amount everywhere; depth darkens separately.
  */
-export const WATER_LIGHT = { luma: 150, amount: 0.22 };
+export const WATER_LIGHT = { luma: 150, amount: 0.22, backdrop: 0.5 };   // amount: the scene light (multiplies everything, so gentle); backdrop: the water behind
+
+/**
+ * Each biome's water hue (degrees) and saturation, spread round the wheel so neighbours differ by
+ * at least ~30 degrees or clearly in saturation (techartist's hue check, 2026-11-14); brightness
+ * comes from WATER_LIGHT.luma and depth only.
+ */
+export const WATER_HUES = {
+    beach: [178, 0.55], mangrove: [105, 0.45], reef: [185, 0.75], blue: [218, 0.8], kelp: [145, 0.5],
+    harbour: [85, 0.3], wreck: [40, 0.25], shore: [200, 0.35], trench: [240, 0.6]
+};
+
+/** A colour from hue (degrees) and saturation at a middle lightness (its luminance is set afterwards). */
+export function hueColor(h, sat) {
+    const l = 0.5, c = (1 - Math.abs(2 * l - 1)) * sat, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return (Math.round((r + m) * 255) << 16) | (Math.round((g + m) * 255) << 8) | Math.round((b + m) * 255);
+}
+
+const hueOf = b => (WATER_HUES[b.id] ? hueColor(...WATER_HUES[b.id]) : b.water[0]);
 
 const lumaOf = c => 0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255);
 
@@ -197,7 +216,7 @@ export function atLuma(c, luma = WATER_LIGHT.luma) {
 /** The water's hue at x: the biomes' colours blended, at the one shared brightness. */
 export function waterHue(x) {
     const { a, b, t } = biomeBlendAt(x);
-    return atLuma(mixColor(a.water[0], b.water[0], t));
+    return atLuma(mixColor(hueOf(a), hueOf(b), t));
 }
 
 export function mixColor(c1, c2, t) {

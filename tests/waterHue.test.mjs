@@ -16,3 +16,13 @@ test('the hue is kept: a dark violet stays violet, a green stays green', () => {
     assert.ok((v & 255) > ((v >> 8) & 255), 'violet: more blue than green');
     assert.ok(((g >> 8) & 255) > ((g >> 16) & 255), 'green: more green than red');
 });
+
+test('neighbouring biomes differ by hue (>= 25 deg) or clearly by saturation', async () => {
+    const { WATER_HUES } = await import('../game/level/biomes.js');
+    const ids = BIOMES.map(b => b.id).filter(id => WATER_HUES[id]);
+    for (let i = 1; i < ids.length; i++) {
+        const [h0, s0] = WATER_HUES[ids[i - 1]], [h1, s1] = WATER_HUES[ids[i]];
+        const dh = Math.min(Math.abs(h0 - h1), 360 - Math.abs(h0 - h1));
+        assert.ok(dh >= 25 || Math.abs(s0 - s1) >= 0.25, `${ids[i - 1]} -> ${ids[i]}: ${dh} deg, sat ${s0} vs ${s1}`);
+    }
+});
