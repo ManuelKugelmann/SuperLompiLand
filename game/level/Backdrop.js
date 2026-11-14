@@ -10,8 +10,8 @@ import SeaFarLayer from './SeaFarLayer.js';
  */
 /** Far fish schools are placed again once this far outside the picture (px). */
 /** The backdrop water from the surface (0) to the bottom of the screen (1): brightness shares of the top. */
-const WATER_GRADIENT = [[0, 1], [0.25, 0.75], [0.6, 0.52], [1, 0.38]];
-const WATER_TOP_LUMA = 200;     // brightness of the water just under the surface
+const WATER_GRADIENT = [[0, 1], [0.25, 0.9], [0.6, 0.63], [1, 0.46]];
+const WATER_TOP_LUMA = 160;     // brightness of the water just under the surface (higher clips blues to cyan: atLuma)
 const OPEN_SEA = 0x35b3cc;      // the open-sea blue the biome hues are laid over (WATER_LIGHT.backdrop)
 const grey = v => Math.round(v * 255) * 0x010101;
 const SCHOOL_MARGIN = { x: 700, y: 500 };

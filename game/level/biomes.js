@@ -183,8 +183,8 @@ export const WATER_LIGHT = { luma: 150, amount: 0.22, backdrop: 0.85, deepLuma: 
  * comes from WATER_LIGHT.luma and depth only.
  */
 export const WATER_HUES = {
-    beach: [178, 0.55], mangrove: [105, 0.45], reef: [185, 0.75], blue: [218, 0.8], kelp: [145, 0.5],
-    harbour: [85, 0.3], wreck: [40, 0.25], shore: [200, 0.35], trench: [240, 0.6]
+    beach: [178, 0.55], mangrove: [105, 0.45], reef: [170, 0.75], blue: [218, 0.8], kelp: [145, 0.5],
+    harbour: [85, 0.3], wreck: [40, 0.25], shore: [200, 0.25], trench: [240, 0.45]
 };
 
 /** A colour from hue (degrees) and saturation at a middle lightness (its luminance is set afterwards). */
