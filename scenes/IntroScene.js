@@ -28,6 +28,7 @@ import { SHIP_FILES } from '../game/level/SetPieceLayer.js';
 import { DOCKS_ART } from '../game/level/DocksLayer.js';
 import { MANTA_ART } from '../game/ai/MantaLayer.js';
 import { SKY_ART } from '../game/level/SkyLayer.js';
+import { NEAR_COAST } from '../game/level/skyline.js';
 import { STORY_ART } from './StoryScene.js';
 import { STORM_LOOK } from '../game/fx/StormLayer.js';
 import { MICRO, MICRO_KINDS, microKey } from '../game/level/microScatter.js';
@@ -118,6 +119,7 @@ export default class IntroScene extends Phaser.Scene {
         // Painted ground cover (MicroArt.js paints the ones missing).
         for (const kind of MICRO_KINDS) for (let v = 0; v < MICRO.variants; v++) { const key = microKey(kind, v); if (!this.textures.exists(key)) this.load.image(key, `img/micro/${key}.webp`); }
         for (const a of [STORY_ART.back, STORY_ART.ash, STORM_LOOK.clouds]) if (!this.textures.exists(a.key)) this.load.image(a.key, a.file);
+        for (const id of NEAR_COAST.biomes) if (!this.textures.exists(`sky_coast_${id}`)) this.load.image(`sky_coast_${id}`, `img/coast/${id}.webp`);   // each island's near coast
         for (const kind of SKY_ART) if (!this.textures.exists(`sky_${kind}`)) this.load.image(`sky_${kind}`, `img/sky/${kind}.webp`);
         // Painted shoal fish (game/ai/SwarmLayer.js); drawn procedurally while missing.
         for (const id of Object.keys(SPECIES)) {

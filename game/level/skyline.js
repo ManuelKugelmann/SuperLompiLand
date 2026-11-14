@@ -35,6 +35,41 @@ export function skyItems(biomes = BIOMES) {
     return out;
 }
 
+/**
+ * The island's own coast close by (spec 5.0c "above water: that island's coast"): painted
+ * pieces standing on the waterline behind the play plane, nearer than the horizon. Per island
+ * biome its picture (img/coast/<id>.webp as sky_coast_<id>), set along the biome with gaps, a
+ * little bigger or smaller and mirrored now and then so it never repeats exactly.
+ */
+export const NEAR_COAST = {
+    scroll: 0.72,          // share of the camera's movement (near, but behind the play plane)
+    width: 1400,           // px of one piece at size 1
+    size: [0.85, 1.2],
+    gap: [0.15, 1.1],      // gap after a piece, in piece widths
+    edge: 0.08,            // share of the biome left free at both ends (its neighbours' coasts take over)
+    biomes: ['reef', 'kelp', 'harbour', 'shore']
+};
+
+/** The near coast pieces, west to east: { kind, x (world anchor), scroll, size, flip }. */
+export function nearCoastItems(biomes = BIOMES, cfg = NEAR_COAST) {
+    const out = [];
+    for (const b of biomes) {
+        if (!cfg.biomes.includes(b.id)) continue;
+        let seed = (b.from | 0) ^ 0x5bd1e995;
+        const r = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+        // A piece of on-screen width w covers w / scroll of world x (it moves slower than the camera).
+        const x1 = b.from + b.width * (1 - cfg.edge);
+        let x = b.from + b.width * cfg.edge;
+        while (true) {
+            const size = cfg.size[0] + r() * (cfg.size[1] - cfg.size[0]), span = cfg.width * size / cfg.scroll;
+            if (x + span > x1) break;
+            out.push({ kind: `coast_${b.id}`, x: x + span / 2, scroll: cfg.scroll, size, flip: r() < 0.5 });
+            x += span * (1 + cfg.gap[0] + r() * (cfg.gap[1] - cfg.gap[0]));
+        }
+    }
+    return out;
+}
+
 /** Where a shape is on a screen `width` wide when the camera's middle is at world x `cam`: right in the middle when the camera is at its anchor. */
 export function screenX(item, cam, width) {
     return width / 2 + (item.x - cam) * item.scroll;

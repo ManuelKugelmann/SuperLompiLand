@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKYLINE, skyItems, screenX, onScreen, volcanoAt } from '../game/level/skyline.js';
+import { SKYLINE, skyItems, screenX, onScreen, volcanoAt, nearCoastItems, NEAR_COAST } from '../game/level/skyline.js';
 import { BIOMES, WORLD_WEST, WORLD_END, biomeIndexAt } from '../game/level/biomes.js';
 
 const W = 1920;
@@ -33,4 +33,15 @@ test('the volcano is in sight from the west end and reaches the middle, full siz
     assert.equal(b.size, SKYLINE.volcanoGrow[1]);
     assert.ok(a.size < mid.size && mid.size < b.size);
     assert.ok(a.x > mid.x && mid.x > b.x, 'it comes closer steadily');
+});
+
+test('every island biome has its own near coast, inside the biome, with variety', () => {
+    const items = nearCoastItems();
+    for (const id of NEAR_COAST.biomes) {
+        const b = BIOMES.find(x => x.id === id), mine = items.filter(i => i.kind === `coast_${id}`);
+        assert.ok(mine.length >= 2, id);
+        for (const i of mine) assert.ok(i.x > b.from && i.x < b.from + b.width, id);
+        assert.ok(new Set(mine.map(i => i.flip)).size === 2 || mine.length < 3, `${id}: some mirrored`);
+    }
+    assert.deepEqual(nearCoastItems(), items, 'the same every time');
 });

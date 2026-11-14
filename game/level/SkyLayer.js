@@ -1,4 +1,4 @@
-import { skyItems, screenX, onScreen, volcanoAt } from './skyline.js';
+import { skyItems, nearCoastItems, screenX, onScreen, volcanoAt } from './skyline.js';
 
 export const SKY = {
     showAbove: 80,      // world y of the camera's top edge below which nothing of the sky is on screen
@@ -140,6 +140,13 @@ export default class SkyLayer {
             o.item = item;
             return o;
         });
+        // The island's own coast close by, in front of the far shapes (painted only: no drawn fallback).
+        for (const item of nearCoastItems()) {
+            if (!scene.textures.exists(`sky_${item.kind}`)) continue;
+            const o = img(`sky_${item.kind}`, -28.0).setOrigin(0.5, 1).setScale(item.size).setFlipX(item.flip).setAlpha(0.97);
+            o.item = item;
+            this.items.push(o);
+        }
         this.birds = Array.from({ length: SKY.birds }, (_, i) => {
             const b = img('sky_bird', -28.5).setAlpha(0.7);
             b.ox = i * 70 + (i % 2) * 30; b.oy = (i % 3) * 34 - (i % 2) * 22; b.phase = i * 1.7;
