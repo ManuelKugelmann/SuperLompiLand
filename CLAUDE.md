@@ -13,7 +13,14 @@ AAA detail bar), 4.2a (Player core), 5.0b (world partition, bitfields), 5.5b (ro
 ## Goal
 
 A polished, fun game for 10-year-olds: simple, forgiving gameplay inside a dense, alive,
-AAA-detailed world. Polish what exists before adding more.
+AAA-detailed world. Polish what exists before adding more. **Main target: a phone held in
+landscape.** Desktop and other shapes must work, but layout, text size, touch targets and
+performance are judged on a landscape phone first.
+
+**Be proactive, not reactive.** Don't wait for the next message: find the next most valuable
+thing (from the roadmap in `_ref/gamedesign/roadmap.md`, your own review, or a play test) and do
+it. Waiting idle, or only reporting status, is not progress. Feedback is constructive: what is
+missing, why it matters, and the concrete next step, never only "not done yet".
 
 ## Hard rules
 
@@ -21,7 +28,7 @@ AAA-detailed world. Polish what exists before adding more.
   page titles, in-game text, manifest or commit subjects. Do not modify the SDK from this
   repo; stage changes under `_ref/` and propose upstream after asking.
 - **Always landscape.** Portrait renders rotated 90° (`game/orientation.js`); scaling and
-  input changes must keep that working.
+  input changes must keep that working. The landscape phone is the main target.
 - **Control schemes are switchable at runtime:** one per file in `game/controls/`, extends
   `ControllerBase`, registered in `game/controls/index.js`, drives the fish only through the
   `Player` API (`thrust`, `launch`, `special`), removes everything in `destroy()`.

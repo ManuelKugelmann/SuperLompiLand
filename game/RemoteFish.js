@@ -63,7 +63,6 @@ export default class RemoteFish {
         this.ring.setStrokeStyle(7, color, 0.85);
         this.iconRing.setFillStyle(0x0a3f6e, 0.45).setStrokeStyle(5, color, 1);
         this.arrow.setTint(color);
-        this.mapDot?.setFillStyle(color, 1);
     }
 
     /** Snapshot: { n, t, x, y, vx, vy, s: 'normal'|'inflated', f: 1|-1, c: characterId }. `now` = local clock, ms. */
@@ -138,6 +137,6 @@ export default class RemoteFish {
 
     destroy() {
         this.rig?.destroy();
-        for (const o of [this.icon, this.arrow, this.far, this.ring, this.iconRing, this.help, this.mapDot]) o?.destroy();
+        for (const o of [this.icon, this.arrow, this.far, this.ring, this.iconRing, this.help]) o?.destroy();
     }
 }

@@ -3,7 +3,7 @@ import BurgerMenu from '@gks/sdk/ui/BurgerMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
 import { heartRow, textStyle } from '../game/ui/kit.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
+import { BIOMES } from '../game/level/biomes.js';
 import { feedbackMenuItems } from '../game/feedback.js';
 import { soundMenuItem } from '../game/audio.js';
 import { keepInSafeArea } from '../game/orientation.js';
@@ -14,10 +14,7 @@ export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
 export const HUD = {
     switcherFirstMs: 14000,   // the control-scheme row stays this long on the very first run
     switcherMenuMs: 12000,    // ... and this long when called from the menu
-    bannerAlpha: 0.85,        // announcements never cover the picture fully (spec 5.0j: faint and minimal)
-    mapRest: 0.5,             // the journey strip is the map (no minimap): soft at rest (readable on a small phone) ...
-    mapShown: 0.9,            // ... clear for a while when something on it changes
-    mapShowMs: 3500
+    bannerAlpha: 0.85         // announcements never cover the picture fully (spec 5.0j: faint and minimal)
 };
 
 /**
@@ -84,32 +81,6 @@ export default class HudScene extends Phaser.Scene {
             fontFamily: 'Arial', fontSize: '20px', color: '#ffffff'
         }).setOrigin(1, 1).setAlpha(0.4);
 
-        // Journey strip: the whole trip west -> east at a glance. Biome colours,
-        // nests as dots, the grand nest as a star, the abyss as a notch, you as the arrow.
-        this.mapX = this.scale.width - 560; this.mapW = 520; this.mapY = 156;      // below the control-scheme icons (y 64, 84 px)
-        const toMap = x => this.mapX + Phaser.Math.Clamp((x - WORLD_WEST) / (WORLD_END - WORLD_WEST), 0, 1) * this.mapW;
-        this.toMap = toMap;
-        const mg = this.add.graphics();
-        mg.fillStyle(0x06343a, 0.6).fillRoundedRect(this.mapX - 12, this.mapY - 24, this.mapW + 24, 48, 20);
-        BIOMES.forEach(b => {
-            const x0 = toMap(b.from), x1 = toMap(b.from + b.width);
-            mg.fillStyle(b.rock[1], 1).fillRect(x0, this.mapY - 11, Math.max(2, x1 - x0 - 2), 22);
-        });
-        mg.fillStyle(0x0a1436, 1).fillTriangle(toMap(ABYSS.x) - 7, this.mapY + 11, toMap(ABYSS.x) + 7, this.mapY + 11, toMap(ABYSS.x), this.mapY + 26);
-        this.nestDots = main.level.nests.map(n => n.grand
-            ? this.add.star(toMap(n.x), this.mapY, 5, 9, 19, 0xfff3b0).setStrokeStyle(2, 0x6b4a2b)
-            : this.add.circle(toMap(n.x), this.mapY, 9, 0xffffff, 0.5).setStrokeStyle(2, 0x06343a));
-        // The friends waiting along the way: a ring where each one is, filled once it is freed.
-        this.friendDots = main.journey.list.filter(c => c.friend).map(c => {
-            const dot = this.add.circle(toMap(c.x), this.mapY + 36, 11, 0xff6b9a, 0).setStrokeStyle(4, 0xffffff);
-            dot.friendId = c.friend.id;
-            return dot;
-        });
-        // You: a clear white disc on the strip itself (first-impression pass: the small arrow read as a scrollbar thumb).
-        this.mapYou = this.add.circle(0, this.mapY, 20, 0xffffff).setStrokeStyle(6, 0xff6b9a);
-        this.map = this.add.container(0, 0, [mg, ...this.nestDots, ...this.friendDots, this.mapYou]).setAlpha(HUD.mapRest);
-        this.mapState = '';
-
         // ?debug=perf: frame time and where it goes, for checking on a real device.
         if (new URLSearchParams(window.location.search).get('debug') === 'perf') {
             this.perf = this.add.text(this.scale.width - 20, 200, '', {
@@ -164,12 +135,6 @@ export default class HudScene extends Phaser.Scene {
         for (const k of ['physics', 'world']) { p[k].sum = 0; p[k].n = 0; p[k].max = 0; }
     }
 
-    showMap() {
-        this.tweens.killTweensOf(this.map);
-        this.tweens.add({ targets: this.map, alpha: HUD.mapShown, duration: 400 });
-        this.tweens.add({ targets: this.map, alpha: HUD.mapRest, duration: 1200, delay: HUD.mapShowMs });
-    }
-
     banner(title, subtitle = '') {
         const targets = [this.bannerTitle, this.bannerSub];
         this.tweens.killTweensOf(targets);
@@ -186,23 +151,6 @@ export default class HudScene extends Phaser.Scene {
         // Playing together the counter is the team's: everything the room has collected.
         this.coinText.setText(String(m.mp ? m.teamCoins() : m.coins));
         this.depthText.setText(`${this.depthLabel} ${m.depthMeters()} m`);
-        this.mapYou.x = this.toMap(m.fish.sprite.x);
-        // Playing together: every friend is a dot in their colour on the journey strip.
-        for (const g of m.mp?.ghosts.values() ?? []) {
-            if (!g.mapDot) {
-                g.mapDot = this.add.circle(0, this.mapY + 36, 11, g.color ?? 0xffffff, 1).setStrokeStyle(3, 0xffffff);
-                this.map.add(g.mapDot);
-            }
-            g.mapDot.setVisible(!!g.pos);
-            if (g.pos) g.mapDot.x = this.toMap(g.pos.x);
-        }
-        // The next nest to reach is drawn bigger, so the strip says where to go.
-        this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setScale(i === m.nestIndex + 1 ? 1.7 : 1); });
-        this.nestDots.forEach((d, i) => { if (!m.level.nests[i].grand) d.setFillStyle(i <= m.nestIndex && (i > 0 || m.banked > 0 || m.nestIndex > 0) ? 0xffd23f : 0xffffff, i <= m.nestIndex ? 1 : 0.5); });
-        for (const d of this.friendDots) d.setFillStyle(0xff6b9a, m.journey.has(d.friendId) ? 1 : 0);
-        // The strip lights up when the biome, the nest or the freed friends change, then fades back.
-        const state = `${m.biomeIndex}/${m.nestIndex}/${this.friendDots.filter(d => m.journey.has(d.friendId)).length}`;
-        if (state !== this.mapState) { if (this.mapState) this.showMap(); this.mapState = state; }
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
     }
