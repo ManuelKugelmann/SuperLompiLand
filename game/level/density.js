@@ -32,6 +32,8 @@ export const ROUTE = {
     aboveNest: 240,     // it passes this far above every nest
     descent: 1.6,       // px along the way per px of depth when it dips to a nest (gentle slopes)
     clear: 420,         // hazards stay at least this far from its middle
+    fadeIn: [1500, 900],   // the lane starts this far west of the start pool and reaches full depth over this many px
+    fadeOut: 280,       // and it closes over this many px before the world's east end (behind the grand nest)
     grid: 32            // px: its depth is worked out every so many px and joined by straight pieces
 };
 
@@ -142,7 +144,10 @@ export function createField(seed) {
             // open surface water, everything above it is lane too, so no sliver of rock is left between.
             const ry = routeY(x), shallow = crest < 0.5 && ry - ROUTE.halfWidth * 2 < 620 && y < ry;      // not under the reef crest: there the lane is a channel through coral
             const off = shallow ? 0 : Math.abs(y - ry) / ROUTE.halfWidth;
-            if (off < 2 && x > FIELD.spawn.x - 600 && x < WORLD_END) n -= 0.95 * smooth01(2 - off);
+            // The lane begins west of the start pool and ends at the grand nest; it fades in and out
+            // there over a stretch, so it never ends in a cut face in the sand.
+            const ends = Math.min(smooth01((x - (FIELD.spawn.x - ROUTE.fadeIn[0])) / ROUTE.fadeIn[1]), smooth01((WORLD_END - x) / ROUTE.fadeOut));
+            if (off < 2 && ends > 0) n -= 0.95 * smooth01(2 - off) * ends;
             for (const nest of nests) {
                 const dx = Math.abs(x - nest.x);
                 if (dx > 520) continue;

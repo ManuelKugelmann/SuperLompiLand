@@ -3,7 +3,7 @@
 // of them lies where is decided here; MicroArt.js paints them, LevelGenerator places them.
 
 export const MICRO = {
-    rate: 0.75,        // chance that a piece of floor gets something
+    rate: 0.66,        // chance that a piece of floor gets something
     max: 9,            // at most this many per chunk (object budget: chunks are loaded well beyond the view)
     width: [140, 260], // px across of one patch (sized for the painted patches)
     variants: 3        // pictures per kind
