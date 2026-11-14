@@ -2,7 +2,6 @@ import { MEADOW, meadowSpot, eelAt, eelOut, createRay, stepRay } from './meadow.
 
 export const MEADOW_LOOK = {
     near: 3200, far: 5000,   // px from the colony at which it is built, and beyond which it is removed
-    eelWidth: 26,        // px across of an eel's body as drawn
     depth: 0.95,         // on the sand, just over the ground cover
     rayDepth: 1.2,
     rayFlap: 0.1         // how much the ray's wings beat while it glides (share of its height)
@@ -10,6 +9,9 @@ export const MEADOW_LOOK = {
 
 // Texture keys: painted pictures loaded under these keys replace the drawn ones.
 const EEL = 'garden_eel', RAY = 'sand_ray';
+
+/** The painted eel and ray (loaded by the title screen); drawn procedurally while missing. */
+export const MEADOW_ART = { [EEL]: 'img/garden_eel.webp', [RAY]: 'img/sand_ray.webp' };
 
 function ensureTextures(scene) {
     if (!scene.textures.exists(EEL)) {
@@ -59,7 +61,7 @@ export default class MeadowLayer {
             const e = eelAt(i), y = this.groundY(e.x);
             if (y === null) continue;
             const img = s.add.image(e.x, y + 6, EEL).setOrigin(0.5, 1).setDepth(L.depth);
-            img.setScale(L.eelWidth / img.width, e.height / img.height);
+            img.setScale(e.height / img.height);      // its own proportions: the head wider than the body
             eels.push({ img, x: e.x, y, height: e.height, phase: e.phase, out: 1, full: e.height / img.height });
         }
         const mind = createRay(this.spot.x + MEADOW.ray.from), ry = this.groundY(mind.x);
