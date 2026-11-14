@@ -18,7 +18,7 @@ import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
 import { getCharacter, loadSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
-import { play, nowSeconds, musicClock, updateMusic } from '../game/audio.js';
+import { play, nowSeconds, musicClock, updateMusic, updateWeatherSound } from '../game/audio.js';
 import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
 import { CHAIN, createChain, createSpin, coinWorth } from '../game/chain.js';
 import BoosterLayer from '../game/level/BoosterLayer.js';
@@ -73,6 +73,7 @@ const WORLD = {
     puffSail: 1.5,        // a puffed fish is big and light: the water pushes it this much harder (spec 5.0d)
     tumbleAt: 4,          // px/step of breaker push that tumbles the fish (squash, bubbles)
     tumbleMs: 900,        // at most one tumble per this long
+    rushFull: 9,          // px/step of moving water (surge, breaker, downwelling) heard at full rush
     friendBonus: 5,
     schoolRadius: 420,    // friends (other players) this close swim as a school ...
     schoolBoost: 0.1,     // ... each of up to two makes you this much faster
@@ -1175,6 +1176,11 @@ export default class MainScene extends Phaser.Scene {
         const lit = mixColor(mixColor(0xffffff, water, 0.1 + waterAmt * 0.6), 0x0c1436, depth01 * 0.8);
         this.ambient.setFillStyle(lit, 1);
         updateMusic(this.biomeId(), depth01);   // background score + sea hum (spec ch.12)
+        // The storm rumbles overhead (loudest near the surface); strong moving water rushes past the fish.
+        const p = this.soundProbe || (this.soundProbe = { x: 0, y: 0 }), waves = this.waves ?? this.wavePhase();
+        let moving = Math.hypot(surgeAt(view.x, view.y, waves, p).x, p.y);
+        moving += Math.hypot(breakerAt(view.x, view.y, waves, p).x, p.y) + Math.abs(downAt(view.x, view.y, p).y);
+        updateWeatherSound(stormShare(view.x) * (1 - 0.6 * Phaser.Math.Clamp(view.y / 1500, 0, 1)), moving / WORLD.rushFull);
         // In the dark the fish carries a little light of its own.
         this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
 

@@ -239,9 +239,12 @@ export const MUSIC = {
     lookahead: 0.4,       // s scheduled ahead
     cutoffTop: 3800,      // Hz music filter at the surface ...
     cutoffDeep: 650,      // ... and in the deep
-    fadeInS: 2.5
+    fadeInS: 2.5,
+    stormVol: 0.14,       // the storm's low rumble at full strength (spec 5.0c)
+    rushVol: 0.2,         // the rush of strong moving water: surge, breakers, downwelling
+    rushHz: 900           // centre of the rush's band
 };
-let bus = null, busFilter = null, amb = null, ambFilter = null, nextBeat = -1, beatIdx = 0;
+let bus = null, busFilter = null, amb = null, ambFilter = null, nextBeat = -1, beatIdx = 0, rumble = null, rush = null;
 
 function musicNodes() {
     if (bus) return;
@@ -271,6 +274,25 @@ function musicNodes() {
     src.connect(ambFilter).connect(amb).connect(master);
     amb.gain.setTargetAtTime(MUSIC.ambVol, ctx.currentTime, MUSIC.fadeInS / 3);
     src.start();
+    // Weather from the same noise, silent until needed: a deep rumble and a band of rushing water.
+    const voice = (type, hz, q, offset) => {
+        const n = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+        n.buffer = buf; n.loop = true; n.loopStart = src.loopStart; n.loopEnd = src.loopEnd;
+        fl.type = type; fl.frequency.value = hz; fl.Q.value = q; g.gain.value = 0;
+        n.connect(fl).connect(g).connect(master);
+        n.start(ctx.currentTime, offset);
+        return g;
+    };
+    rumble = voice('lowpass', 160, 0.7, 1.7);
+    rush = voice('bandpass', MUSIC.rushHz, 0.6, 3.9);
+}
+
+/** Weather sound, 0..1 each: the storm overhead and how hard the water around the fish moves. */
+export function updateWeatherSound(storm01, rush01) {
+    if (!rumble || muted) return;
+    const t = ctx.currentTime, k = v => Math.max(0, Math.min(1, v));
+    rumble.gain.setTargetAtTime(MUSIC.stormVol * k(storm01), t, 0.8);
+    rush.gain.setTargetAtTime(MUSIC.rushVol * k(rush01), t, 0.25);
 }
 
 /** A soft pad voice: two slightly detuned triangles, slow attack and release. */
