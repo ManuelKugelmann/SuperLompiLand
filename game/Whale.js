@@ -5,7 +5,8 @@ export const WHALE_SCENE = {
     id: 'whale',         // the journey's name for this event
     near: 3400,          // px: she appears when the player is this close to her place ...
     far: 5600,           // ... and is taken away again beyond this while still caught
-    below: 560,          // px she swims under the calm route (which runs just under the surface out here)
+    below: 400,          // px she swims under the calm route (which runs just under the surface out here)
+    lookWithin: 1900,    // px from her middle within which the view tips down to her
     // A piece of net is wrapped round her where it hangs: `bodyHalf` = half her height there (in
     // her lengths, one per piece, as in WHALE.nets). The near half of the wrap lies on her side
     // from her back to her belly, its torn end hanging below; the far half shows behind her,
@@ -123,6 +124,13 @@ export default class Whale {
         this.body.destroy(); this.calf.destroy();
         for (const n of this.nets) { n?.far.destroy(); n?.destroy(); }
         this.mind = null;
+    }
+
+    /** How much (0..1) the view should tip down to her from x: she is the picture while she is there. */
+    look(x) {
+        if (!this.mind) return 0;
+        const k = Math.max(0, 1 - Math.abs(x - this.mind.x) / WHALE_SCENE.lookWithin);
+        return k * k * (3 - 2 * k) * (1 - this.mind.dive);
     }
 
     /** During her ride: the velocity the fish takes on at her back (px per step), or null. */

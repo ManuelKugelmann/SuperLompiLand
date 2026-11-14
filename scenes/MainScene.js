@@ -1118,8 +1118,8 @@ export default class MainScene extends Phaser.Scene {
         const k = 1 - Math.pow(WORLD.cameraEase, delta / STEP_MS);
         const prevX = this.camX, prevY = this.camY;
         this.camX = Phaser.Math.Linear(this.camX, view.x + v.x * WORLD.lookAhead - W / 2, k);
-        // At a drop-off the view tips down: the wall and the blue below it come into the picture.
-        this.camY = Phaser.Math.Linear(this.camY, view.y + v.y * WORLD.lookAhead - H / 2 + WORLD.wallLook * H * dropOffView(view.x), k);
+        // At a drop-off the view tips down: the wall and the blue below it come into the picture. The same for the whale below the route.
+        this.camY = Phaser.Math.Linear(this.camY, view.y + v.y * WORLD.lookAhead - H / 2 + WORLD.wallLook * H * Math.max(dropOffView(view.x), this.whale?.look(view.x) ?? 0), k);
         this.camY = Math.max(this.camY, -760); // room for a jump, not the whole sky
         this.cameras.main.setScroll(this.camX, this.camY);
 
