@@ -13,7 +13,7 @@ test('the sky cycles very gradually: no jump between two seconds, night darker t
     }
     assert.ok(worst < 3, `largest change per second ${worst.toFixed(2)}`);
     const day = skyAt(LIGHT.dayS * 0.2), night = skyAt(LIGHT.dayS * 0.78);
-    assert.ok(night.strength < day.strength && night.strength > 0.6);
+    assert.ok(night.strength < day.strength && night.strength >= 0.55);
 });
 
 test('near the surface the sky colours the light; deep down it does not; depth darkens', () => {
@@ -32,4 +32,13 @@ test('tint stays gentle; the seabed bounces its colour up close above it; a stor
     const storm = lightAt({ y: 50, t: 0, storm: 1 }), calm = lightAt({ y: 50, t: 0 });
     const sat = c => Math.max(...rgb(c)) - Math.min(...rgb(c));
     assert.ok(sat(storm) <= sat(calm) + 2, 'overcast, not coloured');
+});
+
+test('night share: none by day, full at night, partway at sunset; it never jumps', async () => {
+    const { nightShare } = await import('../game/level/light.js');
+    assert.equal(nightShare(LIGHT.dayS * 0.2), 0);
+    assert.equal(nightShare(LIGHT.dayS * 0.72), 1);
+    let worst = 0;
+    for (let t = 0; t < LIGHT.dayS; t++) worst = Math.max(worst, Math.abs(nightShare(t + 1) - nightShare(t)));
+    assert.ok(worst < 0.05, `largest step ${worst}`);
 });

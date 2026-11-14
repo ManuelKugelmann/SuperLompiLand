@@ -9,7 +9,7 @@ import { causticPattern, sunlightAt, gradeMatrix } from './causticsMath.js';
  * constant here: 0 switches it off.
  *
  *   create():  this.waterLight = new WaterLight(this)
- *   update():  this.waterLight.update()
+ *   update():  this.waterLight.update(sun)   sun 0..1: the sky's light (night and storms dim it; game/level/light.js)
  */
 export const WATER_LIGHT = {
     shafts: 1.8,          // strength of the light shafts (0 = off)
@@ -92,13 +92,13 @@ export default class WaterLight {
         }
     }
 
-    update() {
+    update(sun = 1) {
         const scene = this.scene, cam = scene.cameras.main;
         const W = scene.scale.width, H = scene.scale.height;
         const t = scene.time.now / 1000;
         // Light where the upper third of the view is: that is where shafts and caustics read.
         // (Never above the waterline: when the view rises into the sky, the water below it is the shallowest there is.)
-        const light = sunlightAt(Math.max(0, cam.scrollY + H * 0.35), WATER_LIGHT.fadeTo);
+        const light = sunlightAt(Math.max(0, cam.scrollY + H * 0.35), WATER_LIGHT.fadeTo) * sun;
         const above = cam.scrollY < 0 ? Math.min(1, -cam.scrollY / (H * 0.5)) : 0;   // view partly in the sky
 
         for (const s of this.shafts) {

@@ -47,7 +47,7 @@ const frameFor = size => {
 
 export default class ParticleLayer {
     /** @param env see particles.js step(): flowAt, isSolid, surfaceY (functions, swappable later) */
-    constructor(scene, env = {}, { capacity = PARTICLES.capacity, depthNormal = 2.5, depthAdd = 4.5 } = {}) {
+    constructor(scene, env = {}, { capacity = PARTICLES.capacity, depthNormal = 2.5, depthAdd = 4.5, depthGlow = 41, glowCap = 240 } = {}) {
         this.scene = scene;
         this.env = env;
         this.sim = createParticles({ capacity });
@@ -55,6 +55,7 @@ export default class ParticleLayer {
         this.layers = {
             normal: this.makeBlitter(depthNormal, Phaser.BlendModes.NORMAL, capacity),
             add: this.makeBlitter(depthAdd, Phaser.BlendModes.ADD, capacity),
+            glow: this.makeBlitter(depthGlow, Phaser.BlendModes.ADD, glowCap)   // a light of its own, above the scene's darkness (MainScene ambient, 40)
         };
         // Soft clouds, one pass per kind ('wisp', 'goo'): a Blitter off the display list,
         // drawn each frame into a half-resolution render texture that blurs it.
@@ -90,10 +91,12 @@ export default class ParticleLayer {
         const L = this.layers;
         L.normal.used = 0;
         L.add.used = 0;
+        L.glow.used = 0;
         const C = this.clouds;
         for (const k in C) C[k].dots.used = 0;
         this.sim.forEach((x, y, size, alpha, color, blend, i, soft) => {
-            const b = soft ? C[soft].dots : blend === 'add' ? L.add : L.normal;
+            const b = soft ? C[soft].dots : (L[blend] || L.normal);
+            if (b.used >= b.pool.length) return;
             const bob = b.pool[b.used++];
             const f = frameFor(size);
             bob.setFrame(f);
@@ -104,7 +107,7 @@ export default class ParticleLayer {
             bob.tint = color;
             bob.visible = true;
         });
-        for (const b of [L.normal, L.add, ...Object.values(C).map(c => c.dots)]) {
+        for (const b of [L.normal, L.add, L.glow, ...Object.values(C).map(c => c.dots)]) {
             for (let i = b.used; i < b.pool.length && b.pool[i].visible; i++) b.pool[i].visible = false;
         }
         // Soft clouds: redraw only while there is something to show.
@@ -125,6 +128,7 @@ export default class ParticleLayer {
     destroy() {
         this.layers.normal.destroy();
         this.layers.add.destroy();
+        this.layers.glow.destroy();
         for (const k in this.clouds) { this.clouds[k].dots.destroy(); this.clouds[k].rt.destroy(); }
     }
 }

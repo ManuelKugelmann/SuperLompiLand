@@ -15,7 +15,7 @@ export const PARTICLES = {
  * a particle takes on the water's velocity (1/s); cool = how fast heat fades (1/s,
  * hot particles rise with `rise`, cold ones with `rise * coldRise`); surface: what
  * happens at the waterline ('pop' ends it, 'slick' spreads it along the surface,
- * 'pass' ignores it); blend: 'normal' or 'add'; soft: drawn as one blurred, merged
+ * 'pass' ignores it); blend: 'normal', 'add' or 'glow' (additive above the scene's darkness); soft: drawn as one blurred, merged
  * cloud instead of separate dots: 'wisp' (smoke, ash: fades out softly) or 'goo'
  * (oil: overlapping blobs fuse into one body with a defined edge). Optional: diffuse = turbulent
  * spreading (px/s of random drift, growing with age) and thin = how much of its alpha a particle
@@ -33,6 +33,8 @@ export const PRESETS = {
     contrail: { life: [0.35, 0.6], size: [4, 7], grow: 0.8, drag: 4.0, rise: 20, coldRise: 1, cool: 0, alpha: 0.5, color: 0xffffff, colorEnd: 0xd8f4ff, surface: 'pop', blend: 'add' },
     // Warm motes of light drifting along the calm main route: the bright, inviting way (spec 5.2c).
     glint:  { life: [2.5, 4], size: [9, 18], grow: 1.2, drag: 2.0, rise: 8, coldRise: 1, cool: 0, alpha: 0.7, color: 0xffe08a, colorEnd: 0xffd36b, surface: 'pop', blend: 'normal' },
+    // Glowing plankton stirred up by a swimmer at night and in the deep (spec 5.0k, open sea #2).
+    plankton: { life: [0.9, 1.8], size: [5, 11], grow: 0.5, drag: 2.5, rise: 0, coldRise: 1, cool: 0, alpha: 0.85, color: 0xb8fff6, colorEnd: 0x2fd6c0, surface: 'pop', blend: 'glow' },
     smoke:  { life: [4, 7], size: [20, 40], grow: 3.2, drag: 0.7, rise: 60, coldRise: 0.7, cool: 0.2, alpha: 0.4, color: 0x9a9ea4, colorEnd: 0xd5d8dc, surface: 'pass', blend: 'normal', soft: 'wisp' }
 };
 export const PRESET_IDS = Object.keys(PRESETS);

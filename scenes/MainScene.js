@@ -47,7 +47,7 @@ import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
-import { lightAt, murkAt } from '../game/level/light.js';
+import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
 import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
@@ -73,6 +73,10 @@ const GRUMPY_HIT = 0.5;      // hearts a grumpy's shove costs (spec 7.1)
 const STYLE_ASK_MS = 1600;   // after the nest cheer, ask how to play (once)
 /** Fin-tip contrails: from this speed (px per step), at these tips (× body radius, nose = +x). */
 const CONTRAIL = { speed: 11, tips: [[-0.35, -0.55], [-0.35, 0.55]] };
+/** Glowing plankton in the wake at night and in the deep (spec 5.0k): from this speed (px per step), one spark per `everyMs` at full glow. */
+/** `?sky=<seconds>` starts the sky cycle there (checking sunset and night without waiting). */
+const SKY_START = Number(new URLSearchParams(window.location.search).get('sky')) || 0;
+const PLANKTON = { speed: 3, everyMs: 30, from: 0.25 };
 /** Reef book: how often to look around, and how close counts as seen up close (px). */
 const BOOK = { scanMs: 300, seePx: 420 };
 /** How high coins hop on each beat (px). */
@@ -983,6 +987,14 @@ export default class MainScene extends Phaser.Scene {
     /** A faint note in the corner (spec 5.0j: faint and minimal): picture + "New in the reef book" + name, no box. */
     bookToast(e) {
         if (this.ambientMode) return;
+        // One at a time: a second discovery waits until the first note has faded.
+        const now = this.time.now, wait = Math.max(0, (this.toastFree || 0) - now);
+        this.toastFree = now + wait + 3400;
+        if (wait > 0) { this.time.delayedCall(wait, () => this.showBookToast(e)); return; }
+        this.showBookToast(e);
+    }
+
+    showBookToast(e) {
         const de = this.lang === 'de', H = this.scale.height, shadow = { offsetY: 2, color: '#06243d', blur: 10, fill: true };
         const box = this.add.container(36, H - 150).setScrollFactor(0).setDepth(55).setAlpha(0);
         if (e.image && this.textures.exists(e.image)) {
@@ -1390,7 +1402,18 @@ export default class MainScene extends Phaser.Scene {
         this.lightTick = ((this.lightTick || 0) + 1) % 8;
         if (!this.lightTick) this.floorNear = this.level.groundBelow(view.x, view.y, 700);
         const fl = this.floorNear;
-        this.ambient.setFillStyle(lightAt({ depth01, y: view.y, t: this.time.now / 1000, storm: stormShare(view.x), hue, deepHue: deep,
+        // Night or the deep: a swimmer stirs up glowing plankton, more the faster it goes.
+        const skyT = SKY_START + this.time.now / 1000, glow = Math.max(nightShare(skyT), depth01);
+        this.planktonAt = (this.planktonAt || 0) - delta;
+        if (glow > PLANKTON.from && !this.fish.inAir && this.planktonAt <= 0) {
+            const fv = this.fish.sprite.body.velocity, sp2 = Math.hypot(fv.x, fv.y);
+            if (sp2 > PLANKTON.speed) {
+                this.planktonAt = PLANKTON.everyMs / glow;
+                const n = sp2 > 9 ? 2 : 1, r = this.fish.radius;
+                this.particles.spawn('plankton', view.x - fv.x * 2.5, view.y - fv.y * 2.5, n, { radius: r * 0.8, spread: 25, vx: -fv.x * 6, vy: -fv.y * 6 });
+            }
+        }
+        this.ambient.setFillStyle(lightAt({ depth01, y: view.y, t: skyT, storm: stormShare(view.x), hue, deepHue: deep,
             floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) }), 1);
         // Inside the side cave the score closes in: it is played as if much deeper down.
         const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
@@ -1411,7 +1434,7 @@ export default class MainScene extends Phaser.Scene {
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.farLayers.update(this.camX);
         this.rockLayers.update(this.camX, this.camY);
-        this.waterLight.update();
+        this.waterLight.update(sunAt(SKY_START + this.time.now / 1000, stormShare(this.fish.sprite.x)));
         if (!this.surf) {
             const z = surfZones();
             if (sp.x < z.surge[1] + WORLD.weatherRange || (sp.x > z.reef[0] - WORLD.weatherRange && sp.x < z.reef[1] + WORLD.weatherRange)) this.surf = new SurfLayer(this, this.surface);
