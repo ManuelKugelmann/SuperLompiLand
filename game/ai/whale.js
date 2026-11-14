@@ -9,6 +9,7 @@ export const WHALE = {
     nets: [0.84, 0.62, 0.38, 0.12],   // where the net pieces hang, as a share of her length from the fluke
     netDrop: [-0.03, 0, -0.02, 0.01],   // ... and how far above (-) or below (+) her middle line, in lengths
     cutRadius: 240,      // px: swimming this close to a piece tears it off
+    cutPause: 0.8,       // s before the next piece can come off: one per touch
     drift: 42,           // px/s while she is caught
     waitBehind: 1500,    // px: she stops and waits when the player is this far behind her
     singS: 2.6,          // s she sings before she sets off
@@ -23,7 +24,7 @@ export const WHALE = {
 
 /** A whale at x on the route; `endX` = where her ride ends. */
 export function createWhale(x, endX, cfg = WHALE) {
-    return { cfg, x, y: 0, baseX: x, endX, v: cfg.drift, state: 'caught', timer: 0, cut: cfg.nets.map(() => false), left: cfg.nets.length, dive: 0 };
+    return { cfg, x, y: 0, baseX: x, endX, v: cfg.drift, state: 'caught', timer: 0, cut: cfg.nets.map(() => false), left: cfg.nets.length, dive: 0, pause: 0 };
 }
 
 /** World place of a spot on her body: `along` = share of her length from the fluke, `off` = lengths from her middle line. */
@@ -47,12 +48,13 @@ export function stepWhale(w, dt, fish, routeY, t = 0) {
     let want = 0;
     if (w.state === 'caught') {
         want = fish && fish.x < w.x - c.waitBehind ? 0 : c.drift;      // she waits for whoever comes to help
-        if (fish) {
+        w.pause -= dt;
+        if (fish && w.pause <= 0) {
             for (let i = 0; i < c.nets.length; i++) {
                 if (w.cut[i]) continue;
                 const s = bodySpot(w, c.nets[i], c.netDrop[i], SPOT);
                 if (Math.hypot(s.x - fish.x, s.y - fish.y) < c.cutRadius) {
-                    w.cut[i] = true; w.left--;
+                    w.cut[i] = true; w.left--; w.pause = c.cutPause;
                     event = w.left === 0 ? 'freed' : 'cut';
                     if (w.left === 0) { w.state = 'sing'; w.timer = 0; }
                     break;

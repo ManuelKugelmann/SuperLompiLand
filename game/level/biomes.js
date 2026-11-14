@@ -70,7 +70,7 @@ export const BIOMES = [
         rock: [0xd9e2ee, 0xa9b8cc, 0x7d8fa8, 0x5a6a84, 0x414c63], water: [0x1b5fd0, 0.24], open: 0.3,
         backRock: 0,
         rockWall: 0,
-        coral: 0.15, kelp: 0.05, coins: 3, friendRate: 0.45, hazardRate: 0.25,
+        coral: 0, kelp: 0, coins: 3, friendRate: 0.45, hazardRate: 0.25,
         props: { boulder: 1, seafan: 1 }, propRate: 0.6,
         friends: { friend_jellyfish: 4, friend_turtle: 2 }, hazards: { mine: 2, hazard_buoy: 1 }
     },
@@ -97,12 +97,12 @@ export const BIOMES = [
         hazards: { hazard_net: 4, hazard_buoy: 3, mine: 2, spikes: 2 }
     },
     {
-        // Open sea again; far below lie the wrecks, for whoever dives.
+        // Open sea again; far below lie the wrecks, for whoever dives. No light reaches that floor: no corals, no kelp.
         id: 'wreck', name: { de: 'Schiffsfriedhof', en: 'Ship Graveyard' }, zone: 'sea', floor: 4700,
         rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.26,
         backRock: 0,
         rockWall: 0,
-        coral: 0.12, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.55,
+        coral: 0, kelp: 0, coins: 3, friendRate: 0.2, hazardRate: 0.55,
         props: { wreck: 5, trawler: 3, rowboat: 1, barrel: 2, crate: 1, boulder: 1, anemone: 1 }, propRate: 2.4,
         landmark: 'wreck',
         friends: { friend_starfish: 1, friend_seahorse: 1, urchin: 1 },
@@ -187,6 +187,22 @@ const smooth = v => { const t = clamp(v, 0, 1); return t * t * (3 - 2 * t); };
 /** Is the water at x open sea (far from any island's coast)? */
 export function isSea(x) {
     return BIOMES[biomeIndexAt(x)].zone === 'sea';
+}
+
+// The reef crest (spec 5.0d): at the coral reef's outer edge the reef grows up to just under
+// the surface, a wall of coral from there down to the seabed. Waves break on it; the calm
+// route passes through it as a channel; beyond it the seabed falls away into the open sea.
+export const REEF_CREST = { inset: 520, half: 400, ramp: 300, top: 180 };
+
+/** World x of the middle of the reef crest. */
+export function reefCrestX(cfg = REEF_CREST) {
+    const reef = BIOMES.find(b => b.id === 'reef');
+    return reef.from + reef.width - cfg.inset;
+}
+
+/** How much of the reef crest stands at x: 1 on it, 0 away from it. */
+export function reefCrest(x, cfg = REEF_CREST) {
+    return smooth((cfg.half + cfg.ramp - Math.abs(x - reefCrestX(cfg))) / cfg.ramp);
 }
 
 /** How much the water at x is open sea: 0 along the coasts, 1 out at sea, easing in just past an island's edge and out before the next. */

@@ -10,6 +10,7 @@ const cutAll = w => {
         const s = bodySpot(w, WHALE.nets[i], WHALE.netDrop[i]);
         const e = stepWhale(w, 1 / 60, { x: s.x, y: s.y }, route, 0);
         if (e) ev.push(e);
+        for (let k = 0; k < WHALE.cutPause * 60 + 2; k++) stepWhale(w, 1 / 60, null, route, 0);      // swim on to the next piece
     }
     return ev;
 };
@@ -74,4 +75,17 @@ test('a rider at her back is carried at her speed; one who swims away is let go;
     assert.ok(Math.abs(vx - w.v / 60) < 0.05, 'takes on her speed');
     assert.ok(Math.abs(vy) < 0.05);
     assert.equal(whaleCarry(w, { x: seat.x, y: seat.y + WHALE.seatRadius + 10 }, 0, 0), null);
+});
+
+test('one touch tears off one piece, even where two hang within reach', () => {
+    const w = createWhale(1000, 9000);
+    stepWhale(w, 1 / 60, null, route, 0);      // she takes her place on the route
+    const a = bodySpot(w, WHALE.nets[0], WHALE.netDrop[0]), b = bodySpot(w, WHALE.nets[1], WHALE.netDrop[1]);
+    const between = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    assert.ok(Math.hypot(a.x - between.x, a.y - between.y) < WHALE.cutRadius, 'both are in reach from here');
+    let cuts = 0;
+    for (let i = 0; i < WHALE.cutPause * 60 - 2; i++) if (stepWhale(w, 1 / 60, between, route, 0)) cuts++;
+    assert.equal(cuts, 1);
+    for (let i = 0; i < 10; i++) if (stepWhale(w, 1 / 60, between, route, 0)) cuts++;
+    assert.equal(cuts, 2, 'staying there takes the next one after a moment');
 });

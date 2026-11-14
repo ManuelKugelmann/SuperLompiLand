@@ -6,7 +6,14 @@ export const WHALE_SCENE = {
     near: 3400,          // px: she appears when the player is this close to her place ...
     far: 5600,           // ... and is taken away again beyond this while still caught
     below: 560,          // px she swims under the calm route (which runs just under the surface out here)
-    drape: [230, 640],   // px: width and height of a piece of net as it hangs over her
+    // A piece of net is wrapped round her where it hangs: `bodyHalf` = half her height there (in
+    // her lengths, one per piece, as in WHALE.nets). The near half of the wrap lies on her side
+    // from her back to her belly, its torn end hanging below; the far half shows behind her,
+    // shifted and darker, so the band reads as going round her.
+    bodyHalf: [0.103, 0.118, 0.082, 0.034],
+    band: 0.73,          // share of the net picture's height that is the band (the rest is the torn end)
+    wrapShift: 46,       // px the far half is shifted toward her tail
+    wrapTint: 0x7d7767,  // ... and its colour, in her shadow
     calf: 0.3,           // her calf, in sizes of her
     blowEvery: 0.35      // s between the bubbles from her blowhole on the ride
 };
@@ -95,20 +102,26 @@ export default class Whale {
     }
 
     build() {
-        const s = this.scene, [dw, dh] = WHALE_SCENE.drape;
+        const s = this.scene;
         this.mind = createWhale(this.startX, this.endX);
         this.mind.y = this.routeY(this.startX);
         this.body = createRig(s, profile(WHALE.length), this.startX, this.mind.y, 3.4);
         this.calf = createRig(s, profile(WHALE.length * WHALE_SCENE.calf), this.startX, this.mind.y, 3.3);
         this.calfAt = { x: this.startX, y: this.mind.y };
         // Hung from the top: each piece lies over her back and trails below her belly.
-        this.nets = WHALE.nets.map(() => s.add.image(0, 0, DRAPE_KEY).setOrigin(0.5, 0.32).setDepth(3.6).setDisplaySize(dw, dh));
+        this.nets = WHALE.nets.map((_, i) => {
+            const half = WHALE_SCENE.bodyHalf[i] * WHALE.length, h = half * 2.1 / WHALE_SCENE.band, w = Math.max(90, Math.min(230, half * 1.1));
+            const near = s.add.image(0, 0, DRAPE_KEY).setOrigin(0.5, 0).setDepth(3.6).setDisplaySize(w, h);
+            near.far = s.add.image(0, 0, DRAPE_KEY).setOrigin(0.5, 0).setDepth(3.35).setDisplaySize(w * 1.1, h * 1.08).setTint(WHALE_SCENE.wrapTint);
+            near.half = half;
+            return near;
+        });
         this.blow = 0;
     }
 
     remove() {
         this.body.destroy(); this.calf.destroy();
-        for (const n of this.nets) n?.destroy();
+        for (const n of this.nets) { n?.far.destroy(); n?.destroy(); }
         this.mind = null;
     }
 
@@ -130,7 +143,7 @@ export default class Whale {
             // The piece peels off her: it slips down her side, turns and sinks away.
             const i = this.nets.findIndex((n, k) => n && w.cut[k]), net = this.nets[i];
             this.nets[i] = null;
-            s.tweens.add({ targets: net, y: net.y + 520, x: net.x - 160, angle: -75, alpha: 0, scaleX: net.scaleX * 0.5, duration: 1500, ease: 'Sine.easeIn', onComplete: () => net.destroy() });
+            s.tweens.add({ targets: [net, net.far], y: net.y + 520, x: net.x - 160, angle: -75, alpha: 0, scaleX: net.scaleX * 0.5, duration: 1500, ease: 'Sine.easeIn', onComplete: () => { net.far.destroy(); net.destroy(); } });
         }
         if (event) this.on(event, w.x, w.y);
         if (event === 'gone') { this.remove(); return; }
@@ -144,8 +157,10 @@ export default class Whale {
         this.calf.setAlpha(alpha).draw({ x: cx, y: cy, vx: cvx, vy: cvy, frames, effort: 0.4, turn: 0.05 });
         this.nets.forEach((n, i) => {
             if (!n) return;
-            const p = bodySpot(w, WHALE.nets[i], WHALE.netDrop[i], SPOT);
-            n.setPosition(p.x, p.y).setRotation(Math.sin(t * 1.1 + i * 1.7) * 0.07 - 0.05);      // the trailing end sways behind
+            // Hung from her back line at that place; the torn end sways behind.
+            const p = bodySpot(w, WHALE.nets[i], 0, SPOT), sway = Math.sin(t * 1.1 + i * 1.7) * 0.05 - 0.04;
+            n.setPosition(p.x, p.y - n.half * 1.05).setRotation(sway).setAlpha(alpha);
+            n.far.setPosition(p.x - WHALE_SCENE.wrapShift, p.y - n.half * 1.12).setRotation(sway * 0.6).setAlpha(alpha);
         });
         // On the ride her breath streams back over the rider: it feels like being carried.
         if (w.state === 'ride' && (this.blow -= delta / 1000) <= 0) {

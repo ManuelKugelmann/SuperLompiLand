@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY } from '../game/level/density.js';
-import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
+import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS, REEF_CREST, reefCrest, reefCrestX } from '../game/level/biomes.js';
 import { detour } from '../game/level/weather.js';
 
 const field = createField(1337);
@@ -116,4 +116,15 @@ test('the open sea is clear water: no rock hangs between the surface and just ab
             }
         }
     }
+});
+
+test('the reef crest stands just under the surface at the reef\'s outer edge, and the calm route has its channel through it', () => {
+    const f = createField(1337), c = reefCrestX();
+    for (const dx of [-300, 0, 300]) {
+        assert.ok(f.density(c + dx, REEF_CREST.top - 60) < FIELD.threshold, 'water over the crest');
+        for (const y of [REEF_CREST.top + 160, 500]) assert.ok(f.density(c + dx, y) > FIELD.threshold, `coral at ${c + dx}, ${y}`);
+        assert.ok(f.density(c + dx, f.routeY(c + dx)) < FIELD.threshold, 'the channel');
+    }
+    assert.ok(f.routeY(c) > REEF_CREST.top + ROUTE.halfWidth + 200, 'the channel lies well under the crest');
+    assert.equal(reefCrest(c - 2000), 0);
 });

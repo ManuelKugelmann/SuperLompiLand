@@ -3,7 +3,7 @@
 // so it runs unchanged on the main thread, in a Web Worker and in the tests.
 import { vnoise } from './terrain.js';
 import { detour } from './weather.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare } from './biomes.js';
+import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
@@ -11,6 +11,7 @@ export const FIELD = {
     maxDepth: 5600,               // deepest regular seabed (the abyss goes further)
     nestRadius: 230,              // half width of the sand basin a nest lies in
     nestRim: 16,                  // how far its rim stands above the middle
+    crestRock: 1.4,               // density inside the reef crest (the calm route still cuts its channel through)
     seaClear: 1.3,                // how much rock the open sea takes away above its bottom (more than the noise can add)
     seaBottom: 300,               // px above the sea's bottom over which rock comes back
     nestSearch: 16                // a nest may move up to this many steps of 120 px east to find real seabed
@@ -90,6 +91,9 @@ export function createField(seed) {
         }
         // Keep the abyss shaft swimmable all the way down.
         if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;
+        // The reef crest: solid coral from just under the surface down, whatever the noise says.
+        const crest = reefCrest(x);
+        if (crest > 0 && y > REEF_CREST.top) n += (FIELD.crestRock - n) * crest * smooth01((y - REEF_CREST.top) / 120);
         if (x < WORLD_WEST + 900) n += (WORLD_WEST + 900 - x) / 500;     // western shore
         if (x > WORLD_END + 900) n += (x - WORLD_END - 900) / 500;       // wall behind the grand nest
         const ds = Math.hypot(x - FIELD.spawn.x, y - FIELD.spawn.y);
@@ -98,7 +102,7 @@ export function createField(seed) {
             // The calm route: fully open inside its half width, fading back to rock over as much
             // again (a soft edge: no sharp step in the field). Where the lane runs just under the
             // open surface water, everything above it is lane too, so no sliver of rock is left between.
-            const ry = routeY(x), shallow = ry - ROUTE.halfWidth * 2 < 620 && y < ry;
+            const ry = routeY(x), shallow = crest < 0.5 && ry - ROUTE.halfWidth * 2 < 620 && y < ry;      // not under the reef crest: there the lane is a channel through coral
             const off = shallow ? 0 : Math.abs(y - ry) / ROUTE.halfWidth;
             if (off < 2 && x > FIELD.spawn.x - 600 && x < WORLD_END) n -= 0.95 * smooth01(2 - off);
             for (const nest of nests) {

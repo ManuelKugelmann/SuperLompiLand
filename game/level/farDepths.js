@@ -4,7 +4,7 @@
 // line. Far ones are smaller, softer, hazier and fade out at their base into the water,
 // so nothing has a cut edge and nothing floats. The open ocean has none.
 // Pure (no Phaser): placement and looks; FarLayers.js draws. Tested in tests/farDepths.test.mjs.
-import { biomeBlendAt, floorY } from './biomes.js';
+import { biomeBlendAt, floorY, isSea } from './biomes.js';
 import { rng, mix } from './layerMath.js';
 
 export const FAR = {
@@ -14,6 +14,7 @@ export const FAR = {
     tint: 0.7,          // and shift toward the water colour, at the farthest
     shrink: 0.6,        // farthest objects are this much smaller than near ones
     rise: 0.05,         // up to this share of the screen height above the far seabed
+    minFloor: 520,      // the far seabed never lies shallower than this, even where the real sand leaves the water
     horizon: 0.74       // screen height share of the infinitely far seabed (low: far bases hide behind the near seabed)
 };
 
@@ -41,10 +42,10 @@ export const FAR_KINDS = {
     mangrove: { per: 0.6, haze: 1.4, kinds: pick(['roots', 2], ['grass', 1], ['boulders', 0.4]) },
     kelp: { per: 1.2, haze: 1.4, kinds: pick(['kelp', 4], ['boulders', 0.5]) },
     blue: { per: 0, kinds: [] },
-    wreck: { per: 1, kinds: pick(['hulls', 1], ['boulders', 1], ['kelp', 0.3]) },
+    wreck: { per: 0, kinds: [] },
     shore: { per: 1, kinds: pick(['boulders', 3], ['kelp', 0.6]) },
     harbour: { per: 0.9, kinds: pick(['piers', 3], ['hulls', 1], ['boulders', 1]) },
-    trench: { per: 0.7, kinds: pick(['boulders', 1]) }
+    trench: { per: 0, kinds: [] }
 };
 
 /** World x that layer x `lx` lines up with when it is in the middle of a `W`-wide screen. */
@@ -58,6 +59,9 @@ export function farCell(di, ci, W, seed = 1337, has = () => true) {
     const s = FAR.depths[di], r = rng(((seed * 31 + di) * 977 + ci) >>> 0);
     const mid = worldXFor((ci + 0.5) * FAR.cell, s, W);
     const biome = biomeBlendAt(mid).a;
+    // The open sea has no far scenery: its bottom lies far below the view, and anything placed on
+    // a far seabed there would hang in mid-water (also just past an island's edge).
+    if (isSea(mid)) return [];
     const spec = FAR_KINDS[biome.id] || FAR_KINDS.reef;
     const kinds = spec.kinds.filter(k => has(k[0]));
     const want = spec.per * (0.45 + 0.55 * s / FAR.depths[FAR.depths.length - 1]);
@@ -80,7 +84,8 @@ export function farCell(di, ci, W, seed = 1337, has = () => true) {
  * the base shows at screen y = result - camY * s.
  */
 export function farBaseY(worldX, s, H, rise = 0) {
-    return s * floorY(worldX) + H * FAR.horizon * (1 - s) - rise * H;
+    // Over the beach the real sand leaves the water; the far seabed stays under it, so nothing far stands in the sky.
+    return s * Math.max(FAR.minFloor, floorY(worldX)) + H * FAR.horizon * (1 - s) - rise * H;
 }
 
 /** Alpha and tint of an object at depth s in a biome (fades into the water with distance). */

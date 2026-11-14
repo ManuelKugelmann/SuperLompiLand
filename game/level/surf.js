@@ -3,7 +3,7 @@
 // (px per 60 Hz step) that add to the flow field; neither ever hurts. Time is counted in
 // waves (`phase`, one per wave period), so the sea can breathe with the music's bars.
 
-import { BIOMES, floorY } from './biomes.js';
+import { floorY, REEF_CREST, reefCrestX } from './biomes.js';
 
 export const SURF = {
     surge: {
@@ -15,10 +15,9 @@ export const SURF = {
         lift: 0.45         // share of that which goes up on the push and down in the backwash
     },
     breaker: {
-        inset: 520,        // px before the reef's outer edge where the waves break
         reach: 760,        // px the foam cloud runs on toward the lagoon ...
         lead: 260,         // ... and how far it starts on the sea side of the break
-        depth: 210,        // px the foam reaches down; below it the water is calm
+        depth: REEF_CREST.top + 20,   // px the foam reaches down: the water over the reef crest; below it is coral, beside it calm
         set: 3,            // breakers in a set ...
         gap: 3,            // ... then this many quiet waves: the moment to cross
         speed: 13,         // px/step toward the lagoon at the height of a breaker
@@ -56,10 +55,9 @@ export function surgeCrestX(n, phase, cfg = SURF.surge) {
     return (n + 0.25 - phase) * cfg.wavelength;
 }
 
-/** Where the waves break: just inside the outer edge of the coral reef. */
-export function breakerX(cfg = SURF.breaker) {
-    const reef = BIOMES.find(b => b.id === 'reef');
-    return reef.from + reef.width - cfg.inset;
+/** Where the waves break: on the reef crest, just inside the outer edge of the coral reef. */
+export function breakerX() {
+    return reefCrestX();
 }
 
 /**

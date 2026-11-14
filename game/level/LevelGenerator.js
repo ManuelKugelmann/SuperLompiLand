@@ -17,7 +17,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 8,
+    version: 9,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -139,6 +139,7 @@ export default class LevelGenerator {
         makeLineTexture(scene);
         this.field = createField(LEVEL.seed);
         this.storySpots = chapters().filter(c => c.friend).map(c => ({ x: c.x, y: this.field.routeY(c.x) }));
+        this.storyStretches = chapters().filter(c => c.event).map(c => ({ x0: c.event.x - JOURNEY.eventClear, x1: c.event.endX + JOURNEY.eventClear }));
         // Never out of reach: coins and friends are not placed in sealed pockets of water (reach.js).
         this.reachable = createReach(this.field.density, LEVEL.threshold, this.field.routeY, ROUTE.halfWidth * 0.75);
         this.nests = this.field.nests.map(n => ({ ...n, biome: BIOMES[n.biome] }));
@@ -613,6 +614,8 @@ export default class LevelGenerator {
         const s = this.scene, h = HAZARDS[key];
         // Danger is optional (spec 5.2c): nothing harmful on or near the calm main route.
         if (Math.abs(y - this.field.routeY(x)) < ROUTE.clear + h.r) return null;
+        // Wonder first: nothing harmful along the stretch where a big story event passes (the whale and her ride).
+        for (const e of this.storyStretches) if (x > e.x0 && x < e.x1) return null;
         const top = y - h.size * 0.46, rock = h.chain ? this.ceilingAbove(x, top) : null;
         if (h.chain && top - (rock ? rock.y : 16) > h.reach) return null;
         const img = makeCritter(s, key, x, y, h.size, h.anim || 'still', { ...h, rotation: angle }).setDepth(3);

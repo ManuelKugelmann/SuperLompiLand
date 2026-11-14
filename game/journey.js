@@ -14,6 +14,7 @@ export const JOURNEY = {
     freeRadius: 190,     // px: swimming this close tears the net
     specialRadius: 420,  // px: a special this close tears it too
     clear: 250,          // px around an event that stay free of coins
+    eventClear: 1800,    // px before and after a big event's stretch that stay free of hazards
     coins: 10            // thank-you coins for each friend freed
 };
 
@@ -23,7 +24,7 @@ const CHAPTERS = {
     mangrove: { friend: 'seahorse', goal: { de: 'Jemand hängt zwischen den Wurzeln fest', en: 'Someone is stuck among the roots' } },
     reef: { friend: 'jellyfish', goal: { de: 'Am Riff zappelt etwas im Netz', en: 'Something wriggles in a net on the reef' } },
     kelp: { friend: 'turtle', goal: { de: 'Im Tangwald ruft jemand um Hilfe', en: 'Someone calls for help in the kelp' } },
-    blue: { friend: 'flyingfish', event: { id: 'whale', from: 0.68, to: 1.03 }, goal: { de: 'Draußen im Blau treibt ein Netz', en: 'A net drifts out in the blue' } },
+    blue: { friend: 'flyingfish', event: { id: 'whale', from: 0.68, to: 0.9 }, goal: { de: 'Draußen im Blau treibt ein Netz', en: 'A net drifts out in the blue' } },
     wreck: { goal: { de: 'Weit unten liegen alte Schiffe. Oben geht es weiter', en: 'Old ships lie far below. The way on is up here' } },
     shore: { friend: 'firefish', goal: { de: 'An der Felsenküste leuchtet es schwach', en: 'A faint light on the rocky shore' } },
     harbour: { friend: 'shark', goal: { de: 'Im Hafen steckt ein großer Freund fest', en: 'A big friend is caught in the harbour' } },

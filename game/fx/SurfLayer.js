@@ -9,7 +9,7 @@ export const SURF_ART = {
 
 export const SURF_LOOK = {
     lines: 5,            // foam lines of the surge that can be in view at once
-    lineSize: [560, 70], // px
+    lineSize: [640, 170], // px: a band of whitewater, half above and half below the surface line
     puffs: 12,           // whitewater puffs in a breaker's foam cloud
     puffSize: 300,       // px
     crestSize: [900, 150],
@@ -71,7 +71,7 @@ export default class SurfLayer {
             const k = surgeShare(x, 1);
             if (k < 0.05) continue;
             const [w, h] = SURF_LOOK.lineSize;
-            this.lines[used++].setVisible(true).setPosition(x, this.surface.heightAt(x, t) - 6).setDisplaySize(w, h).setAlpha(0.9 * k);
+            this.lines[used++].setVisible(true).setPosition(x, this.surface.heightAt(x, t)).setDisplaySize(w, h).setAlpha(Math.min(1, 1.3 * k));
         }
         for (let i = used; i < this.lines.length; i++) this.lines[i].setVisible(false);
 
