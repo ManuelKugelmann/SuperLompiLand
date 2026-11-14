@@ -152,3 +152,15 @@ test('an anchoring creature rests holding on to the rock, longer than others res
     run(b, 240, { isOpen: floor }, s => { if (s.state === 'rest') plain += 1 / 60; });
     assert.ok(restS > plain * 1.3, `anchored ${restS} vs ${plain}`);
 });
+
+test('the breath is reached even when open water ends just under the waterline, as in the game', () => {
+    const sea = (x, y) => y > 24;
+    assert.ok(SWIMMER.surfaceY > 24 + 10, 'the breathing depth lies inside the water the creature may use');
+    for (const seed of [1, 2, 3]) {
+        const a = createSwimmer({ x: 0, y: 195 }, { breathe: true, range: 400, speed: 1.3, turn: 0.03 }, seed);
+        a.air = 0;
+        let top = Infinity, reachedAt = null;
+        run(a, 12, { isOpen: sea }, (s, i) => { top = Math.min(top, s.y); if (reachedAt === null && s.y <= SWIMMER.surfaceY + 8) reachedAt = i / 60; });
+        assert.ok(reachedAt !== null && reachedAt < 8, `seed ${seed}: stalled at ${top}`);
+    }
+});

@@ -147,7 +147,9 @@ export default class LevelGenerator {
         this.chains = [];           // hanging chains: verlet ropes (rope.js) with the hazard as the weight at the end
         this.coralSpacing = createSpacing(LEVEL.coralGap);
         this.lineEnd = { x: 0, y: 0 };
-        this.brainEnv = { isOpen: (x, y) => this.isOpen(x, y, 0.05), t: 0, player: null, alarm: null };
+        // Open water for a creature reaches right up to the waterline (isOpen stops 60 px under it,
+        // which is for placing things): a turtle must be able to put its head up for a breath.
+        this.brainEnv = { isOpen: (x, y) => y > 24 && this.density(x, y) < LEVEL.threshold - 0.05, t: 0, player: null, alarm: null };
         this.crawlEnv = { density: (x, y) => this.density(x, y), threshold: LEVEL.threshold, player: null };
         this.alarm = { x: 0, y: 0 };   // where something sudden just happened (a special): creatures nearby take fright
         this.alarmLeft = 0;

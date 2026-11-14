@@ -137,7 +137,8 @@ export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
         want = p || env.alarm ? from : a.heading;
         speed = a.speed * cfg.fleeSpeed; turn = a.turn * 3;
     }
-    if (speed > 0) want = avoid(env.isOpen, a.x, a.y, want, cfg.look);
+    // Going up for air it looks only a little way ahead: the waterline itself is not a wall to steer round.
+    if (speed > 0) want = avoid(env.isOpen, a.x, a.y, want, a.state === 'breathe' ? Math.min(cfg.look, 30) : cfg.look);
     const before = a.heading;
     a.heading = turnToward(a.heading, want, turn * steps);
     if (a.state === 'greet') a.turned += angleTo(before, a.heading);
