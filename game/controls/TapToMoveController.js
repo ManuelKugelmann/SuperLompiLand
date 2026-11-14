@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
+import GhostFinger from '../ui/GhostFinger.js';
 
 const BAND_FULL = 520; // finger distance at which the pull is at full strength
 
@@ -14,16 +15,25 @@ export default class TapToMoveController extends ControllerBase {
         this.hint(this.de ? `Halten = Gummiband zum Finger · Loslassen = bremsen · Doppeltipp = ${this.specialWord()}`
             : `Hold = rubber band to your finger · let go = brake · double tap = ${this.specialWord()}`);
 
+        // On the first starts a ghost finger shows how, without words (spec 9.1); the first touch ends it.
+        this.demo = GhostFinger.maybe(this.scene, this.ui);
         this.listen(this.scene.input, 'pointerdown', this.onDown);
         this.listen(this.scene.input, 'pointerup', this.onUp);
     }
 
     onDown(pointer) {
+        this.demo?.stop();
         if (!this.held && !this.overHud(pointer)) this.held = pointer;
     }
 
     onUp(pointer) {
         if (this.held === pointer) this.held = null;
+    }
+
+    draw() {
+        if (!this.demo) return;
+        const view = this.scene.cameras.main.worldView, sp = this.fish.sprite;
+        this.demo.update(this.scene.game.loop.delta / 1000, sp.x - view.x, sp.y - view.y);
     }
 
     update() {
