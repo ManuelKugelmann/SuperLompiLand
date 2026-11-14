@@ -22,13 +22,40 @@ export function textStyle(size, color = UI.text, outline = true) {
 }
 
 /** Draw a pill surface into a Graphics object (cleared first). */
-export function drawPill(g, w, h, { fill = UI.surface, alpha = 0.92, radius = UI.radius } = {}) {
-    const r = Math.min(radius, h / 2);
+export function drawPill(g, w, h, { fill = UI.surface, alpha = 0.92, radius = UI.radius, ox = 0, oy = 0 } = {}) {
+    const r = Math.min(radius, h / 2), x = ox - w / 2, y = oy - h / 2;
     g.clear();
-    g.fillStyle(UI.shadow, 0.35).fillRoundedRect(-w / 2 + 2, -h / 2 + 6, w, h, r);         // shadow
-    g.fillStyle(fill, alpha).fillRoundedRect(-w / 2, -h / 2, w, h, r);                      // body
-    g.fillStyle(0xffffff, 0.16).fillRoundedRect(-w / 2 + 6, -h / 2 + 5, w - 12, h * 0.36, r * 0.7); // top light
-    g.lineStyle(3, 0xffffff, 0.45).strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+    g.fillStyle(UI.shadow, 0.35).fillRoundedRect(x + 2, y + 6, w, h, r);         // shadow
+    g.fillStyle(fill, alpha).fillRoundedRect(x, y, w, h, r);                      // body
+    g.fillStyle(0xffffff, 0.16).fillRoundedRect(x + 6, y + 5, w - 12, h * 0.36, r * 0.7); // top light
+    g.lineStyle(3, 0xffffff, 0.45).strokeRoundedRect(x, y, w, h, r);
+}
+
+/**
+ * A pill baked once into a texture (cached by size and look) and shown as an Image centred on the
+ * pill's body. Rounded paths in a live Graphics are re-triangulated every frame (measured: the menu
+ * button alone cost more than a shoal on a throttled phone); a baked picture costs one quad.
+ * `extra(g, cx, cy)` may draw more on top before baking; name it in `id` so it gets its own texture.
+ * Returns { key, originX, originY }.
+ */
+export function pillTexture(scene, w, h, opts = {}, extra = null, id = '') {
+    const { fill = UI.surface, alpha = 0.92, radius = UI.radius } = opts;
+    w = Math.round(w); h = Math.round(h);
+    const key = `pill:${w}x${h}:${fill}:${alpha}:${radius}:${id}`, cx = w / 2 + 1, cy = h / 2 + 1;
+    if (!scene.textures.exists(key)) {
+        const g = scene.make.graphics({}, false);
+        drawPill(g, w, h, { fill, alpha, radius, ox: cx, oy: cy });
+        extra?.(g, cx, cy);
+        g.generateTexture(key, w + 5, h + 9);
+        g.destroy();
+    }
+    return { key, originX: cx / (w + 5), originY: cy / (h + 9) };
+}
+
+/** A baked pill (pillTexture) as an Image centred at (x, y). */
+export function pillImage(scene, x, y, w, h, opts = {}, extra = null, id = '') {
+    const t = pillTexture(scene, w, h, opts, extra, id);
+    return scene.add.image(x, y, t.key).setOrigin(t.originX, t.originY);
 }
 
 /**
@@ -36,12 +63,13 @@ export function drawPill(g, w, h, { fill = UI.surface, alpha = 0.92, radius = UI
  * The hit area is an invisible rectangle, so the whole pill is easy to hit.
  */
 export function pillButton(scene, x, y, w, h, label, onTap, { size = 30 } = {}) {
-    const g = scene.add.graphics().setPosition(x, y);
+    const img = scene.add.image(x, y, '__DEFAULT');
     const txt = scene.add.text(x, y, label, textStyle(size, UI.text, false)).setOrigin(0.5);
     const hit = scene.add.rectangle(x, y, w, h, 0xffffff, 0).setInteractive({ useHandCursor: true });
     let selected = false;
     const paint = pressed => {
-        drawPill(g, w, h, { fill: selected ? UI.accent : (pressed ? UI.surfaceDark : UI.surface), alpha: selected ? 1 : 0.9 });
+        const p = pillTexture(scene, w, h, { fill: selected ? UI.accent : (pressed ? UI.surfaceDark : UI.surface), alpha: selected ? 1 : 0.9 });
+        img.setTexture(p.key).setOrigin(p.originX, p.originY);
         txt.setColor(selected ? UI.accentText : UI.text);
     };
     hit.on('pointerdown', () => { paint(true); onTap(); });
@@ -51,8 +79,8 @@ export function pillButton(scene, x, y, w, h, label, onTap, { size = 30 } = {}) 
     return {
         setSelected(on) { selected = !!on; paint(false); },
         setLabel(text) { txt.setText(text); },
-        setVisible(on) { g.setVisible(on); txt.setVisible(on); hit.setVisible(on); if (on) hit.setInteractive({ useHandCursor: true }); else hit.disableInteractive(); },
-        destroy() { g.destroy(); txt.destroy(); hit.destroy(); }
+        setVisible(on) { img.setVisible(on); txt.setVisible(on); hit.setVisible(on); if (on) hit.setInteractive({ useHandCursor: true }); else hit.disableInteractive(); },
+        destroy() { img.destroy(); txt.destroy(); hit.destroy(); }
     };
 }
 

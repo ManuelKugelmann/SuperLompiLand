@@ -1,4 +1,4 @@
-import { UI, drawPill, textStyle } from './kit.js';
+import { UI, pillImage, textStyle } from './kit.js';
 
 // The game's menu in the UI kit's look, laid out for the landscape phone (spec 5.0l): a round
 // burger button, and a two-column grid of big pills whose height is a share of the screen, so
@@ -18,14 +18,13 @@ export default class GameMenu {
         this.scene = scene;
         this.items = items;
         const H = scene.scale.height, s = Math.round(H * MENU.button);
-        // The burger: a round kit pill with three bars.
-        this.icon = scene.add.container(x, y).setDepth(19000);
-        const g = scene.add.graphics();
-        drawPill(g, s, s, { radius: s / 2, alpha: 0.75 });
-        const bars = scene.add.graphics().fillStyle(0xffffff, 1);
-        for (const dy of [-0.18, 0, 0.18]) bars.fillRoundedRect(-s * 0.24, dy * s - s * 0.035, s * 0.48, s * 0.07, s * 0.035);
-        this.icon.add([g, bars]);
-        this.icon.setSize(s, s).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.toggleMenu());
+        // The burger: a round kit pill with three bars, baked into one picture.
+        const bars = (g, cx, cy) => {
+            g.fillStyle(0xffffff, 1);
+            for (const dy of [-0.18, 0, 0.18]) g.fillRoundedRect(cx - s * 0.24, cy + dy * s - s * 0.035, s * 0.48, s * 0.07, s * 0.035);
+        };
+        this.icon = pillImage(scene, x, y, s, s, { radius: s / 2, alpha: 0.75 }, bars, 'burger').setDepth(19000);
+        this.icon.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.toggleMenu());
         this.overlay = null;
     }
 
@@ -41,8 +40,7 @@ export default class GameMenu {
             const lone = i === this.items.length - 1 && this.items.length % 2 === 1;      // an odd last item sits in the middle
             const x = lone ? W / 2 : W / 2 + (col === 0 ? -1 : 1) * (colW / 2 + gap / 2);
             const y = H / 2 - totalH / 2 + rowH / 2 + row * (rowH + gap);
-            const g = sc.add.graphics().setPosition(x, y);
-            drawPill(g, colW, rowH, { fill: item.color ?? UI.surface, alpha: 0.95 });
+            const g = pillImage(sc, x, y, colW, rowH, { fill: item.color ?? UI.surface, alpha: 0.95 });
             const txt = sc.add.text(x, y, item.label, textStyle(Math.round(H * MENU.font))).setOrigin(0.5);
             if (txt.width > colW - 24) txt.setScale((colW - 24) / txt.width);
             const hit = sc.add.rectangle(x, y, colW, rowH, 0xffffff, 0).setInteractive({ useHandCursor: true });
