@@ -451,10 +451,9 @@ export default class MainScene extends Phaser.Scene {
         if (!tour.done) return;
         const rows = tour.rows(), lines = perfReport(rows);
         window.__perftest = rows;      // for automated runs
-        console.log(lines.join('
-'));
-        this.add.text(40, 120, lines.join('
-'), { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
+        const text = lines.join(String.fromCharCode(10));
+        console.log(text);
+        this.add.text(40, 120, text, { fontFamily: 'monospace', fontSize: '26px', color: '#b6ffb0', backgroundColor: '#000000cc', padding: { x: 14, y: 12 } })
             .setScrollFactor(0).setDepth(99);
     }
 
