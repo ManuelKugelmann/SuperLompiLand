@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { biomeBlendAt, mixColor, waterHue, WATER_LIGHT } from './biomes.js';
+import { mixColor, waterHue, atLuma, WATER_LIGHT } from './biomes.js';
 import SkyLayer from './SkyLayer.js';
 import SeaFarLayer from './SeaFarLayer.js';
 
@@ -9,6 +9,11 @@ import SeaFarLayer from './SeaFarLayer.js';
  * above y = 0.
  */
 /** Far fish schools are placed again once this far outside the picture (px). */
+/** The backdrop water from the surface (0) to the bottom of the screen (1): brightness shares of the top. */
+const WATER_GRADIENT = [[0, 1], [0.25, 0.75], [0.6, 0.52], [1, 0.38]];
+const WATER_TOP_LUMA = 200;     // brightness of the water just under the surface
+const OPEN_SEA = 0x35b3cc;      // the open-sea blue the biome hues are laid over (WATER_LIGHT.backdrop)
+const grey = v => Math.round(v * 255) * 0x010101;
 const SCHOOL_MARGIN = { x: 700, y: 500 };
 /** Far fish come from one sheet: body widths (px) x tail-beat stretches, so a school is one Blitter. */
 const FAR_FISH = { widths: [16, 22, 29, 37], beats: [0.88, 1, 1.12], cell: { w: 46, h: 24 } };
@@ -30,10 +35,10 @@ export default class Backdrop {
         this.maxDepth = maxDepth;
         const W = scene.scale.width, H = scene.scale.height;
 
-        makeGradient(scene, 'bd_grad', H, [[0, 0x7fdce6], [0.25, 0x35b3cc], [0.6, 0x1480a8], [1, 0x0d5a8c]]);
-        scene.add.image(0, 0, 'bd_grad').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(-30);
-        this.dark = scene.add.rectangle(0, 0, W, H, 0x04122e, 0).setOrigin(0).setScrollFactor(0).setDepth(-25);
-        this.tint = scene.add.rectangle(0, 0, W, H, 0xffffff, 0).setOrigin(0).setScrollFactor(0).setDepth(-26);
+        // The water behind everything: a brightness-only gradient, tinted with the biome's hue,
+        // so each biome's water shows its own colour instead of a blend over a fixed blue.
+        makeGradient(scene, 'bd_grad', H, WATER_GRADIENT.map(([t, v]) => [t, grey(v)]));
+        this.water = scene.add.image(0, 0, 'bd_grad').setOrigin(0).setDisplaySize(W, H).setScrollFactor(0).setDepth(-30);
 
         // Sky and waterline live in the world (scroll vertically, follow x).
         // Both are redrawn every frame so the waterline can wave.
@@ -103,10 +108,10 @@ export default class Backdrop {
     update(camX, camY, dx, dy, surface) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
         const depth = Phaser.Math.Clamp((camY + H / 2) / this.maxDepth, 0, 1);
-        this.dark.setAlpha(Phaser.Math.Clamp((camY + H / 2 - 2200) / 3400, 0, 1) * 0.7);
         // Each biome colours the water; neighbours fade into each other.
-        const bl = biomeBlendAt(camX + W / 2);
-        this.tint.setFillStyle(waterHue(camX + W / 2), WATER_LIGHT.backdrop);      // hue only: darkness comes from depth (spec 5.0h)
+        // hue only: darkness comes from depth (spec 5.0h); backdrop = how far the biome hue replaces the open-sea blue
+        const hue = mixColor(OPEN_SEA, waterHue(camX + W / 2), WATER_LIGHT.backdrop);
+        this.water.setTint(atLuma(hue, WATER_TOP_LUMA));
 
         const t = this.scene.time.now / 1000;
 

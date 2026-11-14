@@ -9,7 +9,7 @@
 // facets or chunk seams. Pure maths (no Phaser, no DOM): it runs in the terrain
 // worker and, as a fallback, on the main thread. Tested in tests/shade.test.mjs.
 import { hash, vnoise } from './terrain.js';
-import { biomeBlendAt } from './biomes.js';
+import { biomeBlendAt, waterTone } from './biomes.js';
 import { FIELD } from './density.js';
 import { MAT, BIOME_INDEX, materialTiles } from './materials.js';
 import { backRockCover } from './backRock.js';
@@ -231,8 +231,9 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
     if (br.any) {
         for (let px = 0; px < B; px++) {
             const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * span / B);
+            const ta = waterTone(a), tb = waterTone(b);
             for (let c = 0; c < 3; c++) {
-                const sh = 16 - c * 8, wa = (a.water[0] >> sh) & 255, wb = (b.water[0] >> sh) & 255;
+                const sh = 16 - c * 8, wa = (ta >> sh) & 255, wb = (tb >> sh) & 255;
                 fogCol[px * 3 + c] = ((wa + (wb - wa) * t) + cfg.deepTint[c]) / 2;
             }
         }

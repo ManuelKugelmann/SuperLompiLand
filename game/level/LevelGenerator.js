@@ -18,7 +18,7 @@ import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare } from './biomes.js';
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare, waterTone } from './biomes.js';
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
@@ -549,7 +549,7 @@ export default class LevelGenerator {
                 if (rng.frac() < 0.5) img.setFlipX(true);
                 if (p.tint) img.setTint(p.tint);
                 // Passable things read as behind the play plane: hazed toward the biome's water.
-                else if (p.back) img.setTint(mix(0xffffff, mix(biome.water[0], 0x8fb4c0, 0.5), PROP_BACK_HAZE));
+                else if (p.back) img.setTint(mix(0xffffff, waterTone(biome, 170), PROP_BACK_HAZE));
             }
         }
 

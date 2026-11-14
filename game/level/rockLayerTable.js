@@ -10,7 +10,7 @@
 // Pure (no Phaser): the terrain worker shades the layer chunks, RockLayers.js shows them.
 // Tested in tests/rockLayers.test.mjs.
 import { vnoise } from './terrain.js';
-import { biomeBlendAt, seaShare } from './biomes.js';
+import { biomeBlendAt, seaShare, waterTone } from './biomes.js';
 import { SHADE } from './shade.js';
 import { FIELD, ROUTE } from './density.js';
 
@@ -205,17 +205,19 @@ export function layerChunkRect(layer, cx, cy, span = LAYER_CHUNK) {
  * of the way toward the water colour of its biome (mixed with the deep tint by depth), which
  * lifts the darkest values and lowers the contrast. The rock's alpha is kept: solid, not see-through.
  */
-const LIFT_TO = [0x2a, 0x9f, 0xc8], FOG_LIFT = 0.35;
+const LIFT_LUMA = 128, FOG_LIFT = 0.35;
 
 export function fogLayer(rgba, size, ox, oy, span, layer, deepTint = SHADE.deepTint, maxDepth = 5600) {
     const fog = layer.fog;
     for (let px = 0; px < size; px++) {
         const { a, b, t } = biomeBlendAt(ox + (px + 0.5) * span / size);
-        // The water colour, lifted toward open-sea blue: even in the darkest biome the rock
-        // behind stays lighter than the play-plane rock, so it never reads as solid.
-        const wc = [16, 8, 0].map((sh, c) => {
-            const w = ((a.water[0] >> sh) & 255) * (1 - t) + ((b.water[0] >> sh) & 255) * t;
-            return w + (LIFT_TO[c] - w) * FOG_LIFT;
+        // The water colour, lifted toward a brighter tone of its own hue: even in the darkest
+        // biome the rock behind stays lighter than the play-plane rock, so it never reads as solid.
+        const wa = waterTone(a), wb = waterTone(b), ta = waterTone(a, LIFT_LUMA), tb = waterTone(b, LIFT_LUMA);
+        const wc = [16, 8, 0].map(sh => {
+            const w = ((wa >> sh) & 255) * (1 - t) + ((wb >> sh) & 255) * t;
+            const lift = ((ta >> sh) & 255) * (1 - t) + ((tb >> sh) & 255) * t;
+            return w + (lift - w) * FOG_LIFT;
         });
         for (let py = 0; py < size; py++) {
             const o = (py * size + px) * 4;

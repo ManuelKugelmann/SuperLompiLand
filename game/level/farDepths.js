@@ -4,8 +4,10 @@
 // line. Far ones are smaller, softer, hazier and fade out at their base into the water,
 // so nothing has a cut edge and nothing floats. The open ocean has none.
 // Pure (no Phaser): placement and looks; FarLayers.js draws. Tested in tests/farDepths.test.mjs.
-import { biomeBlendAt, floorY, isSea } from './biomes.js';
+import { biomeBlendAt, floorY, isSea, waterTone } from './biomes.js';
 import { rng, mix } from './layerMath.js';
+
+const FAR_WATER_LUMA = 128;     // brightness of the water far things fade into (its hue is the biome's)
 
 export const FAR = {
     depths: [0.16, 0.24, 0.32, 0.41, 0.5, 0.6, 0.7],   // parallax (camera speed share), far -> near
@@ -90,7 +92,7 @@ export function farBaseY(worldX, s, H, rise = 0) {
 /** Alpha and tint of an object at depth s in a biome (fades into the water with distance). */
 export function farLook(s, biome) {
     const far = 1 - s, haze = FAR_KINDS[biome.id]?.haze ?? 1, extra = haze - 1;
-    const water = mix(biome.water[0], 0x2a9fc8, 0.5);
+    const water = waterTone(biome, FAR_WATER_LUMA);
     const fog = Math.min(0.97, FAR.fog * far * haze + extra * 0.3);
     return { alpha: 1 - fog, tint: mix(0xffffff, water, Math.min(1, FAR.tint * far * haze + extra * 0.4)) };
 }

@@ -175,7 +175,7 @@ export function biomeBlendAt(x) {
  * brightness. Every water colour is brought to the same luminance, and laid over the view by the
  * same amount everywhere; depth darkens separately.
  */
-export const WATER_LIGHT = { luma: 150, amount: 0.22, backdrop: 0.5 };   // amount: the scene light (multiplies everything, so gentle); backdrop: the water behind
+export const WATER_LIGHT = { luma: 150, amount: 0.22, backdrop: 0.85 };   // amount: the scene light (multiplies everything, so gentle); backdrop: how far the biome hue replaces the open-sea blue behind everything
 
 /**
  * Each biome's water hue (degrees) and saturation, spread round the wheel so neighbours differ by
@@ -211,6 +211,11 @@ export function atLuma(c, luma = WATER_LIGHT.luma) {
     }
     const ch = [16, 8, 0].map(sh => Math.min(255, Math.round(((c >> sh) & 255) * k)));
     return (ch[0] << 16) | (ch[1] << 8) | ch[2];
+}
+
+/** A biome's water in its hue (WATER_HUES), at its own water's brightness or the one given: what fog, haze and far things fade toward. */
+export function waterTone(b, luma = lumaOf(b.water[0])) {
+    return atLuma(hueOf(b), luma);
 }
 
 /** The water's hue at x: the biomes' colours blended, at the one shared brightness. */
