@@ -1,5 +1,5 @@
 import { seaShare } from './biomes.js';
-import { socketView, passing } from './seaFar.js';
+import { socketView, passing, farWrecks } from './seaFar.js';
 
 export const SEA_FAR_LOOK = {
     depth: -21,          // behind every other far layer
@@ -10,7 +10,8 @@ export const SEA_FAR_LOOK = {
     snowAlpha: 0.75,
     snowSizes: [18, 32, 50], // px across of a far, a middle and a near flake (the nearest are big and bright)
     passAlpha: 0.22,
-    passSize: 900        // px length of a big shape at scale 1
+    passSize: 900,       // px length of a big shape at scale 1
+    wreckAlpha: 0.3      // the far wrecks on the graveyard sea's floor
 };
 
 /** Soft pictures, painted once: everything out here is seen through haze. */
@@ -104,6 +105,7 @@ export default class SeaFarLayer {
         const img = key => scene.add.image(0, 0, key).setScrollFactor(0).setDepth(L.depth).setTint(L.tint).setVisible(false);
         this.socket = img('seafar_socket').setOrigin(0, 1).setDisplaySize(W * 0.95, H * 1.05).setTint(L.socketTint);
         this.pass = { img: img('seafar_manta'), n: 0, t: 0, spec: passing(0), waiting: true };
+        this.wrecks = [0, 1, 2].map(() => img('wreck_1').setOrigin(0.5, 1).setTint(L.socketTint));   // pool for the far wrecks in view
         this.snow = [];      // made when the open sea is first reached (makeSnow)
         this.out = { x: 0, alpha: 0 };
     }
@@ -128,6 +130,17 @@ export default class SeaFarLayer {
         this.socket.setVisible(!!v && under > 0);
         // It stands on the bottom of the view and sinks out of it as the camera climbs toward the surface.
         if (v) this.socket.setPosition(v.x, H * 1.02 + Math.max(0, 500 - camY) * 0.25).setAlpha(v.alpha);
+
+        // Far wrecks on the graveyard sea's floor, standing on the bottom of the view like the socket.
+        const wrecks = under > 0 ? farWrecks(cam, W) : [];
+        this.wrecks.forEach((o, i) => {
+            const w = wrecks[i];
+            o.setVisible(!!w && this.scene.textures.exists(w.key));
+            if (!o.visible) return;
+            if (o.texture.key !== w.key) o.setTexture(w.key);
+            o.setPosition(w.x, H * 1.02 + Math.max(0, 500 - camY) * 0.25).setFlipX(w.flip)
+                .setDisplaySize(w.size, w.size * o.frame.height / o.frame.width).setAlpha(L.wreckAlpha * sea);
+        });
 
         // Marine snow: sinks slowly, slides against the camera's movement, wraps round the screen.
         const show = sea > 0.05 && camY > 60;

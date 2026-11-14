@@ -63,7 +63,7 @@ export default class DeepGlowLayer {
 
     build(cx, cy) {
         const s = this.scene, add = Phaser.BlendModes.ADD;
-        return glowCell(cx, cy, this.seed, this.isOpen).map(g => {
+        return glowCell(cx, cy, this.seed, this.isOpen, DEEP_GLOW, this.night).map(g => {
             let obj;
             if (g.kind === 'jelly') obj = s.add.image(g.x, g.y, 'glow_jelly').setScale(g.size / 128);
             else if (g.kind === 'string') obj = s.add.image(g.x, g.y, 'glow_string').setOrigin(0.5, 0).setScale(g.size / 512);
@@ -83,13 +83,16 @@ export default class DeepGlowLayer {
         });
     }
 
-    /** view = camera world view {x, y, width, height}; t = s. */
-    update(view, t) {
+    /** view = camera world view {x, y, width, height}; t = s; night = 0 day .. 1 full night (light.js nightShare). */
+    update(view, t, night = 0) {
         const C = DEEP_GLOW.cell, m = GLOW_LOOK.margin;
+        // The night comes in steps: when it changes, the cells are placed again for it.
+        const step = Math.round(night * 4) / 4;
+        if (step !== this.night) { this.destroy(); this.night = step; }
         const cx0 = Math.floor(view.x / C) - m, cx1 = Math.floor((view.x + view.width) / C) + m;
         const cy0 = Math.max(0, Math.floor(view.y / C) - m), cy1 = Math.floor((view.y + view.height) / C) + m;
         const keep = new Set();
-        if (glowShare(view.y + view.height + m * C) > 0) {
+        if (glowShare(view.y + view.height + m * C, DEEP_GLOW, this.night) > 0) {
             for (let cx = cx0; cx <= cx1; cx++) for (let cy = cy0; cy <= cy1; cy++) {
                 const id = `${cx}:${cy}`;
                 keep.add(id);
@@ -107,7 +110,7 @@ export default class DeepGlowLayer {
     }
 
     animate(g, obj, y0, t) {
-        const L = GLOW_LOOK, light = glowShare(y0);
+        const L = GLOW_LOOK, light = glowShare(y0, DEEP_GLOW, this.night);
         if (g.kind === 'jelly') {
             const p = Math.sin(t * L.pulse * Math.PI * 2 / 2 + g.phase);
             obj.y = y0 + Math.sin(t * 0.4 + g.phase) * L.drift;

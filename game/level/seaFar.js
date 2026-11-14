@@ -13,7 +13,10 @@ export const SEA_FAR = {
     passEvery: [11, 19],  // s between two big shapes passing (about every 15 s, spec 5.0i)
     passTime: [22, 34],   // s one takes to cross the view
     passScale: [0.5, 1],  // how big (near) or small (far) it is
-    kinds: ['manta', 'shark', 'school']
+    kinds: ['manta', 'shark', 'school'],
+    // Sunken ships far off on the graveyard sea's floor: something to hold the eye in the empty
+    // sea (at night above all). One every `every` px of the sea, seen at parallax `scroll`.
+    wrecks: { biome: 'wreck', every: 5200, scroll: 0.15, size: [900, 1300], keys: ['wreck_1', 'wreck_2', 'wreck_3'] }
 };
 
 /** World x where the next island east of x begins, or null when only sea is left. */
@@ -36,6 +39,22 @@ export function socketView(cam, width, cfg = SEA_FAR, out = { x: 0, alpha: 0 }) 
     const near = Math.max(0, Math.min(1, 1 - away / cfg.socketFrom));
     out.x = width * (cfg.socketX[0] + (cfg.socketX[1] - cfg.socketX[0]) * near);
     out.alpha = (cfg.socketAlpha[0] + (cfg.socketAlpha[1] - cfg.socketAlpha[0]) * near) * sea;
+    return out;
+}
+
+/**
+ * The far wrecks in view for a camera whose middle is at world x `cam` on a screen `width` wide:
+ * [{ id, key, x (screen, its middle), size (px long), flip }]. Same for every player.
+ */
+export function farWrecks(cam, width, cfg = SEA_FAR) {
+    const F = cfg.wrecks, b = BIOMES.find(bi => bi.id === F.biome), out = [];
+    if (!b || cam < b.from - width / F.scroll || cam > b.from + b.width + width / F.scroll) return out;
+    for (let i = 0; i * F.every < b.width; i++) {
+        const r = rnd(i * 4111 + 7), at = b.from + (i + 0.2 + r() * 0.6) * F.every;
+        const size = F.size[0] + r() * (F.size[1] - F.size[0]), x = width / 2 + (at - cam) * F.scroll;
+        if (x < -size || x > width + size) continue;
+        out.push({ id: i, key: F.keys[Math.floor(r() * F.keys.length)], x, size, flip: r() < 0.5 });
+    }
     return out;
 }
 

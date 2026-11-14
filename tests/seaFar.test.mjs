@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SEA_FAR, nextIslandX, socketView, passing } from '../game/level/seaFar.js';
+import { SEA_FAR, nextIslandX, socketView, passing, farWrecks } from '../game/level/seaFar.js';
 import { BIOMES } from '../game/level/biomes.js';
 
 const W = 1920, blue = BIOMES.find(b => b.id === 'blue'), kelp = BIOMES.find(b => b.id === 'kelp');
@@ -37,4 +37,12 @@ test('big shapes pass now and then, the same for everyone, within their limits',
         kinds.add(p.kind);
     }
     assert.equal(kinds.size, SEA_FAR.kinds.length);
+});
+
+test('far wrecks show only around the graveyard sea, a few at a time', () => {
+    const b = BIOMES.find(bi => bi.id === 'wreck');
+    let seen = 0;
+    for (let cam = b.from; cam < b.from + b.width; cam += 1500) { const w = farWrecks(cam, 1920); assert.ok(w.length <= 3, `${w.length}`); seen += w.length; }
+    assert.ok(seen > 0);
+    assert.equal(farWrecks(BIOMES[0].from + 5000, 1920).length, 0);
 });
