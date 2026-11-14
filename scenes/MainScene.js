@@ -69,6 +69,9 @@ const WORLD = {
     maxHealth: 5,
     hitStopMs: 70,
     ventLift: 0.0026,     // upward force per unit mass inside a bubble column
+    puffSail: 1.5,        // a puffed fish is big and light: the water pushes it this much harder (spec 5.0d)
+    tumbleAt: 4,          // px/step of breaker push that tumbles the fish (squash, bubbles)
+    tumbleMs: 900,        // at most one tumble per this long
     friendBonus: 5,
     schoolRadius: 420,    // friends (other players) this close swim as a school ...
     schoolBoost: 0.1,     // ... each of up to two makes you this much faster
@@ -623,13 +626,29 @@ export default class MainScene extends Phaser.Scene {
      * (particles cluster, the noise field is not free); flowAt is the hook for the
      * shared flow field later: for now only bubble columns move the water.
      */
+    /**
+     * The water's velocity at (x, y) in px per physics step: currents and swell (flow.js), the
+     * coast's surge and breakers (surf.js), the storm's churned top and the downwelling
+     * (weather.js). One field for the fish, particles and shoals, so everything sways together.
+     */
+    waterAt(x, y, out) {
+        this.flow.at(x, y, this.time.now / 1000, out);
+        if (this.waveT !== this.time.now) { this.waveT = this.time.now; this.waves = this.wavePhase(); }   // once per frame: particles ask often
+        const waves = this.waves, add = this.waterAdd || (this.waterAdd = { x: 0, y: 0 });
+        surgeAt(x, y, waves, add); out.x += add.x; out.y += add.y;
+        breakerAt(x, y, waves, add); out.x += add.x; out.y += add.y;
+        stormAt(x, y, this.time.now / 1000, add); out.x += add.x; out.y += add.y;
+        downAt(x, y, add); out.x += add.x; out.y += add.y;
+        return out;
+    }
+
     particleEnv() {
         const cache = new Map();
         let cacheAt = 0;
         return {
             // Particles want px per second; the field speaks px per physics step.
             flowAt: (x, y, out) => {
-                this.flow.at(x, y, this.time.now / 1000, out);
+                this.waterAt(x, y, out);
                 out.x *= 60; out.y = out.y * 60 + (this.level.liftAt(x, y) ? -170 : 0);
             },
             isSolid: (x, y) => {
@@ -996,19 +1015,20 @@ export default class MainScene extends Phaser.Scene {
         if (lifted) fsp.applyForce({ x: 0, y: -WORLD.ventLift * fsp.body.mass });
         // Currents: the water takes the player up to its own speed and never brakes it,
         // so a stream entered fast is left faster (flow.js).
-        const water = this.flow.at(fsp.x, fsp.y, this.time.now / 1000, this.flowAt);
-        // The coast's own forces ride on top: the surge in the surf zone, the breakers on the reef's edge.
-        const waves = this.wavePhase(), coast = this.coastPush || (this.coastPush = { x: 0, y: 0 });
-        surgeAt(fsp.x, fsp.y, waves, coast); water.x += coast.x; water.y += coast.y;
-        breakerAt(fsp.x, fsp.y, waves, coast); water.x += coast.x; water.y += coast.y;
-        // Open sea: the storm's churned top layer, and the downwelling that pulls deep and lifts again.
-        stormAt(fsp.x, fsp.y, this.time.now / 1000, coast); water.x += coast.x; water.y += coast.y;
-        downAt(fsp.x, fsp.y, coast); water.x += coast.x; water.y += coast.y;
+        const water = this.waterAt(fsp.x, fsp.y, this.flowAt);
+        // A breaking wave tumbles the fish: a squash and a burst of bubbles (spec 5.0d).
+        const br = breakerAt(fsp.x, fsp.y, this.wavePhase(), this.coastPush || (this.coastPush = { x: 0, y: 0 }));
+        if (Math.hypot(br.x, br.y) > WORLD.tumbleAt && this.time.now > (this.tumbleUntil || 0)) {
+            this.tumbleUntil = this.time.now + WORLD.tumbleMs;
+            this.fish.squash = -0.45;
+            this.particles.spawn('bubble', fsp.x, fsp.y, 10, { radius: 16, spread: 50 });
+            play('splash', 0.8);
+        }
         // In the storm the wind takes whatever jumps out of the water back west.
         if (this.fish.inAir) { const gale = stormShare(fsp.x); if (gale > 0) fsp.setVelocity(fsp.body.velocity.x - WEATHER.storm.wind * gale, fsp.body.velocity.y); }
         if (!this.fish.inAir && !this.fish.hold && (water.x || water.y)) {
             const push = carry(water.x, water.y, fsp.body.velocity.x, fsp.body.velocity.y, FLOW, this.flowPush || (this.flowPush = { x: 0, y: 0 }));
-            const sail = this.fish.mode?.flow ?? 1;      // a spread fan catches the current
+            const sail = (this.fish.mode?.flow ?? 1) * (this.fish.posed ? WORLD.puffSail : 1);   // a spread fan or a puffed ball catches the water
             fsp.setVelocity(fsp.body.velocity.x + push.x * sail, fsp.body.velocity.y + push.y * sail);
         }
         // Chain moves: riding a current, and loops flown in the air.
