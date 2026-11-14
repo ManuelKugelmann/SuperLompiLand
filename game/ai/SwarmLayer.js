@@ -22,7 +22,9 @@ export const SWARMS = { perView: 2, inView: [1000, 520], ahead: [1150, 1400],   
     spawnMin: 700, spawnMax: 1300, dropAt: 2800, checkMs: 900, depth: 3.6,
     haze: 0.6,    // how far the farthest fish of a shoal blends into the water colour
     fade: 0.3,    // and how much it fades
-    deepCount: 80 };  // shoals of this many fish or more get the full depth; smaller ones less
+    deepCount: 80,    // shoals of this many fish or more get the full depth; smaller ones less
+    farPad: 450,      // px beyond "in view" from which a shoal counts as out of sight ...
+    farEvery: 3 };    // ... and is then simulated only every so many frames (with the time that passed), its pictures left alone
 
 /** Texture size of one frame (px) for a species. */
 const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (sp.tall ? 1.25 : 0.8)) });
@@ -190,7 +192,13 @@ export default class SwarmLayer {
         const env = { isOpen: this.env.isOpen, flowAt: this.env.flowAt, players };
         this.time = (this.time || 0) + dt;
         for (const s of this.swarms) {
-            s.sim.step(Math.min(dt, 0.05), env);
+            // A shoal out of sight costs a third: it swims on in bigger steps and nothing is drawn of it.
+            const c = s.sim.centre(), far = Math.abs(c.x - cx) > SWARMS.inView[0] + SWARMS.farPad || Math.abs(c.y - cy) > SWARMS.inView[1] + SWARMS.farPad;
+            s.owed = (s.owed || 0) + dt;
+            if (far && (s.skipped = (s.skipped || 0) + 1) % SWARMS.farEvery) continue;
+            s.sim.step(Math.min(s.owed, 0.05), env);
+            s.owed = 0;
+            if (far) continue;
             const { x, y, vx, vy, panic, turn } = s.sim;
             for (let i = 0; i < s.bobs.length; i++) {
                 const b = s.bobs[i], ph = s.phase[i];
