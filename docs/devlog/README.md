@@ -2,6 +2,14 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Light from the sky, caustics on the sand, rainbow fish, a bait ball and a glowing night
+
+[`9ba8bd9`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9ba8bd9) · 2026-11-14 16:10
+
+![A web of caustic light on the lagoon sand, rainbow-spotted Lompi](25-caustics.jpg)
+![Inside a bait ball of silver sardines in the open blue](25-bait-ball.jpg)
+![Night in the open blue: plankton glows in Lompi's wake, glowing jellies drift](25-night-glow.jpg)
+
 ## A world ten times as long: sea arch, small rescues, jelly blooms
 
 [`dea67e2`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/dea67e2) · 2026-11-14 14:28
