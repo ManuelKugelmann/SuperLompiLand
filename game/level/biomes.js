@@ -175,7 +175,7 @@ export function biomeBlendAt(x) {
  * brightness. Every water colour is brought to the same luminance, and laid over the view by the
  * same amount everywhere; depth darkens separately.
  */
-export const WATER_LIGHT = { luma: 150, amount: 0.22, backdrop: 0.85 };   // amount: the scene light (multiplies everything, so gentle); backdrop: how far the biome hue replaces the open-sea blue behind everything
+export const WATER_LIGHT = { luma: 150, amount: 0.22, backdrop: 0.85, deepLuma: 24, deepHue: 0.5 };   // amount: the scene light (multiplies everything, so gentle); backdrop: how far the biome hue replaces the open-sea blue behind everything
 
 /**
  * Each biome's water hue (degrees) and saturation, spread round the wheel so neighbours differ by
