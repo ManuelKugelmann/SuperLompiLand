@@ -628,6 +628,7 @@ export default class MainScene extends Phaser.Scene {
             this.vignette.setDisplaySize(W, H);
             for (const o of this.backdrop.made) o.destroy();
             this.backdrop.seaFar.snowLayer?.destroy();      // made later, on first use
+            for (const o of this.backdrop.sky.pool) o.destroy();      // and so are the sky's pooled pictures
             this.backdrop = this.made(() => new Backdrop(this, LEVEL.maxDepth));
             this.farLayers.destroy(); this.farLayers = new FarLayers(this);
             this.waterLight.destroy(); this.waterLight = new WaterLight(this);

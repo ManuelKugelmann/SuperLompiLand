@@ -135,18 +135,16 @@ export default class SkyLayer {
         // The plume first, so the mountain stands in front of its foot.
         this.smoke = Array.from({ length: SKY.smoke }, () => img('sky_cloud1', -28.9).setTint(0x6d6470));
         this.volcano = img('sky_volcano', -28.8).setOrigin(0.5, 1).setAlpha(SKY.haze);
-        this.items = skyItems().map(item => {
-            const o = img(`sky_${item.kind}`, -28.7 + item.scroll).setOrigin(0.5, 1).setScale(item.size).setAlpha(SKY.haze * (0.75 + item.scroll * 1.5));
-            o.item = item;
-            return o;
-        });
-        // The island's own coast close by, in front of the far shapes (painted only: no drawn fallback).
-        for (const item of nearCoastItems()) {
-            if (!scene.textures.exists(`sky_${item.kind}`)) continue;
-            const o = img(`sky_${item.kind}`, -28.0).setOrigin(0.5, 1).setScale(item.size).setFlipX(item.flip).setAlpha(0.97);
-            o.item = item;
-            this.items.push(o);
-        }
+        // The far shapes on the horizon and the islands' own coasts close by (painted only: no drawn
+        // fallback): well over a hundred along the whole journey, a handful in view at a time. They
+        // are a list of what stands where; the few in view are shown with pictures from a small pool.
+        this.items = [
+            ...skyItems().map(item => ({ item, key: `sky_${item.kind}`, depth: -28.7 + item.scroll, alpha: SKY.haze * (0.75 + item.scroll * 1.5), flip: false })),
+            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.0, alpha: 0.97, flip: item.flip }))
+        ];
+        for (const d of this.items) d.half = scene.textures.getFrame(d.key).width * d.item.size / 2;
+        this.pool = [];      // pictures for the items in view, made as needed
+        this.make = img;
         this.birds = Array.from({ length: SKY.birds }, (_, i) => {
             const b = img('sky_bird', -28.5).setAlpha(0.7);
             b.ox = i * 70 + (i % 2) * 30; b.oy = (i % 3) * 34 - (i % 2) * 22; b.phase = i * 1.7;
@@ -166,10 +164,16 @@ export default class SkyLayer {
             const sx = ((c.wx + t * SKY.cloudDrift - camX * SKY.cloudScroll) % span + span) % span - 350;
             c.setVisible(show).setX(sx);
         }
-        for (const o of this.items) {
-            const sx = screenX(o.item, cam, W);
-            o.setVisible(show && onScreen(sx, o.displayWidth / 2, W)).setPosition(sx, SKY.baseY);
+        let used = 0;
+        if (show) for (const d of this.items) {
+            const sx = screenX(d.item, cam, W);
+            if (!onScreen(sx, d.half, W)) continue;
+            const o = this.pool[used] || (this.pool[used] = this.make(d.key, d.depth));
+            used++;
+            if (o.shows !== d) { o.shows = d; o.setTexture(d.key).setOrigin(0.5, 1).setScale(d.item.size).setFlipX(d.flip).setAlpha(d.alpha).setDepth(d.depth); }
+            o.setVisible(true).setPosition(sx, SKY.baseY);
         }
+        for (let i = used; i < this.pool.length; i++) this.pool[i].setVisible(false);
         const v = volcanoAt(cam, W);
         this.volcano.setVisible(show).setPosition(v.x, SKY.baseY).setScale(v.size);
         const top = SKY.baseY - this.volcano.displayHeight * 0.86;
