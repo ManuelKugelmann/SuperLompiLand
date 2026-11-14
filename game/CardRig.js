@@ -1,6 +1,7 @@
 import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
+import RigEyes from './rig/RigEyes.js';
 import { CHARACTERS } from './characters.js';
 import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
 
@@ -112,7 +113,24 @@ export default class CardRig {
         const view = new CardView(scene, st.key, R.size, st.width / W);
         view.wiggle = st.wiggle;
         this.views[Object.keys(this.char.states).find(k => this.char.states[k] === st)] = view;
-        return { entries, poseOrder, size: R.size, view };
+        const set = { entries, poseOrder, size: R.size, view };
+        if (st.eyes) {
+            // Living eyes (rig/RigEyes.js), each riding the body vertex nearest to it.
+            const body = entries.find(e => e.body), c = body.card;
+            set.eyes = new RigEyes(scene, st.eyes, (this.char.id || st.key).length + Object.keys(this.sets).length);
+            set.eyeAt = st.eyes.at.map(a => {
+                const ex = a.x - W / 2, ey = a.y - H / 2;
+                let best = 0, d = Infinity;
+                for (let s = 0; s < c.strip.length; s++) {
+                    const i = c.strip[s], dd = (c.pivot[0] + c.lx[i] - ex) ** 2 + (c.pivot[1] + c.ly[i] - ey) ** 2;
+                    if (dd < d) { d = dd; best = s; }
+                }
+                const i = c.strip[best];
+                return { s: best, dx: ex - (c.pivot[0] + c.lx[i]), dy: ey - (c.pivot[1] + c.ly[i]) };
+            });
+            set.bodyEntry = body;
+        }
+        return set;
     }
 
     /** Switch the look (e.g. 'inflated'); unknown states fall back to 'normal'. */
@@ -121,13 +139,14 @@ export default class CardRig {
         this.state = this.sets[name] ? name : 'normal';
         this.view = this.views[this.state];
         if (old !== this.view) { this.view.x = old.x; this.view.y = old.y; this.view.alpha = old.alpha; }
-        for (const [k, set] of Object.entries(this.sets)) for (const e of set.entries) e.rope.setVisible(this.shown && k === this.state && e.drawn);
+        for (const [k, set] of Object.entries(this.sets)) { for (const e of set.entries) e.rope.setVisible(this.shown && k === this.state && e.drawn); if (k !== this.state) set.eyes?.hide(); }
         return this;
     }
 
     setVisible(on) {
         this.shown = on;
         for (const e of this.sets[this.state].entries) e.rope.setVisible(on && e.drawn);
+        if (!on) this.sets[this.state].eyes?.hide();
         return this;
     }
 
@@ -141,7 +160,10 @@ export default class CardRig {
 
     setDepth(d) {
         this.depth = d;
-        for (const set of Object.values(this.sets)) set.entries.forEach((e, i) => e.rope.setDepth(d + i * 0.001));
+        for (const set of Object.values(this.sets)) {
+            set.entries.forEach((e, i) => e.rope.setDepth(d + i * 0.001));
+            set.eyes?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 + 0.0005);      // on the body, under the fins in front
+        }
         return this;
     }
 
@@ -154,6 +176,7 @@ export default class CardRig {
         const wv = this.cam.worldView, reach = Math.max(W, H) * view.baseScale * this.zoom + CARDS.offView;
         if (!this.turning && (x < wv.x - reach || x > wv.right + reach || y < wv.y - reach || y > wv.bottom + reach)) {
             for (const e of set.entries) e.rope.setPosition(x, y);
+            set.eyes?.hide();
             return;
         }
         const speed = Math.hypot(vx, vy);
@@ -263,10 +286,26 @@ export default class CardRig {
             e.drawn = true;
             r.setVisible(this.shown);
         }
+        if (set.eyes) {
+            if (!this.shown) set.eyes.hide();
+            else {
+                // Each eye rides its body vertex (projected just now), offset by its distance from it.
+                const verts = set.bodyEntry.rope.vertices, cr = Math.cos(rotation), sr = Math.sin(rotation);
+                const place = (a, out) => {
+                    const k = set.eyeAt[set.eyes.spec.at.indexOf(a)], ox = k.dx * sx * flip, oy = k.dy * sy;
+                    out.x = x + verts[k.s * 2] + ox * cr - oy * sr; out.y = y + verts[k.s * 2 + 1] + ox * sr + oy * cr; out.s = sc;
+                };
+                const look = this.look || { x: x + flip * 400 + vx * 30, y: y + vy * 30 };
+                set.eyes.update(place, { rotation, facing: flip, alpha: view.alpha, edge: Math.abs(Math.cos(yaw)) }, look, frames / 60, { scared: this.scared || 0 });
+            }
+        }
     }
 
+    /** Where the eyes look (a world point; null: ahead), and how frightened they are (0..1). */
+    lookAt(point, scared = 0) { this.look = point; this.scared = scared; return this; }
+
     destroy() {
-        for (const set of Object.values(this.sets)) for (const e of set.entries) e.rope.destroy();
+        for (const set of Object.values(this.sets)) { for (const e of set.entries) e.rope.destroy(); set.eyes?.destroy(); }
     }
 }
 

@@ -87,3 +87,13 @@ test('shape difference: the same ratio is 0, an address bar is a little, a resha
     assert.ok(shapeOff(1920, 1080, 1000, 1000) > 0.5);
     assert.ok(Math.abs(shapeOff(1600, 900, 900, 1600) - shapeOff(900, 1600, 1600, 900)) < 1e-12);
 });
+
+test('eye spots lie inside their pictures', async () => {
+    const { readFileSync } = await import('node:fs');
+    const rig = JSON.parse(readFileSync(new URL('../public/img/parts/rig.json', import.meta.url)));
+    for (const c of CHARACTERS) for (const st of Object.values(c.states)) {
+        if (!st.eyes) continue;
+        const [W, H] = rig[st.key].size;
+        for (const e of st.eyes.at) assert.ok(e.x - e.rx >= 0 && e.x + e.rx <= W && e.y - e.ry >= 0 && e.y + e.ry <= H, `${c.id} ${st.key}`);
+    }
+});
