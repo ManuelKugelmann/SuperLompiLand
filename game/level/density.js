@@ -31,7 +31,8 @@ export const ROUTE = {
     ease: 5, easeStep: 280,   // the cruise depth is averaged over this many steps of this size to either side
     aboveNest: 240,     // it passes this far above every nest
     descent: 1.6,       // px along the way per px of depth when it dips to a nest (gentle slopes)
-    clear: 420          // hazards stay at least this far from its middle
+    clear: 420,         // hazards stay at least this far from its middle
+    grid: 32            // px: its depth is worked out every so many px and joined by straight pieces
 };
 
 /**
@@ -65,33 +66,62 @@ const CREST_X = reefCrestX(), CREST_REACH = REEF_CREST.inset + REEF_CREST.half +
 export function createField(seed) {
     let nests = null;
 
-    /** Height of the calm route's middle at world x. */
-    const routeCache = new Map();     // grids ask for the same columns again and again
-    const routeY = x => {
-        let y = routeCache.get(x);
+    /**
+     * Height of the calm route's middle at world x. Worked out on a grid of x and joined by
+     * straight pieces: it is asked for at every rock sample and by every creature, each at its
+     * own x, and it changes slowly.
+     */
+    const routeGrid = new Map();
+    const routeAt = i => {
+        let y = routeGrid.get(i);
         if (y !== undefined) return y;
+        const x = i * ROUTE.grid;
         y = cruiseY(x);
         for (const nest of nests) {
             const dx = Math.abs(x - nest.x);
             if (dx < nest.reach) y += (nest.y - ROUTE.aboveNest - y) * smooth01(1 - dx / nest.reach);
         }
-        if (routeCache.size > 8192) routeCache.clear();
-        routeCache.set(x, y);
+        if (routeGrid.size > 16384) routeGrid.clear();
+        routeGrid.set(i, y);
         return y;
+    };
+    const routeY = x => {
+        const f = x / ROUTE.grid, i = Math.floor(f), y0 = routeAt(i);
+        return f === i ? y0 : y0 + (routeAt(i + 1) - y0) * (f - i);
+    };
+
+    // What depends on x alone (seabed depth, how open the biome is, how much open sea): worked
+    // out on a grid of x and joined by straight pieces, like the route. Every rock sample, every
+    // creature and every shoal fish asks for it.
+    const colGrid = new Map(), COL = { fy: 0, open: 0, sea: 0 };
+    const colAtGrid = i => {
+        let c = colGrid.get(i);
+        if (c) return c;
+        const x = i * ROUTE.grid, { a, b, t } = biomeBlendAt(x);
+        c = { fy: floorY(x), open: a.open + (b.open - a.open) * t, sea: seaShare(x) };
+        if (colGrid.size > 16384) colGrid.clear();
+        colGrid.set(i, c);
+        return c;
+    };
+    const columnAt = x => {
+        const f = x / ROUTE.grid, i = Math.floor(f), k = f - i, c0 = colAtGrid(i);
+        if (k === 0) return c0;
+        const c1 = colAtGrid(i + 1);
+        COL.fy = c0.fy + (c1.fy - c0.fy) * k; COL.open = c0.open + (c1.open - c0.open) * k; COL.sea = c0.sea + (c1.sea - c0.sea) * k;
+        return COL;
     };
 
     const density = (x, y, withNests = true) => {
         // Two broad octaves only: big soft blobs and winding passages, no jagged detail.
         let n = 0.72 * vnoise(x / 1000, y / 1000, seed) + 0.28 * vnoise(x / 420, y / 420, seed + 7);
-        const { a, b, t } = biomeBlendAt(x);
-        n -= a.open + (b.open - a.open) * t;                             // beach / open sea have less rock
+        const col = columnAt(x), fy = col.fy;
+        n -= col.open;                                                   // beach / open sea have less rock
         if (y < 520) n -= ((520 - y) / 520) * 0.6;                       // open water under the surface
-        const fy = floorY(x);
         if (y > fy) n += (y - fy) / 380;                                 // the seabed
         else {
             // Open sea: clear water from the surface down to just above the bottom. Rock that
             // hangs in mid-water belongs to the islands' flanks only (spec 5.0c).
-            const sea = seaShare(x);
+            const sea = col.sea;
             if (sea > 0) n -= FIELD.seaClear * sea * Math.min(1, (fy - y) / FIELD.seaBottom);
         }
         // Keep the abyss shaft swimmable all the way down.

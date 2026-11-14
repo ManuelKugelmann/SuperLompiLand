@@ -94,3 +94,9 @@ export function weatherNear(x, range) {
     const { x0, x1 } = stormSpan(), { down, up } = downwelling();
     return (x > x0 - range && x < x1 + range) || (x > down - range && x < up + range);
 }
+
+/** The stretches of the world (x) in which the storm and the downwelling can act at all: { storm: [x0, x1], down: [x0, x1] }. */
+export function weatherZones() {
+    const { x0, x1 } = stormSpan(), { down, up } = downwelling();
+    return { storm: [x0, x1], down: [down - WEATHER.down.halfWidth, up + WEATHER.down.halfWidth] };
+}

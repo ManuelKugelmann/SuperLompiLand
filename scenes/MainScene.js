@@ -29,9 +29,9 @@ import { createBook } from '../game/reefbook.js';
 import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
 import { createPerfTour, perfReport } from '../game/perfTour.js';
-import { surgeAt, breakerAt, ripAt } from '../game/level/surf.js';
+import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
-import { WEATHER, stormShare, stormAt, downAt, weatherNear } from '../game/level/weather.js';
+import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
@@ -682,11 +682,16 @@ export default class MainScene extends Phaser.Scene {
         this.flow.at(x, y, this.time.now / 1000, out);
         if (this.waveT !== this.time.now) { this.waveT = this.time.now; this.waves = this.wavePhase(); }   // once per frame: particles ask often
         const waves = this.waves, add = this.waterAdd || (this.waterAdd = { x: 0, y: 0 });
-        surgeAt(x, y, waves, add); out.x += add.x; out.y += add.y;
-        breakerAt(x, y, waves, add); out.x += add.x; out.y += add.y;
-        ripAt(x, y, waves, REEF_CREST.passY, add); out.x += add.x;      // the drawback runs out through the reef pass
-        stormAt(x, y, this.time.now / 1000, add); out.x += add.x; out.y += add.y;
-        downAt(x, y, add); out.x += add.x; out.y += add.y;
+        // Asked hundreds of times a frame (every shoal fish, every particle): each force is only
+        // looked at inside its own stretch of the world.
+        const z = this.waterZones || (this.waterZones = { ...surfZones(), ...weatherZones() });
+        if (x < z.surge[1]) { surgeAt(x, y, waves, add); out.x += add.x; out.y += add.y; }
+        if (x > z.reef[0] && x < z.reef[1]) {
+            breakerAt(x, y, waves, add); out.x += add.x; out.y += add.y;
+            ripAt(x, y, waves, REEF_CREST.passY, add); out.x += add.x;      // the drawback runs out through the reef pass
+        }
+        if (x > z.storm[0] && x < z.storm[1]) { stormAt(x, y, this.time.now / 1000, add); out.x += add.x; out.y += add.y; }
+        if (x > z.down[0] && x < z.down[1]) { downAt(x, y, add); out.x += add.x; out.y += add.y; }
         return out;
     }
 

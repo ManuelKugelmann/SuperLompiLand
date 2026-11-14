@@ -115,3 +115,9 @@ export function ripAt(x, y, phase, passY, out = { x: 0, y: 0 }, cfg = SURF.break
     out.x = cfg.rip * breakerState(phase, STATE, cfg).drawback * k;
     return out;
 }
+
+/** The stretches of the world (x) in which the surge and the breakers (with the rip) can act at all: { surge: [x0, x1], reef: [x0, x1] }. */
+export function surfZones() {
+    const c = reefCrestX();
+    return { surge: [-Infinity, surfEast(SURF.surge)], reef: [c - SURF.breaker.reach - REEF_CREST.half - REEF_CREST.ramp, c + SURF.breaker.lead + REEF_CREST.half + REEF_CREST.ramp] };
+}

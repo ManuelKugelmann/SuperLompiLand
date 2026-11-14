@@ -64,6 +64,8 @@ export function streamY(s, x) {
  * @param isOpen optional: (x, y) -> open water? An eddy only exists where its whole ring is
  *               in open water and clear of the calm route.
  */
+const CALM_STEP = 40;      // px: grid on which the calm route's depth is looked up
+
 export function createFlow(seed, cfg = FLOW, calmY = null, isOpen = null) {
     const slots = new Map();
     const slot = i => { if (!slots.has(i)) slots.set(i, streamInSlot(i, seed, cfg)); return slots.get(i); };
@@ -81,7 +83,9 @@ export function createFlow(seed, cfg = FLOW, calmY = null, isOpen = null) {
     // How much pull is left at (x, y): none inside the calm route, all of it away from it.
     const pull = (x, y) => {
         if (!calmY) return 1;
-        const k = Math.min(1, Math.max(0, (Math.abs(y - calmY(x)) - cfg.calm[0]) / (cfg.calm[1] - cfg.calm[0])));
+        // The route's depth is asked for on a coarse grid of x: it changes slowly, and this is asked
+        // for every shoal fish and particle in a stream, each at its own x.
+        const k = Math.min(1, Math.max(0, (Math.abs(y - calmY(Math.round(x / CALM_STEP) * CALM_STEP)) - cfg.calm[0]) / (cfg.calm[1] - cfg.calm[0])));
         return k * k * (3 - 2 * k);
     };
 
