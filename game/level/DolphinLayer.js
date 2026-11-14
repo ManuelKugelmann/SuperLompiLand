@@ -1,3 +1,4 @@
+import { play } from '../audio.js';
 import { DOLPHIN_RINGS, dolphinSpot, dolphinAt, blowRing, stepRing, ringRadius, throughRing } from './dolphinRings.js';
 
 /**
@@ -82,6 +83,7 @@ export default class DolphinLayer {
         if (v.blowAt <= 0 && v.rings.length < DOLPHIN_RINGS.max) {
             v.blowAt = DOLPHIN_RINGS.every;
             const r = blowRing(ds[v.turn]); v.turn = 1 - v.turn;
+            if (Math.abs(r.x - fish.x) < 1100 && Math.abs(r.y - fish.y) < 700) play('whistle');
             r.img = this.scene.add.image(r.x, r.y, RING).setDepth(L.ringDepth).setAlpha(0);
             v.rings.push(r);
         }
@@ -92,6 +94,7 @@ export default class DolphinLayer {
             r.img.setPosition(r.x, r.y + Math.sin(t * 3 + r.x * 0.01) * 4).setDisplaySize(rad, rad * 2).setAlpha(L.ringAlpha * Math.max(0, fade));
             if (alive && throughRing(r, prev, fish)) {
                 this.scene.particles.spawn('bubble', r.x, r.y, 14, { radius: rad * 0.8, spread: 90 });
+                play('ringPop');
                 this.onRing(r.x, r.y);
                 r.img.destroy();
                 return false;

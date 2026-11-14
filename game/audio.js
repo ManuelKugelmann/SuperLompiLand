@@ -197,6 +197,30 @@ const SOUNDS = {
         src.connect(g).connect(master);
         src.start();
     },
+    // A dolphin whistles as it blows a ring (spec 5.0k): a quick rising-falling chirp, pitched down to stay sweet.
+    whistle() {
+        // Two quick chirps that bend up and back (a long sweep reads as a siren): a fast flutter and some breath.
+        const f0 = 2200 + Math.random() * 400;
+        [[0, 1], [0.21, 1.12]].forEach(([at, k]) => {
+            const t = ctx.currentTime + at, f = f0 * k, dur = 0.17;
+            const o = ctx.createOscillator(), lfo = ctx.createOscillator(), depth = ctx.createGain(), g = ctx.createGain();
+            o.frequency.setValueAtTime(f, t);
+            o.frequency.exponentialRampToValueAtTime(f * 1.32, t + dur * 0.55);
+            o.frequency.exponentialRampToValueAtTime(f * 1.12, t + dur);
+            lfo.frequency.value = 24; depth.gain.value = f * 0.025;
+            lfo.connect(depth).connect(o.frequency);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.045, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            o.connect(g).connect(master);
+            for (const n of [o, lfo]) { n.start(t); n.stop(t + dur + 0.05); }
+            noise({ at, dur, vol: 0.012, from: f * 1.1, to: f * 1.3, q: 5 });
+        });
+    },
+    // Swimming through a bubble ring: a soft round pop with a bright tail.
+    ringPop() { tone({ f: 520, to: 1500, type: 'sine', dur: 0.09, vol: 0.08 }); noise({ dur: 0.08, vol: 0.03, from: 2600, to: 1200, q: 1.2 }); },
+    // An octopus squirts ink: a short, soft whoosh.
+    ink() { noise({ dur: 0.35, vol: 0.06, from: 900, to: 300, q: 0.6 }); },
     // A seabird calls before it dives (spec 5.0d): two harsh, falling croaks.
     cry() { [0, 0.16].forEach((at, i) => { tone({ f: 980 - i * 120, to: 620 - i * 80, type: 'sawtooth', dur: 0.13, vol: 0.07, at }); noise({ dur: 0.12, vol: 0.05, from: 1800, to: 900, q: 2, at }); }); },
     splash(strength = 1) {

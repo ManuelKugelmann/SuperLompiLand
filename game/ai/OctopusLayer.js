@@ -1,3 +1,4 @@
+import { play } from '../audio.js';
 import { OCTOPUS, createOctopus, stepOctopus } from './octopus.js';
 
 /**
@@ -70,6 +71,7 @@ export default class OctopusLayer {
         const ev = stepOctopus(o, dt, dist < OCTOPUS.shy * 1.5 ? { dx: fish.x - o.x, dist, speed } : null);
         if (ev === 'ink') {
             this.scene.particles.spawn('ink', o.x, ground - 70, 10, { radius: 40, spread: 60 });
+            play('ink');
         } else if (ev === 'friend') {
             for (let k = 0; k < OCTOPUS.gift; k++) {
                 const x = o.x + (k - 1) * 90, y = ground - 220 - (k % 2) * 50;
