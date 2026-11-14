@@ -8,7 +8,8 @@ export const BREATH = {
     recover: 0.35,                // how fast the breath calms down again (per second)
     tire: 1.6,                    // how fast exertion drives it up (per second)
     mouthRest: 0.35, mouthMax: 1, // how far the mouth opens per cycle
-    blubEvery: [3, 6]             // cycles between two bubbles
+    blubEvery: [3, 6],            // cycles between two bubbles
+    swell: 0.014                  // how much a rig's body swells with each breath (CardRig, Rig)
 };
 
 export class Breath {

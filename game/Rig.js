@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { CHARACTERS } from './characters.js';
 import { softnessMap, SoftHalo } from './rig/soft.js';
 import { CARDS, makeSpine, spineTable, spineAt } from './rig/cards.js';
+import RigEyes from './rig/RigEyes.js';
+import { faceOf } from './rig/faces.js';
+import { Breath, BREATH } from './rig/breath.js';
 
 /** Tunables of the body animation shared by every playable (local, remote, title screen). */
 export const RIG = {
@@ -83,6 +86,8 @@ export default class Rig {
         this.zoom = 1;          // extra scale on top of the character's size
         this.shown = true;
         this.views = {};
+        this.scene = scene;
+        this.breath = new Breath((character.id || character.states.normal?.key || '').length * 7 + 5);     // breathing (rig/breath.js), as the card rigs
         for (const [name, st] of Object.entries(character.states)) {
             const key = scene.textures.exists(st.key) ? st.key : DEFAULT_STATES.normal.key;
             // With the layered art (body without side fin + the fin on its own)
@@ -96,6 +101,9 @@ export default class Rig {
             view.baseScale = st.width / view.frame.width;
             view.wiggle = st.wiggle;
             view.grid = makeGrid(view, softFor(scene, key));
+            // Living eyes and the mouth (rig/faces.js): only with the painted picture they were measured on.
+            view.face = key === st.key ? faceOf(st) : null;
+            if (view.face?.eyes) view.eyes = new RigEyes(scene, view.face.eyes, key.length + 3).setDepth(depth + 0.05);
             if (layered) {
                 const fin = scene.add.image(x, y, `${key}_fin`).setDepth(depth + 0.1).setVisible(false);
                 fin.setOrigin((pivot.pivotX - pivot.finX) / fin.width, (pivot.pivotY - pivot.finY) / fin.height);
@@ -118,7 +126,7 @@ export default class Rig {
         this.state = this.views[name] ? name : 'normal';
         this.view = this.views[this.state];
         this.view.setPosition(old.x, old.y).setRotation(old.rotation).setAlpha(old.alpha).setVisible(this.shown);
-        if (old !== this.view) { old.setVisible(false); old.fin?.setVisible(false); this.view.grid.halo.fresh = true; }
+        if (old !== this.view) { old.setVisible(false); old.fin?.setVisible(false); old.eyes?.hide(); this.view.grid.halo.fresh = true; }
         this.view.fin?.setVisible(this.shown);
     }
 
@@ -127,13 +135,14 @@ export default class Rig {
         this.view.setVisible(on);
         this.view.fin?.setVisible(on);
         this.overlay?.setVisible(on);
+        if (!on) this.view.eyes?.hide();
         return this;
     }
 
     setAlpha(a) { this.view.setAlpha(a); return this; }
 
     setDepth(d) {
-        for (const v of Object.values(this.views)) { v.setDepth(d); v.fin?.setDepth(d + 0.1); }
+        for (const v of Object.values(this.views)) { v.setDepth(d); v.fin?.setDepth(d + 0.1); v.eyes?.setDepth(d + 0.05); }
         return this;
     }
 
@@ -190,6 +199,9 @@ export default class Rig {
         this.spinePh += step * this.spine.rate;
         const ph = this.phase, amp = view.wiggle * (RIG.idle + drive * (1 - RIG.idle)), w = view.frame.width;
         const style = this.char.anim || 'swim';
+        // Breathing: always; the body swells a little with each breath.
+        const br = this.breath.update(frames / 60, raw), swell = BREATH.swell * (br.gill - 0.3);
+        scaleX *= 1 - swell * 0.4; scaleY *= 1 + swell;
         let bend;
         if (style === 'pulse') {
             // Jellyfish: the bell pumps (harder when swimming), the tentacles trail
@@ -302,6 +314,23 @@ export default class Rig {
             fin.setAlpha(view.alpha);
         }
 
+        // Eyes and mouth ride the bent picture where they are painted.
+        const face = view.face;
+        if (face) {
+            const w = view.frame.width, h = view.frame.height;
+            const place = (a, o) => {
+                bend(a.x / w, a.y / h, out);
+                const lx = (a.x - w / 2 + out.x) * scaleX, ly = (a.y - h / 2 + out.y) * scaleY;
+                o.x = x + lx * cos - ly * sin; o.y = y + lx * sin + ly * cos; o.s = Math.abs(scaleY);
+            };
+            if (view.eyes) {
+                if (!this.shown) view.eyes.hide();
+                // Mirrored upside down when heading left (see above): seen upright, that is a left-facing eye.
+                else view.eyes.update(place, { rotation: flip < 0 ? rotation - Math.PI : rotation, facing: flip, alpha: view.alpha, edge: 1 }, this.look || { x: x + flip * 400 + vx * 30, y: y + vy * 30 }, frames / 60, { scared: this.scared || 0 });
+            }
+            if (br.blub && face.mouth && this.shown && y > 0) { place(face.mouth, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); }
+        }
+
         const over = this.overlay;
         if (over) {
             over.setPosition(x, y).setScale(scaleX, scaleY);
@@ -314,6 +343,9 @@ export default class Rig {
      * A second copy of the picture that lies exactly on the body and bends with it (a sheen,
      * a glow). The caller sets blend mode, colours and alpha; it follows the 'normal' look.
      */
+    /** Where the eyes look (a world point; null: ahead), and how frightened they are (0..1). */
+    lookAt(point, scared = 0) { this.look = point; this.scared = scared; return this; }
+
     addOverlay(scene, depth) {
         const v = this.views.normal;
         const over = scene.add.rope(v.x, v.y, v.texture.key, null, STRIP.length / 2, true).setDepth(depth);
@@ -324,12 +356,12 @@ export default class Rig {
     }
 
     destroy() {
-        for (const v of Object.values(this.views)) { v.fin?.destroy(); v.destroy(); }
+        for (const v of Object.values(this.views)) { v.fin?.destroy(); v.eyes?.destroy(); v.destroy(); }
         this.overlay?.destroy();
     }
 }
 
-const TMP = { x: 0, y: 0 }, SPINE = { z: 0, a: 0, dx: 0 };
+const TMP = { x: 0, y: 0 }, SPINE = { z: 0, a: 0, dx: 0 }, MOUTH = { x: 0, y: 0, s: 1 };
 const still = (u, v, out) => { out.x = 0; out.y = 0; };
 
 /** Everything about one picture's grid that never changes: places, texture coordinates, soft weights, rays. */

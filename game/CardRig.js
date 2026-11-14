@@ -2,10 +2,8 @@ import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import RigEyes from './rig/RigEyes.js';
-import { Breath } from './rig/breath.js';
-
-/** Breathing (rig/breath.js): how much the body swells with each breath, and the bubble let go every few breaths. */
-export const RIG_BREATH = { swell: 0.014, bubble: 'bubble' };
+import { faceOf } from './rig/faces.js';
+import { Breath, BREATH } from './rig/breath.js';
 import { CHARACTERS } from './characters.js';
 import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
 
@@ -133,12 +131,13 @@ export default class CardRig {
             return { s: best, dx: ex - (c.pivot[0] + c.lx[i]), dy: ey - (c.pivot[1] + c.ly[i]) };
         };
         set.bodyEntry = body;
-        if (st.eyes) {
+        const face = faceOf(st);
+        if (face?.eyes) {
             // Living eyes (rig/RigEyes.js).
-            set.eyes = new RigEyes(scene, st.eyes, (this.char.id || st.key).length + Object.keys(this.sets).length);
-            set.eyeAt = st.eyes.at.map(anchor);
+            set.eyes = new RigEyes(scene, face.eyes, (this.char.id || st.key).length + Object.keys(this.sets).length);
+            set.eyeAt = face.eyes.at.map(anchor);
         }
-        if (st.mouth) set.mouthAt = anchor(st.mouth);
+        if (face?.mouth) set.mouthAt = anchor(face.mouth);
         return set;
     }
 
@@ -213,7 +212,7 @@ export default class CardRig {
         this.spinePh += step * this.spine.rate;
         const ph = this.phase, sq = Phaser.Math.Clamp(squash, -0.35, 0.35), sc = view.baseScale * this.zoom;
         // Breathing: always, slow at rest and quicker after effort; the body swells a little with each breath.
-        const br = this.breath.update(frames / 60, raw), swell = RIG_BREATH.swell * (br.gill - 0.3);
+        const br = this.breath.update(frames / 60, raw), swell = BREATH.swell * (br.gill - 0.3);
         let sx = sc * (1 + sq - swell * 0.4), sy = sc * (1 - sq + swell), rotation = Phaser.Math.Angle.Wrap(this.angle - level) + lean;
         // Steering shows in the body (user: 'creatures should bend tail fin or body when steering'): while the
         // nose turns, the tail lags behind and the body curves into the turn; it straightens when the turn ends.
@@ -303,7 +302,7 @@ export default class CardRig {
             const ox = k.dx * sx * flip, oy = k.dy * sy;
             out.x = x + verts[k.s * 2] + ox * cr - oy * sr; out.y = y + verts[k.s * 2 + 1] + ox * sr + oy * cr; out.s = sc;
         };
-        if (br.blub && set.mouthAt && this.shown && spread < 0.5) { pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn(RIG_BREATH.bubble, MOUTH.x, MOUTH.y, 1); }
+        if (br.blub && set.mouthAt && this.shown && spread < 0.5) { pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); }
         if (set.eyes) {
             if (!this.shown) set.eyes.hide();
             else {

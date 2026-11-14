@@ -88,12 +88,15 @@ test('shape difference: the same ratio is 0, an address bar is a little, a resha
     assert.ok(Math.abs(shapeOff(1600, 900, 900, 1600) - shapeOff(900, 1600, 1600, 900)) < 1e-12);
 });
 
-test('eye spots lie inside their pictures', async () => {
+test('face spots lie inside their pictures', async () => {
     const { readFileSync } = await import('node:fs');
+    const { FACES } = await import('../game/rig/faces.js');
     const rig = JSON.parse(readFileSync(new URL('../public/img/parts/rig.json', import.meta.url)));
-    for (const c of CHARACTERS) for (const st of Object.values(c.states)) {
-        if (!st.eyes) continue;
-        const [W, H] = rig[st.key].size;
-        for (const e of st.eyes.at) assert.ok(e.x - e.rx >= 0 && e.x + e.rx <= W && e.y - e.ry >= 0 && e.y + e.ry <= H, `${c.id} ${st.key}`);
+    for (const [key, f] of Object.entries(FACES)) {
+        const size = rig[key]?.size;
+        if (!size) continue;           // a picture without part cards: checked by eye in the viewer
+        const [W, H] = size;
+        for (const e of f.eyes?.at || []) assert.ok(e.x - e.rx >= 0 && e.x + e.rx <= W && e.y - e.ry >= 0 && e.y + e.ry <= H, key);
+        if (f.mouth) assert.ok(f.mouth.x >= 0 && f.mouth.x <= W && f.mouth.y >= 0 && f.mouth.y <= H, key);
     }
 });
