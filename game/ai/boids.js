@@ -80,9 +80,10 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
 
         /**
          * Advance by dt seconds. env: isOpen(x, y), flowAt(x, y, out) in px/s,
-         * player {x, y, vx, vy} in px/s (all optional).
+         * player {x, y, vx, vy} in px/s (all optional). Every fish moves in every step;
+         * `thinkEvery` = each fish decides every this many steps (the fish taking turns).
          */
-        step(dt, env = {}) {
+        step(dt, env = {}, thinkEvery = P.thinkEvery) {
             const W = P.weights;
             // Players: the local fish and, in a room, its friends (`players`), or one `player`.
             const players = env.players || (env.player ? [env.player] : []);
@@ -111,7 +112,7 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
 
             buildGrid();
             tick++;
-            const think = Math.max(1, P.thinkEvery | 0), decay = Math.exp(-P.panicDecay * dt * think);
+            const think = Math.max(1, thinkEvery | 0), decay = Math.exp(-P.panicDecay * dt * think);
             for (let i = 0; i < n; i++) {
                 let fx = pullX[i], fy = pullY[i];
                 if ((i + tick) % think === 0) {

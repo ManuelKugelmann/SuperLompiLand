@@ -63,7 +63,7 @@ import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
-import { VIEW_CULL, cullToView } from '../game/viewCull.js';
+import { cullToView } from '../game/viewCull.js';
 import { due, everyOf } from '../game/throttle.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
 import FriendSchool from '../game/FriendSchool.js';
@@ -1323,9 +1323,23 @@ export default class MainScene extends Phaser.Scene {
     /** Coins hop on the music's beat, all together (spec ch.12, music-synced world). */
     /**
      * The player is never hidden (spec 10.10a): foreground objects (FOREGROUND depth band)
-     * fade while Lompi or a friend overlaps them, and come back when clear.
+     * fade while Lompi or a friend overlaps them, and come back when clear. Which of them cover a
+     * player is found out every few frames (`scan`, throttle.js); the fading itself runs every frame,
+     * over those few only.
      */
-    revealPlayers(dt, view) {
+    revealPlayers(dt, view, scan) {
+        const fading = this.fgFading || (this.fgFading = []);
+        if (scan) this.findCovering(view, fading);
+        for (const o of fading) {
+            if (!o.active) continue;
+            o.fgAlpha = fadeStep(o.fgAlpha, o.fgBase, o.fgCover, dt);
+            o.setAlpha(o.fgAlpha);
+        }
+    }
+
+    /** Fills `fading` with the foreground objects that cover a player now or have not faded back in yet. */
+    findCovering(view, fading) {
+        fading.length = 0;
         const r = this.fish.radius * FOREGROUND.pad;
         const players = [view];
         for (const g of this.mp?.ghosts.values() ?? []) if (g.pos) players.push(g.pos);
@@ -1347,10 +1361,8 @@ export default class MainScene extends Phaser.Scene {
                 edges.x0 -= half; edges.x1 += half; edges.y0 -= half; edges.y1 += half;
             } else continue;
             if (o.fgBase === undefined) { o.fgBase = o.alpha; o.fgAlpha = o.alpha; }
-            const covering = players.some(p => boxHitsCircle(edges, p.x, p.y, r));
-            if (!covering && o.fgAlpha === o.fgBase) continue;
-            o.fgAlpha = fadeStep(o.fgAlpha, o.fgBase, covering, dt);
-            o.setAlpha(o.fgAlpha);
+            o.fgCover = players.some(p => boxHitsCircle(edges, p.x, p.y, r));
+            if (o.fgCover || o.fgAlpha !== o.fgBase) fading.push(o);
         }
     }
 
@@ -1739,7 +1751,8 @@ export default class MainScene extends Phaser.Scene {
         // A frame that built a chunk has spent its build budget: no layer builds its scene in the same frame.
         if (this.level.buildMs.count !== this.chunkBuilds) { this.chunkBuilds = this.level.buildMs.count; this.lastBuildFrame = this.game.loop.frame; }
         this.level.animate(time / 1000, view, speed, this.mp?.others(this.roomPlayers || (this.roomPlayers = [])), this.wavePhase());
-        this.revealPlayers(delta / 1000, view);
+        const frame = this.game.loop.frame, checkEvery = everyOf('check', this.quality.tier);
+        this.revealPlayers(delta / 1000, view, due(frame, checkEvery, 1));
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.farLayers.update(this.camX);
         this.rockLayers.update(this.camX, this.camY);
@@ -1748,7 +1761,7 @@ export default class MainScene extends Phaser.Scene {
         // The net of light on rock, sand and props: in world space, as strong as the sun, in the water's hue.
         updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun * QUALITY[this.quality.tier].caustics, biomeBlendAt(view.x).a.water[0]);
         // Nothing outside the picture is drawn (viewCull.js): after every layer has set its things where they are for this frame.
-        if (this.game.loop.frame % VIEW_CULL.every === 0) cullToView(this.children.list, this.cameras.main.worldView, this.cameras.main.id);
+        if (due(frame, checkEvery)) cullToView(this.children.list, this.cameras.main.worldView, this.cameras.main.id);
         // Quality: the frame rate decides (quality.js); a fixed tier (?quality=...) and the perf tour are left alone.
         this.quality.fps = this.autotune.fps;
         if (this.quality.auto) { const tier = this.autotune.step(delta); if (tier) this.applyQuality(tier, true); }

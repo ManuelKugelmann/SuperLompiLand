@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { VIEW_CULL, touchesView, reachOf, cullToView } from '../game/viewCull.js';
 
 const view = { centerX: 1000, centerY: 500, width: 1920, height: 1080 };
-const img = (x, y, w = 100, h = 100, extra = {}) => ({ type: 'Image', x, y, displayWidth: w, displayHeight: h, scrollFactorX: 1, scrollFactorY: 1, cameraFilter: 0, ...extra });
+const img = (x, y, w = 100, h = 100, extra = {}) => ({ type: 'Image', x, y, scaleX: 1, displayWidth: w, displayHeight: h, scrollFactorX: 1, scrollFactorY: 1, cameraFilter: 0, ...extra });
 
 test('what touches the view (with its own reach) counts as in it', () => {
     assert.equal(touchesView(1000, 500, 0, 1000, 500, 960, 540), true);
