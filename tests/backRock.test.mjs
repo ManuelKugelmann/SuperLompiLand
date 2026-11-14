@@ -60,3 +60,18 @@ test('distance to rock is 0 in rock and grows away from it', () => {
     }
     assert.ok(inRock > 0 && far > 0);
 });
+
+test('an island gets a pillar behind it down to the seabed; a wide cave roof does not', () => {
+    const reef = BIOMES.find(b => b.id === 'reef'), x0 = Math.round((reef.from + 2000) / SPAN) * SPAN;
+    const seabed = 1960 + 900;
+    // An island 400 px wide and 200 thick, 600 px of water under it, then the seabed.
+    const island = { density: (x, y) => (y > seabed || (Math.abs(x - (x0 + 480)) < 200 && y > 1960 + 100 && y < 1960 + 300)) ? 1 : 0 };
+    const a = backRockCover(island, 0.5, x0, 1960, SPAN);
+    const cellAt = (r, x, y) => r.cov[Math.floor((y - 1960) / r.C + r.m) * r.N + Math.floor((x - x0) / r.C + r.m)];
+    // the raw (pre-blur) pillar is blurred; under the island's middle it stays strong
+    assert.ok(cellAt(a, x0 + 480, 1960 + 600) > 0.6, `under the island: ${cellAt(a, x0 + 480, 1960 + 600)}`);
+    // A roof across the whole grid (a cave), the same gap below: no pillar, only the fading skirt.
+    const roof = { density: (x, y) => (y > seabed || (y > 1960 + 100 && y < 1960 + 300)) ? 1 : 0 };
+    const b = backRockCover(roof, 0.5, x0, 1960, SPAN);
+    assert.ok(cellAt(b, x0 + 480, 1960 + 760) < cellAt(a, x0 + 480, 1960 + 760), 'a cave roof makes no pillar');
+});

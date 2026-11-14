@@ -15,7 +15,9 @@ export const BACK_ROCK = {
     cell: 32,          // world px per cell
     margin: 8,         // cells computed beyond each chunk side (the blur needs them; no seams)
     blur: 4,           // box blur radius in cells (two passes sideways, one down)
-    scanStep: 48       // world px between the samples that look for rock above the grid
+    scanStep: 48,      // world px between the samples that look for rock above and below the grid
+    pillar: 2200,      // under an island, rock below closer than this: the gap between is a pillar
+    island: [1100, 1200]   // an island is narrower [0] and thinner [1] than this (world px), with water above
 };
 
 /** Reach (world px) of back rock at world x, blended across biome borders. */
@@ -63,6 +65,20 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
         }
     }
 
+    // Width of the horizontal rock run each solid cell belongs to (0 = touches the grid edge:
+    // too wide to tell, never an island).
+    const runW = new Uint16Array(N * N);
+    for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N;) {
+            if (!solid[j * N + i]) { i++; continue; }
+            let e = i;
+            while (e < N && solid[j * N + e]) e++;
+            const w = i === 0 || e === N ? 0 : e - i;
+            for (let k = i; k < e; k++) runW[j * N + k] = w;
+            i = e;
+        }
+    }
+
     const cov = new Float32Array(N * N);
     let any = false;
     for (let i = 0; i < N; i++) {
@@ -74,9 +90,31 @@ export function backRockCover(field, threshold, ox, oy, span, cfg = BACK_ROCK) {
         for (let y = y0 - cfg.scanStep; y >= y0 - R; y -= cfg.scanStep) {
             if (field.density(x, y) > threshold) { rockY = y; break; }
         }
+        // Nearest rock below every cell (within the grid, else looked up below it). Under an
+        // island — a small piece of rock with water above it (not a cave roof or a big mass) —
+        // the gap down to the rock below is a pillar behind, so the island never floats.
+        const below = new Float32Array(N);
+        let next = Infinity;
+        const yEnd = y0 + (N - 1) * C;
+        for (let y = yEnd + cfg.scanStep; y <= yEnd + cfg.pillar; y += cfg.scanStep) {
+            if (field.density(x, y) > threshold) { next = y; break; }
+        }
+        for (let j = N - 1; j >= 0; j--) {
+            if (solid[j * N + i]) next = y0 + j * C;
+            below[j] = next;
+        }
+        let runTop = -Infinity, island = false;
         for (let j = 0; j < N; j++) {
-            const y = y0 + j * C;
-            if (solid[j * N + i]) { rockY = y; cov[j * N + i] = 1; continue; }
+            const y = y0 + j * C, k = j * N + i;
+            if (solid[k]) {
+                if (j > 0 && !solid[k - N]) runTop = y;                      // the run starts below water
+                else if (j === 0) runTop = -Infinity;                       // runs on above the grid
+                rockY = y;
+                island = y - runTop < cfg.island[1] && runW[k] > 0 && runW[k] * C < cfg.island[0];
+                cov[k] = 1;
+                continue;
+            }
+            if (island && below[j] - rockY <= cfg.pillar) { cov[k] = 1; continue; }
             const u = (y - rockY) / R;
             cov[j * N + i] = u >= 1 ? 0 : (1 - u) * (1 - u);
         }
