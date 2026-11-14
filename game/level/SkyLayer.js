@@ -140,7 +140,7 @@ export default class SkyLayer {
         // are a list of what stands where; the few in view are shown with pictures from a small pool.
         this.items = [
             ...skyItems().map(item => ({ item, key: `sky_${item.kind}`, depth: -28.7 + item.scroll, alpha: SKY.haze * (0.75 + item.scroll * 1.5), flip: false })),
-            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.0, alpha: 0.97, flip: item.flip }))
+            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.05, alpha: 0.97, flip: item.flip }))
         ];
         for (const d of this.items) d.half = scene.textures.getFrame(d.key).width * d.item.size / 2;
         this.pool = [];      // pictures for the items in view, made as needed
