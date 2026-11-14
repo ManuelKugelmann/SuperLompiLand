@@ -2,14 +2,15 @@
 // the nests lie, and the density grids a chunk is drawn from. No Phaser, no DOM,
 // so it runs unchanged on the main thread, in a Web Worker and in the tests.
 import { vnoise } from './terrain.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY } from './biomes.js';
+import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
     spawn: { x: 0, y: 420 },      // start pool in the shallow lagoon, kept free of rock
     maxDepth: 5600,               // deepest regular seabed (the abyss goes further)
     nestRadius: 230,              // half width of the sand basin a nest lies in
-    nestRim: 16                   // how far its rim stands above the middle
+    nestRim: 16,                  // how far its rim stands above the middle
+    nestSearch: 16                // a nest may move up to this many steps of 120 px east to find real seabed
 };
 
 // The calm main route (spec 5.2c): one lane of open water through the whole journey, from
@@ -17,9 +18,13 @@ export const FIELD = {
 // exists by construction, and hazards keep their distance from it (LevelGenerator).
 export const ROUTE = {
     halfWidth: 260,     // the lane is open at least this far above and below its middle
-    cruise: 0.5,        // between nests it runs at this share of the way down to the seabed ...
+    cruise: 0.5,        // along an island it runs at this share of the way down to the seabed ...
     minY: 320,          // ... but never shallower
     maxY: 2600,         // ... or deeper than this
+    seaY: 470,          // across the open sea it stays this close under the surface (spec 5.0c)
+    seaFrom: 2700,      // seabed depth from which the water counts as open sea for the route ...
+    seaFull: 3700,      // ... and from which the route is fully at `seaY`
+    ease: 5, easeStep: 280,   // the cruise depth is averaged over this many steps of this size to either side
     aboveNest: 240,     // it passes this far above every nest
     descent: 1.6,       // px along the way per px of depth when it dips to a nest (gentle slopes)
     clear: 420          // hazards stay at least this far from its middle
@@ -31,6 +36,20 @@ export const ROUTE = {
  */
 const smooth01 = v => { const t = v <= 0 ? 0 : v >= 1 ? 1 : v; return t * t * (3 - 2 * t); };
 
+/**
+ * The calm route's depth away from any nest: half way down along the coasts, near the surface
+ * over deep water. Averaged along the way, so it climbs and sinks gently even where the seabed
+ * falls away as a wall.
+ */
+export function cruiseY(x, cfg = ROUTE) {
+    let sum = 0;
+    for (let k = -cfg.ease; k <= cfg.ease; k++) {
+        const fy = floorY(x + k * cfg.easeStep), coast = Math.min(cfg.maxY, Math.max(cfg.minY, Math.min(fy, cfg.seaFrom) * cfg.cruise));
+        sum += coast + (cfg.seaY - coast) * smooth01((fy - cfg.seaFrom) / (cfg.seaFull - cfg.seaFrom));
+    }
+    return sum / (cfg.ease * 2 + 1);
+}
+
 export function createField(seed) {
     let nests = null;
 
@@ -39,7 +58,7 @@ export function createField(seed) {
     const routeY = x => {
         let y = routeCache.get(x);
         if (y !== undefined) return y;
-        y = Math.min(ROUTE.maxY, Math.max(ROUTE.minY, floorY(x) * ROUTE.cruise));
+        y = cruiseY(x);
         for (const nest of nests) {
             const dx = Math.abs(x - nest.x);
             if (dx < nest.reach) y += (nest.y - ROUTE.aboveNest - y) * smooth01(1 - dx / nest.reach);
@@ -93,17 +112,23 @@ export function createField(seed) {
         return n;
     };
 
-    // The first nest right under the start pool (in the lagoon), one per later biome start,
-    // the grand nest at the end; each on the real seabed: start inside it and walk up.
-    const xs = [FIELD.spawn.x, ...BIOMES.slice(1).map(b => b.from + 260)];
+    // The first nest right under the start pool (in the lagoon), one where every later coast
+    // biome begins (the open sea has none: its bottom is far below the way across), the grand
+    // nest at the end; each on the real seabed: start inside it and walk up.
+    const xs = [FIELD.spawn.x, ...BIOMES.slice(1).filter(b => b.zone === 'island').map(b => b.from + 260)];
     xs.push(WORLD_END - 300);
-    nests = xs.map((x, index) => {
-        let y = floorY(x) + 260;
-        while (y > 400 && density(x, y, false) > FIELD.threshold) y -= 12;
+    const groundAt = x => { let y = floorY(x) + 260; while (y > 400 && density(x, y, false) > FIELD.threshold) y -= 12; return y; };
+    nests = xs.map((at, index) => {
+        // On the seabed, not on top of a rock that happens to stand there: of the columns
+        // close by, the one whose ground lies deepest.
+        let x = at, y = groundAt(at);
+        if (index > 0 && index < xs.length - 1) {
+            for (let k = 1; k <= FIELD.nestSearch; k++) { const gx = at + k * 120, gy = groundAt(gx); if (gy > y) { x = gx; y = gy; } }
+        }
         // How far to either side the route's dip to this nest reaches.
-        const cruise = Math.min(ROUTE.maxY, Math.max(ROUTE.minY, floorY(x) * ROUTE.cruise));
+        const cruise = cruiseY(x);
         const reach = Math.max(900, Math.abs(y + 12 - ROUTE.aboveNest - cruise) * ROUTE.descent);
-        return { x, y: y + 12, index, grand: index === xs.length - 1, reach };
+        return { x, y: y + 12, index, grand: index === xs.length - 1, reach, biome: biomeIndexAt(x) };
     });
 
     return { density, nests, routeY };

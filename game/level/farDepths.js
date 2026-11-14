@@ -42,6 +42,7 @@ export const FAR_KINDS = {
     kelp: { per: 1.2, haze: 1.4, kinds: pick(['kelp', 4], ['boulders', 0.5]) },
     blue: { per: 0, kinds: [] },
     wreck: { per: 1, kinds: pick(['hulls', 1], ['boulders', 1], ['kelp', 0.3]) },
+    shore: { per: 1, kinds: pick(['boulders', 3], ['kelp', 0.6]) },
     harbour: { per: 0.9, kinds: pick(['piers', 3], ['hulls', 1], ['boulders', 1]) },
     trench: { per: 0.7, kinds: pick(['boulders', 1]) }
 };

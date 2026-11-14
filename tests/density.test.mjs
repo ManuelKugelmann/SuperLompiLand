@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FIELD, createField, chunkGrids, gridRows, ROUTE } from '../game/level/density.js';
-import { floorY, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
+import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY } from '../game/level/density.js';
+import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS } from '../game/level/biomes.js';
 
 const field = createField(1337);
 
@@ -86,4 +86,16 @@ test('the calm route passes just above every nest', () => {
         assert.ok(Math.abs(f.routeY(nest.x) - (nest.y - ROUTE.aboveNest)) < 1, `nest ${nest.index}`);
         assert.ok(f.density(nest.x, nest.y + 60) > FIELD.threshold, `nest ${nest.index} still lies on solid ground`);
     }
+});
+
+test('the calm route crosses the open sea just under the surface and runs half way down along the coasts', () => {
+    const f = createField(1337);
+    for (const b of BIOMES) {
+        if (b.id === 'beach' || b.id === 'trench') continue;
+        const x = b.from + b.width / 2, y = cruiseY(x);
+        if (b.zone === 'sea') assert.ok(Math.abs(y - ROUTE.seaY) < 1, `${b.id}: ${Math.round(y)}`);
+        else assert.ok(y > 800 && y < 1300, `${b.id}: ${Math.round(y)}`);
+    }
+    assert.ok(f.nests.every(n => n.grand || BIOMES[n.biome].zone === 'island'), 'nests lie on the coasts (and the grand nest at the end)');
+    assert.equal(f.nests.length, BIOMES.filter(b => b.zone === 'island').length + 1);
 });

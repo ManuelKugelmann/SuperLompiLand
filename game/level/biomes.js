@@ -1,3 +1,8 @@
+// The journey runs west -> east along an island chain (spec 5.0c): the home island (lagoon,
+// mangroves, coral reef), a reef wall that drops into the open sea, then open sea and islands
+// in turn. `zone` says which a biome is; `floor` is how deep its seabed lies (world px).
+// Islands are shallow coast; in the open sea the bottom is far below and the way across is
+// near the surface.
 // The journey runs west -> east. It starts in a shallow, safe lagoon behind the
 // beach; the mangroves and the coral reef follow, and every biome further east is
 // deeper and a little more dangerous.
@@ -21,7 +26,7 @@
 //   props    scenery on the seabed (groups in LevelGenerator PROPS)   propRate: props per chunk
 // How wide each biome is (world px). The lagoon starts 6500 px west of the start
 // pool at x = 0; everything else follows from these widths.
-const WIDTHS = { beach: 11500, mangrove: 9000, reef: 8000, kelp: 10000, blue: 14000, wreck: 10000, harbour: 10000, trench: 12000 };
+const WIDTHS = { beach: 11500, mangrove: 9000, reef: 8000, blue: 16000, kelp: 9000, harbour: 9000, wreck: 14000, shore: 10000, trench: 12000 };
 export const WORLD_WEST = -6500;
 
 const ROCK_REEF = [0xf3dba0, 0xd2ae6c, 0x9c7a54, 0x6a5748, 0x4b4350];
@@ -30,7 +35,7 @@ export const BIOMES = [
     {
         // The shallow lagoon behind the beach, where the journey starts: seagrass meadows and a
         // few rocks; corals only here and there (sign-off S3).
-        id: 'beach', name: { de: 'Flache Lagune', en: 'Shallow Lagoon' },
+        id: 'beach', name: { de: 'Flache Lagune', en: 'Shallow Lagoon' }, zone: 'island', floor: 1650,
         rock: [0xfff0c0, 0xf2d894, 0xd9b877, 0xb89868, 0x937a5c], water: [0x7ff0e0, 0.22], open: 0.2,
         backRock: 400,
         rockWall: 0.15,
@@ -41,7 +46,7 @@ export const BIOMES = [
     {
         // Shallow, sheltered, full of roots to weave through. `roots` = mangrove
         // roots hanging from the surface, some in front of the fish, most behind.
-        id: 'mangrove', name: { de: 'Mangroven', en: 'Mangroves' },
+        id: 'mangrove', name: { de: 'Mangroven', en: 'Mangroves' }, zone: 'island', floor: 1900,
         rock: [0xe8d9a6, 0xbfae77, 0x8f8257, 0x665d44, 0x474233], water: [0x4fb98a, 0.22], open: 0.22,
         backRock: 400,
         rockWall: 0.6,
@@ -51,7 +56,7 @@ export const BIOMES = [
         hazards: { hazard_net: 1 }
     },
     {
-        id: 'reef', name: { de: 'Korallenriff', en: 'Coral Reef' },
+        id: 'reef', name: { de: 'Korallenriff', en: 'Coral Reef' }, zone: 'island', floor: 2200,
         rock: ROCK_REEF, water: [0x3fd0e8, 0.0], open: 0.0,
         backRock: 900,
         rockWall: 0.45,
@@ -61,18 +66,7 @@ export const BIOMES = [
         hazards: { spikes: 1 }
     },
     {
-        // Cold water: anemones and sea fans, no reef corals.
-        id: 'kelp', name: { de: 'Tangwald', en: 'Kelp Forest' },
-        rock: [0xc9d08a, 0x9fae62, 0x6f8250, 0x4d5f44, 0x384238], water: [0x2f9a5c, 0.26], open: 0.05,
-        backRock: 900,
-        rockWall: 0.25,
-        coral: 0, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
-        props: { boulder: 3, kelpclump: 3, anemone: 2, seafan: 1 }, propRate: 1.8,
-        friends: { friend_seahorse: 3, friend_nudibranch: 3, friend_snail: 1, urchin: 1 },
-        hazards: { hazard_net: 2, spikes: 1 }
-    },
-    {
-        id: 'blue', name: { de: 'Blaues Meer', en: 'Open Blue' },
+        id: 'blue', name: { de: 'Blaues Meer', en: 'Open Blue' }, zone: 'sea', floor: 4300,
         rock: [0xd9e2ee, 0xa9b8cc, 0x7d8fa8, 0x5a6a84, 0x414c63], water: [0x1b5fd0, 0.24], open: 0.3,
         backRock: 0,
         rockWall: 0,
@@ -81,21 +75,21 @@ export const BIOMES = [
         friends: { friend_jellyfish: 4, friend_turtle: 2 }, hazards: { mine: 2, hazard_buoy: 1 }
     },
     {
-        id: 'wreck', name: { de: 'Schiffsfriedhof', en: 'Ship Graveyard' },
-        rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.1,
+        // Cold water: anemones and sea fans, no reef corals.
+        id: 'kelp', name: { de: 'Tangwald', en: 'Kelp Forest' }, zone: 'island', floor: 1900,
+        rock: [0xc9d08a, 0x9fae62, 0x6f8250, 0x4d5f44, 0x384238], water: [0x2f9a5c, 0.26], open: 0.05,
         backRock: 1200,
-        rockWall: 0.55,
-        coral: 0.12, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.55,
-        props: { wreck: 5, trawler: 3, rowboat: 1, barrel: 2, crate: 1, boulder: 1, anemone: 1 }, propRate: 2.4,
-        landmark: 'wreck',
-        friends: { friend_starfish: 1, friend_seahorse: 1, urchin: 1 },
-        hazards: { mine: 4, hazard_buoy: 2, spikes: 2 }
+        rockWall: 0.75,
+        coral: 0, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
+        props: { boulder: 3, kelpclump: 3, anemone: 2, seafan: 1 }, propRate: 1.8,
+        friends: { friend_seahorse: 3, friend_nudibranch: 3, friend_snail: 1, urchin: 1 },
+        hazards: { hazard_net: 2, spikes: 1 }
     },
     {
-        id: 'harbour', name: { de: 'Hafen', en: 'Harbour' },
+        id: 'harbour', name: { de: 'Hafen', en: 'Harbour' }, zone: 'island', floor: 2000,
         rock: [0xb7b9b0, 0x8d9088, 0x676b66, 0x4a4e4c, 0x353838], water: [0x6f8f3a, 0.26], open: 0.08,
-        backRock: 600,
-        rockWall: 0.25,
+        backRock: 1200,
+        rockWall: 0.7,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
         props: { pier: 1, trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
         landmark: 'pier', spot: 'surface',   // the pier stands at the waterline
@@ -103,8 +97,31 @@ export const BIOMES = [
         hazards: { hazard_net: 4, hazard_buoy: 3, mine: 2, spikes: 2 }
     },
     {
+        // Open sea again; far below lie the wrecks, for whoever dives.
+        id: 'wreck', name: { de: 'Schiffsfriedhof', en: 'Ship Graveyard' }, zone: 'sea', floor: 4700,
+        rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.26,
+        backRock: 0,
+        rockWall: 0,
+        coral: 0.12, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.55,
+        props: { wreck: 5, trawler: 3, rowboat: 1, barrel: 2, crate: 1, boulder: 1, anemone: 1 }, propRate: 2.4,
+        landmark: 'wreck',
+        friends: { friend_starfish: 1, friend_seahorse: 1, urchin: 1 },
+        hazards: { mine: 4, hazard_buoy: 2, spikes: 2 }
+    },
+    {
+        // The last island before the volcano: bare rock, cold clear water, sea fans and urchins.
+        id: 'shore', name: { de: 'Felsenküste', en: 'Rocky Shore' }, zone: 'island', floor: 1900,
+        rock: [0xcfd3cc, 0xa3a9a4, 0x7b827f, 0x585f60, 0x3f4547], water: [0x4fa7b8, 0.2], open: 0.12,
+        backRock: 1300,
+        rockWall: 0.8,
+        coral: 0.1, kelp: 0.3, coins: 3, friendRate: 0.4, hazardRate: 0.2,
+        props: { boulder: 4, seafan: 2, anemone: 2, kelpclump: 1 }, propRate: 1.8,
+        friends: { friend_starfish: 2, friend_snail: 1, friend_seahorse: 1, friend_nudibranch: 2, urchin: 3 },
+        hazards: { spikes: 1, hazard_net: 1 }
+    },
+    {
         // No light down here: no reef corals and no seaweed (review R2).
-        id: 'trench', name: { de: 'Tiefsee', en: 'Deep Trench' },
+        id: 'trench', name: { de: 'Tiefsee', en: 'Deep Trench' }, zone: 'sea', floor: 5600,
         rock: [0x7f86c4, 0x5b5f9c, 0x434576, 0x303158, 0x21213f], water: [0x1a0f4a, 0.42], open: 0.04,
         backRock: 1400,
         rockWall: 0.7,
@@ -149,8 +166,6 @@ export function mixColor(c1, c2, t) {
     return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
-const FLOOR_SLOPE = (5600 - 1050) / (BIOMES[BIOMES.length - 1].from - WORLD_WEST);
-
 const BEACH_END = BIOMES[1].from;          // where the lagoon hands over to the mangroves
 export const SHORE = WORLD_WEST + 1500;   // west of this the sand is above the water
 
@@ -162,14 +177,37 @@ export function surfAt(x) {
 /** The abyss: a narrow chasm in the deep-sea biome that drops far below everything else. */
 export const ABYSS = { x: BIOMES[BIOMES.length - 1].from + 5200, halfWidth: 650, depth: 7500 };
 
-/** Seabed depth: shallow in the west, dropping steadily toward the east, plus the abyss. */
-export function floorY(x) {
-    // Full depth is reached where the deep trench begins.
-    let base = clamp(1050 + (x - WORLD_WEST) * FLOOR_SLOPE, 1000, 5600);
+// How the seabed gets from one biome's depth to the next (px along the way). Between an island
+// and the sea the whole slope lies on the sea's side, so an island's coast keeps its depth right
+// up to its edge: leaving an island the bottom falls away as a wall, toward one it climbs gently.
+export const SEABED = { dropOff: 900, rise: 2600, coast: 1600 };
+
+const smooth = v => { const t = clamp(v, 0, 1); return t * t * (3 - 2 * t); };
+
+/** Is the water at x open sea (far from any island's coast)? */
+export function isSea(x) {
+    return BIOMES[biomeIndexAt(x)].zone === 'sea';
+}
+
+/** Seabed depth: shallow along the islands, far down in the open sea between them, plus the abyss. */
+export function floorY(x, cfg = SEABED) {
+    const i = biomeIndexAt(x), b = BIOMES[i], prev = BIOMES[i - 1], next = BIOMES[i + 1];
+    let base = b.floor;
+    if (prev && prev.zone !== b.zone) {
+        // island -> sea: the drop-off just inside the sea; sea -> island: nothing here, the rise lay in the sea
+        if (b.zone === 'sea') base = prev.floor + (b.floor - prev.floor) * smooth((x - b.from) / cfg.dropOff);
+    } else if (prev && x < b.from + cfg.coast / 2) {
+        base = prev.floor + (b.floor - prev.floor) * smooth(0.5 + (x - b.from) / cfg.coast);
+    }
+    if (next && next.zone !== b.zone) {
+        if (b.zone === 'sea') { const k = smooth((x - (next.from - cfg.rise)) / cfg.rise); base += (next.floor - base) * k; }
+    } else if (next && x > next.from - cfg.coast / 2) {
+        base = b.floor + (next.floor - b.floor) * smooth(0.5 + (x - next.from) / cfg.coast);
+    }
     // The lagoon: the sand rises gently toward the west until it leaves the water.
     if (x < BEACH_END) {
         const t = clamp((x - SHORE) / (BEACH_END - SHORE), 0, 1);
-        base = -70 + (1050 + (BEACH_END - WORLD_WEST) * FLOOR_SLOPE + 70) * Math.pow(t, 1.15);
+        base = -70 + (base + 70) * Math.pow(t, 1.15);
     }
     const d = (x - ABYSS.x) / ABYSS.halfWidth;
     return base + ABYSS.depth * Math.exp(-d * d * 1.6);

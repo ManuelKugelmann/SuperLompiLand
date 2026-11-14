@@ -27,6 +27,7 @@ export const BIOME_MATERIALS = {
     kelp: ['granite', 'basalt'],
     blue: ['granite', 'limestone'],
     wreck: ['sandstone', 'rust'],
+    shore: ['granite', 'basalt'],
     harbour: ['granite', 'rust'],
     trench: ['basalt', 'mudstone']
 };

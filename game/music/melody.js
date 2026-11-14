@@ -31,6 +31,7 @@ export const BIOME_MUSIC = {
     kelp: { root: 62, scale: 'dorian', motifs: [[0, 2, 4, 3, 2, 6, 7], [4, 6, 7, 6, 4, 3, 2, 0]] },
     blue: { root: 65, scale: 'lydian', motifs: [[0, 3, 4, 6, 7, 4, 9], [7, 6, 4, 3, 4, 7, 11]] },
     wreck: { root: 69, scale: 'minorPenta', motifs: [[0, 2, 1, 3, 2, 4, 5], [5, 4, 2, 3, 1, 0, 2]] },
+    shore: { root: 64, scale: 'dorian', motifs: [[0, 2, 3, 5, 4, 2, 7], [7, 5, 4, 2, 3, 2, 0]] },
     harbour: { root: 64, scale: 'mixolydian', motifs: [[0, 2, 4, 6, 4, 2, 7], [4, 4, 6, 7, 6, 4, 2]] },
     trench: { root: 62, scale: 'minor', motifs: [[0, 4, 3, 2, 4, 7], [7, 5, 4, 3, 2, 0, 4]] }
 };

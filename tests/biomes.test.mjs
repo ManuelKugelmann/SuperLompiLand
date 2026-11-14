@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor, landmarkGroup, LANDMARK
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, SEABED, isSea, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor, landmarkGroup, LANDMARK
 } from '../game/level/biomes.js';
 
 test('biomes are ordered west to east and every table is complete', () => {
@@ -54,13 +54,34 @@ test('mixColor interpolates per channel and clamps t', () => {
     assert.equal(mixColor(0x102030, 0x304050, 0.5), 0x203040);
 });
 
-test('the seabed never rises toward the east, and the abyss is by far the deepest place', () => {
-    let prev = floorY(WORLD_WEST);
-    for (let x = WORLD_WEST; x < ABYSS.x - ABYSS.halfWidth * 3; x += 200) {
-        assert.ok(floorY(x) >= prev - 1e-6);
-        prev = floorY(x);
+test('an island chain: coasts are shallow, the open sea between them is deep, and the abyss is by far the deepest place', () => {
+    const zones = BIOMES.map(b => b.zone);
+    assert.deepEqual(zones.slice(0, 3), ['island', 'island', 'island'], 'the home island: lagoon, mangroves, reef');
+    assert.equal(zones.at(-1), 'sea');
+    for (let i = 3; i < zones.length - 1; i++) assert.ok(zones[i] !== zones[i + 1] || zones[i] === 'island', 'two seas never touch: there is always an island between');
+    for (const b of BIOMES) {
+        const mid = floorY(b.from + b.width / 2);
+        if (b.id === 'beach' || b.id === 'trench') continue;      // the lagoon rises to the shore; the trench holds the abyss
+        assert.ok(b.zone === 'sea' ? mid > 4000 : mid < 2400, `${b.id}: ${Math.round(mid)}`);
+        assert.equal(isSea(b.from + b.width / 2), b.zone === 'sea');
     }
     assert.ok(floorY(ABYSS.x) > floorY(ABYSS.x - 5000) + ABYSS.depth * 0.9);
+});
+
+test('leaving an island the seabed falls away as a wall; toward the next one it climbs gently; a coast keeps its depth to its edge', () => {
+    for (let i = 1; i < BIOMES.length; i++) {
+        const a = BIOMES[i - 1], b = BIOMES[i];
+        if (a.zone === b.zone) continue;
+        const island = a.zone === 'island' ? a : b, sea = a.zone === 'sea' ? a : b;
+        assert.ok(Math.abs(floorY(b.from - 1) - floorY(b.from + 1)) < 20, `${a.id} -> ${b.id}: no step at the border`);
+        assert.ok(Math.abs(floorY(island === a ? b.from - 50 : b.from + 50) - island.floor) < 60, `${island.id}: full depth at its edge`);
+        if (sea === b) assert.ok(floorY(b.from + SEABED.dropOff) - floorY(b.from) > 2000, `${a.id}: the drop-off`);
+        else {
+            let steepest = 0;
+            for (let x = b.from - SEABED.rise; x < b.from; x += 100) steepest = Math.max(steepest, Math.abs(floorY(x + 100) - floorY(x)) / 100);
+            assert.ok(steepest < 2.2, `${b.id}: the climb, steepest ${steepest.toFixed(2)}`);
+        }
+    }
 });
 
 test('the beach rises out of the water in the west and the surf runs higher there', () => {

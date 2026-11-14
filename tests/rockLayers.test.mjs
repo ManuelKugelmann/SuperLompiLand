@@ -32,7 +32,10 @@ test('closed share per biome: the trench is far more walled than the beach and t
         return k / n;
     };
     assert.ok(closed('trench') > closed('reef') && closed('reef') > closed('beach'), `${closed('trench')} ${closed('reef')} ${closed('beach')}`);
-    assert.ok(closed('kelp') < 0.5);
+    // An island's flank stands in front of its rock socket (no far view); the open sea has none (spec 5.0c).
+    assert.ok(closed('kelp') > 0.5);
+    assert.equal(closed('blue'), 0);
+    assert.equal(closed('wreck'), 0);
 });
 
 test('near walls are rarer than mid walls', () => {

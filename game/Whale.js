@@ -6,6 +6,7 @@ export const WHALE_SCENE = {
     id: 'whale',         // the journey's name for this event
     near: 3400,          // px: she appears when the player is this close to her place ...
     far: 5600,           // ... and is taken away again beyond this while still caught
+    below: 560,          // px she swims under the calm route (which runs just under the surface out here)
     netSize: 300,        // px across of each net piece
     calf: 0.3            // her calf, in sizes of her
 };
@@ -52,7 +53,7 @@ const SPOT = { x: 0, y: 0 }, PULL = { x: 0, y: 0 };
  */
 export default class Whale {
     constructor(scene, journey, startX, endX, routeY, on) {
-        this.scene = scene; this.journey = journey; this.startX = startX; this.endX = endX; this.routeY = routeY; this.on = on;
+        this.scene = scene; this.journey = journey; this.startX = startX; this.endX = endX; this.routeY = x => routeY(x) + WHALE_SCENE.below; this.on = on;
         this.mind = null;
         ensureWhale(scene);
         ensureNet(scene);

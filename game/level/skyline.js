@@ -20,7 +20,8 @@ const COASTS = {
     reef: [['light', 0.5, 0.09, 1]],
     kelp: [['stacks', 0.3, 0.1, 1], ['stacks', 0.75, 0.06, 0.6]],
     blue: [['ship', 0.25, 0.05, 1], ['ship', 0.7, 0.04, 0.7]],
-    wreck: [['stacks', 0.2, 0.08, 0.8], ['palms', 0.6, 0.1, 0.9]],
+    wreck: [['ship', 0.3, 0.05, 0.9], ['stacks', 0.8, 0.06, 0.6]],
+    shore: [['stacks', 0.25, 0.12, 1], ['light', 0.7, 0.1, 0.9]],
     harbour: [['port', 0.5, 0.13, 1]],
     trench: [['stacks', 0.3, 0.07, 0.7]]
 };

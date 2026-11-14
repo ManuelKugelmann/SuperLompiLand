@@ -24,7 +24,8 @@ const CHAPTERS = {
     reef: { friend: 'jellyfish', goal: { de: 'Am Riff zappelt etwas im Netz', en: 'Something wriggles in a net on the reef' } },
     kelp: { friend: 'turtle', goal: { de: 'Im Tangwald ruft jemand um Hilfe', en: 'Someone calls for help in the kelp' } },
     blue: { friend: 'flyingfish', event: { id: 'whale', from: 0.68, to: 1.03 }, goal: { de: 'Draußen im Blau treibt ein Netz', en: 'A net drifts out in the blue' } },
-    wreck: { friend: 'firefish', goal: { de: 'Zwischen den Wracks leuchtet es schwach', en: 'A faint light among the wrecks' } },
+    wreck: { goal: { de: 'Weit unten liegen alte Schiffe. Oben geht es weiter', en: 'Old ships lie far below. The way on is up here' } },
+    shore: { friend: 'firefish', goal: { de: 'An der Felsenküste leuchtet es schwach', en: 'A faint light on the rocky shore' } },
     harbour: { friend: 'shark', goal: { de: 'Im Hafen steckt ein großer Freund fest', en: 'A big friend is caught in the harbour' } },
     trench: { goal: { de: 'Ganz unten wartet das große Nest', en: 'The grand nest waits far below' } }
 };

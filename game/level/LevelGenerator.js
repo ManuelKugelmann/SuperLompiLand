@@ -17,7 +17,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 6,
+    version: 7,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -141,7 +141,7 @@ export default class LevelGenerator {
         this.storySpots = chapters().filter(c => c.friend).map(c => ({ x: c.x, y: this.field.routeY(c.x) }));
         // Never out of reach: coins and friends are not placed in sealed pockets of water (reach.js).
         this.reachable = createReach(this.field.density, LEVEL.threshold, this.field.routeY, ROUTE.halfWidth * 0.75);
-        this.nests = this.field.nests.map(n => ({ ...n, biome: BIOMES[Math.min(n.index + 1, BIOMES.length - 1)] }));
+        this.nests = this.field.nests.map(n => ({ ...n, biome: BIOMES[n.biome] }));
         // Density grids are computed in a Web Worker when available; the chunk is
         // then drawn on the main thread, one per frame.
         this.pending = new Set();   // chunk keys requested from the worker
