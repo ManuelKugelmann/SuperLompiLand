@@ -72,10 +72,11 @@ export const PROPS = {
     wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
     trawler: { keys: ['trawler_1', 'cutter_1'], width: [880, 1150], sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
     // Pier (generated art): stands at the surface, not on a floor spot (pierAt / drawPier).
-    // `piles` = pile positions across the deck (under the deck's own stubs), `pileSlices` = where the pile art is cut
-    // into band (above a) and foot (below b); the wood between is the tileable pier_pile_mid, `above` = share of the deck above the waterline.
-    pier: { keys: ['pier_deck', 'pier_pile', 'pier_pile_mid'], width: [1300, 1600], surface: true, every: 4, chance: 0.5, max: 1,
-        piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileSlices: [0.47, 0.58], above: 0.2, depth: -3, tint: 0xc4d0d4 },
+    // `piles` = pile positions across the deck (under its own posts), `pileWidth` = post width (share of the deck),
+    // `pileWood` = share of the pile art that is wood (band, seamless wood strip and foot are cut from one
+    // generated pile, soft-edged), `above` = share of the deck above the waterline.
+    pier: { keys: ['pier_deck', 'pier_pile_mid', 'pier_band', 'pier_foot'], width: [1300, 1600], surface: true, every: 4, chance: 0.5, max: 1,
+        piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileWood: 0.7, above: 0.2, depth: -3, tint: 0xc4d0d4 },
     rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.2, reach: 0.2, flat: 0.35, depth: -1, max: 1 },
     // Generated art (FLUX.2 klein, Replicate): plants between the kelp stalks.
     seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, reach: 0.2, flat: 0.6, depth: -1, max: 2, sway: 0.6 },
@@ -799,36 +800,37 @@ export default class LevelGenerator {
 
     /**
      * This chunk's share of a pier: the deck where it lies in the chunk, and each pile as a
-     * vertical 3-slice — barnacle band on top, a seamless wood strip tiled down through
-     * the chunks, the overgrown foot sunk into the rock.
+     * seamless wood strip tiled down through the chunks, a barnacle band in the tidal zone
+     * (varied per pile) and the overgrown foot sunk into the rock.
      */
     drawPier(chunk, pier, oy, keep) {
         const s = this.scene, p = PROPS.pier, y1 = oy + CH;
-        const tex = s.textures.get('pier_pile');
-        if (!tex.has('top')) {
-            const src = tex.getSourceImage(), W = src.width, H = src.height;
-            const [a, b] = p.pileSlices;
-            tex.add('top', 0, 0, 0, W, Math.round(H * a));
-            tex.add('foot', 0, 0, Math.round(H * b), W, H - Math.round(H * b));
-        }
-        const fw = tex.get('top').width, pw = pier.w * p.pileWidth, k = pw / fw;
-        const piece = (frame, x, y, h) => keep(s.add.image(x, y, 'pier_pile', frame).setOrigin(0.5, 0)
+        const frame = key => s.textures.getFrame(key);
+        // The pile art is wider than its wood (growth sticks out): size it so the wood
+        // matches the deck's own posts, which fade into the piles at their bottom.
+        const fw = frame('pier_pile_mid').width, pw = pier.w * p.pileWidth / p.pileWood, k = pw / fw;
+        const piece = (key, x, y, h) => keep(s.add.image(x, y, key).setOrigin(0.5, 0)
             .setDisplaySize(pw, h).setDepth(p.depth).setTint(p.tint));
         if (Math.max(0, pier.deckTop) >= oy && Math.max(0, pier.deckTop) < y1) {      // the deck pokes above the surface
             keep(s.add.image(pier.x0, pier.deckTop, 'pier_deck').setOrigin(0.5, 0)
                 .setDisplaySize(pier.w, pier.deckH).setDepth(p.depth + 0.01).setTint(p.tint));
         }
+        const top = pier.deckTop + pier.deckH * 0.8;                   // hidden behind the posts' opaque part
         for (const q of pier.piles) {
-            const top = pier.deckTop + pier.deckH * 0.9, topH = tex.get('top').height * k;
-            const footH = tex.get('foot').height * k, foot = q.ground + pw * 0.5 - footH;
-            if (top >= oy && top < y1) piece('top', q.x, top, topH);
-            if (foot >= oy && foot < y1) piece('foot', q.x, foot, footH);
-            const m0 = Math.max(oy, top + topH - 2), m1 = Math.min(y1, foot + 2);
-            if (m1 > m0) {        // seamless wood strip, tiled by world y so chunk joins don't show
+            const footH = frame('pier_foot').height * k, foot = q.ground + pw * 0.5 - footH;
+            if (foot >= oy && foot < y1) piece('pier_foot', q.x, foot, footH);
+            // Seamless wood strip, tiled by world y; one pixel of overlap at chunk joins.
+            const m0 = Math.max(oy, top), m1 = Math.min(y1 + 1, foot + 2);
+            if (m1 > m0) {
                 const mid = keep(s.add.tileSprite(q.x, m0, fw, (m1 - m0) / k, 'pier_pile_mid')
                     .setOrigin(0.5, 0).setScale(k).setDepth(p.depth - 0.01).setTint(p.tint));
                 mid.tilePositionY = m0 / k;
             }
+            // Barnacle and mussel band in the tidal zone: its own height, size and side per pile.
+            const r = Math.abs(Math.sin(q.x * 12.9898) * 43758.5453) % 1, r2 = (r * 7.31) % 1;
+            const bandH = frame('pier_band').height * k * (0.75 + 0.5 * r2);
+            const by = pier.deckTop + pier.deckH * (1.05 + 0.6 * r);
+            if (by >= oy && by < y1 && by + bandH < foot) piece('pier_band', q.x, by, bandH).setFlipX(r2 < 0.5);
         }
     }
 
