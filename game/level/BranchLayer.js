@@ -4,7 +4,7 @@ export const BRANCH_LOOK = {
     murk: 0.5,           // how dark the water is at the mouth ...
     murkInside: 0.34,    // ... and along the tunnel
     murkSize: 760,       // px across of one patch of murk
-    rope: 460,           // px the rope across the mouth spans
+    rope: 620,           // px the rope across the mouth spans (its floats are then about 100 and 70 px across)
     siltMs: 260,         // one puff of silt at the mouth this often while the fish is near
     near: 2200,          // px from the mouth within which the silt runs
     clam: 300,           // px across of the giant clam
@@ -19,22 +19,33 @@ const KEYS = { rope: 'cave_rope', clam: 'giant_clam', clamOpen: 'giant_clam_open
 function ensureTextures(scene) {
     const T = scene.textures;
     if (!T.exists(KEYS.rope)) {
-        // An old rope sagging across the mouth, a red-and-white fishing float on it: "someone marked this place".
-        const W = 512, H = 150, tex = T.createCanvas(KEYS.rope, W, H), c = tex.getContext();
-        const sag = x => 18 + 70 * Math.sin(Math.PI * x / W);
-        c.lineCap = 'round';
-        for (const [w, col] of [[11, '#5d4a31'], [7, '#a58a5c']]) {
-            c.strokeStyle = col; c.lineWidth = w; c.beginPath();
-            for (let x = 6; x <= W - 6; x += 8) { const y = sag(x); if (x === 6) c.moveTo(x, y); else c.lineTo(x, y); }
-            c.stroke();
-        }
-        c.strokeStyle = 'rgba(70,52,30,0.7)'; c.lineWidth = 2;                      // the twist of the strands
-        for (let x = 10; x < W - 10; x += 12) { const y = sag(x); c.beginPath(); c.moveTo(x - 3, y - 4); c.lineTo(x + 3, y + 4); c.stroke(); }
-        const fx = W * 0.56, fy = sag(fx) + 4;
-        const body = (y0, y1, a, b) => { const g = c.createLinearGradient(fx - 26, 0, fx + 26, 0); g.addColorStop(0, a); g.addColorStop(0.45, b); g.addColorStop(1, a); c.fillStyle = g; c.beginPath(); c.ellipse(fx, (y0 + y1) / 2, 26, (y1 - y0) / 2 + 10, 0, 0, 7); c.save(); c.clip(); c.fillRect(fx - 30, y0, 60, y1 - y0); c.restore(); };
-        body(fy - 2, fy + 30, '#a82a22', '#ef5a4a');       // red half
-        body(fy + 30, fy + 60, '#c9c2b2', '#fbf7ec');      // white half
-        c.fillStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.ellipse(fx - 9, fy + 18, 5, 12, 0.2, 0, 7); c.fill();
+        // Old fishing gear across the mouth: a rope sagging between the rocks, two red-and-white
+        // floats on it, a frayed end hanging down. "Someone marked this place", read from the route.
+        const W = 512, H = 300, tex = T.createCanvas(KEYS.rope, W, H), c = tex.getContext();
+        const sag = x => 24 + 86 * Math.sin(Math.PI * x / W);
+        const strand = (pts, w, col) => { c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke(); };
+        const main = []; for (let x = 6; x <= W - 6; x += 8) main.push([x, sag(x)]);
+        const loose = []; for (let k = 0; k <= 10; k++) loose.push([W * 0.27 + Math.sin(k * 0.7) * 9, sag(W * 0.27) + k * 15]);     // the hanging end
+        for (const pts of [main, loose]) { strand(pts, 14, '#5d4a31'); strand(pts, 9, '#a58a5c'); }
+        c.strokeStyle = 'rgba(70,52,30,0.7)'; c.lineWidth = 2.5;                    // the twist of the strands
+        for (let x = 10; x < W - 10; x += 12) { const y = sag(x); c.beginPath(); c.moveTo(x - 4, y - 5); c.lineTo(x + 4, y + 5); c.stroke(); }
+        const [ex, ey] = loose[loose.length - 1];                                   // frayed
+        c.strokeStyle = '#a58a5c'; c.lineWidth = 3;
+        for (let k = -3; k <= 3; k++) { c.beginPath(); c.moveTo(ex, ey); c.lineTo(ex + k * 7, ey + 26 + Math.abs(k) * -3); c.stroke(); }
+        const float = (fx, r) => {
+            const fy = sag(fx) + 6;
+            c.strokeStyle = '#5d4a31'; c.lineWidth = 5; c.beginPath(); c.moveTo(fx, sag(fx)); c.lineTo(fx, fy + 8); c.stroke();
+            const half = (y0, y1, a, b) => {
+                c.save(); c.beginPath(); c.ellipse(fx, fy + r * 1.25, r, r * 1.25, 0, 0, 7); c.clip();
+                const g = c.createLinearGradient(fx - r, 0, fx + r, 0); g.addColorStop(0, a); g.addColorStop(0.42, b); g.addColorStop(1, a);
+                c.fillStyle = g; c.fillRect(fx - r, y0, r * 2, y1 - y0); c.restore();
+            };
+            half(fy, fy + r * 1.25, '#a82a22', '#f0604f');                          // red on top
+            half(fy + r * 1.25, fy + r * 2.5, '#c2bbab', '#fbf7ec');                // white below
+            c.fillStyle = 'rgba(255,255,255,0.55)'; c.beginPath(); c.ellipse(fx - r * 0.35, fy + r * 0.8, r * 0.16, r * 0.42, 0.2, 0, 7); c.fill();
+        };
+        float(W * 0.58, 44);
+        float(W * 0.8, 30);
         tex.refresh();
     }
     if (!T.exists(KEYS.murk)) {

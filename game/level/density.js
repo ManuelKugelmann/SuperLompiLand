@@ -189,10 +189,15 @@ export function createField(seed) {
         if (withNests && nests) {
             const cv = caveOf();
             if (x > cv.x0 - CAVE_REACH && x < cv.x1 + CAVE_REACH) {
-                const top = ridgeTop(cv, x) + BRANCH.lump * (vnoise(x / 230, 8.1, seed + 41) * 2 - 1);
-                const k = caveAt(cv, x, y, top);
-                if (k > 0) n += (FIELD.crestRock - n) * smooth01((y - top) / 100);
-                else if (k < 0) n = Math.min(n, FIELD.threshold - 0.5);
+                // Lumps on its top, bigger bulges on the flanks beyond mouth and exit (no straight ramps).
+                const flank = Math.min(1, Math.max(0, cv.x0 - BRANCH.mouth - x, x - cv.x1 - BRANCH.mouth) / 250);
+                const top = ridgeTop(cv, x) + BRANCH.lump * (vnoise(x / 230, 8.1, seed + 41) * 2 - 1) + BRANCH.bulge * flank * (vnoise(x / 180, 4.4, seed + 42) * 2 - 1);
+                const d = caveAt(cv, x, y, top);
+                if (d !== null) {
+                    // Rock of the ridge, turning into open water over a worn edge at the tunnel's walls.
+                    const rock = n + (FIELD.crestRock - n) * smooth01((y - top) / 100), water = Math.min(n, FIELD.threshold - 0.5);
+                    n = water + (rock - water) * smooth01(0.5 + d / (BRANCH.soft * 2));
+                }
             }
         }
         // The ghost ship's pinnacle (setPieces.js): a spire of rock from the deep floor up to the ship's keel.
