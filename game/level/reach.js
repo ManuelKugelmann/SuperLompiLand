@@ -35,6 +35,13 @@ export function createReach(density, threshold, routeY = null, lane = 200, cfg =
         const sx = Math.floor(x / cfg.cell), sy = Math.floor(y / cfg.cell), start = `${sx},${sy}`;
         if (known.has(start)) return known.get(start);
         if (!open(sx, sy)) { known.set(start, false); return false; }
+        // The usual case, answered without a fill: straight up or down from the spot the water is open all the way to the calm route.
+        if (routeY !== null) {
+            const ty = Math.floor(routeY(x) / cfg.cell), step = ty > sy ? 1 : -1;
+            let cy = sy;
+            while (cy !== ty && open(sx, cy + step)) cy += step;
+            if (cy === ty) { known.set(start, true); return true; }
+        }
         const seen = new Set([start]), queue = [sx, sy];
         let answer = false;
         for (let i = 0; i < queue.length; i += 2) {

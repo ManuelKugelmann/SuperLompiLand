@@ -36,9 +36,10 @@ export const LEVEL = {
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view
     buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
-    edgeBatch: 5,         // collision strips made per build step
+    buildRushMs: 9,       // ... and this much while a chunk in view is not complete yet (a hole in the picture is worse than a slower frame)
+    edgeBatch: 2,         // collision strips made per build step
     coinBatch: 1,         // coins of a trail made per build step
-    rockParts: 2,         // the rock picture of a chunk is this many textures, one under the other
+    rockParts: 4,         // the rock picture of a chunk is this many textures, one under the other
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
@@ -317,7 +318,7 @@ export default class LevelGenerator {
             // The slowest each kind of step has been, and where: a step runs to its end, so one heavy step is one long frame.
             const worst = this.stepMax.get(r.value);
             if (r.value && (!worst || now - t > worst.ms)) this.stepMax.set(r.value, { ms: now - t, x: camX + W / 2 });
-            return now - t0 < LEVEL.buildBudgetMs;
+            return now - t0 < (this.viewReady ? LEVEL.buildBudgetMs : LEVEL.buildRushMs);
         };
         let budget = !this.job || step();
         if (missing.length) {
@@ -723,7 +724,7 @@ export default class LevelGenerator {
         yield 'nets'; if (chunk.dead) return;
         // --- Pier: deck at the surface, piles down to the rock (spans chunks) --
         const pier = this.pierAt(cx, biome);
-        if (pier) this.drawPier(chunk, pier, oy, keep);
+        if (pier) { yield* this.drawPier(chunk, pier, oy, keep); if (chunk.dead) return; }
 
         yield 'pier'; if (chunk.dead) return;
         // --- Bubble plants: a column of bubbles that carries the fish upward --
@@ -1240,7 +1241,8 @@ export default class LevelGenerator {
      * seamless wood strip tiled down through the chunks, a barnacle band in the tidal zone
      * (varied per pile) and the overgrown foot sunk into the rock.
      */
-    drawPier(chunk, pier, oy, keep) {
+    /** A generator like build(): the deck and every pile are a build step each. */
+    *drawPier(chunk, pier, oy, keep) {
         const s = this.scene, p = PROPS.pier, y1 = oy + CH;
         const frame = key => s.textures.getFrame(key);
         // The pile art is wider than its wood (growth sticks out): size it so the wood
@@ -1261,6 +1263,7 @@ export default class LevelGenerator {
         }
         const top = pier.deckTop + pier.deckH * 0.8;                   // hidden behind the posts' opaque part
         for (const q of pier.piles) {
+            yield 'pier'; if (chunk.dead) return;
             const footH = frame('pier_foot').height * k, foot = q.ground + pw * 0.5 - footH;
             if (foot >= oy && foot < y1) piece('pier_foot', q.x, foot, footH);
             // Seamless wood strip, tiled by world y; one pixel of overlap at chunk joins.
