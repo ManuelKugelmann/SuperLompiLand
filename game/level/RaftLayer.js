@@ -1,9 +1,11 @@
 import { RAFTS, FLYERS, raftSpots, flyersAt, flyerAt } from './rafts.js';
+import { mixColor, waterHue } from './biomes.js';
 
 export const RAFT_LOOK = {
     near: 2600, far: 4200,   // px: a raft is built when the player is this close, removed beyond that
     waterline: 0.36,     // share of the picture's height at which it lies in the water
     rock: 0.035,         // radians it rocks on the swell
+    wet: 0.45,           // how far the part under the surface takes on the water's hue
     depth: 4.8,          // just behind the fish
     flyer: 86,           // px length of a flying fish in a burst
     flyerDepth: 5.4
@@ -41,7 +43,7 @@ export default class RaftLayer {
         this.scene = scene; this.surfaceY = surfaceY; this.onSeen = onSeen; this.seen = false;
         this.spots = raftSpots();
         ensureTexture(scene);       // drawn at start-up, not on first sight
-        this.rafts = new Map();     // spot id -> image
+        this.rafts = new Map();     // spot id -> [dry half, wet half]
         this.flyers = null;         // pooled pictures of one burst
         this.burstAt = null;        // { x, y, dir, seed, t0 }
         this.lastBurst = -Infinity;
@@ -67,10 +69,16 @@ export default class RaftLayer {
             const d = Math.abs(spot.x - fish.x), img = this.rafts.get(spot.id);
             if (!img && d < L.near) {
                 if (!this.scene.buildSlot()) continue;
-                const r = this.scene.add.image(spot.x, 0, KEY).setOrigin(0.5, L.waterline).setDepth(L.depth);
-                this.rafts.set(spot.id, r.setScale(RAFTS.width / r.width));
-            } else if (img && d > L.far) { img.destroy(); this.rafts.delete(spot.id); } else if (img) {
-                img.setY(this.surfaceY(spot.x)).setRotation(Math.sin(t * 0.9 + spot.x) * L.rock);
+                // Two halves of one picture: dry above the waterline, seen through the water below it.
+                const half = wet => {
+                    const r = this.scene.add.image(spot.x, 0, KEY).setOrigin(0.5, L.waterline).setDepth(L.depth), cut = r.height * L.waterline;
+                    if (wet) r.setCrop(0, cut, r.width, r.height - cut).setTint(mixColor(0xffffff, waterHue(spot.x), L.wet));
+                    else r.setCrop(0, 0, r.width, cut);
+                    return r.setScale(RAFTS.width / r.width);
+                };
+                this.rafts.set(spot.id, [half(false), half(true)]);
+            } else if (img && d > L.far) { for (const h of img) h.destroy(); this.rafts.delete(spot.id); } else if (img) {
+                for (const h of img) h.setY(this.surfaceY(spot.x)).setRotation(Math.sin(t * 0.9 + spot.x) * L.rock);
                 if (!this.seen && d < RAFTS.seen && fish.y < 700) { this.seen = true; this.onSeen(); }
             }
         }
