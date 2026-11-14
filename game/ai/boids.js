@@ -63,15 +63,15 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
     }
 
     const flow = { x: 0, y: 0 };
+    // The middle of the swarm, summed up as a by-product of each step.
+    const mid = { x: 0, y: 0 };
+    const findMid = () => { let sx = 0, sy = 0; for (let i = 0; i < n; i++) { sx += px[i]; sy += py[i]; } mid.x = sx / n; mid.y = sy / n; };
+    findMid();
     return {
         count: n, x: px, y: py, vx, vy, panic, turn, anchor, leader,
 
-        /** Centre of the swarm (for cameras, spawning checks, predators). */
-        centre() {
-            let sx = 0, sy = 0;
-            for (let i = 0; i < n; i++) { sx += px[i]; sy += py[i]; }
-            return { x: sx / n, y: sy / n };
-        },
+        /** Centre of the swarm as of its last step (for cameras, spawning checks, predators): one kept object, not to be changed. */
+        centre() { return mid; },
 
         /** A sudden event at (x, y) (a special, a splash): fish within r panic; the wave does the rest. */
         startle(x, y, r = P.panicR) {
@@ -188,6 +188,7 @@ export function createSwarm({ count = 120, x = 0, y = 0, random = Math.random, .
                 if (!env.isOpen || env.isOpen(nx, ny)) { px[i] = nx; py[i] = ny; }
                 else { vx[i] = -vx[i] * 0.5; vy[i] = -vy[i] * 0.5; }   // bounce off, never into rock
             }
+            findMid();
         }
     };
 }

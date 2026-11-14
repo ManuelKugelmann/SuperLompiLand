@@ -62,6 +62,7 @@ import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
 import { VIEW_CULL, cullToView } from '../game/viewCull.js';
+import { due, everyOf } from '../game/throttle.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
 import FriendSchool from '../game/FriendSchool.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
@@ -1687,14 +1688,12 @@ export default class MainScene extends Phaser.Scene {
 
         // Ambient light: one multiply layer over the whole world — warm and bright
         // near the surface, taking on the biome's water colour and dimming with depth.
-        const bl = biomeBlendAt(view.x);
         // Bright down to the reef floor, dimming only in real depth; the abyss is dark.
         const depth01 = WORLD.darkness.reduce((d, [from, to, share]) => d + Phaser.Math.Clamp((view.y - from) / (to - from), 0, 1) * share, 0);
         // Darkness only by depth (spec 5.0h): the biome gives the light its hue at one brightness.
         // ... and depth darkens toward a deep version of that same hue, so a deep wreck stays rusty and the trench indigo.
         // Spec 5.0j: skylight (a slow day/sunset/night cycle, storms), the biome's hue, its sediment,
         // the seabed's colour bouncing up close above it, and depth (game/level/light.js).
-        const hue = waterHue(view.x), deep = mixColor(0x0c1436, atLuma(hue, WATER_LIGHT.deepLuma), WATER_LIGHT.deepHue);
         this.lightTick = ((this.lightTick || 0) + 1) % 8;
         if (!this.lightTick) this.floorNear = this.level.groundBelow(view.x, view.y, 700);
         const fl = this.floorNear;
@@ -1709,20 +1708,24 @@ export default class MainScene extends Phaser.Scene {
                 this.particles.spawn('plankton', view.x - fv.x * 2.5, view.y - fv.y * 2.5, n, { radius: r * 0.8, spread: 25, vx: -fv.x * 6, vy: -fv.y * 6 });
             }
         }
-        const light = lightAt({ depth01, y: view.y, t: skyT, storm: stormShare(view.x), hue, deepHue: deep,
-            floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) });
-        this.ambient.setFillStyle(light, 1);
-        this.coinGlow.update(light);      // coins keep a gold glint where the light is dim (night, depth)
-        // Inside the side cave the score closes in: it is played as if much deeper down.
-        const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
-        // The score plays as if deeper inside the cave, and partway at night (sparser, softer; spec 5.0k).
-        const musicDepth = Math.max(depth01, inCave ? WORLD.caveDepth01 : 0, nightShare(skyT) * WORLD.nightDepth01);
-        updateMusic(biomeBlendAt(this.fish.sprite.x), musicDepth);   // background score + sea hum (spec ch.12)
-        // The storm rumbles overhead (loudest near the surface); strong moving water rushes past the fish.
-        const p = this.soundProbe || (this.soundProbe = { x: 0, y: 0 }), waves = this.waves ?? this.wavePhase();
-        let moving = Math.hypot(surgeAt(view.x, view.y, waves, p).x, p.y);
-        moving += Math.hypot(breakerAt(view.x, view.y, waves, p).x, p.y) + Math.abs(downAt(view.x, view.y, p).y);
-        updateWeatherSound(stormShare(view.x) * (1 - 0.6 * Phaser.Math.Clamp(view.y / 1500, 0, 1)), moving / WORLD.rushFull);
+        // The light, the score and the sound of the water are read from the world a few times a second (throttle.js): they change slowly.
+        if (due(this.game.loop.frame, everyOf('sample', this.quality.tier))) {
+            const bl = biomeBlendAt(view.x), hue = waterHue(view.x), deep = mixColor(0x0c1436, atLuma(hue, WATER_LIGHT.deepLuma), WATER_LIGHT.deepHue);
+            const light = lightAt({ depth01, y: view.y, t: skyT, storm: stormShare(view.x), hue, deepHue: deep,
+                floorGap: fl ? fl.y - view.y : Infinity, ground: fl ? fl.color : undefined, murk: murkAt(bl) });
+            this.ambient.setFillStyle(light, 1);
+            this.coinGlow.update(light);      // coins keep a gold glint where the light is dim (night, depth)
+            // Inside the side cave the score closes in: it is played as if much deeper down.
+            const cv = this.level.field.cave, inCave = sp.x > cv.x0 - BRANCH.mouth && sp.x < cv.x1 + BRANCH.mouth && sp.y > cv.top;
+            // The score plays as if deeper inside the cave, and partway at night (sparser, softer; spec 5.0k).
+            const musicDepth = Math.max(depth01, inCave ? WORLD.caveDepth01 : 0, nightShare(skyT) * WORLD.nightDepth01);
+            updateMusic(bl, musicDepth);   // background score + sea hum (spec ch.12)
+            // The storm rumbles overhead (loudest near the surface); strong moving water rushes past the fish.
+            const p = this.soundProbe || (this.soundProbe = { x: 0, y: 0 }), waves = this.waves ?? this.wavePhase();
+            let moving = Math.hypot(surgeAt(view.x, view.y, waves, p).x, p.y);
+            moving += Math.hypot(breakerAt(view.x, view.y, waves, p).x, p.y) + Math.abs(downAt(view.x, view.y, p).y);
+            updateWeatherSound(stormShare(view.x) * (1 - 0.6 * Phaser.Math.Clamp(view.y / 1500, 0, 1)), moving / WORLD.rushFull);
+        }
         // In the dark the fish carries a little light of its own.
         this.glow.setPosition(view.x, view.y).setAlpha(depth01 * FISH_LIGHT.alpha * shareOf(this, 'glow'));
 
