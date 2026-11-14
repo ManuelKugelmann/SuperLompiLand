@@ -1,15 +1,20 @@
 {
+    "id": "./",
     "name": "Super Lompi Land",
     "short_name": "LompiLand",
     "description": "Kugelfisch-Platformer — probiere verschiedene Steuerungen aus.",
+    "lang": "de",
     "start_url": "./",
     "scope": "./",
-    "display": "fullscreen",
+    "display": "standalone",
+    "display_override": ["fullscreen", "standalone"],
     "orientation": "landscape",
     "background_color": "#04343a",
     "theme_color": "#0e6b6b",
     "icons": [
-        { "src": "pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-        { "src": "pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+        { "src": "pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+        { "src": "pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
     ]
 }
