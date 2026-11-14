@@ -3,6 +3,7 @@ import GameMenu, { MENU } from '../game/ui/GameMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
 import { heartRow, textStyle, pillImage } from '../game/ui/kit.js';
 import { CONTROL_SCHEMES } from '../game/controls/index.js';
+import { TRAILS } from '../game/trails.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { feedbackMenuItems } from '../game/feedback.js';
@@ -149,6 +150,12 @@ export default class HudScene extends Phaser.Scene {
         });
         this.showSteer();
         x -= s + gap;
+        // The trail shop (spec 5.0r): coins buy a swim trail for Lompi. The list is made fresh at every opening.
+        if (TRAILS.enabled) {
+            const shop = new GameMenu(this, -9999, -9999, []);
+            button(x, x0 => this.add.text(x0, y, '✨', { fontSize: `${Math.round(s * 0.46)}px` }).setOrigin(0.5), () => { if (!shop.overlay) shop.items = m.trailItems(); shop.toggleMenu(); });
+            x -= s + gap;
+        }
         // The reef book.
         button(x, x0 => this.add.text(x0, y + 2, '📖', { fontSize: `${Math.round(s * 0.5)}px` }).setOrigin(0.5), () => m.openBook());
         // Fullscreen on or off (user: 'add exit fullscreen button to topbar'); only where the browser can do it.
