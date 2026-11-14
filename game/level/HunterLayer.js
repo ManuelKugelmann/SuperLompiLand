@@ -6,7 +6,7 @@ import { due, everyOf } from '../throttle.js';
  * that comes in from outside the picture, chases Lompi and swims off. Nothing exists between
  * events; one image during one.
  *
- *   create():  this.hunter = new HunterLayer(scene, solid, { warn, caught, escaped, seen })
+ *   create():  this.hunter = new HunterLayer(scene, { solid, top }, { warn, caught, escaped, seen })
  *   update():  this.hunter.update(fish, dt)
  */
 export const HUNTER_LOOK = { depth: 3.8, wag: 0.07, wagHz: 5, bubbleS: 0.12 };
@@ -37,9 +37,9 @@ function ensureTexture(scene) {
 }
 
 export default class HunterLayer {
-    /** `solid(x, y)` = rock there; `on` = { warn(), caught(x, y), escaped(), seen(kind) }. */
-    constructor(scene, solid, on) {
-        this.scene = scene; this.solid = solid; this.on = on;
+    /** `world` = { solid(x, y) rock there, top(x) the surface's y }; `on` = { warn(), caught(x, y), escaped(), seen(kind) }. */
+    constructor(scene, world, on) {
+        this.scene = scene; this.world = world; this.on = on;
         this.spots = hunterSpots(); this.done = new Set();
         this.h = null; this.img = null; this.sees = true; this.bubble = 0;
         ensureTexture(scene);
@@ -54,14 +54,14 @@ export default class HunterLayer {
             const s = spotNear(fish.x, this.done, HUNTER, this.spots);
             if (!s) return;
             this.done.add(s.id);
-            this.h = startHunter(fish);
+            this.h = startHunter(fish, HUNTER, this.world);
             this.on.warn();
             return;
         }
         const h = this.h, was = h.phase;
         // Rock between them hides Lompi; looked up every few frames (throttle.js 'check').
-        if (h.phase === 'chase' && due(frame, everyOf('check', tier), 3)) this.sees = !sightBlocked(this.solid, h.x, h.y, fish.x, fish.y);
-        stepHunter(h, fish, this.sees, dt);
+        if (h.phase === 'chase' && due(frame, everyOf('check', tier), 3)) this.sees = !sightBlocked(this.world.solid, h.x, h.y, fish.x, fish.y);
+        stepHunter(h, fish, this.sees, dt, HUNTER, this.world);
         if (h.phase === 'done') { this.img?.destroy(); this.img = null; this.h = null; return; }
         if (h.phase === 'warn') return;
         if (!this.img) {

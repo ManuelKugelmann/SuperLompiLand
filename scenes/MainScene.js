@@ -330,7 +330,7 @@ export default class MainScene extends Phaser.Scene {
         this.dumbo = new DumboLayer(this, x => this.level.field.routeY(x), kind => this.bookEntry(kind));
         // A dugong grazing at the lagoon's seagrass meadow (user reference): lifts its head to look at Lompi.
         // World event (spec 5.0t 1): a barracuda passes; hide behind rock, keep away or last it out. Not in the ambient title; the perf tour skips it.
-        this.hunter = this.ambientMode ? null : new HunterLayer(this, (x, y) => this.density(x, y) > LEVEL.threshold, {
+        this.hunter = this.ambientMode ? null : new HunterLayer(this, { solid: (x, y) => this.density(x, y) > LEVEL.threshold, top: x => this.surface.heightAt(x, this.time.now / 1000) }, {
             warn: () => { play('whistle'); this.announce(this.lang === 'de' ? 'Ein Jäger kommt!' : 'A hunter is coming!', this.lang === 'de' ? 'Versteck dich hinter Felsen oder schwimm davon!' : 'Hide behind rock or swim away!'); },
             caught: (x, y) => { if (!this.relaxed) this.hurt(x, y, 1); },
             escaped: () => { play('nest'); this.announce('', this.lang === 'de' ? 'Puh! Entwischt!' : 'Phew! Got away!'); },

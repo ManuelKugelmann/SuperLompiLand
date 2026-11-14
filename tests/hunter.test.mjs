@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HUNTER, hunterSpots, spotNear, startHunter, stepHunter, sightBlocked } from '../game/level/hunter.js';
+import { HUNTER, hunterSpots, spotNear, startHunter, stepHunter, sightBlocked, freeHeading } from '../game/level/hunter.js';
 import { BIOMES } from '../game/level/biomes.js';
 
 const DT = 1 / 60;
@@ -59,4 +59,23 @@ test('rock between two points blocks the view', () => {
     assert.equal(sightBlocked(wall, 0, 0, 1000, 0), true);
     assert.equal(sightBlocked(wall, 0, 0, 400, 0), false);
     assert.equal(sightBlocked(() => false, 0, 0, 1000, 300), false);
+});
+
+test('it never swims into rock or above the surface, also when the fish hides behind a wall', () => {
+    // A wall right of x = 5600 from y = 600 down, the surface at y = 300; the fish sits behind the wall.
+    const world = { solid: (x, y) => x > 5600 && x < 5900 && y > 600, top: () => 300 };
+    const fish = { x: 6100, y: 900 }, h = startHunter(fish, HUNTER, world);
+    assert.ok(h.y >= 300 + HUNTER.under, 'it sets off under the surface');
+    for (let t = 0; t < 25 && h.phase !== 'done'; t += DT) {
+        stepHunter(h, fish, !sightBlocked(world.solid, h.x, h.y, fish.x, fish.y), DT, HUNTER, world);
+        assert.ok(!world.solid(h.x, h.y), 'in rock at ' + Math.round(h.x) + ',' + Math.round(h.y));
+        assert.ok(h.y > 300, 'above the surface');
+    }
+    assert.equal(h.phase, 'done');
+});
+
+test('the free heading is the wanted one in open water and turns off before rock', () => {
+    const open = { solid: () => false, top: () => -Infinity };
+    assert.equal(freeHeading(0, 0, 0.3, open), 0.3);
+    assert.notEqual(freeHeading(0, 0, 0, { solid: x => x > 200, top: () => -Infinity }), 0);
 });
