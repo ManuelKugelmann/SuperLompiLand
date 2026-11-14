@@ -14,7 +14,8 @@ export const SKY = {
     // Every island stands on rock that goes on down under the water (user: nothing ends at the
     // waterline): a socket under each near coast piece, as wide as it at the top, widening and fading
     // into the water over `deep` px. Drawn just over the sea sheet, behind everything that plays.
-    socket: { deep: 760, depth: -27.9, tint: 0x6aa2ae, alpha: 0.78, top: 0.62 }      // top: share of the picture's width its top takes (it widens below)
+    // It stands as far off as the island: hazy, water-tinted, soft-edged, gone in the deep blue below.
+    socket: { deep: 620, depth: -27.9, tint: 0x5f9daa, alpha: 0.5, top: 0.62, fit: 0.78 }      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
 };
 
 /** The rock socket under an island (drawn once, procedural): a dark rock mass with a jagged outline and ledges, fading downward. */
@@ -25,13 +26,14 @@ function ensureSocket(scene) {
     // Half width from SKY.socket.top / 2 at the top to the full width at the bottom, bulging in big
     // ledges and rough in detail: the foot of a rocky island, not a straight-sided block.
     const T = SKY.socket.top / 2, bulge = [r(), r(), r(), r()];
-    const edge = (v, side) => side * W * (T + (0.49 - T) * Math.pow(v, 0.8)) + side * W * 0.03 * Math.sin(v * 9 + bulge[side > 0 ? 0 : 1] * 6) + (r() - 0.5) * 22 * (0.3 + v);
+    // Smooth noise only (low sines): per-vertex jitter read as stair steps once the texture is stretched.
+    const edge = (v, side) => { const b = bulge[side > 0 ? 0 : 1] * 6, k = bulge[side > 0 ? 2 : 3] * 6; return side * W * (T + (0.47 - T) * Math.pow(v, 0.8) + 0.03 * Math.sin(v * 9 + b) + 0.012 * Math.sin(v * 23 + k) * (0.3 + v)); };
     c.beginPath(); c.moveTo(W / 2 - T * W, 0); c.lineTo(W / 2 + T * W, 0);
     for (let v = 0; v <= 1.0001; v += 0.04) c.lineTo(W / 2 + edge(v, 1), v * H);
     for (let v = 1; v >= -0.0001; v -= 0.04) c.lineTo(W / 2 + edge(v, -1), v * H);
     c.closePath();
     const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#3a4652'); g.addColorStop(0.5, '#2b3744'); g.addColorStop(1, '#1f2a36');
-    c.fillStyle = g; c.fill();
+    c.fillStyle = g; c.shadowColor = '#2b3744'; c.shadowBlur = 18; c.fill(); c.shadowBlur = 0;      // a soft rim: far rock, out of focus
     c.save(); c.clip();
     for (let i = 0; i < 26; i++) {           // ledges: a lit top edge with a shadow under it
         const y = r() * H, x = r() * W, w = 60 + r() * 160;
@@ -42,7 +44,7 @@ function ensureSocket(scene) {
     for (let i = 0; i < 900; i++) { c.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '0,0,0'},${0.05 + r() * 0.08})`; c.fillRect(r() * W, r() * H, 2 + r() * 4, 2 + r() * 3); }
     c.restore();
     c.globalCompositeOperation = 'destination-in';            // fade into the water toward the bottom
-    const f = c.createLinearGradient(0, 0, 0, H); f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(0.45, 'rgba(0,0,0,0.85)'); f.addColorStop(1, 'rgba(0,0,0,0)');
+    const f = c.createLinearGradient(0, 0, 0, H); f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(0.3, 'rgba(0,0,0,0.8)'); f.addColorStop(0.85, 'rgba(0,0,0,0)');
     c.fillStyle = f; c.fillRect(0, 0, W, H);
     t.refresh();
 }
@@ -174,7 +176,7 @@ export default class SkyLayer {
         // are a list of what stands where; the few in view are shown with pictures from a small pool.
         this.items = [
             ...skyItems().map(item => ({ item, key: `sky_${item.kind}`, depth: -28.7 + item.scroll, alpha: SKY.haze * (0.75 + item.scroll * 1.5), flip: false })),
-            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.05, alpha: NEAR_COAST.alpha, tint: NEAR_COAST.tint, flip: item.flip }))
+            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.05, alpha: NEAR_COAST.alpha, tint: NEAR_COAST.tint, flip: item.flip, near: true }))
         ];
         for (const d of this.items) d.half = scene.textures.getFrame(d.key).width * d.item.size / 2;
         this.pool = [];      // pictures for the items in view, made as needed
@@ -194,12 +196,12 @@ export default class SkyLayer {
         const K = SKY.socket, deepEnough = camY > SKY.baseY + K.deep;
         let used = 0;
         if (!deepEnough) for (const d of this.items) {
-            if (d.depth !== -28.0) continue;                   // near coast pieces only (the far shapes stand on the horizon)
+            if (!d.near) continue;                             // near coast pieces only (the far shapes stand on the horizon)
             const sx = screenX(d.item, cam, W);
             if (!onScreen(sx, d.half, W)) continue;
             const o = this.sockets[used] || (this.sockets[used] = this.scene.add.image(0, 0, 'coast_socket').setOrigin(0.5, 0).setScrollFactor(0, 1).setDepth(K.depth).setTint(K.tint).setAlpha(K.alpha));
             used++;
-            o.setVisible(true).setPosition(sx, SKY.baseY - 6).setDisplaySize(d.half * 2 / K.top, K.deep).setFlipX(d.flip);
+            o.setVisible(true).setPosition(sx, SKY.baseY - 6).setDisplaySize(d.half * 2 * K.fit / K.top, K.deep).setFlipX(d.flip);
         }
         for (let i = used; i < this.sockets.length; i++) this.sockets[i].setVisible(false);
     }
