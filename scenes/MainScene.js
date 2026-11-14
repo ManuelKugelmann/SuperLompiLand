@@ -208,6 +208,9 @@ export default class MainScene extends Phaser.Scene {
         this.speedLines = new SpeedLines(this);     // streaks rushing past while in flow
         // ?debug=flow: arrows show where the water moves and how fast (also with the Debug button).
         this.flowDebug = new URLSearchParams(window.location.search).get('debug') === 'flow';
+        // ?debug=ai: every creature shows what it is doing right now (spec 6.2 readability guard).
+        this.aiDebug = new URLSearchParams(window.location.search).get('debug') === 'ai';
+        this.aiLabels = new Map();
 
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
         this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.level.startle(x, y); this.chainMove('special'); });
@@ -446,6 +449,19 @@ export default class MainScene extends Phaser.Scene {
         this.activeScheme = id;
         this.controller = makeController(id, this, this.fish);
         this.progression.set?.('controls', id);
+    }
+
+    /** Debug only: a label over every creature with a mind, naming its state. */
+    drawAi() {
+        for (const f of this.level.friends) {
+            const mind = f.img.brain || f.img.crawler;
+            if (!mind || !f.img.active || this.aiLabels.has(f.img)) continue;
+            this.aiLabels.set(f.img, this.add.text(0, 0, '', { fontFamily: 'Arial', fontSize: '26px', color: '#ffffff', stroke: '#0a3f6e', strokeThickness: 6 }).setOrigin(0.5).setDepth(9.6));
+        }
+        for (const [img, label] of this.aiLabels) {
+            if (!img.active) { label.destroy(); this.aiLabels.delete(img); continue; }
+            label.setText((img.brain || img.crawler).state).setPosition(img.x, img.y - img.displayHeight * 0.5 - 24);
+        }
     }
 
     /** Debug only: the flow field as arrows on a grid, redrawn a few times a second. */
@@ -934,6 +950,7 @@ export default class MainScene extends Phaser.Scene {
         }
         this.speedLines.update(delta, v.x, v.y, !this.relaxed && this.chain.flow);
         this.drawFlow(delta);
+        if (this.aiDebug) this.drawAi();
         const shot = this.boosters.update(this.cameras.main.worldView, this.fish, this.time.now);
         if (shot) {
             play(shot === 'cannon' ? 'cannon' : 'boing');

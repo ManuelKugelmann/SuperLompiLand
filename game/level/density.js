@@ -64,9 +64,12 @@ export function createField(seed) {
         const ds = Math.hypot(x - FIELD.spawn.x, y - FIELD.spawn.y);
         if (ds < 900) n -= (1 - ds / 900) * 0.6;                         // clear start pool
         if (withNests && nests) {
-            // The calm route: fully open inside its half width, fading back to rock over half as much again.
-            const off = Math.abs(y - routeY(x)) / ROUTE.halfWidth;
-            if (off < 1.5 && x > FIELD.spawn.x - 600 && x < WORLD_END) n -= 0.95 * smooth01((1.5 - off) * 2);
+            // The calm route: fully open inside its half width, fading back to rock over as much
+            // again (a soft edge: no sharp step in the field). Where the lane runs just under the
+            // open surface water, everything above it is lane too, so no sliver of rock is left between.
+            const ry = routeY(x), shallow = ry - ROUTE.halfWidth * 2 < 620 && y < ry;
+            const off = shallow ? 0 : Math.abs(y - ry) / ROUTE.halfWidth;
+            if (off < 2 && x > FIELD.spawn.x - 600 && x < WORLD_END) n -= 0.95 * smooth01(2 - off);
             for (const nest of nests) {
                 const dx = Math.abs(x - nest.x);
                 if (dx > 520) continue;

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import { createSwimmer, stepSwimmer } from '../ai/swimmer.js';
+import { createCrawler, stepCrawler } from '../ai/crawler.js';
 import { eachCell as marchGrid } from './terrain.js';
 import { FIELD, ROUTE, createField, chunkGrids, gridRows } from './density.js';
 import { SHADE, shadeChunk } from './shade.js';
@@ -14,7 +15,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 5,           // bump when generation changes what index a coin or friend gets
+    version: 6,           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
@@ -38,10 +39,11 @@ const FRIENDS = {
     friend_turtle: { size: 240, swim: 380, bob: 18, anim: 'swim', speed: 0.5, ai: { speed: 1.3, range: 560, turn: 0.03, shy: 0.7 } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
     friend_seahorse: { size: 120, bob: 26, anim: 'sway', ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2 } },
-    friend_starfish: { size: 170, ground: true, anim: 'wobble' },
-    friend_snail: { size: 160, ground: true, anim: 'wobble' },
-    friend_nudibranch: { size: 190, ground: true, anim: 'wobble' },
-    urchin: { size: 140, ground: true, anim: 'throb' },
+    // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
+    friend_starfish: { size: 170, ground: true, anim: 'wobble', crawl: { speed: 0.1, range: 160 } },
+    friend_snail: { size: 160, ground: true, anim: 'wobble', crawl: { speed: 0.18, range: 240 } },
+    friend_nudibranch: { size: 190, ground: true, anim: 'wobble', crawl: { speed: 0.26, range: 300 } },
+    urchin: { size: 140, ground: true, anim: 'throb', crawl: { speed: 0.05, range: 90 } },
     // The anglerfish art faces left (tail on the right); it lights the deep.
     enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', tail: 'right', speed: 0.7, facesLeft: true, glow: true, ai: { speed: 1.6, range: 620, turn: 0.04 } }
 };
@@ -136,6 +138,7 @@ export default class LevelGenerator {
         this.chains = [];           // hanging chains: verlet ropes (rope.js) with the hazard as the weight at the end
         this.lineEnd = { x: 0, y: 0 };
         this.brainEnv = { isOpen: (x, y) => this.isOpen(x, y, 0.05), t: 0, player: null, alarm: null };
+        this.crawlEnv = { density: (x, y) => this.density(x, y), threshold: LEVEL.threshold, player: null };
         this.alarm = { x: 0, y: 0 };   // where something sudden just happened (a special): creatures nearby take fright
         this.alarmLeft = 0;
         this.tethers = [];          // lines that hold drifting things: stretched between them and their anchor every frame
@@ -308,7 +311,17 @@ export default class LevelGenerator {
         env.t = t; env.player = this.chainBody.active ? this.chainBody : null;
         env.alarm = this.alarmLeft > 0 ? this.alarm : null;
         this.alarmLeft -= dt;
+        const ground = this.crawlEnv;
+        ground.player = env.player;
         for (const o of this.animated) {
+            const c = o.crawler;
+            if (c && o.active && dt > 0) {
+                stepCrawler(c, dt, ground);
+                o.setPosition(c.x + c.nx * o.lift, c.y + c.ny * o.lift);
+                o.lean = Math.atan2(c.nx, -c.ny);
+                o.shrink += ((c.state === 'curl' ? 0.78 : 1) - o.shrink) * 0.15;
+                if (c.state === 'crawl') o.face(c.dir);
+            }
             const a = o.brain;
             if (!a || !o.active || dt <= 0) continue;
             stepSwimmer(a, dt, env);
@@ -669,6 +682,11 @@ export default class LevelGenerator {
         const s = this.scene, f = FRIENDS[key];
         const img = makeCritter(s, key, x, y, f.size, f.anim, { ...f, rotation: angle }).setDepth(f.ground ? 1 : 4);
         this.animated.push(img);
+        if (f.crawl) {
+            // On the rock: it follows the outline, pauses, and pulls in when bumped.
+            const c = createCrawler(x, y, this.crawlEnv.density, LEVEL.threshold, f.crawl, rng.frac() * 1000);
+            if (c.onRock) { img.crawler = c; img.lift = Math.hypot(x - c.x, y - c.y); img.shrink = 1; }
+        }
         if (f.ai) {
             // No fixed path: it roams, rests, notices and greets the player, and darts off when rushed.
             img.brain = createSwimmer({ x, y }, f.ai, rng.frac() * 1000);

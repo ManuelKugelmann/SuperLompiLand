@@ -72,10 +72,13 @@ export function makeCritter(scene, key, x, y, width, anim = 'wobble', opts = {})
         } else if (anim === 'still') {
             obj.rotation = opts.rotation ?? 0;
         } else {
-            obj.rotation = (opts.rotation ?? 0) + Math.sin(p * 1.6) * 0.05;
+            obj.rotation = (obj.lean ?? opts.rotation ?? 0) + Math.sin(p * 1.6) * 0.05;
             sy = base * (1 + Math.sin(p * 2.3) * 0.025);
         }
-        obj.setScale(sx * dir, sy);
+        // `lean` (set from outside) turns a sitter to the ground it crawls on; `shrink` pulls it in.
+        if (anim === 'throb' && obj.lean !== undefined) obj.rotation = obj.lean;
+        const k = obj.shrink ?? 1;
+        obj.setScale(sx * dir * k, sy * k);
     };
     return obj;
 }
