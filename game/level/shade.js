@@ -36,7 +36,7 @@ export const SHADE = {
     wallMix: [0x0a, 0x2a, 0x44],
     wallAlpha: 0.62,
     backRockAlpha: 0.8,   // back rock under overhangs (backRock.js): how solid at its fullest
-    backRockDark: 0.62,   // its stone colour is darkened by this much (unlit, far)
+    backRockDark: 0.66,   // its stone colour is darkened to this at full cover (unlit, far)
     backRockFog: 0.38,    // and moved this far toward the biome's water colour
     occlusion: 0.36,      // darkest shade in the water right at the rock
     occlusionReach: 0.085 // density range in the water over which it fades out
@@ -273,7 +273,8 @@ export function shadeChunk(field, seed, ox, oy, span, cfg = SHADE) {
                 let wall = pal[p + c] + (cfg.wallMix[c] - pal[p + c]) * 0.45;
                 wall += (cfg.deepTint[c] - wall) * tintK;
                 const cave = wall * (0.8 + 0.4 * grain);
-                let far = pal[p + c] * tone * cfg.backRockDark;
+                // Darkest deep inside, lighter toward the openings (low coverage): inviting, not a dungeon.
+                let far = pal[p + c] * tone * (1 - (1 - cfg.backRockDark) * rockA / cfg.backRockAlpha);
                 far += (fogCol[px * 3 + c] - far) * cfg.backRockFog;
                 const w = wallA > 0 ? (cave * caveA + far * rockA * (1 - caveA)) / wallA : 0;
                 back[o + c] = (DARK[c] * occA + w * wallA * (1 - occA)) / a;

@@ -28,6 +28,8 @@ export const WATER_LIGHT = {
 };
 
 const TEX = 256;
+// Back shafts fall on everything behind the play plane, the cave back walls (depth -6) included.
+const SHAFT_BACK_DEPTH = -5.8;
 
 export default class WaterLight {
     constructor(scene) {
@@ -43,7 +45,7 @@ export default class WaterLight {
             const img = scene.add.image(x, -40, 'bd_ray').setOrigin(0.5, 0)
                 .setDisplaySize(front ? Phaser.Math.Between(70, 140) : Phaser.Math.Between(220, 460), H * Phaser.Math.FloatBetween(0.9, 1.25))
                 .setRotation(-0.22 + Phaser.Math.FloatBetween(-0.05, 0.05))
-                .setScrollFactor(0).setDepth(front ? 5.6 : -12).setBlendMode(Phaser.BlendModes.ADD);
+                .setScrollFactor(0).setDepth(front ? 5.6 : SHAFT_BACK_DEPTH).setBlendMode(Phaser.BlendModes.ADD);
             img.base = front ? Phaser.Math.FloatBetween(0.05, 0.09) : Phaser.Math.FloatBetween(0.16, 0.3);
             img.phase = Math.random() * 6.28;
             img.baseX = x;
