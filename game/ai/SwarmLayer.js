@@ -51,13 +51,14 @@ function paintedFrames(c, img, w, h) {
     });
 }
 
-function fishTexture(scene, id, sp) {
+/** The frames of one species (tail beats 0..2, flash 3), painted or drawn; baked once as swarm_<id>. Returns the texture key. */
+export function fishTexture(scene, id, sp) {
     const key = `swarm_${id}`;
     if (scene.textures.exists(key)) return key;
     const { w, h } = frameSize(sp);
     const tex = scene.textures.createCanvas(key, w * (TAIL.length + 1), h);
     const c = tex.getContext();
-    const art = schoolArt(id).key;
+    const art = schoolArt(sp.art || id).key;      // `art`: another species' painting at this size
     if (scene.textures.exists(art)) {
         paintedFrames(c, scene.textures.get(art).getSourceImage(), w, h);
         [...TAIL, 0].forEach((_, f) => tex.add(f, 0, f * w, 0, w, h));

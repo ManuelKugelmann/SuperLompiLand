@@ -4,9 +4,7 @@
 // current, a friend or an event is.
 
 import { BIOMES } from './biomes.js';
-import { WEATHER, weatherZones } from './weather.js';
-import { JOURNEY, chapters } from '../journey.js';
-import { rescueSpots } from '../rescues.js';
+import { busyStretches, isClear, slideClear } from './openSea.js';
 
 export const BLOOM = {
     seas: ['blue', 'wreck'],
@@ -32,28 +30,17 @@ let FIELDS = null;
 /** Every bloom field, west to east: [{ id, x0, x1, top, bottom }]. A `deep` field's top and bottom are px above and below the calm route. */
 export function bloomFields(cfg = BLOOM) {
     if (cfg === BLOOM && FIELDS) return FIELDS;
-    const w = weatherZones(), keep = [w.storm, ...w.downs.map(([a, z]) => [a - WEATHER.down.ramp, z + WEATHER.down.ramp])], out = [];
-    for (const c of chapters()) {
-        if (c.friend) keep.push([c.x, c.x]);
-        if (c.event) keep.push([c.event.x - JOURNEY.eventClear, c.event.endX + JOURNEY.eventClear]);
-    }
-    for (const r of rescueSpots()) keep.push([r.x, r.x]);
+    const keep = busyStretches(), out = [];
     for (const id of cfg.seas) {
         const b = BIOMES.find(bi => bi.id === id);
         for (let x0 = b.from + cfg.first; x0 + cfg.width + cfg.first < b.from + b.width; x0 += cfg.every) {
-            // Move on east until it stands clear.
-            let at = x0;
-            for (let tries = 0; tries < 8; tries++) {
-                const hit = keep.find(([a, z]) => at + cfg.width + cfg.keep >= a && at - cfg.keep <= z);
-                if (!hit) break;
-                at = hit[1] + cfg.keep + 1;
-            }
+            const at = slideClear(x0, cfg.width, keep, cfg.keep);     // moved on east until it stands clear
             if (at + cfg.width + cfg.first < b.from + b.width && (!out.length || at > out[out.length - 1].x1 + cfg.keep)) out.push({ id: `bloom${out.length}`, x0: at, x1: at + cfg.width, top: cfg.top, bottom: cfg.bottom });
         }
     }
     const t = BIOMES.find(bi => bi.id === cfg.deep.biome);
     for (let x0 = t.from + cfg.deep.first; x0 + cfg.width + cfg.first / 2 < t.from + t.width; x0 += cfg.deep.every) {
-        if (!keep.some(([a, z]) => x0 + cfg.width + cfg.keep >= a && x0 - cfg.keep <= z)) out.push({ id: `bloom${out.length}`, x0, x1: x0 + cfg.width, top: -cfg.deep.half, bottom: cfg.deep.half, deep: true });
+        if (isClear(x0, cfg.width, keep, cfg.keep)) out.push({ id: `bloom${out.length}`, x0, x1: x0 + cfg.width, top: -cfg.deep.half, bottom: cfg.deep.half, deep: true });
     }
     if (cfg === BLOOM) FIELDS = out;
     return out;
