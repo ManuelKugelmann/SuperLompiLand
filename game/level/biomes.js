@@ -54,11 +54,12 @@ export const BIOMES = [
         hazards: { hazard_net: 1 }
     },
     {
+        // Cold water: anemones and sea fans, no reef corals.
         id: 'kelp', name: { de: 'Tangwald', en: 'Kelp Forest' },
         rock: [0xc9d08a, 0x9fae62, 0x6f8250, 0x4d5f44, 0x384238], water: [0x2f9a5c, 0.26], open: 0.05,
         backRock: 900,
-        coral: 0.15, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
-        props: { boulder: 3, kelpclump: 3 }, propRate: 1.4,
+        coral: 0, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
+        props: { boulder: 3, kelpclump: 3, anemone: 2, seafan: 1 }, propRate: 1.8,
         friends: { friend_seahorse: 3, friend_nudibranch: 3, friend_snail: 1, urchin: 1 },
         hazards: { hazard_net: 2, spikes: 1 }
     },
