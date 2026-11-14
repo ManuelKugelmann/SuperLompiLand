@@ -42,10 +42,12 @@ export function skyItems(biomes = BIOMES) {
  * little bigger or smaller and mirrored now and then so it never repeats exactly.
  */
 export const NEAR_COAST = {
-    scroll: 0.72,          // share of the camera's movement (near, but behind the play plane)
+    scroll: 0.5,           // share of the camera's movement (nearer than the far skyline, but a coast on the horizon)
     width: 1400,           // px of one piece at size 1
-    size: [0.85, 1.2],
-    gap: [0.05, 0.55],     // gap after a piece, in piece widths (small: the island shows on most jumps)
+    size: [0.4, 0.56],     // (playtest: "no foreground islands": a coast sits on the horizon behind the sea, never big and dark over the swimmer)
+    alpha: 0.85,           // hazed by the air between ...
+    tint: 0xbfe0ea,        // ... which also takes its darks toward the sky's colour
+    gap: [0.5, 1.6],       // gap after a piece, in piece widths (small: the island shows on most jumps)
     edge: 0.08,            // share of the biome left free at both ends (its neighbours' coasts take over)
     biomes: ['reef', 'kelp', 'harbour', 'shore']
 };

@@ -1,4 +1,5 @@
 import { spotsOf } from './worldMap.js';
+import { mixColor, waterHue } from './biomes.js';
 import BonusCoins from './BonusCoins.js';
 import { createRig } from '../CardRig.js';
 
@@ -15,7 +16,7 @@ export const RHYTHM_LOOK = {
     // px it cruises to either side; px under the route (whole in the picture when the fish swims the lane, never beside it);
     // faded into the water; how fast it comes and goes; `far` = how much of the camera's travel it follows
     // (it drifts past slower than the play plane, like everything distant); px at which it goes into the reef book.
-    shark: { scale: [1.6, 2.1], sharky: 250, roam: 1500, below: 380, depth: -5, alpha: 0.32, pace: 0.045, far: 0.3, seen: 1300, edge: 0.3 }      // edge: its length times this stays clear of the view's bottom edge (it is never cut by it)
+    shark: { scale: [1.6, 2.1], sharky: 250, roam: 1500, below: 380, depth: -5, alpha: 0.32, pace: 0.045, far: 0.3, seen: 1300, edge: 0.3, haze: 0.55 }      // edge: its length times this stays clear of the view's bottom edge (it is never cut by it)
 };
 
 /** The painted big corals (loaded by the title screen): a table, a brain, a fan and a staghorn thicket. While one is missing, one of the reef's own corals stands in, grown huge. */
@@ -87,7 +88,7 @@ export default class RhythmLayer {
         if (!key) return { destroy() {} };
         // The painted shark swims (its part rig bends tail and fins); `img` only says where it is.
         const width = L.sharky * pick(L.scale, hash(i, 3));
-        const rig = createRig(s, { states: { normal: { key, width, wiggle: 8 } }, anim: 'swim', soft: 0.5, upright: true }, spot.x0, 0, L.depth).setAlpha(L.alpha);
+        const rig = createRig(s, { states: { normal: { key, width, wiggle: 8 } }, anim: 'swim', soft: 0.5, upright: true }, spot.x0, 0, L.depth).setAlpha(L.alpha).setTint(mixColor(0xffffff, waterHue(spot.x0), L.haze));
         return { img: { x: spot.x0, y: 0 }, rig, width, book: 'adult_shark', seen: L.seen, phase: hash(i, 4) * 6.283, home: spot.x0, cruise: true, destroy: () => rig.destroy() };
     }
 

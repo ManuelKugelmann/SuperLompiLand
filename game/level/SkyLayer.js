@@ -1,4 +1,4 @@
-import { skyItems, nearCoastItems, screenX, onScreen, volcanoAt } from './skyline.js';
+import { NEAR_COAST, skyItems, nearCoastItems, screenX, onScreen, volcanoAt } from './skyline.js';
 
 export const SKY = {
     showAbove: 80,      // world y of the camera's top edge below which nothing of the sky is on screen
@@ -174,7 +174,7 @@ export default class SkyLayer {
         // are a list of what stands where; the few in view are shown with pictures from a small pool.
         this.items = [
             ...skyItems().map(item => ({ item, key: `sky_${item.kind}`, depth: -28.7 + item.scroll, alpha: SKY.haze * (0.75 + item.scroll * 1.5), flip: false })),
-            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.05, alpha: 0.97, flip: item.flip }))
+            ...nearCoastItems().filter(item => scene.textures.exists(`sky_${item.kind}`)).map(item => ({ item, key: `sky_${item.kind}`, depth: -28.05, alpha: NEAR_COAST.alpha, tint: NEAR_COAST.tint, flip: item.flip }))
         ];
         for (const d of this.items) d.half = scene.textures.getFrame(d.key).width * d.item.size / 2;
         this.pool = [];      // pictures for the items in view, made as needed
@@ -222,7 +222,7 @@ export default class SkyLayer {
             if (!onScreen(sx, d.half, W)) continue;
             const o = this.pool[used] || (this.pool[used] = this.make(d.key, d.depth));
             used++;
-            if (o.shows !== d) { o.shows = d; o.setTexture(d.key).setOrigin(0.5, 1).setScale(d.item.size).setFlipX(d.flip).setAlpha(d.alpha).setDepth(d.depth); }
+            if (o.shows !== d) { o.shows = d; o.setTexture(d.key).setOrigin(0.5, 1).setScale(d.item.size).setFlipX(d.flip).setAlpha(d.alpha).setDepth(d.depth).setTint(d.tint ?? 0xffffff); }
             o.setVisible(true).setPosition(sx, SKY.baseY);
         }
         for (let i = used; i < this.pool.length; i++) this.pool[i].setVisible(false);
