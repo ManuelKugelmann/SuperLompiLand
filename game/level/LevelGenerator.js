@@ -48,6 +48,7 @@ export const LEVEL = {
     atlasChunks: 36,      // chunks an atlas holds (a full one falls back to canvases)
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
+    frontAlpha: 0.75,     // trees and kelp that stand in front of the fish are this see-through, decided when they are built and never changed
     cullPad: 300,         // px beyond the view within which the world's pictures are still drawn (spec 5.0j: nothing further out is)
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
     rippleMax: 8,         // strips of rippled sand per chunk, at most
@@ -415,7 +416,7 @@ export default class LevelGenerator {
     cull(vx, vy, hw, hh) {
         for (const chunk of this.chunks.values()) {
             for (const o of chunk.objects) {
-                if (o.cullR === undefined) o.cullR = CULLED.has(o.type) ? Math.hypot(o.displayWidth, o.displayHeight) : -1;
+                if (o.cullR === undefined) o.cullR = !CULLED.has(o.type) ? -1 : o.points ? ropeReach(o) : Math.hypot(o.displayWidth, o.displayHeight);
                 if (o.cullR < 0) continue;
                 const on = Math.abs(o.x - vx) < hw + o.cullR && Math.abs(o.y - vy) < hh + o.cullR;
                 if (on !== o.visible) o.setVisible(on);
@@ -802,7 +803,8 @@ export default class LevelGenerator {
                 const root = keep(s.add.image(x, -40, `root_${rng.between(1, 3)}`).setOrigin(0.5, 0));
                 const stretch = 0.9 + (rng.realInRange(1.1, 2.1) - 1.1) * 0.2;
                 const scale = rng.realInRange(1.2, 2.4) * 512 * (front ? 1.15 : 1) / root.height;
-                root.setScale(scale * stretch, scale).setDepth(front ? 7.5 : -7).setAlpha(front ? 0.9 : 0.8);
+                root.setScale(scale * stretch, scale).setDepth(front ? 7.5 : -7).setAlpha(front ? LEVEL.frontAlpha : 0.8);
+                root.fgFixed = true;      // a tree keeps its look while the fish swims past (tester: "it shouldn't change"): a front one is a little see-through for good
                 if (rng.frac() < 0.5) root.setFlipX(true);
                 if (!front) root.setTint(0x6f8f86);
                 // Roots belong to a tree: its trunk and canopy stand above the waterline
@@ -810,6 +812,8 @@ export default class LevelGenerator {
                 const painted = s.textures.exists('root_top_1'), tree = painted ? `root_top_${1 + (k % 2)}` : 'root_top';
                 const top = keep(s.add.image(x, painted ? 6 : -34, tree).setOrigin(0.5, 1)    // painted roots end right at the waterline
                     .setScale(root.scaleX * 1.25).setDepth(front ? 7.4 : -7.1).setFlipX(root.flipX));
+                top.fgFixed = true;
+                if (front) top.setAlpha(LEVEL.frontAlpha);
                 if (!front) top.setTint(0xa9c4b4);
             }
         }
@@ -1347,6 +1351,7 @@ export default class LevelGenerator {
         const stalk = makeCritter(s, key, f.x + up.x * h * 0.48, f.y + up.y * h * 0.48, h * frame.width / frame.height, 'sway',
             { root: 'bottom', speed: rng.realInRange(0.5, 0.9), scaleY: h / frame.height });
         stalk.setDepth(depth);
+        if (depth >= 7) { stalk.setAlpha(LEVEL.frontAlpha); stalk.fgFixed = true; }      // in front of the fish: a little see-through for good, never fading in and out
         if (rng.frac() < 0.5) stalk.setFlipX?.(true);
         if (tint !== null) stalk.setColors?.(tint) ?? stalk.setTint?.(tint);
         stalk.isPlant = depth > -5;      // only stalks in the play plane bend away from the fish
@@ -1409,6 +1414,13 @@ export default class LevelGenerator {
         this.chains = this.chains.filter(o => o.active);
         this.vents = this.vents.filter(v => v.chunk !== key);
     }
+}
+
+/** How far a rope (a swaying stalk) reaches from its own x, y: the farthest of its points, plus its strip's width and room for its sway. */
+function ropeReach(o) {
+    let far = 0;
+    for (const q of o.points) far = Math.max(far, Math.hypot(q.x * o.scaleX, q.y * o.scaleY));
+    return far * 1.3 + (o.frame?.height || 0) * Math.abs(o.scaleY);
 }
 
 /** Nest pictures, made once: a disc of raked sand as a shaded relief, and a little shell. */

@@ -1265,7 +1265,7 @@ export default class MainScene extends Phaser.Scene {
         const box = this.fgBox || (this.fgBox = new Phaser.Geom.Rectangle());
         const edges = { x0: 0, y0: 0, x1: 0, y1: 0 };
         for (const o of this.children.list) {
-            if (o.depth < FOREGROUND.minDepth || o.depth >= FOREGROUND.maxDepth || !o.visible) continue;
+            if (o.depth < FOREGROUND.minDepth || o.depth >= FOREGROUND.maxDepth || !o.visible || o.fgFixed) continue;      // fgFixed: trees and kelp keep their look (LEVEL.frontAlpha)
             if (o.getBounds) {
                 o.getBounds(box);
                 edges.x0 = box.x; edges.y0 = box.y; edges.x1 = box.right; edges.y1 = box.bottom;
