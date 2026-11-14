@@ -20,11 +20,13 @@ export const sheenHue = (nx, ny, px, py, t, cfg = SHEEN) => nx * cfg.angle + ny 
 
 /** Vertex tint (0xRRGGBB) for shading g (0..1), hue h and strength k (0..1). */
 export function sheenTint(g, h, k, cfg = SHEEN) {
-    const ch = off => {
-        const rainbow = cfg.floor + (1 - cfg.floor) * (0.5 + 0.5 * Math.cos(TAU * (h + off)));
-        return Math.round(255 * g * (1 - k + k * rainbow));
-    };
-    return (ch(0) << 16) | (ch(2 / 3) << 8) | ch(1 / 3);
+    if (k <= 0) { const v = Math.round(255 * g); return (v << 16) | (v << 8) | v; }      // no sheen (every animal): plain shading, no cosines
+    // Per vertex per frame: no closures, so nothing is left for the garbage collector.
+    const f = cfg.floor, a = 255 * g * (1 - k), b = 255 * g * k * (1 - f) * 0.5, base = 255 * g * k * f;
+    const r = Math.round(a + base + b * (1 + Math.cos(TAU * h)));
+    const gr = Math.round(a + base + b * (1 + Math.cos(TAU * (h + 2 / 3))));
+    const bl = Math.round(a + base + b * (1 + Math.cos(TAU * (h + 1 / 3))));
+    return (r << 16) | (gr << 8) | bl;
 }
 
 /** Strength for a card: a part by its role, the body by SHEEN.body. */
