@@ -31,6 +31,7 @@ import { RESCUE_ART } from '../game/RescueLayer.js';
 import { BLOOM_ART } from '../game/level/BloomLayer.js';
 import { RAFT_ART } from '../game/level/RaftLayer.js';
 import { MEADOW_ART } from '../game/level/MeadowLayer.js';
+import { WHALE_SHARK_ART } from '../game/level/WhaleSharkLayer.js';
 import { MANTA_ART } from '../game/ai/MantaLayer.js';
 import { SKY_ART } from '../game/level/SkyLayer.js';
 import { NEAR_COAST } from '../game/level/skyline.js';
@@ -119,7 +120,7 @@ export default class IntroScene extends Phaser.Scene {
         if (!this.textures.exists('hull_bottom')) this.load.image('hull_bottom', 'img/props/hull_bottom.webp');
         for (const [key, file] of Object.entries(SHIP_FILES.images)) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.cache.json.exists(SHIP_FILES.json[0])) this.load.json(SHIP_FILES.json[0], SHIP_FILES.json[1]);
-        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
+        for (const [key, file] of Object.entries({ ...DOCKS_ART, ...ARCH_ART, ...RESCUE_ART, ...BLOOM_ART, ...RAFT_ART, ...MEADOW_ART, ...WHALE_SHARK_ART })) if (!this.textures.exists(key)) this.load.image(key, file);
         if (!this.textures.exists(MANTA_ART.key)) this.load.image(MANTA_ART.key, MANTA_ART.file);
         if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);

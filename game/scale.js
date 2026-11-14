@@ -39,6 +39,7 @@ export const LENGTHS = {
     whale: 14,                    // humpback
     whaleCalf: 5,
     manta: 5,                     // wingspan
+    whaleShark: 10,
     reefShark: 1.6,
     grouper: 1,
     turtle: 1,                    // green turtle, shell length

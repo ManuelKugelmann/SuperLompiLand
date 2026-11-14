@@ -54,6 +54,8 @@ import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
 import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
 import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
+import WhaleSharkLayer from '../game/level/WhaleSharkLayer.js';
+import { slipAt } from '../game/level/whaleShark.js';
 import StormLayer from '../game/fx/StormLayer.js';
 import Whale, { WHALE_SCENE } from '../game/Whale.js';
 import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
@@ -219,6 +221,8 @@ export default class MainScene extends Phaser.Scene {
         this.docks = new DocksLayer(this, docksSpot(), this.pearls.includes('docks_crab'), (x, y) => this.freeCrab(x, y));
         // The reef's wonder beat (spec 9.1): a manta glides to and fro high over the reef.
         this.manta = new MantaLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('manta'));
+        // The whale shark in the ship graveyard's sea, with a slipstream along its back (5.0k #4).
+        this.whaleShark = new WhaleSharkLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('whale_shark'));
         // The rocky shore's set piece (spec 5.0g): the sea arch, with its arc of coins for a jump through it.
         this.arch = new SeaArchLayer(this, seaArch(), inAir => this.throughArch(inAir), (x, y) => this.coinTaken(x, y));
         // Small rescues between the chapters (spec 5.0i): an animal in a bit of net every so often on the route.
@@ -854,6 +858,8 @@ export default class MainScene extends Phaser.Scene {
         if (z.downs.some(d => x > d[0] && x < d[1])) { downAt(x, y, add); out.x += add.x; out.y += add.y; }
         const cave = this.level.field.cave;
         if (x > cave.x0 && x < cave.x1) { caveFlow(cave, x, y, add); out.x += add.x; }      // the current in the side cave
+        const ws = this.whaleShark?.pose;      // its slipstream, only while it is built
+        if (ws && Math.abs(x - ws.x) < 1600) { slipAt(x, y, ws, add); out.x += add.x; }
         if (this.ventField?.live) { this.ventField.flowAt(x, y, add); out.y += add.y; }      // warm water rising over the smokers
         return out;
     }
@@ -1469,6 +1475,7 @@ export default class MainScene extends Phaser.Scene {
         this.branch.update(sp, time / 1000, delta, this.particles);
         this.docks.update(sp, time / 1000);
         this.manta.update(sp, time / 1000, delta);
+        this.whaleShark.update(sp, time / 1000, delta);
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
