@@ -18,13 +18,13 @@ import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare, waterTone } from './biomes.js';
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt, seaShare, waterTone, zonedBiomeAt } from './biomes.js';
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 28,
+    version: 29,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -415,7 +415,7 @@ export default class LevelGenerator {
         const keep = o => { chunk.objects.push(o); return o; };
         const has = key => s.textures.exists(key);
         const blend = biomeBlendAt(mid);
-        const biome = blend.t < 0.5 ? blend.a : blend.b;
+        const biome = zonedBiomeAt(blend.t < 0.5 ? blend.a : blend.b, mid);      // inside a sub-zone: its own mix of growth and props
 
         // The terrain pictures are shaded per pixel (shade.js, normally in the
         // worker) and shown as two plain images per chunk: nothing about the

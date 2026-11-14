@@ -1,3 +1,5 @@
+import { zoneMix, zoneValue, zoneKind, zonedBiome } from './subzones.js';
+
 // The journey runs west -> east along an island chain (spec 5.0c): the home island (lagoon,
 // mangroves, coral reef), a reef wall that drops into the open sea, then open sea and islands
 // in turn. `zone` says which a biome is; `floor` is how deep its seabed lies (world px).
@@ -31,6 +33,13 @@
 // Spec 5.0h: long zones, about a million px for the whole journey.
 const WIDTHS = { beach: 115000, mangrove: 90000, reef: 80000, blue: 160000, kelp: 90000, harbour: 90000, wreck: 140000, shore: 100000, trench: 120000 };
 export const WORLD_WEST = -6500;
+
+// Sub-zones (subzones.js): the kinds of seabed each long island biome runs through, in turn.
+const ZONES = {
+    beach: ['flats', 'meadow', 'outcrops', 'garden', 'gully'], mangrove: ['flats', 'gully', 'meadow', 'outcrops'], reef: ['garden', 'outcrops', 'gully', 'flats'],
+    kelp: ['meadow', 'outcrops', 'gully'], harbour: ['flats', 'gully', 'outcrops'], shore: ['outcrops', 'gully', 'flats', 'garden']
+};
+const ZONES_FROM = { beach: 12000 };      // world x from which a biome's sub-zones begin to act (the start lagoon stays as it is)
 
 // Living reef rock: warm limestone with pink coralline tones running deep, so its faces read as reef, not concrete.
 const ROCK_REEF = [0xf3dba0, 0xdcb986, 0xb88f78, 0x957474, 0x76606a];
@@ -145,7 +154,7 @@ export const BIOMES = [
 // Lay the biomes out west -> east.
 {
     let x = WORLD_WEST;
-    for (const b of BIOMES) { b.from = x; b.width = WIDTHS[b.id]; x += b.width; }
+    for (const b of BIOMES) { b.from = x; b.width = WIDTHS[b.id]; x += b.width; if (ZONES[b.id]) b.zones = ZONES[b.id]; if (ZONES_FROM[b.id] !== undefined) b.zoneFrom = ZONES_FROM[b.id]; }
 }
 
 /** x of the grand nest = end of the journey. */
@@ -352,7 +361,22 @@ export function wallLifeAt(x) {
     return b?.wallLife ? { rate: b.wallRate, life: b.wallLife } : null;
 }
 
-/** Seabed depth: shallow along the islands, far down in the open sea between them, plus the abyss. */
+/** The sub-zones at x: the mix of subzones.js for the biome x lies in (null where it has none). */
+export function subzoneAt(x, out) {
+    return zoneMix(BIOMES[biomeIndexAt(x)], x, out);
+}
+
+/** The biome's row for what grows and lies at x: inside a sub-zone, with that kind's rates. */
+export function zonedBiomeAt(biome, x) {
+    return biome.zones ? zonedBiome(biome, zoneKind(zoneMix(biome, x))) : biome;
+}
+
+/** How much rock a sub-zone takes away (+) or adds (-) at x. */
+export function zoneOpen(x) {
+    return zoneValue(subzoneAt(x), 'open');
+}
+
+/** Seabed depth: shallow along the islands (deeper or higher by sub-zone), far down in the open sea between them, plus the abyss. */
 export function floorY(x, cfg = SEABED) {
     const i = biomeIndexAt(x), b = BIOMES[i], prev = BIOMES[i - 1], next = BIOMES[i + 1];
     let base = b.floor;
@@ -367,6 +391,7 @@ export function floorY(x, cfg = SEABED) {
     } else if (next && x > next.from - cfg.coast / 2) {
         base = b.floor + (next.floor - b.floor) * smooth(0.5 + (x - next.from) / cfg.coast);
     }
+    if (b.zones) base += zoneValue(zoneMix(b, x), 'floor');
     // The lagoon: the sand rises gently toward the west until it leaves the water.
     if (x < LAGOON_RISE) {
         const t = clamp((x - SHORE) / (LAGOON_RISE - SHORE), 0, 1);

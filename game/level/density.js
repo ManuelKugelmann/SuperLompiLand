@@ -6,7 +6,7 @@ import { detour } from './weather.js';
 import { SET_PIECES, ghostShip, pinnacleTop, descentStart } from './setPieces.js';
 import { BRANCH, sideCave, ridgeTop, caveAt } from './branches.js';
 import { SEA_ARCH, seaArch } from './seaArch.js';
-import { BIOMES, BLEND, LANDMARK, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
+import { BIOMES, BLEND, LANDMARK, WORLD_WEST, WORLD_END, ABYSS, zoneOpen, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
@@ -19,7 +19,7 @@ export const FIELD = {
     footReach: 460,               // ... fading out this far above it
     seaClear: 1.3,                // how much rock the open sea takes away above its bottom (more than the noise can add)
     seaBottom: 300,               // px above the sea's bottom over which rock comes back
-    nestSearch: 16,               // a nest may move up to this many steps of 120 px east to find real seabed
+    nestSearch: 40,               // a nest may move up to this many steps of 120 px east to find real seabed (not the top of an outcrop)
     nestEvery: 15000,             // along an island a nest lies every so many px (spec 5.0h) ...
     nestKeep: 2600,               // ... but this far away from the set pieces and the friends' nets
     nestBucket: 4096              // px: nests are looked up by stretches of this length
@@ -155,7 +155,7 @@ export function createField(seed) {
         let c = colGrid.get(i);
         if (c) return c;
         const x = i * ROUTE.grid, { a, b, t } = biomeBlendAt(x);
-        c = { fy: floorY(x), open: a.open + (b.open - a.open) * t, sea: seaShare(x) };
+        c = { fy: floorY(x), open: a.open + (b.open - a.open) * t + zoneOpen(x), sea: seaShare(x) };
         if (colGrid.size > 16384) colGrid.clear();
         colGrid.set(i, c);
         return c;
