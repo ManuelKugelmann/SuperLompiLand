@@ -205,10 +205,11 @@ export const REEF_CREST = {
     half: 400,           // px to either side of the middle that it stands at full height
     ramp: 300,           // px beyond that over which things count as "on the crest"
     top: 180,            // px under the surface of its top
-    lump: 45,            // px its top rises and falls (a grown thing, not a table)
+    lump: 45,            // px its top rises and falls (a grown thing, not a table) ...
+    knobs: 25,           // ... plus this much in small bumps
     lagoonSlope: 2.6,    // px it falls per px toward the lagoon beyond its full part ...
     seaSlope: 1.5,       // ... and toward the open sea: a long encrusted slope
-    groove: { cell: 330, shift: 70, width: [40, 90], depth: [60, 150] },   // spur and groove: one rounded notch per cell, placed, sized and cut unevenly
+    groove: { cell: 380, shift: 60, depth: [40, 90], deep: [120, 150], deepShare: 0.33, slope: 1.15 },   // spur and groove: one hollow per cell, placed unevenly; most are shallow, about one in three is deep; `slope` = half width per px of depth (gentle sides)
     passY: 1560,         // the reef pass: the calm route dips to this depth to go through the reef, far under its top ...
     passRamp: 1000,      // ... sinking to it over this many px on the lagoon side ...
     passOut: 2600        // ... and leaving that depth over this many px beyond the reef's edge
@@ -234,11 +235,11 @@ export function reefCrestX(cfg = REEF_CREST) {
 export function reefCrestTop(x, cfg = REEF_CREST) {
     const dx = x - reefCrestX(cfg), out = Math.max(0, Math.abs(dx) - cfg.half);
     if (dx > cfg.inset) return Infinity;      // the reef ends here: beyond its edge the wall falls into the open sea
-    // One groove per cell: a rounded U (flat bottom, soft shoulders), never a V.
+    // One groove per cell: a rounded hollow with a round bottom and sloping sides (a cosine dip), never a slot.
     const gr = cfg.groove, i = Math.floor(dx / gr.cell);
     const mid = (i + 0.5) * gr.cell + (cellRand(i, 1) - 0.5) * 2 * gr.shift;
-    const half = (gr.width[0] + cellRand(i, 2) * (gr.width[1] - gr.width[0])) / 2, deep = gr.depth[0] + cellRand(i, 3) * (gr.depth[1] - gr.depth[0]);
-    const u = Math.abs(dx - mid) / half, notch = u >= 1.6 ? 0 : deep * smooth((1.6 - u) / 0.9);
+    const range = cellRand(i, 2) < gr.deepShare ? gr.deep : gr.depth, deep = range[0] + cellRand(i, 3) * (range[1] - range[0]);
+    const u = Math.abs(dx - mid) / (deep * gr.slope), notch = u >= 1 ? 0 : deep * 0.5 * (1 + Math.cos(Math.PI * u));
     return cfg.top + out * (dx < 0 ? cfg.lagoonSlope : cfg.seaSlope) + notch;
 }
 

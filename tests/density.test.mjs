@@ -125,7 +125,7 @@ test('the reef crest stands just under the surface at the reef\'s outer edge, lu
     for (let x = c - REEF_CREST.half + 40; x <= c + REEF_CREST.half - 40; x += 40) {
         const y = topAt(x);
         tops.push(y);
-        assert.ok(y > REEF_CREST.top - REEF_CREST.lump - 80 && y < REEF_CREST.top + REEF_CREST.lump + REEF_CREST.groove.depth[1] + 140, `crest top at ${x}: ${y}`);
+        assert.ok(y > REEF_CREST.top - REEF_CREST.lump - 80 && y < REEF_CREST.top + REEF_CREST.lump + REEF_CREST.knobs + REEF_CREST.groove.deep[1] + 80, `crest top at ${x}: ${y}`);
         assert.ok(f.density(x, f.routeY(x)) < FIELD.threshold, 'the channel');
     }
     assert.ok(Math.max(...tops) - Math.min(...tops) > 40, 'no flat table: the top rises and falls');

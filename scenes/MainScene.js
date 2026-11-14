@@ -5,7 +5,7 @@ import WorldState from '../systems/worldState.js';
 import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
-import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor, dropOffView } from '../game/level/biomes.js';
+import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor, dropOffView, REEF_CREST } from '../game/level/biomes.js';
 import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
@@ -28,7 +28,7 @@ import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
 import { JOURNEY, createJourney } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
-import { surgeAt, breakerAt } from '../game/level/surf.js';
+import { surgeAt, breakerAt, ripAt } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
 import { WEATHER, stormShare, stormAt, downAt } from '../game/level/weather.js';
 import StormLayer from '../game/fx/StormLayer.js';
@@ -639,6 +639,7 @@ export default class MainScene extends Phaser.Scene {
         const waves = this.waves, add = this.waterAdd || (this.waterAdd = { x: 0, y: 0 });
         surgeAt(x, y, waves, add); out.x += add.x; out.y += add.y;
         breakerAt(x, y, waves, add); out.x += add.x; out.y += add.y;
+        ripAt(x, y, waves, REEF_CREST.passY, add); out.x += add.x;      // the drawback runs out through the reef pass
         stormAt(x, y, this.time.now / 1000, add); out.x += add.x; out.y += add.y;
         downAt(x, y, add); out.x += add.x; out.y += add.y;
         return out;

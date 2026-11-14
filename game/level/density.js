@@ -99,7 +99,7 @@ export function createField(seed) {
         // The reef crest: solid coral from just under the surface down, whatever the noise says.
         // Its upper face is lumpy, slopes away to both sides and has grooves: no flat top, no cut faces.
         const crestTop = Math.abs(x - CREST_X) > CREST_REACH ? Infinity      // nowhere near it: nothing to work out
-            : reefCrestTop(x) + REEF_CREST.lump * (vnoise(x / 170, 3.7, seed + 21) * 2 - 1);
+            : reefCrestTop(x) + REEF_CREST.lump * (vnoise(x / 170, 3.7, seed + 21) * 2 - 1) + REEF_CREST.knobs * (vnoise(x / 55, 9.1, seed + 22) * 2 - 1);
         const crest = crestTop < fy ? reefCrest(x) : 0;
         if (crestTop < fy && y > crestTop) n += (FIELD.crestRock - n) * smooth01((y - crestTop) / 120);
         if (x < WORLD_WEST + 900) n += (WORLD_WEST + 900 - x) / 500;     // western shore

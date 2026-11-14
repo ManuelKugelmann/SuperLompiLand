@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SURF, surgeShare, surgeWave, surgeAt, surgeCrestX, breakerX, breakerState, breakerAt } from '../game/level/surf.js';
+import { SURF, surgeShare, surgeWave, surgeAt, surgeCrestX, breakerX, breakerState, breakerAt, ripAt } from '../game/level/surf.js';
 import { BIOMES, SHORE, floorY } from '../game/level/biomes.js';
 
 // A place in the surf zone: the sand a little under the surface.
@@ -68,4 +68,13 @@ test('a breaker tumbles whoever is in its foam toward the lagoon and down; under
     assert.deepEqual({ ...breakerAt(x, 40, SURF.breaker.set + 1) }, { x: 0, y: 0 }, 'nothing in the gap');
     assert.deepEqual({ ...breakerAt(x - SURF.breaker.reach - 300, 40, 0.5) }, { x: 0, y: 0 }, 'the lagoon behind is calm');
     assert.ok(breakerAt(x, 40, SURF.breaker.set + SURF.breaker.gap - 0.05).x > 0, 'the drawback pulls outward');
+});
+
+test('while the sea draws back, a mild rip runs out through the reef pass, and only there and then', () => {
+    const x = breakerX(), passY = 1560, before = SURF.breaker.set + SURF.breaker.gap - 0.05;
+    const v = ripAt(x, passY, before, passY);
+    assert.ok(v.x > 1 && v.x <= SURF.breaker.rip && v.y === 0, 'out to sea, gently');
+    assert.equal(ripAt(x, passY, 0.5, passY).x, 0, 'not while the waves break');
+    assert.equal(ripAt(x, passY - SURF.breaker.ripHalf - 10, before, passY).x, 0, 'not above the pass');
+    assert.equal(ripAt(x - 3000, passY, before, passY).x, 0, 'not in the lagoon');
 });

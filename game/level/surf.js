@@ -3,7 +3,7 @@
 // (px per 60 Hz step) that add to the flow field; neither ever hurts. Time is counted in
 // waves (`phase`, one per wave period), so the sea can breathe with the music's bars.
 
-import { floorY, REEF_CREST, reefCrestX } from './biomes.js';
+import { floorY, REEF_CREST, reefCrestX, reefCrest } from './biomes.js';
 
 export const SURF = {
     surge: {
@@ -23,7 +23,9 @@ export const SURF = {
         speed: 13,         // px/step toward the lagoon at the height of a breaker
         down: 0.55,        // share of that which goes down
         drawback: 0.6,     // waves before a set during which the sea draws back ...
-        pull: 4            // ... outward, at up to this many px/step
+        pull: 4,           // ... outward, at up to this many px/step
+        rip: 3,            // the same drawback runs out through the reef pass, at up to this many px/step (never enough to hold a fish)
+        ripHalf: 320       // px above and below the pass's middle that the rip reaches
     }
 };
 
@@ -88,5 +90,17 @@ export function breakerAt(x, y, phase, out = { x: 0, y: 0 }, cfg = SURF.breaker)
     const st = breakerState(phase, STATE, cfg);
     if (st.breaking > 0) { out.x = -cfg.speed * st.breaking * k; out.y = cfg.speed * cfg.down * st.breaking * k; }
     else if (st.drawback > 0) out.x = cfg.pull * st.drawback * k;
+    return out;
+}
+
+/**
+ * The rip in the reef pass: while the sea draws back before a set, the water in the pass
+ * (middle at depth `passY`) runs out to sea. Mild: a fish swims against it easily.
+ */
+export function ripAt(x, y, phase, passY, out = { x: 0, y: 0 }, cfg = SURF.breaker) {
+    out.x = 0; out.y = 0;
+    const k = reefCrest(x) * (1 - Math.abs(y - passY) / cfg.ripHalf);
+    if (k <= 0) return out;
+    out.x = cfg.rip * breakerState(phase, STATE, cfg).drawback * k;
     return out;
 }
