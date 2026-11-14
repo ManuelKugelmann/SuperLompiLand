@@ -20,7 +20,7 @@ test('it keeps the worst of each number per biome and skips the frames right aft
     t.sample({ logicMs: 1.5, chunkMs: 8, objects: 300, tweens: 40 });
     t.sample({ logicMs: 2.5, chunkMs: 3, objects: 280, tweens: 60 });
     const [r] = t.rows();
-    assert.deepEqual([r.biome, r.logicMs, r.chunkMs, r.objects, r.tweens, r.frames], ['beach', 2.5, 8, 300, 60, 2]);
+    assert.deepEqual([r.biome, r.logicMs, r.worstMs, r.chunkMs, r.objects, r.tweens, r.frames], ['beach', 2, 2.5, 8, 300, 60, 2]);
     assert.deepEqual(r.over, []);
 });
 
