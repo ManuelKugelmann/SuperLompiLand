@@ -8,10 +8,10 @@ import TiltController from './TiltController.js';
  * in-game switcher automatically.
  */
 export const CONTROL_SCHEMES = [
-    { id: 'tap', label: 'Tippen', Ctor: TapToMoveController },     // first = default for new players
-    { id: 'flap', label: 'Flattern', Ctor: FlapController },
-    { id: 'tilt', label: 'Neigen', Ctor: TiltController },
-    { id: 'stick', label: 'Stick', Ctor: VirtualStickController }
+    { id: 'tap', label: { de: 'Tippen', en: 'Tap' }, Ctor: TapToMoveController },     // first = default for new players
+    { id: 'flap', label: { de: 'Flattern', en: 'Flap' }, Ctor: FlapController },
+    { id: 'tilt', label: { de: 'Neigen', en: 'Tilt' }, Ctor: TiltController },
+    { id: 'stick', label: { de: 'Stick', en: 'Stick' }, Ctor: VirtualStickController }
 ];
 
 export function makeController(id, scene, fish) {

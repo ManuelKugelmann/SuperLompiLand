@@ -14,7 +14,7 @@ export default class ControlSwitcher {
         let x = (W - total) / 2 + bw / 2;
         this.buttons = {};
         for (const s of CONTROL_SCHEMES) {
-            this.buttons[s.id] = pillButton(scene, x, y, bw, bh, s.label, () => onSelect(s.id));
+            this.buttons[s.id] = pillButton(scene, x, y, bw, bh, s.label[scene.registry.get('currentLanguage') === 'en' ? 'en' : 'de'], () => onSelect(s.id));
             x += bw + gap;
         }
         // The physics-debug toggle is a developer's tool: only with ?debug in the address.
