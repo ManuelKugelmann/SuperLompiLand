@@ -20,6 +20,7 @@ import { play, nowSeconds, musicClock } from '../game/audio.js';
 import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
 import { CHAIN, createChain, createSpin } from '../game/chain.js';
 import BoosterLayer from '../game/level/BoosterLayer.js';
+import SpeedLines from '../game/fx/SpeedLines.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
@@ -200,6 +201,10 @@ export default class MainScene extends Phaser.Scene {
         // Bubble cannons and bounce pads along the streams (game/level/boosters.js).
         this.boosters = new BoosterLayer(this, this.flow, (x, y) => y > 60 && this.density(x, y) <= LEVEL.threshold);
 
+        this.speedLines = new SpeedLines(this);     // streaks rushing past while in flow
+        // ?debug=flow: arrows show where the water moves and how fast (also with the Debug button).
+        this.flowDebug = new URLSearchParams(window.location.search).get('debug') === 'flow';
+
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
         this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.chainMove('special'); });
 
@@ -256,6 +261,7 @@ export default class MainScene extends Phaser.Scene {
             this.particles.destroy();
             this.swarms.destroy();
             this.boosters.destroy();
+            this.speedLines.destroy();
             this.events.off('fish-special');
             document.removeEventListener('visibilitychange', saveNow);
             window.removeEventListener('pagehide', saveNow);
@@ -427,6 +433,33 @@ export default class MainScene extends Phaser.Scene {
         this.activeScheme = id;
         this.controller = makeController(id, this, this.fish);
         this.progression.set?.('controls', id);
+    }
+
+    /** Debug only: the flow field as arrows on a grid, redrawn a few times a second. */
+    drawFlow(delta) {
+        const on = this.flowDebug || this.debugOn;
+        if (!on && !this.flowArrows) return;
+        if (!this.flowArrows) this.flowArrows = this.add.graphics().setDepth(9.5);
+        this.flowArrows.setVisible(on);
+        this.flowDrawAt = (this.flowDrawAt || 0) - delta;
+        if (!on || this.flowDrawAt > 0) return;
+        this.flowDrawAt = 200;
+        const g = this.flowArrows.clear(), wv = this.cameras.main.worldView, t = this.time.now / 1000, out = this.flowProbe || (this.flowProbe = { x: 0, y: 0 });
+        const cell = 90;
+        for (let x = Math.floor(wv.x / cell) * cell; x < wv.right; x += cell) {
+            for (let y = Math.max(cell, Math.floor(wv.y / cell) * cell); y < wv.bottom; y += cell) {
+                this.flow.at(x, y, t, out);
+                const speed = Math.hypot(out.x, out.y);
+                if (speed < 0.15) continue;
+                // Colour by speed: pale = swell, yellow = a stream slower than the player, red = faster.
+                g.lineStyle(3, speed < 2 ? 0xbfe8ff : speed < 14 ? 0xffe066 : 0xff6b4a, 0.85);
+                const len = Math.min(cell * 0.8, 10 + speed * 3.2), ux = out.x / speed, uy = out.y / speed;
+                const x2 = x + ux * len, y2 = y + uy * len;
+                g.lineBetween(x, y, x2, y2);
+                g.lineBetween(x2, y2, x2 - ux * 10 - uy * 6, y2 - uy * 10 + ux * 6);
+                g.lineBetween(x2, y2, x2 - ux * 10 + uy * 6, y2 - uy * 10 - ux * 6);
+            }
+        }
     }
 
     toggleDebug() {
@@ -869,6 +902,8 @@ export default class MainScene extends Phaser.Scene {
             }
             this.streamBubbles %= 1;
         }
+        this.speedLines.update(delta, v.x, v.y, !this.relaxed && this.chain.flow);
+        this.drawFlow(delta);
         const shot = this.boosters.update(this.cameras.main.worldView, this.fish, this.time.now);
         if (shot) {
             play(shot === 'cannon' ? 'cannon' : 'boing');
