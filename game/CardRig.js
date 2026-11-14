@@ -2,7 +2,7 @@ import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import { CHARACTERS } from './characters.js';
-import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose } from './rig/cards.js';
+import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt } from './rig/cards.js';
 
 /** Where the part cards come from (scripts/parts/bake.py). */
 export const PARTS = { json: 'parts', url: 'img/parts/', texture: key => `parts_${key}` };
@@ -39,7 +39,7 @@ class CardView {
     get displayHeight() { return this.frame.height * this.baseScale; }
 }
 
-const BEND = { x: 0, y: 0 };
+const BEND = { x: 0, y: 0, z: 0, a: 0 }, SP = { z: 0, a: 0, dx: 0 };
 
 /**
  * A playable drawn as 2.5D part cards (game/rig/cards.js): the same API as Rig, so Player,
@@ -57,6 +57,9 @@ export default class CardRig {
         this.facing = 1;
         this.angle = 0;
         this.phase = 0;
+        this.spine = { ...CARDS.spine, ...character.spine };   // the spine wave (CARDS.spine), per profile
+        this.spineT = makeSpine();
+        this.spinePh = 0;
         this.spread = 0;
         this.zoom = 1;
         this.shown = true;
@@ -171,7 +174,9 @@ export default class CardRig {
 
         // How hard it really swims: eased in, so drifting and hovering stay calm.
         const raw = Phaser.Math.Clamp(Math.max(effort, speed / 14), 0, 1), drive = Math.pow(raw, CARDS.driveCurve);
-        this.phase += (CARDS.cycle[0] + raw * (CARDS.cycle[1] - CARDS.cycle[0])) * frames;
+        const step = (CARDS.cycle[0] + raw * (CARDS.cycle[1] - CARDS.cycle[0])) * frames;
+        this.phase += step;
+        this.spinePh += step * this.spine.rate;
         const ph = this.phase, sq = Phaser.Math.Clamp(squash, -0.35, 0.35), sc = view.baseScale * this.zoom;
         let sx = sc * (1 + sq), sy = sc * (1 - sq), rotation = Phaser.Math.Angle.Wrap(this.angle - level) + lean;
         // Steering shows in the body (user: 'creatures should bend tail fin or body when steering'): while the
@@ -199,7 +204,16 @@ export default class CardRig {
             sy *= 1 - stroke * 0.025 * (0.1 + drive);
             bend = (u, v, o) => { o.x = 0; o.y = 0; };
         } else {
-            bend = (u, v, o) => { const t = 1 - u; o.x = 0; o.y = (Math.sin(ph - t * 2.6) * amp * 0.35 + steerBend) * t * t; };
+            // The spine wave (sideways, head to tail, growing toward the tail; CARDS.spine) drives the
+            // swimming; a smaller S-curve in the picture plane and the steering lag ride on top.
+            const T = this.spineT, sp = this.spine;
+            spineTable(this.spinePh, raw, sp, T);         // raw effort: cruising already shows the wave, gliding is still
+            bend = (u, v, o) => {
+                const t = 1 - u;
+                spineAt(T, t, SP);
+                o.x = (SP.dx + SP.z * sp.tilt) * W; o.z = SP.z * W; o.a = SP.a;
+                o.y = (Math.sin(ph - t * 2.6) * amp * 0.35 * sp.lift + steerBend) * t * t;
+            };
         }
 
         // Wings open in the air and fold back in the water, over a few frames (CARDS.spreadRate).
@@ -216,11 +230,13 @@ export default class CardRig {
                 carryPoint(p.card, p.part, m, p.at, px - p.card.pivot[0], py - p.card.pivot[1], p.turn, CARRY);
                 at[0] = CARRY.x; at[1] = CARRY.y; turn = CARRY.a;
             } else {
+                BEND.z = 0;
                 bend(px / W + 0.5, py / H + 0.5, BEND);
                 at[0] = px + BEND.x + (e.shift?.[0] || 0); at[1] = py + BEND.y + (e.shift?.[1] || 0);
             }
             e.at = e.at || [0, 0]; e.at[0] = at[0]; e.at[1] = at[1]; e.turn = turn;
             posePart(e.card, e.part, m, at, !!e.mirror, e.posed, turn);
+            if (!p && BEND.z) for (let i = 0; i < e.card.n; i++) e.posed.z[i] += BEND.z;     // a fin rides the spine wave in depth
         }
         for (const e of set.entries) {
             pv.fade = !e.body; pv.dark = e.dark ?? 1;

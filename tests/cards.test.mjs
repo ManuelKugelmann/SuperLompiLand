@@ -65,3 +65,22 @@ test('a fin turning edge-on fades out', () => {
     const { a } = run(card, posed, { ...atRest, yaw: Math.PI / 2 - 0.01, fade: true });
     assert.ok(Math.max(...a) < 0.05);
 });
+
+test('spine wave: still at rest, grows head to tail, travels to the tail, keeps the spine length', async () => {
+    const { CARDS, makeSpine, spineTable, spineAt } = await import('../game/rig/cards.js');
+    const t = makeSpine(), o = {};
+    spineTable(1.3, 0, CARDS.spine, t);
+    spineAt(t, 1, o);
+    assert.equal(o.z, 0); assert.equal(o.dx, 0);
+    // Largest swing over a cycle: small at the head, full at the tail.
+    const peak = s => { let m = 0; for (let k = 0; k < 64; k++) { spineTable(k / 64 * 2 * Math.PI, 1, CARDS.spine, t); spineAt(t, s, o); m = Math.max(m, Math.abs(o.z)); } return m; };
+    assert.ok(peak(0) < 0.2 * peak(1));
+    assert.ok(Math.abs(peak(1) - CARDS.spine.tail) < 0.01);
+    // The crest moves toward the tail as the phase advances.
+    const crest = ph => { spineTable(ph, 1, { ...CARDS.spine, head: 1 }, t); let best = 0, at = 0; for (let i = 0; i <= 16; i++) if (t.z[i] > best) { best = t.z[i]; at = i; } return at; };
+    assert.ok(crest(Math.PI / 2 + 1) > crest(Math.PI / 2));
+    // A bent spine looks shorter toward the tail, never longer.
+    spineTable(0.7, 1, CARDS.spine, t);
+    spineAt(t, 1, o);
+    assert.ok(o.dx > 0 && o.dx < 0.1);
+});
