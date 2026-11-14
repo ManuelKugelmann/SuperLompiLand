@@ -12,6 +12,7 @@ import WaterLight from '../game/fx/WaterLight.js';
 import ParticleLayer from '../game/fx/ParticleLayer.js';
 import SwarmLayer from '../game/ai/SwarmLayer.js';
 import SeabirdLayer from '../game/ai/SeabirdLayer.js';
+import { ghostShip } from '../game/level/setPieces.js';
 import DeepGlowLayer from '../game/level/DeepGlowLayer.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
@@ -155,7 +156,8 @@ export default class MainScene extends Phaser.Scene {
             isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK),
             flowAt: this.particles.env.flowAt,
             biomeAt: x => BIOMES[biomeIndexAt(x)].id,
-            waterAt: x => { const bl = biomeBlendAt(x); return mixColor(bl.a.water[0], bl.b.water[0], bl.t); }
+            waterAt: x => { const bl = biomeBlendAt(x); return mixColor(bl.a.water[0], bl.b.water[0], bl.t); },
+            homes: [{ ...ghostShip(), id: 'silverside' }]   // a shoal shelters in the ghost ship's hull (spec 5.0e)
         });
         this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         // Gannets over the island coasts dive after shoals and after a fish near the surface (spec 5.0d).

@@ -102,7 +102,11 @@ function mix(a, b, k) {
 }
 
 export default class SwarmLayer {
-    /** @param env { isOpen(x, y), flowAt(x, y, out) px/s, biomeAt(x) -> id, waterAt(x) -> water colour } */
+    /**
+     * @param env { isOpen(x, y), flowAt(x, y, out) px/s, biomeAt(x) -> id, waterAt(x) -> water colour,
+     *   homes: [{ x, y, id }] (optional): places that always have a shoal of that species around them,
+     *   like the one sheltering in the ghost ship (spec 5.0e); they come on top of the roaming ones }
+     */
     constructor(scene, env) {
         this.scene = scene;
         this.env = env;
@@ -110,7 +114,7 @@ export default class SwarmLayer {
         this.checkAt = 0;
     }
 
-    spawn(id, x, y) {
+    spawn(id, x, y, home = null) {
         const sp = SPECIES[id];
         const sim = createSwarm({ count: sp.count, x, y, speed: sp.speed, maxSpeed: sp.speed * 3, ...sp.flock });
         const key = fishTexture(this.scene, id, sp);
@@ -128,7 +132,7 @@ export default class SwarmLayer {
             const z = (1 - (i + 0.5) / sp.count) * deep;
             b.setTint(mixColor(0xffffff, water, z * SWARMS.haze)).setAlpha(1 - z * SWARMS.fade);
         });
-        this.swarms.push({ id, sim, blitter, bobs, w, h, phase });
+        this.swarms.push({ id, sim, blitter, bobs, w, h, phase, home });
     }
 
     /** Keep a few swarms of the current biome around the view; drop far ones. */
@@ -137,9 +141,12 @@ export default class SwarmLayer {
             const s = this.swarms[i], c = s.sim.centre();
             if (Math.hypot(c.x - cx, c.y - cy) > SWARMS.dropAt) { s.blitter.destroy(); this.swarms.splice(i, 1); }
         }
+        for (const home of this.env.homes || []) {
+            if (Math.hypot(home.x - cx, home.y - cy) < SWARMS.dropAt * 0.8 && !this.swarms.some(s => s.home === home)) this.spawn(home.id, home.x, home.y, home);
+        }
         const biome = this.env.biomeAt(cx);
         const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(biome));
-        if (!native.length || this.swarms.length >= SWARMS.perView) return;
+        if (!native.length || this.swarms.filter(s => !s.home).length >= SWARMS.perView) return;
         // Prefer a species not already around: variety over repeats.
         const fresh = native.filter(id => !this.swarms.some(s => s.id === id));
         const kinds = fresh.length ? fresh : native;
