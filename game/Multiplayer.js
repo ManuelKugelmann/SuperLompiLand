@@ -10,6 +10,7 @@ import { pillButton, textStyle } from './ui/kit.js';
 const SEND_MS = 1000 / 20;   // state broadcast rate
 const WAKE_REJOIN_MS = 5000; // hidden at least this long -> rejoin on return
 const EMOTE_GAP_MS = 700;    // one emote per this long, per player
+const ALARM_GAP_MS = 400;    // one creature alarm (a special going off) per this long, per player
 const BUBBLE_MS = 5000;      // a downed friend's revive bubble lasts this long (then they respawn solo)
 const BUBBLE_R = 110;        // revive bubble radius (px)
 const LOST_MS = 3500;        // friends all quiet this long -> reconnect (public relays can drop us)
@@ -54,6 +55,7 @@ export default class Multiplayer {
         this.myColor = null;
         this.colorKey = '';
         this.limit = new RateLimit(EMOTE_GAP_MS);
+        this.alarms = new RateLimit(ALARM_GAP_MS);
         this.strikes = new Strikes(20);
         this.hud = null;          // { badge, dots, emotes[] } inside the HUD scene
         this.menu = null;         // room menu (word + invite), behind a tap on the badge
@@ -96,6 +98,11 @@ export default class Multiplayer {
             if (!ev) { this.strikes.bad(id); return; }
             if (ev.t === 'down' && this.ghosts.has(id)) this.addBubble(id, ev.x, ev.y);
             if (ev.t === 'claim') this.applyClaim(ev.c, ev.k, ev.i);
+            // A friend's special: the creatures and shoals around it take fright here too.
+            if (ev.t === 'alarm' && this.ghosts.has(id) && this.alarms.allow(id, performance.now())) {
+                this.scene.swarms?.startle(ev.x, ev.y);
+                this.scene.level?.startle(ev.x, ev.y);
+            }
             if (ev.t === 'sync') for (const [c, k, b] of ev.e) for (const i of bitsOf(b, WORLD_KINDS[k])) this.applyClaim(c, k, i);
             if (ev.t === 'revive') {
                 this.dropBubble(ev.id);
@@ -149,6 +156,18 @@ export default class Multiplayer {
         if (!world?.chunks) return;
         const batches = syncBatches(world.chunks).slice(0, 200);
         batches.forEach((ev, i) => setTimeout(() => this.net.sendEvent?.(ev), 120 + i * 60));
+    }
+
+    /** Our special went off at (x, y): everyone's creatures nearby take fright. */
+    alarm(x, y) {
+        if (this.alarms.allow('me', performance.now())) this.net.sendEvent?.({ t: 'alarm', x: Math.round(x), y: Math.round(y) });
+    }
+
+    /** Everyone else in the room as the creatures see them: [{ x, y, vx, vy }]. */
+    others(out = []) {
+        out.length = 0;
+        for (const g of this.ghosts.values()) if (g.pos) out.push(g.pos);
+        return out;
     }
 
     /** Our fish has 0 hearts at (x, y): friends get a revive bubble there for a few seconds. */

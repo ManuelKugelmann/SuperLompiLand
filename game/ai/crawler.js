@@ -5,6 +5,8 @@
 //
 // Pure, no Phaser (tests/crawler.test.mjs). Speeds in px per step (60 per second), times in s.
 
+import { nearestPlayer } from './steering.js';
+
 export const CRAWLER = {
     speed: 0.22,        // px per step along the rock
     range: 240,         // how far from where it started it roams
@@ -61,13 +63,13 @@ export function createCrawler(x, y, density, threshold, traits = {}, seed = 0) {
 const between = (c, [lo, hi]) => lo + c.frac(c.rolls++) * (hi - lo);
 
 /**
- * One step. env = { density(x, y), threshold, player: { x, y } | null }.
+ * One step. env = { density(x, y), threshold, player: { x, y } | null, players: [...] optional }.
  * States: crawl, pause, curl (pulled in after a bump).
  */
 export function stepCrawler(c, dt, env, cfg = CRAWLER) {
     if (!c.onRock) return c;
     c.left -= dt;
-    const p = env.player;
+    const p = nearestPlayer(env, c.x, c.y);
     if (p && c.state !== 'curl' && Math.hypot(p.x - c.x, p.y - c.y) < cfg.bump) { c.state = 'curl'; c.left = cfg.curlS; }
     else if (c.left <= 0) {
         c.state = c.state === 'crawl' ? 'pause' : 'crawl';

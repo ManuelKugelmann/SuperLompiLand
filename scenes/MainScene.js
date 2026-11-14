@@ -222,7 +222,7 @@ export default class MainScene extends Phaser.Scene {
             if (this.relaxed || this.health <= GRUMPY_HIT) { this.fish.hit(new Phaser.Math.Vector2(x, y)); return; }
             this.hurt(x, y, GRUMPY_HIT);
         });
-        this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.level.startle(x, y); this.chainMove('special'); });
+        this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.level.startle(x, y); this.mp?.alarm(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
         this.events.on('fish-splash', ({ x, y, speed, entering, skim }) => {
@@ -1035,7 +1035,7 @@ export default class MainScene extends Phaser.Scene {
         this.glow.setPosition(view.x, view.y).setAlpha(depth01 * 0.5);
 
         this.level.update(this.camX, this.camY);
-        this.level.animate(time / 1000, view, speed);
+        this.level.animate(time / 1000, view, speed, this.mp?.others(this.roomPlayers || (this.roomPlayers = [])));
         this.revealPlayers(delta / 1000, view);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.farLayers.update(this.camX);

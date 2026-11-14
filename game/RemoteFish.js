@@ -103,7 +103,7 @@ export default class RemoteFish {
             for (const o of [this.icon, this.arrow, this.far, this.ring, this.iconRing, this.help]) o.setVisible(false);
             return;
         }
-        this.pos = { x: p.x, y: p.y };
+        this.pos = { x: p.x, y: p.y, vx: p.vx || 0, vy: p.vy || 0 };      // also what creatures react to
         const m = edgeMarker(this.scene.cameras.main.worldView, p);
         this.icon.setVisible(!!m);
         this.arrow.setVisible(!!m);

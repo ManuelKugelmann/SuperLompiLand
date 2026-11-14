@@ -83,3 +83,10 @@ test('room save key: stable per room, different per room, never contains the nam
     assert.match(roomStorageKey('korallewalmond'), /^sll_room_[0-9a-f]{16}$/);
     assert.ok(!roomStorageKey('korallewalmond').includes('koralle'));
 });
+
+test('alarm events (a special went off) carry a position and nothing else', () => {
+    assert.deepEqual(cleanEvent({ t: 'alarm', x: 1200, y: 800, extra: 'x' }), { t: 'alarm', x: 1200, y: 800 });
+    assert.equal(cleanEvent({ t: 'alarm', x: 'far', y: 800 }), null);
+    assert.equal(cleanEvent({ t: 'alarm', x: 1e12, y: 0 }), null);
+    assert.equal(cleanEvent({ t: 'alarm' }), null);
+});

@@ -80,3 +80,9 @@ test('on the real seabed crawlers stay on the outline for minutes', () => {
     assert.ok(placed >= 3);
     assert.equal(typeof settle, 'function');
 });
+
+test('a friend bumping it counts like the player', () => {
+    const c = createCrawler(0, 1000, seabed, T, {}, 1);
+    stepCrawler(c, 1 / 60, { density: seabed, threshold: T, player: { x: 900, y: 960 }, players: [{ x: 900, y: 960 }, { x: 20, y: 960 }] });
+    assert.equal(c.state, 'curl');
+});

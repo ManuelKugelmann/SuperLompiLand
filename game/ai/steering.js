@@ -2,6 +2,21 @@
 // want to go" into a heading, shared by every creature brain. No Phaser. Angles in radians,
 // 0 = east, positive = down (screen coordinates).
 
+/**
+ * The player a creature at (x, y) reacts to: the nearest of `env.players` (everyone in the
+ * room), or `env.player` when there is no list. Null when nobody is there.
+ */
+export function nearestPlayer(env, x, y) {
+    const list = env.players;
+    if (!list || !list.length) return env.player || null;
+    let best = null, bd = Infinity;
+    for (const p of list) {
+        const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+        if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+}
+
 /** Shortest signed difference from angle a to angle b. */
 export function angleTo(a, b) {
     const d = b - a;

@@ -11,7 +11,7 @@
 //
 // Pure, no Phaser (tests/swimmer.test.mjs). Speeds in px per step (60 per second), times in s.
 
-import { angleTo, turnToward, wanderHeading, leash, avoid } from './steering.js';
+import { angleTo, turnToward, wanderHeading, leash, avoid, nearestPlayer } from './steering.js';
 
 export const SWIMMER = {
     notice: 430,        // px: the player is noticed from here ...
@@ -67,11 +67,12 @@ export function nearestRock(isOpen, x, y, reach) {
 /**
  * One step.
  *   dt      seconds
- *   env     { isOpen(x, y), t (s), player: { x, y, vx, vy } | null, alarm: { x, y } | null }
+ *   env     { isOpen(x, y), t (s), player: { x, y, vx, vy } | null, alarm: { x, y } | null,
+ *             players: [...] optional: everyone in the room; the nearest one counts }
  * Returns the agent (x, y, heading, v, state updated).
  */
 export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
-    const p = env.player, steps = dt * 60;
+    const p = nearestPlayer(env, a.x, a.y), steps = dt * 60;
     let dist = Infinity, toPlayer = 0, pSpeed = 0, closing = false;
     if (p) {
         const dx = p.x - a.x, dy = p.y - a.y;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { angleTo, turnToward, wanderHeading, leash, avoid } from '../game/ai/steering.js';
+import { angleTo, turnToward, wanderHeading, leash, avoid, nearestPlayer } from '../game/ai/steering.js';
 import { SWIMMER, createSwimmer, stepSwimmer, nearestRock } from '../game/ai/swimmer.js';
 
 const open = () => true;
@@ -165,4 +165,20 @@ test('the breath is reached even when open water ends just under the waterline, 
         assert.ok(top > SWIMMER.surfaceY - 14, `seed ${seed}: drifted on up to ${top}`);
         assert.ok(heldS > SWIMMER.breathHoldS - 0.3 && heldS < SWIMMER.breathHoldS + 1.5, `seed ${seed}: held its breath position for ${heldS}`);
     }
+});
+
+test('playing together, a creature reacts to whoever is nearest', () => {
+    const me = { x: 3000, y: 0, vx: 0, vy: 0 }, friend = { x: 300, y: 0, vx: 0, vy: 0 };
+    assert.equal(nearestPlayer({ player: me }, 0, 0), me, 'alone: the one player');
+    assert.equal(nearestPlayer({ player: me, players: [me, friend] }, 0, 0), friend);
+    assert.equal(nearestPlayer({ player: null, players: [] }, 0, 0), null);
+    // A friend swimming gently nearby is noticed although the local player is far away.
+    const a = createSwimmer({ x: 0, y: 0 }, {}, 1);
+    run(a, 2, { player: me, players: [me, friend] });
+    assert.equal(a.state, 'notice');
+    assert.ok(a.lookX > 0.9);
+    // ... and a friend rushing at it scares it.
+    const b = createSwimmer({ x: 0, y: 0 }, {}, 2);
+    stepSwimmer(b, 1 / 60, { isOpen: open, t: 0, player: me, players: [me, { x: -250, y: 0, vx: 16, vy: 0 }], alarm: null });
+    assert.equal(b.state, 'flee');
 });

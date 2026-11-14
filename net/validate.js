@@ -29,10 +29,12 @@ const B64 = /^[A-Za-z0-9+/]{1,24}={0,2}$/;
  *   { t: 'revive', id }           someone touched player `id`'s revive bubble
  *   { t: 'claim', c, k, i }       pickup `i` of kind `k` in chunk `c` was collected
  *   { t: 'sync', e: [[c, k, b64], ...] }   bitfields for a few chunks (OR-merge on arrival)
+ *   { t: 'alarm', x, y }          a special went off at (x, y): creatures nearby take fright
  */
 export function cleanEvent(d) {
     if (!d || typeof d !== 'object') return null;
     if (d.t === 'down') return num(d.x, LIMIT) && num(d.y, LIMIT) ? { t: 'down', x: d.x, y: d.y } : null;
+    if (d.t === 'alarm') return num(d.x, LIMIT) && num(d.y, LIMIT) ? { t: 'alarm', x: d.x, y: d.y } : null;
     if (d.t === 'revive') return str(d.id, ID_MAX) ? { t: 'revive', id: d.id } : null;
     if (d.t === 'claim') {
         const size = WORLD_KINDS[d.k];

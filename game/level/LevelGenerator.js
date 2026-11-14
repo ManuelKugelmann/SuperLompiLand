@@ -146,6 +146,7 @@ export default class LevelGenerator {
         this.chainBody = { active: false, x: 0, y: 0, vx: 0, vy: 0 };   // the swimmer, as the ropes see it
         this.chains = [];           // hanging chains: verlet ropes (rope.js) with the hazard as the weight at the end
         this.coralSpacing = createSpacing(LEVEL.coralGap);
+        this.allPlayers = [];
         this.lineEnd = { x: 0, y: 0 };
         // Open water for a creature reaches right up to the waterline (isOpen stops 60 px under it,
         // which is for placing things): a turtle must be able to put its head up for a breath.
@@ -290,8 +291,8 @@ export default class LevelGenerator {
         this.early.delete(key);
     }
 
-    /** Per frame: bend / pulse every creature and plant. `t` in seconds. */
-    animate(t, fish, speed = 0) {
+    /** Per frame: bend / pulse every creature and plant. `t` in seconds; `others` = the other players in the room. */
+    animate(t, fish, speed = 0, others = null) {
         for (const o of this.animated) {
             if (!o.active) continue;
             if (o.isPlant && fish) {
@@ -333,10 +334,15 @@ export default class LevelGenerator {
         this.brainT = t;
         const env = this.brainEnv;
         env.t = t; env.player = this.chainBody.active ? this.chainBody : null;
+        // Playing together, friends are players for the creatures too (each device simulates its own).
+        const all = this.allPlayers; all.length = 0;
+        if (env.player) all.push(env.player);
+        if (others) for (const o of others) all.push(o);
+        env.players = all;
         env.alarm = this.alarmLeft > 0 ? this.alarm : null;
         this.alarmLeft -= dt;
         const ground = this.crawlEnv;
-        ground.player = env.player;
+        ground.player = env.player; ground.players = all;
         for (const o of this.animated) {
             const c = o.crawler;
             if (c && o.active && dt > 0) {
