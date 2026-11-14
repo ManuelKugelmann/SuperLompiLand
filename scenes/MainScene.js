@@ -40,6 +40,7 @@ const OIL = { pulseMs: 1400, perPulse: 5, margin: 600, denseCount: 6, graceS: 1.
 const VENT_PLUME = { everyMs: 900, smoke: 3, steam: 2, margin: 500 };
 /** Margin below the rock threshold that counts as open water for the guide and the autopilot. */
 const OPEN_SLACK = 0.04;
+const GRUMPY_HIT = 0.5;      // hearts a grumpy's shove costs (spec 7.1)
 const STYLE_ASK_MS = 1600;   // after the nest cheer, ask how to play (once)
 /** Fin-tip contrails: from this speed (px per step), at these tips (× body radius, nose = +x). */
 const CONTRAIL = { speed: 11, tips: [[-0.35, -0.55], [-0.35, 0.55]] };
@@ -211,6 +212,11 @@ export default class MainScene extends Phaser.Scene {
         this.aiLabels = new Map();
 
         // A special (fan, pulse...) is sudden: nearby shoals scatter in a panic wave.
+        // A grumpy's shove (ai/grumpy.js, spec 7.1): half a heart, never the last half; relaxed play only gets the push.
+        this.events.on('grumpy-hit', ({ x, y }) => {
+            if (this.relaxed || this.health <= GRUMPY_HIT) { this.fish.hit(new Phaser.Math.Vector2(x, y)); return; }
+            this.hurt(x, y, GRUMPY_HIT);
+        });
         this.events.on('fish-special', ({ x, y }) => { this.swarms.startle(x, y); this.level.startle(x, y); this.chainMove('special'); });
 
         // Splash when the fish breaks the surface in either direction.
@@ -268,6 +274,7 @@ export default class MainScene extends Phaser.Scene {
             this.boosters.destroy();
             this.speedLines.destroy();
             this.events.off('fish-special');
+            this.events.off('grumpy-hit');
             document.removeEventListener('visibilitychange', saveNow);
             window.removeEventListener('pagehide', saveNow);
             this.scene.stop(HUD_KEY);
@@ -814,13 +821,13 @@ export default class MainScene extends Phaser.Scene {
     }
 
     /** Something hurt the fish from (x, y). Returns true when it went down. */
-    hurt(x, y) {
+    hurt(x, y, amount = this.character.armor ?? 1) {
         if (!this.fish.hit(new Phaser.Math.Vector2(x, y))) return false;
         this.chainEnd(this.chain.end());
         play('hit');
         this.hitStop = WORLD.hitStopMs;
         this.fish.squash = -0.3;
-        this.health = Math.max(0, this.health - (this.character.armor ?? 1));
+        this.health = Math.max(0, this.health - amount);
         this.cameras.main.shake(180, 0.008);
         if (this.health <= 0 && !this.respawning) { this.goDown(); return true; }
         return false;

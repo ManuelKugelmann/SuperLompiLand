@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import { createSwimmer, stepSwimmer } from '../ai/swimmer.js';
+import { createGrumpy, stepGrumpy, calmGrumpy } from '../ai/grumpy.js';
 import { createCrawler, stepCrawler } from '../ai/crawler.js';
 import { createReach } from './reach.js';
 import { eachCell as marchGrid } from './terrain.js';
@@ -46,7 +47,8 @@ const FRIENDS = {
     friend_nudibranch: { size: 190, ground: true, anim: 'wobble', crawl: { speed: 0.26, range: 300 } },
     urchin: { size: 140, ground: true, anim: 'throb', crawl: { speed: 0.05, range: 90 } },
     // The anglerfish art faces left (tail on the right); it lights the deep.
-    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', tail: 'right', speed: 0.7, facesLeft: true, glow: true, ai: { speed: 1.6, range: 620, turn: 0.04 } }
+    enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', tail: 'right', speed: 0.7, facesLeft: true, glow: true,
+        grumpy: { territory: 320 } }   // guards its patch of the dark: warns, then shoves (ai/grumpy.js)
 };
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
 const HAZARDS = {
@@ -96,6 +98,7 @@ export const PROPS = {
 
 /** Painted kelp stalks (generated art, public/img/plants/); the procedural 'kelp' strip is the fallback. */
 export const KELP_STALKS = ['kelp_stalk_1', 'kelp_stalk_2', 'kelp_stalk_3'];
+const GRUMPY_CALM_R = 320;         // px: a special this close calms a grumpy (it backs off)
 const KELP_BACK_TINT = 0x5f8f86;   // stalks behind the play plane: hazier, toward the water colour
 const PROP_BACK_HAZE = 0.5;        // how far passable seabed props shift toward the water colour
 
@@ -324,6 +327,17 @@ export default class LevelGenerator {
                 o.lean = Math.atan2(c.nx, -c.ny);
                 o.shrink += ((c.state === 'curl' ? 0.78 : 1) - o.shrink) * 0.15;
                 if (c.state === 'crawl') o.face(c.dir);
+            }
+            const g = o.grumpy;
+            if (g && o.active && dt > 0) {
+                if (env.alarm && Math.hypot(env.alarm.x - g.x, env.alarm.y - g.y) < GRUMPY_CALM_R) calmGrumpy(g);
+                const ev = stepGrumpy(g, dt, env);
+                if (ev === 'hit') this.scene.events.emit('grumpy-hit', { x: g.x, y: g.y });
+                // Warning: it puffs up and trembles; then it swings round in its shove.
+                o.shrink += ((g.state === 'warn' ? 1.18 : 1) - o.shrink) * 0.2;
+                const shake = g.state === 'warn' ? Math.sin(t * 60) * 4 : 0;
+                o.setPosition(g.x + shake, g.y + Math.sin(t * 1.3 + g.seed) * o.bob * 0.35);
+                if (g.heading) o.face(g.heading > 0 ? o.look : -o.look);
             }
             const a = o.brain;
             if (!a || !o.active || dt <= 0) continue;
@@ -560,7 +574,9 @@ export default class LevelGenerator {
         if (rng.frac() < biome.friendRate) {
             const key = pickWeighted(rng, only(biome.friends, k => FRIENDS[k] && !FRIENDS[k].ground), has);
             const p = key && openSpot(FRIENDS[key].swim || 0);
-            if (p) this.addFriend(chunk, key, p.x, p.y, rng);
+            // Grumpies never live on the calm main route (spec 5.2c): stress stays optional.
+            const onRoute = p && FRIENDS[key].grumpy && Math.abs(p.y - this.field.routeY(p.x)) < ROUTE.clear + FRIENDS[key].grumpy.territory * 0.5;
+            if (p && !onRoute) this.addFriend(chunk, key, p.x, p.y, rng);
         }
         if (!safe && rng.frac() < biome.hazardRate) {
             const key = pickWeighted(rng, only(biome.hazards, k => HAZARDS[k]?.place === 'water'), has);
@@ -697,6 +713,12 @@ export default class LevelGenerator {
             img.look = f.facesLeft ? -1 : 1;      // which way the art is drawn
             img.bob = f.bob;
             img.pitches = f.anim === 'swim';      // long bodies tip their nose up and down
+        }
+        if (f.grumpy) {
+            img.grumpy = createGrumpy(x, y, f.grumpy, rng.frac() * 1000);
+            img.look = f.facesLeft ? -1 : 1;
+            img.bob = f.bob;
+            img.shrink = 1;
         }
         if (f.glow) {
             const light = s.add.circle(x, y, 150, 0xfff3b0, 0.16).setDepth(42).setBlendMode(Phaser.BlendModes.ADD);
