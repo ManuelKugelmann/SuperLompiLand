@@ -23,6 +23,7 @@ import BoosterLayer from '../game/level/BoosterLayer.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
+import { FOREGROUND, boxHitsCircle, fadeStep } from '../game/level/occluders.js';
 import { BOOK_KEY } from './ReefBookScene.js';
 import { HUD_KEY } from './HudScene.js';
 import { SCENE_KEYS } from './keys.js';
@@ -606,6 +607,39 @@ export default class MainScene extends Phaser.Scene {
     }
 
     /** Coins hop on the music's beat, all together (spec ch.12, music-synced world). */
+    /**
+     * The player is never hidden (spec 10.10a): foreground objects (FOREGROUND depth band)
+     * fade while Lompi or a friend overlaps them, and come back when clear.
+     */
+    revealPlayers(dt, view) {
+        const r = this.fish.radius * FOREGROUND.pad;
+        const players = [view];
+        for (const g of this.mp?.ghosts.values() ?? []) if (g.pos) players.push(g.pos);
+        const box = this.fgBox || (this.fgBox = new Phaser.Geom.Rectangle());
+        const edges = { x0: 0, y0: 0, x1: 0, y1: 0 };
+        for (const o of this.children.list) {
+            if (o.depth < FOREGROUND.minDepth || o.depth >= FOREGROUND.maxDepth || !o.visible) continue;
+            if (o.getBounds) {
+                o.getBounds(box);
+                edges.x0 = box.x; edges.y0 = box.y; edges.x1 = box.right; edges.y1 = box.bottom;
+            } else if (o.points?.length) {            // a Rope (swaying plants): box of its points
+                edges.x0 = edges.y0 = Infinity; edges.x1 = edges.y1 = -Infinity;
+                for (const q of o.points) {
+                    const x = o.x + q.x * o.scaleX, y = o.y + q.y * o.scaleY;
+                    if (x < edges.x0) edges.x0 = x; if (x > edges.x1) edges.x1 = x;
+                    if (y < edges.y0) edges.y0 = y; if (y > edges.y1) edges.y1 = y;
+                }
+                const half = (o.frame?.height || 0) * Math.abs(o.scaleY) / 2;   // the strip's own width
+                edges.x0 -= half; edges.x1 += half; edges.y0 -= half; edges.y1 += half;
+            } else continue;
+            if (o.fgBase === undefined) { o.fgBase = o.alpha; o.fgAlpha = o.alpha; }
+            const covering = players.some(p => boxHitsCircle(edges, p.x, p.y, r));
+            if (!covering && o.fgAlpha === o.fgBase) continue;
+            o.fgAlpha = fadeStep(o.fgAlpha, o.fgBase, covering, dt);
+            o.setAlpha(o.fgAlpha);
+        }
+    }
+
     bobCoins() {
         const lift = COIN_BOB_PX * musicClock.pulse(nowSeconds(), 4);
         for (const c of this.level.coins) if (c.img.active) c.img.y = c.y - lift;
@@ -896,6 +930,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.level.update(this.camX, this.camY);
         this.level.animate(time / 1000, view, speed);
+        this.revealPlayers(delta / 1000, view);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
         this.backLayers.update(this.camX, this.camY);
         this.midLayers.update(this.camX, this.camY);
