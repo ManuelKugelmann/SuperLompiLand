@@ -1,11 +1,10 @@
 import Phaser from 'phaser';
 import ControllerBase from './ControllerBase.js';
 import SteerAssist from './SteerAssist.js';
+import { TILT, gravityFromAngles, gravityFromMotion, screenAxes, tiltDir } from './tilt.js';
 import { play } from '../audio.js';
 
 const KICK = 9;            // speed added per tap
-const FULL_TILT = 22;      // degrees of tilt for full deflection
-const DEAD_ZONE = 0.12;    // fraction of full tilt that is ignored
 const STEER = 2.2;         // how strongly tilting bends the swimming direction
 const LONG_PRESS_MS = 380;
 const SENSOR_WAIT_MS = 1500;
@@ -81,48 +80,43 @@ export default class TiltController extends ControllerBase {
         return !!D && typeof D.requestPermission === 'function' && !this.asked;
     }
 
-    /** Device tilt (degrees, device axes) -> direction in game axes. */
-    applyTilt(gamma, beta, source) {
-        // Undo the OS screen rotation ...
-        const angle = (window.screen.orientation?.angle ?? window.orientation ?? 0);
-        let sx, sy;
-        if (angle === 90) { sx = beta; sy = -gamma; }
-        else if (angle === 270 || angle === -90) { sx = -beta; sy = gamma; }
-        else if (angle === 180) { sx = -gamma; sy = -beta; }
-        else { sx = gamma; sy = beta; }
-        // ... and our own 90° turn when a portrait screen shows the game sideways.
-        const rotated = !!this.scene.registry.get('landscapeRotated');
-        const gx = rotated ? sy : sx;
-        const gy = rotated ? -sx : sy;
-
-        if (this.source !== source) { this.source = source; this.neutral = null; this.refreshStatus(); }
-        if (!this.neutral) this.neutral = { x: gx, y: gy }; // "level" = how it is held right now
-        this.raw = { gamma, beta, angle, rotated, gx, gy };
-        this.setDir((gx - this.neutral.x) / FULL_TILT, (gy - this.neutral.y) / FULL_TILT);
+    /**
+     * The direction gravity pulls in the device's axes (tilt.js) -> the steering direction in game
+     * axes: toward the screen edge that is tilted down, measured from how the phone was held when
+     * this source first reported (or the mode was switched on).
+     */
+    applyGravity(g, source) {
+        // The page as the system has turned it, and our own quarter turn when a portrait screen shows the game sideways.
+        const angle = (window.screen.orientation?.angle ?? window.orientation ?? 0), rotated = !!this.scene.registry.get('landscapeRotated');
+        if (this.source !== source || this.angle !== angle || this.rotated !== rotated) {
+            if (this.source !== source) { this.source = source; this.refreshStatus(); }
+            this.angle = angle; this.rotated = rotated; this.neutral = null;      // turned round: level is how it is held now
+        }
+        if (!this.neutral) this.neutral = { ...g };
+        tiltDir(g, this.neutral, screenAxes(angle, rotated), this.dir);
+        this.raw = { g, angle, rotated };
     }
 
     readOrientation(e) {
         if (e.beta === null || e.gamma === null) return;
-        this.applyTilt(e.gamma, e.beta, 'orientation');
+        this.applyGravity(gravityFromAngles(e.beta, e.gamma), 'orientation');
     }
 
-    /** Fallback: derive the tilt from gravity when no orientation events arrive. */
+    /** Fallback: gravity straight from the motion sensor when no orientation events arrive. */
     readMotion(e) {
         if (this.source === 'orientation') return;
         const a = e.accelerationIncludingGravity;
-        if (!a || a.x === null || a.y === null) return;
+        if (!a || a.x === null || a.y === null || a.z === null) return;
         if (performance.now() - this.enteredAt < SENSOR_WAIT_MS) return; // give orientation a chance first
-        const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-        const k = ios ? 1 : -1; // the two platforms report gravity with opposite sign
-        const deg = v => Phaser.Math.RadToDeg(Math.asin(Phaser.Math.Clamp(v / 9.81, -1, 1)));
-        this.applyTilt(deg(a.x * k), deg(-a.y * k), 'motion');
+        this.applyGravity(gravityFromMotion(a.x, a.y, a.z, /iphone|ipad|ipod/i.test(navigator.userAgent)), 'motion');
     }
 
+    /** The mouse standing in for the tilt (no sensor): x, y each -1..1 at full. */
     setDir(x, y) {
         this.dir.set(x, y);
         const len = this.dir.length();
-        if (len < DEAD_ZONE) this.dir.set(0, 0);
-        else this.dir.setLength(Math.min(1, (len - DEAD_ZONE) / (1 - DEAD_ZONE)));
+        if (len < TILT.dead) this.dir.set(0, 0);
+        else this.dir.setLength(Math.min(1, (len - TILT.dead) / (1 - TILT.dead)));
     }
 
     onMove(pointer) {
@@ -172,7 +166,7 @@ export default class TiltController extends ControllerBase {
         this.drawDemo();
         if (this.debug) {
             const r = this.raw, f = v => (typeof v === 'number' ? v.toFixed(1) : String(v));
-            this.status.setText(`src ${this.source}\nγ ${f(r.gamma)} β ${f(r.beta)}\nangle ${f(r.angle)} rot ${r.rotated}\ndir ${f(this.dir.x)} ${f(this.dir.y)}`);
+            this.status.setText(`src ${this.source}\ng ${f(r.g?.x)} ${f(r.g?.y)} ${f(r.g?.z)}\nangle ${f(r.angle)} rot ${r.rotated}\ndir ${f(this.dir.x)} ${f(this.dir.y)}`);
         } else if (this.source === 'none' && performance.now() - this.enteredAt > SENSOR_WAIT_MS * 2 && !this.waited) {
             this.waited = true;
             this.refreshStatus();
