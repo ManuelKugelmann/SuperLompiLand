@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTERS } from './characters.js';
 import { softnessMap, SoftHalo } from './rig/soft.js';
+import { CARDS, makeSpine, spineTable, spineAt } from './rig/cards.js';
 
 /** Tunables of the body animation shared by every playable (local, remote, title screen). */
 export const RIG = {
@@ -75,6 +76,9 @@ export default class Rig {
         this.facing = 1;        // 1 = right, -1 = left
         this.angle = 0;         // where the nose points (smoothed)
         this.phase = 0;         // swim cycle
+        this.spine = { ...CARDS.spine, ...character.spine };   // the spine wave, shared with the card rigs (CARDS.spine)
+        this.spineT = makeSpine();
+        this.spinePh = 0;
         this.zoom = 1;          // extra scale on top of the character's size
         this.shown = true;
         this.views = {};
@@ -179,8 +183,10 @@ export default class Rig {
         // point lies in it: u = 0 tail .. 1 nose, v = 0 top .. 1 bottom.
         // Calm by default: a body at rest is nearly still, and it only works as hard as it swims
         // (eased in, so gentle cruising stays gentle).
-        const drive = Math.pow(Phaser.Math.Clamp(Math.max(effort, speed / 14), 0, 1), RIG.ease);
-        this.phase += (RIG.cycle[0] + drive * (RIG.cycle[1] - RIG.cycle[0])) * frames;
+        const raw = Phaser.Math.Clamp(Math.max(effort, speed / 14), 0, 1), drive = Math.pow(raw, RIG.ease);
+        const step = (RIG.cycle[0] + drive * (RIG.cycle[1] - RIG.cycle[0])) * frames;
+        this.phase += step;
+        this.spinePh += step * this.spine.rate;
         const ph = this.phase, amp = view.wiggle * (RIG.idle + drive * (1 - RIG.idle)), w = view.frame.width;
         const style = this.char.anim || 'swim';
         let bend;
@@ -212,8 +218,16 @@ export default class Rig {
             scaleX *= swell; scaleY *= swell;
             bend = still;
         } else {
-            // Fish: a wave runs down the body, strongest at the tail.
-            bend = (u, v, out) => { const t = left ? u : 1 - u; out.x = 0; out.y = Math.sin(ph - t * 2.6) * amp * t * t; };
+            // Fish: the spine wave (sideways, head to tail; CARDS.spine) seen a little from behind, so
+            // the rear swings along the body; a smaller S-curve in the picture plane rides on top.
+            const T = this.spineT, sp = this.spine;
+            spineTable(this.spinePh, raw, sp, T);
+            bend = (u, v, out) => {
+                const t = left ? u : 1 - u;
+                spineAt(T, t, SPINE);
+                out.x = (SPINE.dx + SPINE.z * sp.tilt) * w * (left ? -1 : 1);
+                out.y = Math.sin(ph - t * 2.6) * amp * t * t * sp.lift;
+            };
         }
         view.setScale(scaleX, scaleY);
         view.rotation = rotation;
@@ -313,7 +327,7 @@ export default class Rig {
     }
 }
 
-const TMP = { x: 0, y: 0 };
+const TMP = { x: 0, y: 0 }, SPINE = { z: 0, a: 0, dx: 0 };
 const still = (u, v, out) => { out.x = 0; out.y = 0; };
 
 /** Everything about one picture's grid that never changes: places, texture coordinates, soft weights, rays. */
