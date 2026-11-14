@@ -42,12 +42,18 @@ export const SWIRL = {
     spin: 0.9,           // radians per second at the rim (faster inside)
     hide: 0.7,           // share of the radius within which Lompi is hidden in it
     plunge: {
-        every: 3.4,      // s between gannet plunges
-        fall: 1.1,       // s from the sky to the ball
+        every: 4.6,      // s between gannet plunges
+        // one plunge, in phases (s): a flash on the surface (look up!), the dive through the air,
+        // on under water as a white arrow with a bubble jet into the top of the ball, then the
+        // bird bobs back up while the sardines it scattered close in again
+        cue: 0.6, air: 0.45, water: 0.7, rise: 1.6,
         sky: 420,        // px above the surface a dive starts
+        scatter: { reach: 190, push: 150, fade: 1.2 },   // the puff of sardines where it hits: px, px, s
+        into: 180,       // px the bird drives into the ball past its top
+        gap: 80,         // px between the coins in its trail (from just under the surface down)
         reach: 0.6,      // share of the ball's width over which plunges spread
         coins: 3,        // coins left in each bubble trail
-        life: 9          // s the coins stay before they fade
+        life: 4.4        // s the coins stay before they fade (less than `every`: one trail at a time)
     }
 };
 
@@ -84,24 +90,39 @@ export function hiddenIn(dx, dy, cfg = SWIRL) {
     return Math.hypot(dx, dy / cfg.squash) < cfg.radius * cfg.hide;
 }
 
+const PHASES = ['cue', 'air', 'water', 'rise'];
+
 /**
- * The gannet plunge going on at time t: { n (which plunge), dx (from the ball's middle), u (0..1
- * of its fall; > 1 once it has reached the ball) }.
+ * The gannet plunge going on at time t: { n (which plunge), dx (from the ball's middle), phase
+ * ('cue' | 'air' | 'water' | 'rise' | 'rest'), k (0..1 through it), since (s since it hit the ball;
+ * < 0 before) }.
  */
 export function plungeAt(t, out = {}, cfg = SWIRL) {
     const P = cfg.plunge, n = Math.floor(t / P.every);
+    let s = t - n * P.every;
     out.n = n;
     out.dx = (hash(n, 7) - 0.5) * cfg.radius * 2 * P.reach;
-    out.u = (t - n * P.every) / P.fall;
+    out.since = s - P.cue - P.air - P.water;
+    out.phase = 'rest'; out.k = 1;
+    for (const ph of PHASES) {
+        if (s < P[ph]) { out.phase = ph; out.k = s / P[ph]; break; }
+        s -= P[ph];
+    }
     return out;
 }
 
-/** Where a plunge leaves its coins (relative to the ball's middle; `surface` = the surface's y minus the middle's). */
+/** How deep a plunge reaches (relative to the ball's middle): into the ball, past its top. */
+export const plungeDepth = (cfg = SWIRL) => -cfg.radius * cfg.squash + cfg.plunge.into;
+
+/**
+ * Where a plunge leaves its coins (relative to the ball's middle; `surface` = the surface's y minus
+ * the middle's): spaced down its trail from just under the surface, never past where it reached.
+ */
 export function plungeCoins(p, surface, cfg = SWIRL) {
-    const top = -cfg.radius * cfg.squash, out = [];
-    for (let k = 0; k < cfg.plunge.coins; k++) {
-        const s = (k + 1) / (cfg.plunge.coins + 1);
-        out.push({ x: p.dx + Math.sin(k * 2.1 + p.n) * 26, y: surface + (top - surface) * s });
+    const P = cfg.plunge, end = plungeDepth(cfg), out = [];
+    for (let k = 0; k < P.coins; k++) {
+        const y = Math.min(end, surface + P.gap * (k + 0.8));
+        out.push({ x: p.dx + Math.sin(k * 2.1 + p.n) * 22, y });
     }
     return out;
 }

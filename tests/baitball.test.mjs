@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BAITBALL, SWIRL, baitballSlot, inBaitball, ballCentre, fishAt, hiddenIn, plungeAt, plungeCoins } from '../game/level/baitball.js';
+import { BAITBALL, SWIRL, baitballSlot, inBaitball, ballCentre, fishAt, hiddenIn, plungeAt, plungeCoins, plungeDepth } from '../game/level/baitball.js';
 import { isSea } from '../game/level/biomes.js';
 import { FIELD, createField } from '../game/level/density.js';
 import { rescueSpots } from '../game/rescues.js';
@@ -44,11 +44,21 @@ test('the swirl stays inside its slot, its fish go one way round', () => {
     assert.ok(hiddenIn(0, 0) && !hiddenIn(SWIRL.radius, 0));
 });
 
-test('a plunge falls into the ball and leaves its coins between surface and ball', () => {
-    const p = plungeAt(SWIRL.plunge.every * 2 + 0.1);
-    assert.equal(p.n, 2);
-    assert.ok(p.u > 0 && p.u < 1 && Math.abs(p.dx) <= SWIRL.radius * SWIRL.plunge.reach);
-    const coins = plungeCoins(p, -470);
-    assert.equal(coins.length, SWIRL.plunge.coins);
-    for (const k of coins) assert.ok(k.y > -470 && k.y < -SWIRL.radius * SWIRL.squash + 1);
+test('a plunge: cue, dive, under water into the ball, back up; coins between surface and ball', () => {
+    const P = SWIRL.plunge, at = s => plungeAt(P.every * 2 + s);
+    assert.equal(at(0.1).phase, 'cue');
+    assert.equal(at(P.cue + 0.1).phase, 'air');
+    assert.equal(at(P.cue + P.air + 0.1).phase, 'water');
+    const hit = at(P.cue + P.air + P.water + 0.1);
+    assert.equal(hit.phase, 'rise'); assert.ok(hit.since > 0 && hit.n === 2);
+    assert.ok(Math.abs(hit.dx) <= SWIRL.radius * P.reach);
+    assert.ok(P.cue + P.air + P.water + P.rise < P.every);
+    const coins = plungeCoins(hit, -470);
+    assert.equal(coins.length, P.coins);
+    for (const k of coins) assert.ok(k.y > -470 && k.y <= plungeDepth());
+    for (let i = 1; i < coins.length; i++) assert.ok(Math.hypot(coins[i].x - coins[i - 1].x, coins[i].y - coins[i - 1].y) >= 60, 'coins never overlap');
+});
+
+test('one coin trail at a time: coins fade before the next plunge leaves its own', () => {
+    assert.ok(SWIRL.plunge.life < SWIRL.plunge.every);
 });
