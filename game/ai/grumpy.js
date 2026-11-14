@@ -3,8 +3,12 @@
 // warns first (a huff and a colour flush, WARN s), then shoves along a visible arc
 // toward where the player was, sulks back home and stays calm for a while. A shove
 // that touches the player is reported once ('hit'); the scene decides the damage
-// (half a heart, never the last half, never in relaxed play). Units: px and s.
+// (half a heart, never the last half, never in relaxed play). In a room it warns and swings
+// at friends too (env.players), but only a touch on the local fish (env.player) is a 'hit':
+// hearts are personal (spec ch.13 "Creatures in a room"). Units: px and s.
 // Every move has momentum: steering sets a desired velocity, acceleration is limited.
+
+import { nearestPlayer } from './steering.js';
 
 export const GRUMPY = {
     territory: 300,   // px around home it idles in
@@ -37,11 +41,11 @@ function steer(g, tx, ty, speed, dt) {
 }
 
 /**
- * Advance by dt. env: { isOpen(x, y), player: { x, y } | null }.
+ * Advance by dt. env: { isOpen(x, y), player: the local fish | null, players: everyone (optional) }.
  * Returns 'warn' when a warning starts, 'hit' once when a shove touches the player, else null.
  */
 export function stepGrumpy(g, dt, env) {
-    const p = env.player;
+    const p = nearestPlayer(env, g.x, g.y);
     let event = null;
     g.timer += dt;
     const pd = p ? Math.hypot(p.x - g.x, p.y - g.y) : Infinity;
@@ -63,7 +67,8 @@ export function stepGrumpy(g, dt, env) {
         const s = g.shoveSpeed * Math.sin(Math.PI * Math.min(1, g.timer / g.shoveS) * 0.5 + Math.PI * 0.25);
         g.vx += (Math.cos(base) * s - g.vx) * Math.min(1, 10 * dt);
         g.vy += (Math.sin(base) * s - g.vy) * Math.min(1, 10 * dt);
-        if (!g.hit && pd < g.hitR) { g.hit = true; event = 'hit'; }
+        const me = env.player;   // only the local fish loses hearts on this device
+        if (!g.hit && me && Math.hypot(me.x - g.x, me.y - g.y) < g.hitR) { g.hit = true; event = 'hit'; }
         if (g.timer >= g.shoveS || d < 20) { g.state = 'sulk'; g.timer = 0; }
     } else if (g.state === 'sulk') {
         steer(g, g.home.x, g.home.y, g.idleSpeed * 2.5, dt);

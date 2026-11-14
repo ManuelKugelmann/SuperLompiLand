@@ -52,3 +52,15 @@ test('a sudden event calms it; it never enters rock', () => {
     run(h, 3, { isOpen: rock, player: { x: 200, y: 0 } });
     assert.ok(h.x < 120, `at ${h.x.toFixed(0)}`);
 });
+
+test('in a room it warns and swings at a friend, but only the local fish gets a hit', () => {
+    const g = createGrumpy(0, 0, {}, 7);
+    const me = { x: 2000, y: 0 }, friend = { x: 150, y: 0 };
+    const ev = run(g, 1.5, { player: me, players: [me, friend] });
+    assert.equal(ev[0]?.e, 'warn', 'warns the friend');
+    assert.ok(!ev.some(x => x.e === 'hit'), 'no hit for a friend on this device');
+    const h = createGrumpy(0, 0, {}, 8);
+    const near = { x: 150, y: 0 };
+    const ev2 = run(h, 1.5, { player: near, players: [near, { x: 2000, y: 0 }] });
+    assert.equal(ev2.filter(x => x.e === 'hit').length, 1, 'the local fish is hit once');
+});
