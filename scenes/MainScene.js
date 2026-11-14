@@ -54,7 +54,7 @@ import ContainerLayer from '../game/level/ContainerLayer.js';
 import SandbarLayer from '../game/level/SandbarLayer.js';
 import RhythmLayer from '../game/level/RhythmLayer.js';
 import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
-import GrandNestLayer from '../game/level/GrandNestLayer.js';
+import FriendSchool from '../game/FriendSchool.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
 import SurgeChannelLayer from '../game/level/SurgeChannelLayer.js';
@@ -244,10 +244,12 @@ export default class MainScene extends Phaser.Scene {
         // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
         // Whoever the player plays is not waiting in a net: Lompi waits there instead (journey.js).
         this.journey = createJourney(this.progression.get?.('journey', []) || [], chapters(undefined, undefined, this.registry.get('character') || loadSelectedId()));
+        // The freed friends swim along as a little school for the rest of the journey (tester: "rescued friends should follow
+        // indefinitely"): those freed before this start are there from the first frame, the newest nearest.
+        this.school = new FriendSchool(this);
+        for (const ch of this.journey.list) if (ch.friend && this.journey.has(ch.friend.id)) this.school.add(ch.friend);
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y),
-            x => this.level.nests.find(n => n.x > x) || null,
-            // A freed friend has swum along to the next nest and settles in there: said once, so the child knows where it will be.
-            ch => this.announce('', this.lang === 'de' ? `${ch.friend.name} wartet im großen Nest auf dich` : `${ch.friend.name} waits for you at the grand nest`));
+            (ch, x, y) => this.school.add(ch.friend, x, y));
         // The great whale of the open blue: free her from the net and she carries you east (spec 9.0).
         const whaleAt = this.journey.event(WHALE_SCENE.id);
         this.whale = this.ambientMode || !whaleAt ? null
@@ -269,8 +271,7 @@ export default class MainScene extends Phaser.Scene {
         // The kelp forest's surge channel (spec 5.0o): the swell carries the fish on, draws it back a little, and the kelp leans with it.
         this.surgeChannel = new SurgeChannelLayer(this, x => this.level.field.routeY(x), () => this.bookEntry('surge_channel'));
         this.level.lean = x => (this.surgeChannel.live ? channelLean(x, this.time.now / 1000) : 0);
-        // The friends freed on the way wait at the grand nest, circling in its warm light (spec 5.0m).
-        this.grandNest = new GrandNestLayer(this, this.level.nests[this.level.nests.length - 1], () => this.journey.friends());
+        // (The friends freed on the way come along to the grand nest with the fish: FriendSchool.)
         // A danger branch (spec 5.2c): the side cave under the route on the kelp island, with its clam and pearl.
         this.pearls = this.progression.get?.('pearls', []) || [];
         this.branch = new BranchLayer(this, this.level.field.cave, this.pearls.includes('kelp_cave'), (x, y) => this.takePearl('kelp_cave', x, y));
@@ -861,7 +862,7 @@ export default class MainScene extends Phaser.Scene {
             this.progression.set?.('journey', []);
             const friends = this.journey.friends();      // for the end screen: who came along
             // The arrival: the friends gather round, the camera holds and comes a little closer, then the end screen.
-            this.grandNest.gather();
+            this.school.gather(nest);
             this.particles.spawn('glint', nest.x, nest.y - GRAND_NEST.above, 24, { radius: 14, spread: 260 });
             this.tweens.add({ targets: this.cameras.main, zoom: this.cameras.main.zoom * GRAND_NEST.zoom, duration: GRAND_NEST.holdMs, ease: 'Sine.easeInOut' });
             this.time.delayedCall(GRAND_NEST.holdMs, () => this.scene.start(SCENE_KEYS.END, { score: this.coins, distance: this.maxDepth, won: true, friends }));
@@ -1679,7 +1680,6 @@ export default class MainScene extends Phaser.Scene {
         if (!this.storm && weatherNear(sp.x, WORLD.weatherRange)) this.storm = this.made(() => new StormLayer(this));
         this.storm?.update(this.camX, this.camY, time / 1000, delta, this.particles);
         this.setPieces.update(time / 1000, sp, this.fish.radius, delta / 1000);
-        this.grandNest.update(sp, time / 1000, delta / 1000);
         this.nursery.update(sp, this.fish.facing, time / 1000, delta / 1000);
         this.branch.update(sp, time / 1000, delta, this.particles);
         this.docks.update(sp, time / 1000);
@@ -1687,7 +1687,8 @@ export default class MainScene extends Phaser.Scene {
         this.whaleShark.update(sp, time / 1000, delta);
         this.front.update(sp, time / 1000, delta);
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
-        this.beats?.update(sp, time / 1000, delta, this.fish.facing);
+        this.beats?.update(sp, time / 1000, delta);
+        if (!this.ambientMode) this.school.update(sp, this.fish.facing, time / 1000, delta / 1000);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
         else if (this.creaturesWarm && !this.stormWarm && this.buildSlot()) this.stormWarm = !prewarmStorm(this);      // then the storm's pictures, one per frame
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);

@@ -1,48 +1,39 @@
-// A freed friend swims along (pure, no Phaser; tester feedback: "why do the freed fish swim after
-// me for a while and then disappear?"). After its dance of joy the friend keeps swimming with the
-// fish, a little behind and above it, until the next nest. There it settles in and swims circles
-// over the nest while the fish passes on: it is on its way to the grand nest, where it will be
-// waiting. It never fades away in open water.
+// The freed friends swim along (pure, no Phaser; tester feedback: "why do the freed fish swim after
+// me for a while and then disappear?", then: "rescued friends should follow indefinitely"). Every
+// friend the child frees joins a loose little school behind the fish, the newest closest, and
+// stays with it all the way to the grand nest. Nobody fades away, nobody is left behind: set
+// somewhere else (a respawn), the fish is caught up with from just outside the view.
 
 export const ESCORT = {
-    behind: 190,         // px behind the fish (against its direction of travel) the friend swims ...
-    above: 70,           // ... and px above it
-    catchS: 0.45,        // s it takes to close most of the way to its place (a soft trail, not a leash)
-    far: 2200,           // px: further from the fish than this (the fish was set somewhere else), it comes in again from just outside the view
-    reenter: 1100,       // ... this far behind the fish
-    home: 520,           // px before a nest at which the friend leaves the fish for it
-    circle: [150, 70],   // px half width and half height of its circle over the nest ...
-    over: 250,           // ... px over the nest
-    lapS: 5,             // ... s a round
-    gone: 2600           // px the fish is away from the nest when the circling friend (long out of the picture) is taken away
+    behind: 190,         // px behind the fish (against its direction of travel) the nearest friend swims ...
+    spacing: 125,        // ... and px further back each next one
+    above: [70, -40, 115, 5, 150, -85],   // px above the fish, friend by friend (staggered: a school, not a queue)
+    max: 6,              // friends in the school at most
+    catchS: 0.45,        // s the nearest friend takes to close most of the way to its place (a soft trail, not a leash) ...
+    lagS: 0.12,          // ... and s more for each friend further back
+    bob: 14,             // px each bobs up and down on its own
+    far: 2200,           // px: further from the fish than this (the fish was set somewhere else), a friend comes in again from just outside the view
+    reenter: 1100        // ... this far behind the fish
 };
 
-/** Where an escorting friend wants to be: behind and above a fish at (fx, fy) travelling `dir` (+1 east). Into `out`. */
-export function escortPlace(fx, fy, dir, out = {}, cfg = ESCORT) {
-    out.x = fx - dir * cfg.behind; out.y = fy - cfg.above;
+/**
+ * Where friend number `k` of the school (0 = the newest, nearest) wants to be at time `t` (s):
+ * behind a fish at (fx, fy) that travels `dir` (+1 east), staggered up and down. Into `out`.
+ */
+export function schoolPlace(k, fx, fy, dir, t, out = {}, cfg = ESCORT) {
+    out.x = fx - dir * (cfg.behind + k * cfg.spacing);
+    out.y = fy - cfg.above[k % cfg.above.length] + Math.sin(t * 1.1 + k * 1.9) * cfg.bob;
     return out;
 }
 
 /**
- * One step of `dt` s for a friend at `p` ({ x, y }, changed in place) toward the place (tx, ty):
- * it closes the gap smoothly; a friend left far behind comes in again from just outside the view.
- * Returns p.
+ * One step of `dt` s for friend number `k` at `p` ({ x, y }, changed in place) toward its place
+ * (tx, ty): it closes the gap smoothly, those further back a little later; a friend left far
+ * behind comes in again from just outside the view. Returns p.
  */
-export function escortStep(p, tx, ty, fx, dir, dt, cfg = ESCORT) {
-    if (Math.abs(p.x - fx) > cfg.far) { p.x = fx - dir * cfg.reenter; p.y = ty; }
-    const k = 1 - Math.exp(-dt / cfg.catchS);
-    p.x += (tx - p.x) * k; p.y += (ty - p.y) * k;
+export function escortStep(p, k, tx, ty, fx, dir, dt, cfg = ESCORT) {
+    if (Math.abs(p.x - fx) > cfg.far) { p.x = fx - dir * (cfg.reenter + k * cfg.spacing); p.y = ty; }
+    const a = 1 - Math.exp(-dt / (cfg.catchS + k * cfg.lagS));
+    p.x += (tx - p.x) * a; p.y += (ty - p.y) * a;
     return p;
-}
-
-/** Whether a friend escorting a fish at `fx` leaves it for the nest at `nestX` now (the fish has come up to it, or is past it). */
-export function reachesHome(fx, nestX, cfg = ESCORT) {
-    return fx > nestX - cfg.home;
-}
-
-/** Where a friend at home circles at time `t` (s), over a nest at (nx, ny). Into `out`. */
-export function homePlace(nx, ny, t, out = {}, cfg = ESCORT) {
-    const a = t / cfg.lapS * Math.PI * 2;
-    out.x = nx + Math.cos(a) * cfg.circle[0]; out.y = ny - cfg.over + Math.sin(a) * cfg.circle[1];
-    return out;
 }

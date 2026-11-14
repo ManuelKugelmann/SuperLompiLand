@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { createRig } from './CardRig.js';
 import { JOURNEY } from './journey.js';
 import { musicClock, nowSeconds } from './audio.js';
-import { ESCORT, escortPlace, escortStep, reachesHome, homePlace } from './escort.js';
 
 export const BEATS = {
     zoom: 1.5,          // the caught friend is shown this much bigger than it plays: it is the hero of its screen
@@ -13,7 +12,7 @@ export const BEATS = {
     glowAlpha: 0.3,     // its brightness on the beat (half of that between beats)
     helpEvery: 2,       // s between the bubbles it sends up for help
     happyMs: 3600,      // how long a freed friend dances around its spot ...
-    happyRadius: 120    // ... on a circle this big; then it swims along with the fish to the next nest (escort.js)
+    happyRadius: 120    // ... on a circle this big; then it joins the school of freed friends behind the fish (FriendSchool)
 };
 
 const NET_KEY = 'beat_net';
@@ -38,17 +37,16 @@ function ensureNet(scene) {
 /**
  * The events of the story path in the world: in each chapter a friend hangs in a ghost net on
  * the calm route until Lompi swims up (or uses a special nearby); then the net falls away and
- * the friend dances, thanks, and swims along with the fish to the next nest, where it settles in
- * and circles (it is on its way to the grand nest). Scenes are built only near the player.
+ * the friend dances, thanks, and joins the freed friends who swim along with the fish for the
+ * rest of the journey. Scenes are built only near the player.
  */
 export default class StoryBeats {
     /**
      * `routeY(x)` = depth of the calm route; `onFree(chapter, x, y)` is called once per rescue;
-     * `nestAfter(x)` = the next nest east of x ({ x, y }) or null; `onHome(chapter)` once, when a friend settles in at its nest.
+     * `onJoin(chapter, x, y)` when its dance is over and it joins the fish, from where it is.
      */
-    constructor(scene, journey, routeY, onFree, nestAfter, onHome) {
-        this.scene = scene; this.journey = journey; this.routeY = routeY; this.onFree = onFree; this.nestAfter = nestAfter; this.onHome = onHome;
-        this.place = {};
+    constructor(scene, journey, routeY, onFree, onJoin) {
+        this.scene = scene; this.journey = journey; this.routeY = routeY; this.onFree = onFree; this.onJoin = onJoin;
         this.actors = new Map();   // chapter id -> actor
         ensureNet(scene);
     }
@@ -60,7 +58,7 @@ export default class StoryBeats {
         const glow = s.add.image(x, y, 'bd_glow').setDisplaySize(BEATS.glow * 2, BEATS.glow * 2).setTint(0xfff3b0).setDepth(4.4).setBlendMode(Phaser.BlendModes.ADD);
         const n = Math.max(BEATS.netMin, size * BEATS.zoom * BEATS.netSize);
         const net = s.add.image(x, y, NET_KEY).setDepth(4.6).setDisplaySize(n, n);
-        return { ch, x, y, rig, glow, net, state: 'caught', left: 0, seed: x * 0.01, help: 0, top: n * 0.5, px: x, py: y, home: null };
+        return { ch, x, y, rig, glow, net, state: 'caught', left: 0, seed: x * 0.01, help: 0, top: n * 0.5, px: x, py: y };
     }
 
     remove(a) {
@@ -92,9 +90,9 @@ export default class StoryBeats {
         for (const a of this.actors.values()) if (Math.hypot(a.x - x, a.y - y) < JOURNEY.specialRadius) this.free(a);
     }
 
-    /** Per frame. `fish` = { x, y }, `t` s, `delta` ms, `heading` = the way the fish travels (+1 east). */
-    update(fish, t, delta, heading = 1) {
-        const frames = delta / (1000 / 60), dt = delta / 1000, dir = heading >= 0 ? 1 : -1;
+    /** Per frame. `fish` = { x, y }, `t` s, `delta` ms. */
+    update(fish, t, delta) {
+        const frames = delta / (1000 / 60);
         for (const ch of this.journey.list) {
             if (!ch.friend || this.actors.has(ch.id) || this.journey.has(ch.friend.id)) continue;
             if (Math.abs(ch.x - fish.x) < JOURNEY.near) this.actors.set(ch.id, this.build(ch));
@@ -112,25 +110,13 @@ export default class StoryBeats {
                 if (a.help <= 0) { a.help = BEATS.helpEvery; this.callForHelp(a); }
                 continue;
             }
+            // A dance of joy: round and round where the net was. Then it joins the fish (the scene's school of freed friends takes it from here).
             a.left -= delta;
-            if (a.state === 'happy') {
-                // A dance of joy: round and round where the net was.
-                const k = t * 4.2, r = BEATS.happyRadius;
-                a.px = a.x + Math.cos(k) * r; a.py = a.y + Math.sin(k) * r * 0.7;
-                a.rig.draw({ x: a.px, y: a.py, vx: -Math.sin(k) * 8, vy: Math.cos(k) * 5.6, frames, effort: 1 });
-                if (a.left <= 0) { a.state = 'along'; a.home = this.nestAfter(a.x); }
-            } else {
-                // Along with the fish, a little behind and above it, to the next nest; there it settles in and circles (escort.js).
-                if (a.state === 'along' && a.home && reachesHome(fish.x, a.home.x)) { a.state = 'home'; this.onHome(a.ch); }
-                const home = a.state === 'home';
-                if (home && Math.abs(fish.x - a.home.x) > ESCORT.gone) { this.remove(a); continue; }      // long out of the picture
-                const to = home ? homePlace(a.home.x, a.home.y, t, this.place) : escortPlace(fish.x, fish.y, dir, this.place);
-                const ox = a.px, oy = a.py;
-                const at = escortStep({ x: a.px, y: a.py }, to.x, to.y, home ? a.px : fish.x, dir, dt);
-                a.px = at.x; a.py = at.y;
-                a.rig.draw({ x: a.px, y: a.py, vx: (a.px - ox) / Math.max(frames, 0.01), vy: (a.py - oy) / Math.max(frames, 0.01), frames, effort: 0.7 });
-            }
+            const k = t * 4.2, r = BEATS.happyRadius;
+            a.px = a.x + Math.cos(k) * r; a.py = a.y + Math.sin(k) * r * 0.7;
+            a.rig.draw({ x: a.px, y: a.py, vx: -Math.sin(k) * 8, vy: Math.cos(k) * 5.6, frames, effort: 1 });
             a.glow.setPosition(a.px, a.py).setAlpha(BEATS.glowAlpha * 0.5);
+            if (a.left <= 0) { this.onJoin(a.ch, a.px, a.py); this.remove(a); }
         }
     }
 
