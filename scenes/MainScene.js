@@ -66,6 +66,7 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
 import { cullToView } from '../game/viewCull.js';
 import { due, everyOf } from '../game/throttle.js';
+import { setRenderScale } from '../game/renderScale.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
 import FriendSchool from '../game/FriendSchool.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
@@ -562,6 +563,7 @@ export default class MainScene extends Phaser.Scene {
         this.particles.share = q.particles;
         this.swarms.share = q.shoals;
         SWARMS.simEvery = q.simEvery; SWARMS.midEvery = q.midEvery;
+        setRenderScale(this.game, q.resolution);
         if (save) this.progression.set?.('quality', tier);
     }
 

@@ -9,10 +9,11 @@ export const QUALITY = {
     // particles: share of every burst that is spawned; shoals: share of a shoal's fish;
     // simEvery / midEvery: a shoal in sight is simulated every so many frames (near the middle / further out);
     // glow: share of the soft glow pictures that are drawn (fish light, deep glow, coin glows); far: share of the far scenery's single objects.
+    // resolution: share of the game's px the picture is drawn at, each way (renderScale.js): the graphics chip's work goes with its square.
     // (A layer reads its share as QUALITY[scene.quality.tier].glow and the like, when it builds or each frame.)
-    low: { caustics: 0, particles: 0.35, shoals: 0.45, simEvery: 3, midEvery: 5, glow: 0, far: 0.4 },
-    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, simEvery: 2, midEvery: 4, glow: 1, far: 0.7 },
-    high: { caustics: 1, particles: 1, shoals: 1, simEvery: 2, midEvery: 3, glow: 1, far: 1 },
+    low: { caustics: 0, particles: 0.35, shoals: 0.45, simEvery: 3, midEvery: 5, glow: 0, far: 0.4, resolution: 0.67 },
+    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, simEvery: 2, midEvery: 4, glow: 1, far: 0.7, resolution: 0.8 },
+    high: { caustics: 1, particles: 1, shoals: 1, simEvery: 2, midEvery: 3, glow: 1, far: 1, resolution: 1 },
     tune: {
         windowS: 2,       // the frame rate is the average over this many seconds
         lowFps: 30,       // under this for `lowS` seconds: a tier down

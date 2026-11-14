@@ -10,6 +10,8 @@ import PlayStyleScene, { STYLE_KEY } from './PlayStyleScene.js';
 import { pwaMenuItems, VERSION_TAG, setPlaying } from '../game/pwa.js';
 import { CHARACTERS, getCharacter, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import ProgressionManager from '../systems/ProgressionManager.js';
+import { QUALITY, startTier } from '../game/quality.js';
+import { setRenderScale } from '../game/renderScale.js';
 import { fromCookie } from '../systems/savepoints.js';
 import { BIOMES } from '../game/level/biomes.js';
 import { createRig, loadParts } from '../game/CardRig.js';
@@ -168,6 +170,9 @@ export default class IntroScene extends Phaser.Scene {
 
     create() {
         fitToWindow(this.game);     // the picture fills the screen, whatever its shape
+        // The title is drawn at the resolution of the quality tier the last game ended on (medium on a phone at first): its cost is all in the graphics chip.
+        const asked = new URLSearchParams(window.location.search).get('quality');
+        setRenderScale(this.game, QUALITY[QUALITY.tiers.includes(asked) ? asked : startTier(new ProgressionManager().get?.('quality', null), this.sys.game.device.input.touch)].resolution);
         setPlaying(false);          // on the title an update that waited during play may be applied
         const W = this.scale.width, H = this.scale.height;
         const lang = this.registry.get('currentLanguage') || 'de';
