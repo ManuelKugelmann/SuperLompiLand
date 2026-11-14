@@ -200,6 +200,7 @@ export default class HudScene extends Phaser.Scene {
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
         if (this.perf) this.updatePerf(m);
         const now = performance.now();
-        if (this.fpsText && now - this.fpsAt > 500) { this.fpsAt = now; this.fpsText.setText(`${Math.round(this.game.loop.actualFps)} fps`); }
+        if (this.fpsText && now - this.fpsAt > 500) { this.fpsAt = now; const q = m.quality, tier = q ? ` · ${q.tier[0].toUpperCase()}${q.auto ? '' : '!'}` : '';
+            this.fpsText.setText(`${Math.round(this.game.loop.actualFps)} fps${tier}`); }
     }
 }
