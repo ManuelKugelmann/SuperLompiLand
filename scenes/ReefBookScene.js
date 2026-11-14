@@ -18,7 +18,7 @@ const TITLES = {
     place: { de: 'Orte', en: 'Places' },
     leftover: { de: 'Was Menschen hinterlassen', en: 'What people left behind' }
 };
-const CARD = { w: 190, h: 190, gap: 18 };
+const CARD = { max: 190, min: 96, gap: 18, gapRatio: 0.095 };   // cards shrink to fit the panel as the book grows
 
 /**
  * The reef book (spec 5.2d): every creature, place and leftover Lompi has seen up
@@ -49,18 +49,26 @@ export default class ReefBookScene extends Phaser.Scene {
             fontFamily: 'Arial', fontSize: '30px', color: '#eafcff', align: 'center', wordWrap: { width: W - 260 }
         }).setOrigin(0.5);
 
+        // The largest card size at which every section fits between the title and the fact line.
+        const kinds = KINDS.map(kind => ({ kind, items: book.entries(kind) })).filter(k => k.items.length);
+        const room = H - 100 - 40 - 190;
+        const heightAt = size => {
+            const gap = Math.round(size * CARD.gapRatio), perRow = Math.max(1, Math.floor((W - 220 + gap) / (size + gap)));
+            return kinds.reduce((h, k) => h + 44 + Math.ceil(k.items.length / perRow) * (size + gap) + 14, 0);
+        };
+        let size = CARD.max;
+        while (size > CARD.min && heightAt(size) > room) size -= 4;
+        const gap = Math.round(size * CARD.gapRatio), perRow = Math.max(1, Math.floor((W - 220 + gap) / (size + gap)));
         let y = 190;
-        for (const kind of KINDS) {
-            const items = book.entries(kind);
+        for (const { kind, items } of kinds) {
             this.add.text(110, y, TITLES[kind][lang] || TITLES[kind].en, { fontFamily: 'Arial', fontSize: '30px', color: '#7fd3ff', fontStyle: 'bold' });
             y += 44;
-            const perRow = Math.floor((W - 220) / (CARD.w + CARD.gap));
             items.forEach((e, i) => {
-                const cx = 110 + (i % perRow) * (CARD.w + CARD.gap) + CARD.w / 2;
-                const cy = y + Math.floor(i / perRow) * (CARD.h + CARD.gap) + CARD.h / 2;
-                this.card(e, cx, cy, lang, fact);
+                const cx = 110 + (i % perRow) * (size + gap) + size / 2;
+                const cy = y + Math.floor(i / perRow) * (size + gap) + size / 2;
+                this.card(e, cx, cy, lang, fact, size);
             });
-            y += Math.ceil(items.length / perRow) * (CARD.h + CARD.gap) + 14;
+            y += Math.ceil(items.length / perRow) * (size + gap) + 14;
         }
 
         const close = this.add.text(W - 110, 95, '✕', { fontFamily: 'Arial', fontSize: '56px', color: '#ffffff', fontStyle: 'bold' })
@@ -69,23 +77,24 @@ export default class ReefBookScene extends Phaser.Scene {
         this.input.keyboard?.once('keydown-ESC', closeBook);
     }
 
-    card(e, cx, cy, lang, fact) {
-        const bg = this.add.rectangle(cx, cy, CARD.w, CARD.h, e.found ? 0x1d6f9a : 0x163248, 1)
+    card(e, cx, cy, lang, fact, size = CARD.max) {
+        const k = size / CARD.max;
+        const bg = this.add.rectangle(cx, cy, size, size, e.found ? 0x1d6f9a : 0x163248, 1)
             .setStrokeStyle(3, e.found ? 0xfff3b0 : 0x2b5573, e.found ? 0.9 : 0.6)
             .setInteractive({ useHandCursor: e.found });
         const name = e.found ? (e.name[lang] || e.name.en) : '?';
         if (e.image && this.textures.exists(e.image)) {
-            const img = this.add.image(cx, cy - 18, e.image);
-            img.setScale(Math.min(140 / img.width, 110 / img.height));
+            const img = this.add.image(cx, cy - 18 * k, e.image);
+            img.setScale(Math.min(140 * k / img.width, 110 * k / img.height));
             if (!e.found) {                                           // a silhouette until found
                 // Phaser 4 has no setTintFill: there the fill is a tint mode.
                 if (Phaser.TintModes) img.setTint(0x0a1f30).setTintMode(Phaser.TintModes.FILL); else img.setTintFill(0x0a1f30);
                 img.setAlpha(0.8);
             }
         } else {
-            placeBadge(this, cx, cy - 18, 46, e.id, e.found);
+            placeBadge(this, cx, cy - 18 * k, 46 * k, e.id, e.found);
         }
-        this.add.text(cx, cy + 66, name, { fontFamily: 'Arial', fontSize: '19px', color: e.found ? '#ffffff' : '#7a93a8', fontStyle: 'bold', align: 'center', wordWrap: { width: CARD.w - 14 } }).setOrigin(0.5);
+        this.add.text(cx, cy + 66 * k, name, { fontFamily: 'Arial', fontSize: `${Math.max(13, Math.round(19 * k))}px`, color: e.found ? '#ffffff' : '#7a93a8', fontStyle: 'bold', align: 'center', wordWrap: { width: size - 10 } }).setOrigin(0.5);
         if (e.found) {
             bg.on('pointerup', (p, x, y, ev) => {
                 ev.stopPropagation();

@@ -14,6 +14,7 @@ import SwarmLayer from '../game/ai/SwarmLayer.js';
 import SeabirdLayer from '../game/ai/SeabirdLayer.js';
 import { ghostShip } from '../game/level/setPieces.js';
 import DeepGlowLayer from '../game/level/DeepGlowLayer.js';
+import { glowShare } from '../game/level/deepGlow.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
 import { makeController, CONTROL_SCHEMES } from '../game/controls/index.js';
@@ -864,6 +865,13 @@ export default class MainScene extends Phaser.Scene {
         for (const f of this.level.friends) if (f.key && near(f)) ids.push(f.key);
         for (const h of this.level.hazards) if (h.key && near(h)) ids.push(h.key);
         for (const s of this.swarms.near(p.x, p.y, BOOK.seePx)) ids.push(`school_${s}`);
+        // The big encounters of the journey (spec 5.0d, 5.0e, 9.0).
+        const w = this.whale?.mind;
+        if (w && Math.hypot(w.x - p.x, w.y - p.y) < BOOK.seePx * 3) ids.push('whale');
+        if (this.seabirds.coasts.some(c => c.birds?.some(b => Math.hypot(b.mind.x - p.x, b.mind.y - p.y) < BOOK.seePx * 2))) ids.push('gannet');
+        if (glowShare(p.y) > 0.5) ids.push('glow_jelly');
+        const ship = ghostShip();
+        if (Math.hypot(ship.x - p.x, ship.y - p.y) < BOOK.seePx * 3) ids.push('ghost_ship');
         for (const id of ids) this.bookEntry(id);
     }
 
