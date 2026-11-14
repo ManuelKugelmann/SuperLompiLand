@@ -2,6 +2,14 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Set pieces for the long sea: swim through a ghost ship under the storm, dive down the trench past glowing deep-sea life to the grand nest; a painted story opening
+
+[`9d45a47`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9d45a47) · 2026-11-14 13:20
+
+![Lompi swims through the hole in the ghost ship standing on its rock under the storm](23-ghost-ship.jpg)
+![In the deep the light fades and glowing jellies and plankton take over](23-deep-glow.jpg)
+![The painted story opening: the volcano island before the eruption](23-story.jpg)
+
 ## An island chain: the great whale in the open blue, a storm to dive under, currents that pull deep, gannets that hunt near the coasts
 
 [`8489824`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8489824) · 2026-11-14 11:40

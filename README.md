@@ -5,6 +5,10 @@
 <!-- devlog:start -->
 ## Dev log
 
+**Set pieces for the long sea: swim through a ghost ship under the storm, dive down the trench past glowing deep-sea life to the grand nest; a painted story opening** — [`9d45a47`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9d45a47) · 2026-11-14 13:20
+
+![Lompi swims through the hole in the ghost ship standing on its rock under the storm](docs/devlog/23-ghost-ship.jpg)
+
 **An island chain: the great whale in the open blue, a storm to dive under, currents that pull deep, gannets that hunt near the coasts** — [`8489824`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8489824) · 2026-11-14 11:40
 
 ![The great whale with ghost net hanging on her: tear it off piece by piece and she carries you east](docs/devlog/22-island-chain-whale.jpg)
@@ -12,10 +16,6 @@
 **A world above the water: every area has its own coast on the horizon, and the volcano in the east comes closer as you travel** — [`a087bf8`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/a087bf8) · 2026-11-14 11:06
 
 ![A world above the water: every area has its own coast on the horizon, and the volcano in the east comes closer as you travel](docs/devlog/21-a-world-above-the-water-every-area-has-its-own-c.jpg)
-
-**Bubble cannons along the currents: a shot counts as a move in the chain** — [`850be96`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/850be96) · 2026-11-14 05:10
-
-![Bubble cannons along the currents: a shot counts as a move in the chain](docs/devlog/20-bubble-cannons-along-the-currents-a-shot-counts-.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
