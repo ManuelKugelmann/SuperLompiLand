@@ -16,8 +16,11 @@ const FADE = 0.38;           // bottom share of the object that fades into the w
 /** Draw depth of an object at parallax s (far fish schools in Backdrop.js use the same scale). */
 export const depthFor = s => -22.5 + 12 * s;
 
-const SURFACE_NEAR = 300;      // the camera's top edge is at most this far under the surface: the waterline may be in view
-const WATERLINE = 46;          // px under the calm surface where far things are cut off (below the highest waves)
+// Far things are under water too. A far layer's surface lies lower on screen than the real one
+// once the camera rises above the water, so a tall far object would stand in the sky. Each one
+// is therefore made no taller than what stays under the real waterline with the camera's top
+// edge this share of the screen height above the surface (higher than that only in a jump).
+const CAMERA_ABOVE = 1 / 3, HEADROOM = 24, MIN_HEIGHT = 70;
 
 export default class FarLayers {
     constructor(scene) {
@@ -43,8 +46,7 @@ export default class FarLayers {
         return far;
     }
 
-    /** `camX`, `camY` = the camera's top left in the world. */
-    update(camX, camY) {
+    update(camX) {
         const scene = this.scene, W = scene.scale.width, H = scene.scale.height;
         const has = key => scene.textures.exists(key);
         const keep = new Set();
@@ -61,23 +63,18 @@ export default class FarLayers {
                     const img = scene.add.image(o.lx, y, this.baked(o.key)).setOrigin(0.5, o.hang ? 0 : 1)
                         .setScrollFactor(s).setDepth(depthFor(s)).setAlpha(look.alpha).setTint(look.tint).setFlipX(o.flip);
                     img.setScale(o.w / img.width);
+                    // Hanging things begin as far under the layer's surface as the real one can lie below it.
+                    const rise = H * CAMERA_ABOVE * (1 - s);
+                    if (o.hang) img.y = rise;
+                    else {
+                        const room = y - rise - HEADROOM;
+                        if (room < MIN_HEIGHT) img.setVisible(false);
+                        else if (img.displayHeight > room) img.setScale(room / img.height);      // smaller, keeping its shape
+                    }
                     return img;
                 }));
             }
         });
-        // Far things are under water too: whatever of them would show above the waterline is cut
-        // off (their layer's surface lies lower on screen than the real one when the camera rises).
-        const near = camY < SURFACE_NEAR;
-        if (near || this.cropped) {
-            this.cropped = near;
-            for (const imgs of this.live.values()) {
-                for (const img of imgs) {
-                    const top = img.y - img.displayHeight * img.originY - camY * img.scrollFactorY, over = near ? -camY + WATERLINE - top : 0;
-                    if (over > 0) img.setCrop(0, over / img.scaleY, img.width, img.height - over / img.scaleY);
-                    else if (img.isCropped) img.setCrop();
-                }
-            }
-        }
         for (const [id, imgs] of this.live) {
             if (keep.has(id)) continue;
             for (const img of imgs) img.destroy();
