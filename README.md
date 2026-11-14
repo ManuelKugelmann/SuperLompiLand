@@ -207,6 +207,8 @@ A game by **Familie Kugelmann**.
 
 - Stone and metal surfaces (`public/img/mat/`): [ambientCG](https://ambientcg.com) — CC0
   (Ground054, Rock029, Rock057, Rock055, Rock035, Metal021), reduced to 512-px tiles.
+- Seabed props (`public/img/props/`): rendered from [Poly Haven](https://polyhaven.com) models — CC0
+  (dutch_ship_medium, rock_moss_set_01/02, wooden_barrels_01, wooden_crate_02).
 - [Phaser](https://phaser.io), [Matter.js](https://brm.io/matter-js/), [Vite](https://vitejs.dev),
   [Trystero](https://github.com/dmotz/trystero) — MIT.
 

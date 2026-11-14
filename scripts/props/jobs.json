@@ -1,0 +1,14 @@
+[
+  {"name": "wreck_1", "model": "dutch_ship_medium", "hide": ["sails", "rigging"], "yaw": 0, "roll": -12, "growth": 0.85, "tint": "#a09888", "elev": 8, "size": 2048},
+  {"name": "wreck_2", "model": "dutch_ship_medium", "hide": ["sails", "rigging"], "yaw": 180, "roll": 18, "growth": 0.85, "tint": "#a09888", "elev": 14, "size": 2048},
+  {"name": "wreck_3", "model": "dutch_ship_medium", "hide": ["sails", "rigging"], "yaw": 160, "roll": -25, "growth": 0.9, "tint": "#988f80", "elev": 25, "size": 2048},
+  {"name": "boulder_1", "model": "rock_moss_set_01", "pick": 0, "yaw": 20, "growth": 0.3, "tint": "#d0cfc8", "size": 1024},
+  {"name": "boulder_2", "model": "rock_moss_set_01", "pick": 2, "yaw": 110, "growth": 0.3, "tint": "#d0cfc8", "size": 1024},
+  {"name": "boulder_3", "model": "rock_moss_set_01", "pick": 4, "yaw": 200, "growth": 0.3, "tint": "#d0cfc8", "size": 1024},
+  {"name": "boulder_4", "model": "rock_moss_set_02", "pick": 0, "yaw": 40, "growth": 0.3, "tint": "#d0cfc8", "size": 1024},
+  {"name": "boulder_5", "model": "rock_moss_set_02", "pick": 3, "yaw": 150, "growth": 0.3, "tint": "#d0cfc8", "size": 1024},
+  {"name": "boulder_6", "model": "rock_moss_set_02", "pick": 6, "yaw": 260, "growth": 0.3, "tint": "#d0cfc8", "size": 1024},
+  {"name": "barrel_1", "model": "wooden_barrels_01", "pick": 0, "yaw": 0, "roll": 80, "growth": 0.6, "tint": "#b0a898", "size": 640},
+  {"name": "barrel_2", "model": "wooden_barrels_01", "pick": 1, "yaw": 30, "roll": 6, "growth": 0.6, "tint": "#b0a898", "size": 640, "elev": 12},
+  {"name": "crate_1", "model": "wooden_crate_02", "yaw": 25, "roll": 8, "growth": 0.6, "tint": "#b0a898", "size": 640, "elev": 14}
+]

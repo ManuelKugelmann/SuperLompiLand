@@ -54,6 +54,20 @@ const HAZARDS = {
     hazard_net: { size: 150, r: 84, place: 'water', anim: 'sway', bob: 34, speed: 0.7, tether: 620, drift: 300 }
 };
 
+/**
+ * Scenery on the seabed, rendered from CC0 models (public/img/props/). Per group:
+ * texture keys, display width range (px), how much of its height sinks into the
+ * ground (rock must lie under both ends), the steepest floor it stands on (radians), its depth (behind the rock
+ * = half buried, the rock in front hides the keel) and at most how many per chunk.
+ */
+export const PROPS = {
+    boulder: { keys: ['boulder_1', 'boulder_2', 'boulder_3', 'boulder_4', 'boulder_5', 'boulder_6'], width: [200, 460], sink: 0.2, flat: 0.7, depth: -1, max: 2 },
+    barrel: { keys: ['barrel_1', 'barrel_2'], width: [110, 170], sink: 0.14, flat: 0.45, depth: -1, max: 2 },
+    crate: { keys: ['crate_1'], width: [130, 190], sink: 0.12, flat: 0.35, depth: -1, max: 1 },
+    // `every`: only in every third chunk column, so hulls never overlap.
+    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, flat: 0.3, depth: -3, max: 1, every: 3, tint: 0xb6c6cc }
+};
+
 // One turn of the colour wheel, saturated and bright, looked up instead of converted every frame.
 const RAINBOW = Array.from({ length: 96 }, (_, i) => Phaser.Display.Color.HSVToRGB(i / 96, 0.75, 1).color);
 
@@ -317,6 +331,35 @@ export default class LevelGenerator {
             } else if (sitters < 1 && roll > 0.5 && roll < 0.5 + biome.friendRate * 0.12) {
                 const key = pickWeighted(rng, groundFriends, has);
                 if (key) { this.addFriend(chunk, key, f.x + up.x * 46, f.y + up.y * 46, rng, f.angle); sitters++; }
+            }
+        }
+
+        // --- Scenery props on the seabed --------------------------------------
+        if (biome.props) {
+            // Own random stream: props never shift which index a coin or friend gets.
+            const rng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}:props`]);
+            const count = Math.floor(biome.propRate) + (rng.frac() < biome.propRate % 1 ? 1 : 0);
+            const used = {};
+            const exists = g => PROPS[g] && (used[g] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
+            for (let k = 0; k < count; k++) {
+                const group = pickWeighted(rng, biome.props, exists);
+                if (!group) break;
+                const p = PROPS[group];
+                const key = rng.pick(p.keys.filter(has));
+                const tex = s.textures.get(key).getSourceImage();
+                const w = rng.realInRange(p.width[0], p.width[1]), h = w * tex.height / tex.width;
+                // Never floating: rock must lie under both ends, below the buried part.
+                const rockUnder = (x, y) => { for (let d = 0; d <= h * 0.5; d += 40) if (this.density(x, y + d) > T) return true; return false; };
+                const below = f => f.y + h * p.sink * 0.8;
+                const spot = floors.find(f => !f.prop && Math.abs(f.angle) < p.flat
+                    && rockUnder(f.x - w * 0.36, below(f)) && rockUnder(f.x + w * 0.36, below(f)));
+                if (!spot) continue;
+                spot.prop = true;
+                used[group] = (used[group] || 0) + 1;
+                const img = keep(s.add.image(spot.x, spot.y, key).setOrigin(0.5, 1 - p.sink));
+                img.setScale(w / tex.width).setRotation(spot.angle * 0.6).setDepth(p.depth);
+                if (rng.frac() < 0.5) img.setFlipX(true);
+                if (p.tint) img.setTint(p.tint);
             }
         }
 

@@ -7,6 +7,7 @@ export const CREDITS = {
         lines: [
             'Ein Spiel von Familie Kugelmann',
             'Stein- und Metalloberflächen: ambientCG.com (CC0)',
+            'Wracks, Fässer, Kisten und Felsen: Poly Haven (CC0)',
             'Gemacht mit Phaser, Matter.js und Vite (MIT)',
             'Mehrspieler über Trystero (MIT)'
         ],
@@ -17,6 +18,7 @@ export const CREDITS = {
         lines: [
             'A game by Familie Kugelmann',
             'Stone and metal surfaces: ambientCG.com (CC0)',
+            'Wrecks, barrels, crates and boulders: Poly Haven (CC0)',
             'Made with Phaser, Matter.js and Vite (MIT)',
             'Multiplayer via Trystero (MIT)'
         ],
