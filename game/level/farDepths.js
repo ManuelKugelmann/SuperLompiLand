@@ -31,6 +31,8 @@ const K = {
     boulders: [['boulder_1', 1, [320, 700]], ['boulder_2', 1, [320, 700]], ['boulder_4', 1, [320, 700]], ['boulder_5', 1, [320, 700]]],
     hulls: [['wreck_1', 2, SIZES.sailingWreck], ['wreck_2', 2, SIZES.sailingWreck], ['trawler_1', 1, SIZES.fishingBoat], ['cutter_1', 1, SIZES.fishingBoat]]
 };
+/** Every texture key far scenery uses (their small versions are baked ahead: scripts/fx/far_sources.py). */
+export const FAR_KEYS = [...new Set(Object.values(K).flat().map(([key]) => key))];
 const pick = (...groups) => groups.flatMap(([g, w]) => K[g].map(([key, kw, size, hang]) => [key, kw * w, size, !!hang]));
 
 /**

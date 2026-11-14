@@ -1,10 +1,13 @@
-import { FAR, farCell, farBaseY, farLook, worldXFor } from './farDepths.js';
+import { FAR, FAR_KEYS, farCell, farBaseY, farLook, worldXFor } from './farDepths.js';
 
 /**
  * Far scenery (farDepths.js): single painted objects, each at its own parallax depth,
  * small, soft and hazy with distance, their base fading into the water. Textures are
  * baked once per key (smaller, slightly blurred, bottom faded); objects are plain images
  * with a scroll factor, placed per cell as the view moves — nothing is redrawn per frame.
+ * The bakes are made ahead (FAR_ART, scripts/fx/far_sources.py) and loaded with the art: baking
+ * a big picture here decodes all of it, a long frame when a jump lands in a new biome. Baking
+ * here is only the fallback for a missing file.
  *
  *   create():  this.farLayers = new FarLayers(this)
  *   update():  this.farLayers.update(camX)
@@ -12,6 +15,10 @@ import { FAR, farCell, farBaseY, farLook, worldXFor } from './farDepths.js';
 const BAKE_W = 220;          // baked texture width: the far view needs no fine detail
 const BLUR = 1.8;            // bake blur (texture px)
 const FADE = 0.38;           // bottom share of the object that fades into the water
+// (BAKE_W, BLUR and FADE are also used by scripts/fx/far_sources.py: keep them in step.)
+
+/** The far textures baked ahead, loaded by IntroScene under the keys a run-time bake would use. */
+export const FAR_ART = Object.fromEntries(FAR_KEYS.map(k => [`far_${k}`, `img/far/${k}.webp`]));
 
 /** Draw depth of an object at parallax s (far fish schools in Backdrop.js use the same scale). */
 export const depthFor = s => -22.5 + 12 * s;

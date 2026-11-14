@@ -59,3 +59,10 @@ test('busy biomes are hazier at every depth', () => {
     const kelp = BIOMES.find(b => b.id === 'kelp'), reef = BIOMES.find(b => b.id === 'reef');
     for (const s of FAR.depths) assert.ok(farLook(s, kelp).alpha < farLook(s, reef).alpha, `depth ${s}`);
 });
+
+test('every far texture is baked ahead (no long frame decoding big art on arrival)', async () => {
+    const { FAR_KEYS, FAR_KINDS } = await import('../game/level/farDepths.js');
+    const { existsSync } = await import('node:fs');
+    for (const b of Object.values(FAR_KINDS)) for (const [key] of b.kinds) assert.ok(FAR_KEYS.includes(key), key);
+    for (const key of FAR_KEYS) assert.ok(existsSync(new URL(`../public/img/far/${key}.webp`, import.meta.url)), `img/far/${key}.webp`);
+});
