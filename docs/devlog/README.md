@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Smooth shoals, quality that follows the phone
+
+[`8c36b7a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8c36b7a) · 2026-11-14 22:34
+
+![Smooth shoals, quality that follows the phone](29-smooth-shoals-quality-that-follows-the-phone.png)
+
 ## New sights that act: a ferry's wash in the harbour, a sea lion pup, an otter, a sleeping seal, gannets and a surge channel
 
 [`4c5fc77`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/4c5fc77) · 2026-11-14 19:59

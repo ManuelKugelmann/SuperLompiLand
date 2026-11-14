@@ -5,6 +5,10 @@
 <!-- devlog:start -->
 ## Dev log
 
+**Smooth shoals, quality that follows the phone** — [`8c36b7a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8c36b7a) · 2026-11-14 22:34
+
+![Smooth shoals, quality that follows the phone](docs/devlog/29-smooth-shoals-quality-that-follows-the-phone.png)
+
 **New sights that act: a ferry's wash in the harbour, a sea lion pup, an otter, a sleeping seal, gannets and a surge channel** — [`4c5fc77`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/4c5fc77) · 2026-11-14 19:59
 
 ![New sights that act: a ferry's wash in the harbour, a sea lion pup, an otter, a sleeping seal, gannets and a surge channel](docs/devlog/28-new-sights-that-act-a-ferry-s-wash-in-the-harbou.jpg)
@@ -12,10 +16,6 @@
 **The finale: down the vent staircase to the grand nest, where the freed friends wait** — [`51d8537`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/51d8537) · 2026-11-14 18:39
 
 ![The finale: down the vent staircase to the grand nest, where the freed friends wait](docs/devlog/27-the-finale-down-the-vent-staircase-to-the-grand-.jpg)
-
-**The opening story in words: a caption per beat, one tap per beat** — [`e74b467`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/e74b467) · 2026-11-14 17:16
-
-![The opening story in words: a caption per beat, one tap per beat](docs/devlog/26-the-opening-story-in-words-a-caption-per-beat-on.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
