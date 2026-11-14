@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { causticPattern, sunlightAt, gradeMatrix } from './causticsMath.js';
+import { shareOf } from '../quality.js';
 
 /**
  * Sunlight under water — one system for light shafts, caustics and the colour grade
@@ -101,7 +102,11 @@ export default class WaterLight {
         const light = sunlightAt(Math.max(0, cam.scrollY + H * 0.35), WATER_LIGHT.fadeTo) * sun;
         const above = cam.scrollY < 0 ? Math.min(1, -cam.scrollY / (H * 0.5)) : 0;   // view partly in the sky
 
+        // The shafts are glow (additive, screen-filling): off on the tiers without glow (quality.js).
+        const shafts = shareOf(scene, 'glow') > 0;
         for (const s of this.shafts) {
+            s.setVisible(shafts);
+            if (!shafts) continue;
             s.x = s.baseX + Math.sin(t * 0.21 + s.phase) * 60 - ((cam.scrollX * s.drift) % (W + 400));
             if (s.x < -260) s.x += W + 400; else if (s.x > W + 260) s.x -= W + 400;
             s.y = Math.max(-40, -cam.scrollY - 30);   // shafts start at the water surface
