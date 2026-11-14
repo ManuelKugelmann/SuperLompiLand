@@ -410,6 +410,14 @@ const SOUNDS = {
     respawn() { tone({ f: 440, to: 220, type: 'sine', dur: 0.4, vol: 0.2 }); },
     flap() { noise({ dur: 0.09, vol: 0.1, from: 700, to: 1400, q: 1.2 }); },
     tap() { tone({ f: 880, type: 'sine', dur: 0.06, vol: 0.12 }); },
+    /**
+     * A big animal is near, heard before it is seen (game/level/heralds.js): a soft low swell of two notes,
+     * like the music noticing something big. Synthesized barks and chirps were tried and read as a snare
+     * hit and an alarm clock (earshot), so real animal calls wait for recorded CC0 sounds.
+     */
+    herald(notes = [392, 587.33]) {
+        notes.forEach((f, i) => tone({ f, type: 'sine', at: i * 0.12, dur: 2.2, vol: 0.022, rise: 0.6 }));
+    },
     /** Going down past depth mark i (game/level/depthMeters.js): a soft bell, a step lower every mark. */
     deeper(i = 0) {
         // Quieter than a coin, a soft swell instead of a strike, low and dark (earshot: the first version

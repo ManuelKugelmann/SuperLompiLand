@@ -86,6 +86,7 @@ import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport, slowSteps, watchParts, splitFrame } from '../game/perfTour.js';
 import { depthMeters, createDepthBell } from '../game/level/depthMeters.js';
+import { heraldDue } from '../game/level/heralds.js';
 import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics, catchCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
@@ -1858,6 +1859,10 @@ export default class MainScene extends Phaser.Scene {
         this.depthBell ??= createDepthBell();
         const mark = this.depthBell.step(this.depthMeters());
         if (mark >= 0 && !this.ambientMode && !this.perfTour) { play('deeper', mark); this.depthMarkAt = time; }
+        // Big animals are heard before they are seen (research 5.0x #14).
+        this.heard ??= new Set();
+        const herald = this.ambientMode || this.perfTour ? null : heraldDue(this.fish.sprite.x, this.heard);
+        if (herald) { this.heard.add(herald.id); play('herald', herald.call); }
         const t2 = performance.now();
         for (const [k, ms] of [['physics', t1 - t0], ['world', t2 - t1]]) {
             const a = this.perf[k]; a.sum += ms; a.n++; if (ms > a.max) a.max = ms;
