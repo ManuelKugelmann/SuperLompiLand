@@ -14,6 +14,8 @@
 //   open     how much rock is removed (0 = cave-rich, 0.3 = wide open water)
 //   backRock reach (world px) of the rock behind the play plane under overhangs (0 = none: endless open water)
 //   rockWall share of the near/mid rock layers that is closed wall (0 = all open water; rockLayerTable.js)
+//   wallRate / wallLife  chance that a steep rock face gets growth, and what grows there (weighted;
+//            more near an island's drop-off into the sea)
 //   coral    chance that a floor spot gets coral          kelp    chance that it gets a kelp stalk
 //   Friends are the sea's own creatures (anglerfish and urchins included).
 //   Hazards are what the volcano's eruption and people left behind, all of
@@ -40,6 +42,7 @@ export const BIOMES = [
         backRock: 400,
         rockWall: 0.15,
         coral: 0.12, kelp: 0.1, coins: 2, friendRate: 0.5, hazardRate: 0,
+        wallRate: 0.1, wallLife: { anemone: 2, coral: 1 },
         props: { boulder: 2, seagrass: 5, anemone: 1 }, propRate: 2.0,
         friends: { friend_starfish: 3, friend_snail: 3, friend_turtle: 1, urchin: 1 }, hazards: {}
     },
@@ -51,6 +54,7 @@ export const BIOMES = [
         backRock: 400,
         rockWall: 0.6,
         coral: 0.25, kelp: 0.3, coins: 3, friendRate: 0.55, hazardRate: 0.1, roots: 4, spot: 'surface',
+        wallRate: 0.12, wallLife: { anemone: 1 },
         props: { boulder: 1, barrel: 1, seagrass: 3, rowboat: 1 }, propRate: 1.3,
         friends: { friend_seahorse: 2, friend_snail: 2, friend_nudibranch: 2, friend_turtle: 1, friend_starfish: 1, urchin: 1 },
         hazards: { hazard_net: 1 }
@@ -61,6 +65,7 @@ export const BIOMES = [
         backRock: 900,
         rockWall: 0.45,
         coral: 0.6, kelp: 0.12, coins: 2, friendRate: 0.4, hazardRate: 0.12,
+        wallRate: 0.5, wallLife: { coral: 4, seafan: 2, anemone: 1 },
         props: { boulder: 2, seafan: 2, anemone: 2, seagrass: 1 }, propRate: 1.5,
         friends: { friend_starfish: 2, friend_snail: 2, friend_turtle: 1, friend_seahorse: 1, urchin: 2 },
         hazards: { spikes: 1 }
@@ -81,6 +86,7 @@ export const BIOMES = [
         backRock: 1200,
         rockWall: 0.75,
         coral: 0, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
+        wallRate: 0.3, wallLife: { anemone: 3, seafan: 1 },
         props: { boulder: 3, kelpclump: 3, anemone: 2, seafan: 1 }, propRate: 1.8,
         friends: { friend_seahorse: 3, friend_nudibranch: 3, friend_snail: 1, urchin: 1 },
         hazards: { hazard_net: 2, spikes: 1 }
@@ -91,6 +97,7 @@ export const BIOMES = [
         backRock: 1200,
         rockWall: 0.7,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
+        wallRate: 0.1, wallLife: { anemone: 1 },
         props: { pier: 1, trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
         landmark: 'pier', spot: 'surface',   // the pier stands at the waterline
         friends: { friend_snail: 1, friend_nudibranch: 1 },
@@ -115,6 +122,7 @@ export const BIOMES = [
         backRock: 1300,
         rockWall: 0.8,
         coral: 0.1, kelp: 0.3, coins: 3, friendRate: 0.4, hazardRate: 0.2,
+        wallRate: 0.35, wallLife: { seafan: 3, anemone: 2, coral: 1 },
         props: { boulder: 4, seafan: 2, anemone: 2, kelpclump: 1 }, propRate: 1.8,
         friends: { friend_starfish: 2, friend_snail: 1, friend_seahorse: 1, friend_nudibranch: 2, urchin: 3 },
         hazards: { spikes: 1, hazard_net: 1 }
@@ -244,6 +252,27 @@ export function dropOffView(x, cfg = SEABED) {
         k = Math.max(k, smooth(1 - Math.abs(x - (BIOMES[i].from + cfg.dropOff * 0.4)) / cfg.dropView));
     }
     return k;
+}
+
+/**
+ * How close x is to where an island drops off into the open sea: 1 at the edge, 0 from `reach`
+ * px before it; past the edge it stays 1 over the wall itself (`wall` px into the sea).
+ */
+export function dropOffShare(x, reach = 2200, wall = SEABED.dropOff) {
+    const i = biomeIndexAt(x), b = BIOMES[i], next = BIOMES[i + 1], prev = BIOMES[i - 1];
+    if (b.zone === 'sea') return prev && prev.zone === 'island' && x < b.from + wall ? 1 : 0;
+    if (!next || next.zone !== 'sea') return 0;
+    return smooth(1 - (b.from + b.width - x) / reach);
+}
+
+/**
+ * What grows on steep rock faces at x: { rate, life } (biomes' wallRate / wallLife; on the
+ * drop-off wall just past an island, that island's), or null where nothing grows.
+ */
+export function wallLifeAt(x) {
+    const i = biomeIndexAt(x);
+    const b = BIOMES[i].wallLife ? BIOMES[i] : dropOffShare(x) > 0 ? BIOMES[i - 1] : null;
+    return b?.wallLife ? { rate: b.wallRate, life: b.wallLife } : null;
 }
 
 /** Seabed depth: shallow along the islands, far down in the open sea between them, plus the abyss. */

@@ -12,7 +12,7 @@ import { SHADE, shadeChunk } from './shade.js';
 import { MAT, MATERIALS, prepareTile, setMaterials, materialTiles } from './materials.js';
 import { mix } from './layerMath.js';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest } from './biomes.js';
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, floorY, pickWeighted, landmarkGroup, reefCrest, dropOffShare, wallLifeAt } from './biomes.js';
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
@@ -58,6 +58,13 @@ const FRIENDS = {
     // The anglerfish art faces left (tail on the right); it lights the deep, its lure sways as a soft part.
     enemy_angler: { size: 240, swim: 460, bob: 14, anim: 'swim', soft: 0.35, wiggle: 22, facesLeft: true, glow: true,
         grumpy: { territory: 320 } }   // guards its patch of the dark: warns, then shoves (ai/grumpy.js)
+};
+// What grows on steep rock faces (biomes.js wallRate / wallLife): picture keys and width range
+// (px) per kind; at most `max` per chunk; `dropBoost` = extra rate at an island's drop-off.
+const WALL_LIFE = {
+    keys: { coral: ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5'], seafan: ['seafan_1'], anemone: ['anemone_1'] },
+    width: { coral: [90, 170], seafan: [140, 240], anemone: [80, 140] },
+    max: 7, dropBoost: 1.6
 };
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
 const HAZARDS = {
@@ -404,8 +411,8 @@ export default class LevelGenerator {
         // Collision strips and floor spots come from the coarse grid (corners
         // shared with the neighbours -> seamless).
         const val = gridRows(pics.coarse, N + 1);
-        const floors = [];
-        marchGrid(val, ox, oy, CH, T, c => { for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors); });
+        const floors = [], walls = [];
+        marchGrid(val, ox, oy, CH, T, c => { for (const [p, q] of c.edges) this.addEdge(chunk, p, q, floors, walls); });
 
         // --- Nest ------------------------------------------------------------
         for (const nest of this.nests) {
@@ -446,6 +453,26 @@ export default class LevelGenerator {
             } else if (sitters < 1 && roll > 0.5 && roll < 0.5 + biome.friendRate * 0.12) {
                 const key = pickWeighted(rng, groundFriends, has);
                 if (key) { this.addFriend(chunk, key, f.x + up.x * 46, f.y + up.y * 46, rng, f.angle); sitters++; }
+            }
+        }
+
+        // --- Life on the walls: corals, sea fans and anemones grow out of steep rock faces,
+        // thickest where an island drops off into the open sea (spec 5.0c). Own random stream.
+        const wallLife = walls.length ? wallLifeAt(mid) : null;
+        if (wallLife) {
+            const wrng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:${cy}:walls`]);
+            const rate = wallLife.rate * (1 + WALL_LIFE.dropBoost * dropOffShare(mid));
+            const kinds = only(wallLife.life, k => WALL_LIFE.keys[k]?.some(has));
+            wrng.shuffle(walls);
+            let grown = 0;
+            for (const w of walls) {
+                if (grown >= WALL_LIFE.max || wrng.frac() > rate) continue;
+                const kind = pickWeighted(wrng, kinds, () => true);
+                if (!kind) break;
+                const key = wrng.pick(WALL_LIFE.keys[kind].filter(has)), tex = s.textures.get(key).getSourceImage();
+                const width = wrng.realInRange(WALL_LIFE.width[kind][0], WALL_LIFE.width[kind][1]);
+                keep(s.add.image(w.x, w.y, key).setOrigin(0.5, 0.9).setScale(width / tex.width).setRotation(w.angle).setDepth(-1)).setFlipX(wrng.frac() < 0.5);
+                grown++;
             }
         }
 
@@ -594,8 +621,8 @@ export default class LevelGenerator {
         }
     }
 
-    /** One rock outline segment: collision strip + remember upward-facing ones. */
-    addEdge(chunk, a, b, floors) {
+    /** One rock outline segment: collision strip + remember upward-facing ones (floors) and steep ones (walls). */
+    addEdge(chunk, a, b, floors, walls) {
         const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
         const ang = Math.atan2(b.y - a.y, b.x - a.x);
         let nx = -Math.sin(ang), ny = Math.cos(ang);
@@ -604,6 +631,7 @@ export default class LevelGenerator {
         chunk.bodies.push(this.scene.matter.add.rectangle(mx + nx * 26, my + ny * 26, len + 8, 52,
             { isStatic: true, angle: ang, friction: 0.05 }));
         if (ny > 0.8 && len > 45) floors.push({ x: mx, y: my, angle: b.x > a.x ? ang : ang + Math.PI });
+        else if (walls && Math.abs(nx) > 0.7 && len > 40) walls.push({ x: mx, y: my, angle: Math.atan2(-nx, ny) });   // grows out along the face's normal
     }
 
     addCoin(chunk, x, y, chunkKey, index) {

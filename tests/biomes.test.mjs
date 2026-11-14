@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, SEABED, isSea, dropOffView, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor, landmarkGroup, LANDMARK
+    BIOMES, WORLD_WEST, WORLD_END, ABYSS, SHORE, SEABED, isSea, dropOffView, surfAt, biomeIndexAt, biomeBlendAt, mixColor, floorY, pickWeighted, spotFor, landmarkGroup, LANDMARK, dropOffShare, wallLifeAt
 } from '../game/level/biomes.js';
 
 test('biomes are ordered west to east and every table is complete', () => {
@@ -144,4 +144,16 @@ test('the view tips down at every drop-off and nowhere else', () => {
         assert.equal(dropOffView(b.from + b.width / 2), 0, 'not out at sea');
     }
     assert.equal(dropOffView(0), 0);
+});
+
+test('growth on rock faces thickens toward the drop-off of an island into the open sea', () => {
+    const reef = BIOMES.find(b => b.id === 'reef'), end = reef.from + reef.width;
+    assert.equal(BIOMES[BIOMES.indexOf(reef) + 1].zone, 'sea');
+    assert.ok(dropOffShare(end - 50) > 0.9);
+    assert.equal(dropOffShare(end - 5000), 0);
+    assert.equal(dropOffShare(end + 500), 1, 'all over the wall itself');
+    assert.equal(dropOffShare(end + 5000), 0, 'none out at sea');
+    assert.deepEqual(wallLifeAt(end + 300)?.life, reef.wallLife, 'the reef grows down its wall');
+    assert.equal(wallLifeAt(end + 5000), null);
+    for (const b of BIOMES) if (b.wallLife) assert.ok(b.wallRate > 0 && b.wallRate < 1, b.id);
 });
