@@ -188,8 +188,12 @@ export function createField(seed) {
             const low = 1 - (fy - y) / FIELD.footReach;
             if (low > 0 && sea < 1) n += FIELD.foot * low * (1 - sea);
         }
-        // Keep the abyss shaft swimmable all the way down.
-        if (y > 4200 && y < fy - 150 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 0.75) n -= 0.6;
+        // Keep the abyss shaft swimmable all the way down. Its sides wander with depth and fade
+        // out softly (top, bottom and sideways): never a cut box in the rock.
+        if (y > 4000 && Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 1.4) {
+            const ax = (x - ABYSS.x + (vnoise(y / 600, 7.3, seed + 41) - 0.5) * 360) / (ABYSS.halfWidth * 0.75);
+            n -= 0.6 * smooth01((1.35 - Math.abs(ax)) / 0.5) * smooth01((y - 4000) / 400) * smooth01((fy - 150 - y) / 200);
+        }
         // The reef crest: solid coral from just under the surface down, whatever the noise says.
         // Its upper face is lumpy, slopes away to both sides and has grooves: no flat top, no cut faces.
         const crestTop = Math.abs(x - CREST_X) > CREST_REACH ? Infinity      // nowhere near it: nothing to work out

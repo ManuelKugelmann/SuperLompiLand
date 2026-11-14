@@ -64,6 +64,13 @@ export const SURFACE_CLEAR = { below: 300, fade: 420, push: 1.2, wander: 520 };
  */
 export const ROUTE_CLEAR = { half: ROUTE.halfWidth, fade: 220, push: 1.2, wander: 260 };
 
+/**
+ * Where a wall stretch begins, the enclosure is read a little to the side, by an amount that
+ * changes with depth: its edge meanders down the wall instead of standing as one vertical cut
+ * (virtual px: big lazy bends, plus a little rough detail).
+ */
+export const WALL_EDGE = { bend: 700, bendScale: [600, 450], rough: 120, roughScale: [150, 170] };
+
 /** Enclosure noise at world x (0..1): two octaves, so every biome sees many open and closed stretches. */
 const encNoise = (x, layer) => 0.62 * vnoise(x / layer.scale, layer.seed * 0.37, layer.seed)
     + 0.38 * vnoise(x / (layer.scale * 0.37), layer.seed * 0.71, layer.seed + 9);
@@ -155,7 +162,9 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
     const soft = lowPass(cleared, sup.grid), carry = lowPass(cleared, sup.carryGrid);
     return {
         density(x, y) {
-            const e = enclosure(x, layer);
+            const E = WALL_EDGE;
+            const e = enclosure(x + (vnoise(x / E.bendScale[0], y / E.bendScale[1], layer.seed + 31) - 0.5) * E.bend
+                + (vnoise(x / E.roughScale[0], y / E.roughScale[1], layer.seed + 33) - 0.5) * E.rough, layer);
             // Toward fully open the field is pushed far out of rock: walls go, only the deep
             // ground stays (sinking lower), so an open stretch never ends in a straight cut.
             const gone = smooth01((-0.55 - e) / 0.45);
