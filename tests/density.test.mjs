@@ -125,7 +125,7 @@ test('the reef crest stands just under the surface at the reef\'s outer edge, lu
     for (let x = c - REEF_CREST.half + 40; x <= c + REEF_CREST.half - 40; x += 40) {
         const y = topAt(x);
         tops.push(y);
-        assert.ok(y > REEF_CREST.top - REEF_CREST.lump - 80 && y < REEF_CREST.top + REEF_CREST.lump + REEF_CREST.groove[2] + 140, `crest top at ${x}: ${y}`);
+        assert.ok(y > REEF_CREST.top - REEF_CREST.lump - 80 && y < REEF_CREST.top + REEF_CREST.lump + REEF_CREST.groove.depth[1] + 140, `crest top at ${x}: ${y}`);
         assert.ok(f.density(x, f.routeY(x)) < FIELD.threshold, 'the channel');
     }
     assert.ok(Math.max(...tops) - Math.min(...tops) > 40, 'no flat table: the top rises and falls');
@@ -133,6 +133,8 @@ test('the reef crest stands just under the surface at the reef\'s outer edge, lu
     // It slopes away on both sides instead of ending in a cut face.
     assert.ok(topAt(c + REEF_CREST.half + 200) > topAt(c + REEF_CREST.half - 100) + 100, 'the seaward slope');
     assert.ok(topAt(c - REEF_CREST.half - 150) > topAt(c - REEF_CREST.half + 100) + 100, 'the lagoon side slope');
-    assert.ok(f.routeY(c) > REEF_CREST.top + ROUTE.halfWidth + 200, 'the channel lies well under the crest');
+    assert.ok(f.routeY(c) > REEF_CREST.top + ROUTE.halfWidth + 900, 'the pass lies far under the crest: a massive reef above it');
+    // Solid from its top down to the pass: no shelf hanging over open water.
+    for (let y = REEF_CREST.top + 250; y < f.routeY(c) - ROUTE.halfWidth * 2; y += 60) assert.ok(f.density(c + 100, y) > FIELD.threshold, `solid at ${y}`);
     assert.equal(reefCrest(c - 2000), 0);
 });

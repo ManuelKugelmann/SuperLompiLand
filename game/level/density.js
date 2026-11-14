@@ -3,7 +3,7 @@
 // so it runs unchanged on the main thread, in a Web Worker and in the tests.
 import { vnoise } from './terrain.js';
 import { detour } from './weather.js';
-import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop } from './biomes.js';
+import { BIOMES, WORLD_WEST, WORLD_END, ABYSS, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefPass } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
@@ -52,7 +52,9 @@ export function cruiseY(x, cfg = ROUTE) {
         sum += coast + (cfg.seaY - coast) * smooth01((fy - cfg.seaFrom) / (cfg.seaFull - cfg.seaFrom));
     }
     const y = sum / (cfg.ease * 2 + 1), d = detour(x, DETOUR);
-    return y + (d.y - y) * d.k;      // under a storm and through a downwelling the route goes deep (weather.js)
+    const deep = y + (d.y - y) * d.k;      // under a storm and through a downwelling the route goes deep (weather.js)
+    // The reef pass: the reef is solid from its crest far down, and the way through it lies deep.
+    return deep + Math.max(0, REEF_CREST.passY - deep) * reefPass(x);
 }
 
 const DETOUR = { y: 0, k: 0 };

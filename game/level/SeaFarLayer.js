@@ -27,13 +27,35 @@ function ensureTextures(scene) {
         ctx.drawImage(sharp, 0, 0);
         tex.refresh();
     };
-    // The island's socket: a broad shoulder of rock climbing to the right, ledges on its flank.
-    soft('seafar_socket', 900, 700, 10, (c, w, h) => {
-        c.beginPath(); c.moveTo(0, h);
-        c.bezierCurveTo(w * 0.2, h * 0.92, w * 0.3, h * 0.7, w * 0.45, h * 0.62);
-        c.bezierCurveTo(w * 0.55, h * 0.56, w * 0.6, h * 0.36, w * 0.74, h * 0.26);
-        c.bezierCurveTo(w * 0.84, h * 0.18, w * 0.9, h * 0.06, w, 0);
-        c.lineTo(w, h); c.closePath(); c.fill();
+    // The island's socket: a shoulder of rock climbing to the right. Its outline is rock, not a
+    // ramp: big shoulders and ledges, small knobs, two buttresses that lean out, and a rim that
+    // thins into the water; a few far plants stand on its upper shoulder.
+    soft('seafar_socket', 900, 700, 6, (c, w, h) => {
+        const edge = t => {      // height of the outline (0 bottom .. 1 top) at t = 0 left .. 1 right
+            const base = Math.pow(t, 1.25);
+            const ledges = Math.round(base * 6) / 6 * 0.35 + base * 0.65;                          // steps: ledges
+            const big = Math.sin(t * 9.1 + 0.6) * 0.035 + Math.sin(t * 4.3 + 2.1) * 0.05;          // shoulders
+            const knobs = Math.sin(t * 61) * 0.008 + Math.sin(t * 37 + 1.3) * 0.012;               // knobs
+            return Math.max(0, Math.min(1, ledges + (big + knobs) * Math.min(1, t * 4)));
+        };
+        const outline = grow => {
+            c.beginPath(); c.moveTo(0, h);
+            for (let i = 0; i <= 180; i++) {
+                const t = i / 180;
+                // Buttresses: at two places the rock leans out to the left over the water below it.
+                const lean = 46 * Math.exp(-((t - 0.42) ** 2) / 0.0016) + 60 * Math.exp(-((t - 0.71) ** 2) / 0.002);
+                c.lineTo(t * w - lean - grow, h - edge(t) * h - grow);
+            }
+            c.lineTo(w, 0); c.lineTo(w, h); c.closePath();
+        };
+        c.globalAlpha = 0.3; outline(26); c.fill();       // the rim, thin and hazy
+        c.globalAlpha = 0.6; outline(11); c.fill();
+        c.globalAlpha = 1; outline(0); c.fill();
+        c.lineWidth = 5;                                  // far plants on the upper shoulder
+        for (let i = 0; i < 9; i++) {
+            const t = 0.5 + i * 0.05, x = t * w - 8, y = h - edge(t) * h, tall = 40 + (i * 37) % 50;
+            c.beginPath(); c.moveTo(x, y + 4); c.quadraticCurveTo(x + (i % 2 ? 12 : -12), y - tall * 0.5, x + (i % 3 - 1) * 8, y - tall); c.stroke();
+        }
     });
     soft('seafar_manta', 512, 220, 5, (c, w, h) => {
         c.beginPath(); c.moveTo(w * 0.9, h * 0.5);

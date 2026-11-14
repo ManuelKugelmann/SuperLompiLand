@@ -16,6 +16,9 @@ const FADE = 0.38;           // bottom share of the object that fades into the w
 /** Draw depth of an object at parallax s (far fish schools in Backdrop.js use the same scale). */
 export const depthFor = s => -22.5 + 12 * s;
 
+const SURFACE_NEAR = 300;      // the camera's top edge is at most this far under the surface: the waterline may be in view
+const WATERLINE = 46;          // px under the calm surface where far things are cut off (below the highest waves)
+
 export default class FarLayers {
     constructor(scene) {
         this.scene = scene;
@@ -40,7 +43,8 @@ export default class FarLayers {
         return far;
     }
 
-    update(camX) {
+    /** `camX`, `camY` = the camera's top left in the world. */
+    update(camX, camY) {
         const scene = this.scene, W = scene.scale.width, H = scene.scale.height;
         const has = key => scene.textures.exists(key);
         const keep = new Set();
@@ -61,6 +65,19 @@ export default class FarLayers {
                 }));
             }
         });
+        // Far things are under water too: whatever of them would show above the waterline is cut
+        // off (their layer's surface lies lower on screen than the real one when the camera rises).
+        const near = camY < SURFACE_NEAR;
+        if (near || this.cropped) {
+            this.cropped = near;
+            for (const imgs of this.live.values()) {
+                for (const img of imgs) {
+                    const top = img.y - img.displayHeight * img.originY - camY * img.scrollFactorY, over = near ? -camY + WATERLINE - top : 0;
+                    if (over > 0) img.setCrop(0, over / img.scaleY, img.width, img.height - over / img.scaleY);
+                    else if (img.isCropped) img.setCrop();
+                }
+            }
+        }
         for (const [id, imgs] of this.live) {
             if (keep.has(id)) continue;
             for (const img of imgs) img.destroy();

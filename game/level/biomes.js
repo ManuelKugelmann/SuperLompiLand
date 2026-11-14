@@ -208,8 +208,13 @@ export const REEF_CREST = {
     lump: 45,            // px its top rises and falls (a grown thing, not a table)
     lagoonSlope: 2.6,    // px it falls per px toward the lagoon beyond its full part ...
     seaSlope: 1.5,       // ... and toward the open sea: a long encrusted slope
-    groove: [310, 64, 150]   // spur and groove: every so many px a notch this wide, this deep
+    groove: { cell: 330, shift: 70, width: [40, 90], depth: [60, 150] },   // spur and groove: one rounded notch per cell, placed, sized and cut unevenly
+    passY: 1560,         // the reef pass: the calm route dips to this depth to go through the reef, far under its top ...
+    passRamp: 1000,      // ... sinking to it over this many px on the lagoon side ...
+    passOut: 2600        // ... and leaving that depth over this many px beyond the reef's edge
 };
+
+const cellRand = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
 
 /** World x of the middle of the reef crest. */
 export function reefCrestX(cfg = REEF_CREST) {
@@ -225,8 +230,19 @@ export function reefCrestX(cfg = REEF_CREST) {
 export function reefCrestTop(x, cfg = REEF_CREST) {
     const dx = x - reefCrestX(cfg), out = Math.max(0, Math.abs(dx) - cfg.half);
     if (dx > cfg.inset) return Infinity;      // the reef ends here: beyond its edge the wall falls into the open sea
-    const [every, width, depth] = cfg.groove, g = Math.abs(((dx % every) + every) % every - every / 2);
-    return cfg.top + out * (dx < 0 ? cfg.lagoonSlope : cfg.seaSlope) + depth * smooth(1 - g / (width / 2));
+    // One groove per cell: a rounded U (flat bottom, soft shoulders), never a V.
+    const gr = cfg.groove, i = Math.floor(dx / gr.cell);
+    const mid = (i + 0.5) * gr.cell + (cellRand(i, 1) - 0.5) * 2 * gr.shift;
+    const half = (gr.width[0] + cellRand(i, 2) * (gr.width[1] - gr.width[0])) / 2, deep = gr.depth[0] + cellRand(i, 3) * (gr.depth[1] - gr.depth[0]);
+    const u = Math.abs(dx - mid) / half, notch = u >= 1.6 ? 0 : deep * smooth((1.6 - u) / 0.9);
+    return cfg.top + out * (dx < 0 ? cfg.lagoonSlope : cfg.seaSlope) + notch;
+}
+
+/** How far (0..1) the calm route has sunk to the reef pass at x: fully under the whole crest, easing down to it on the lagoon side. */
+export function reefPass(x, cfg = REEF_CREST) {
+    const dx = x - reefCrestX(cfg);
+    if (dx > cfg.inset) return smooth(1 - (dx - cfg.inset) / cfg.passOut);      // out of the wall, then gently up (or on down a current)
+    return smooth((cfg.half + cfg.ramp + cfg.passRamp + dx) / cfg.passRamp);
 }
 
 /** How much of the reef crest stands at x: 1 on it, 0 away from it. */

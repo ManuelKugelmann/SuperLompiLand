@@ -1180,7 +1180,7 @@ export default class MainScene extends Phaser.Scene {
         this.level.animate(time / 1000, view, speed, this.mp?.others(this.roomPlayers || (this.roomPlayers = [])), this.wavePhase());
         this.revealPlayers(delta / 1000, view);
         this.backdrop.update(this.camX, this.camY, this.camX - prevX, this.camY - prevY, this.surface);
-        this.farLayers.update(this.camX);
+        this.farLayers.update(this.camX, this.camY);
         this.rockLayers.update(this.camX, this.camY);
         this.waterLight.update();
         this.surf.update(this.camX, this.scale.width, this.wavePhase(), time / 1000, sp.x);
