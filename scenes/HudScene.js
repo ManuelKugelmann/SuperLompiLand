@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import GameMenu, { MENU } from '../game/ui/GameMenu.js';
 import ControlSwitcher from '../game/ui/ControlSwitcher.js';
-import { heartRow, textStyle, pillImage } from '../game/ui/kit.js';
+import { heartRow, textStyle, softText, pillImage } from '../game/ui/kit.js';
 import { CONTROL_SCHEMES } from '../game/controls/index.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES } from '../game/level/biomes.js';
@@ -17,7 +17,9 @@ export const HUD = {
     depthHz: 4,               // how often the depth line may change per second
     rowGap: 28,               // px between the groups of the top line
     coinSlot: 74,             // px kept for the coin count, so the hearts never move as it grows
-    bannerAlpha: 0.85         // announcements never cover the picture fully (spec 5.0j: faint and minimal)
+    bannerAlpha: 0.85,        // announcements never cover the picture fully (spec 5.0j: faint and minimal)
+    bar: { alpha: 0.32, padX: 22, padY: 10 },   // one soft glass bar behind coins, hearts and depth
+    depthRest: [2500, 0.6]    // the depth line fades to this alpha this many ms after it last changed
 };
 
 /**
@@ -56,11 +58,12 @@ export default class HudScene extends Phaser.Scene {
         if (main.progression.get?.('controls_shown', false)) this.switcher.setVisible(false);
         else { main.progression.set?.('controls_shown', true); showSwitcher(HUD.switcherFirstMs); }
 
-        const hudText = (x, y, size) => this.add.text(x, y, '', textStyle(parseInt(size, 10)));
+        const hudText = (x, y, size) => this.add.text(x, y, '', softText(parseInt(size, 10)));
         // One line along the top (user: 'HUD in top line'): menu, coins, hearts, depth and place. The
         // left side of a landscape phone stays free for the picture.
         const rowY = Math.round(this.scale.height * MENU.button * 0.6);
         let rowX = Math.round(this.scale.height * MENU.button * 1.2) + HUD.rowGap;
+        const barX = rowX - HUD.bar.padX;
         if (this.textures.exists('coin')) this.add.image(rowX + 26, rowY, 'coin').setDisplaySize(52, 52);
         this.coinText = hudText(rowX + 58, rowY, '42px').setOrigin(0, 0.5);
         rowX += 58 + HUD.coinSlot;
@@ -68,6 +71,9 @@ export default class HudScene extends Phaser.Scene {
         this.hearts = heartRow(this, rowX, rowY, main.maxHealth, heartSize);
         rowX += main.maxHealth * heartSize * 1.08 + HUD.rowGap;
         this.depthText = hudText(rowX, rowY, '30px').setOrigin(0, 0.5);
+        // The glass bar: wide enough for the longest depth line, baked once, behind the group.
+        const barH = 52 + HUD.bar.padY * 2, barW = rowX - barX + 430;
+        pillImage(this, barX + barW / 2, rowY, barW, barH, { fill: 0x02212b, alpha: HUD.bar.alpha, radius: barH / 2 }, null, 'hudbar').setDepth(-1);
         this.quickIcons(rowY);
         this.depthLabel = de ? 'Tiefe' : 'Depth';
 
@@ -137,7 +143,11 @@ export default class HudScene extends Phaser.Scene {
         };
         let x = W - 24 - s / 2;
         // Steering: shows the mode in use; a tap goes to the next one.
-        const steerFace = x0 => this.add.text(x0, y, '', textStyle(Math.round(s * 0.26))).setOrigin(0.5);
+        const steerFace = x0 => {
+            this.steerIcon = this.add.image(x0, y, '__DEFAULT').setVisible(false);
+            this.steerSize = s * 0.6;
+            return this.add.text(x0, y, '', textStyle(Math.round(s * 0.26))).setOrigin(0.5);
+        };
         this.steerFace = button(x, steerFace, () => {
             const i = CONTROL_SCHEMES.findIndex(c => c.id === m.activeScheme), next = CONTROL_SCHEMES[(i + 1) % CONTROL_SCHEMES.length];
             m.switchScheme(next.id); this.switcher.setActive(next.id); this.showSteer();
@@ -155,14 +165,17 @@ export default class HudScene extends Phaser.Scene {
             this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => document.removeEventListener('fullscreenchange', sync));
         }
         x -= s / 2 + gap;
-        this.fpsText = this.add.text(x, y, '', textStyle(22)).setOrigin(1, 0.5).setAlpha(0.8);
+        this.fpsText = this.add.text(x, y, '', softText(18)).setOrigin(1, 0.5).setAlpha(0.5);
         this.fpsAt = 0;
     }
 
     /** The steering icon's face: the name of the mode in use. */
     showSteer() {
         const de = this.main.lang === 'de', c = CONTROL_SCHEMES.find(q => q.id === this.main.activeScheme) || CONTROL_SCHEMES[0];
-        this.steerFace.setText(c.label[de ? 'de' : 'en']);
+        const key = `ctrl_${c.id}`, icon = this.textures.exists(key);
+        this.steerIcon.setVisible(icon);
+        if (icon) this.steerIcon.setTexture(key).setDisplaySize(this.steerSize, this.steerSize);
+        this.steerFace.setText(icon ? '' : c.label[de ? 'de' : 'en']);
     }
 
     updatePerf(m) {
@@ -206,7 +219,8 @@ export default class HudScene extends Phaser.Scene {
             // Where am I (tester: 'it used to say where I am'): the place stays next to the depth.
             const place = BIOMES[m.biomeIndex]?.name?.[m.lang] || BIOMES[m.biomeIndex]?.name?.en || '';
             const line = place ? `${this.depthLabel} ${m.depthMeters()} m · ${place}` : `${this.depthLabel} ${m.depthMeters()} m`;
-            if (line !== this.shownDepth) { this.shownDepth = line; this.depthText.setText(line); }
+            if (line !== this.shownDepth) { this.shownDepth = line; this.depthText.setText(line); this.depthChanged = tick; }
+            this.depthText.setAlpha(tick - (this.depthChanged || 0) > HUD.depthRest[0] ? HUD.depthRest[1] : 1);
         }
         if (m.depthMarkAt && m.depthMarkAt !== this.shownMark) {      // a depth mark was passed: the depth line glows (spec 5.0w)
             this.shownMark = m.depthMarkAt;

@@ -21,6 +21,11 @@ export function textStyle(size, color = UI.text, outline = true) {
     };
 }
 
+/** Modern HUD text (2026-11-15 "HUD modernization"): no heavy outline, a soft shadow keeps it readable on any water. */
+export function softText(size, color = UI.text) {
+    return { fontFamily: UI.font, fontSize: `${size}px`, color, fontStyle: 'bold', shadow: { offsetX: 0, offsetY: 2, color: '#021a26', blur: 8, fill: true } };
+}
+
 /** Draw a pill surface into a Graphics object (cleared first). */
 export function drawPill(g, w, h, { fill = UI.surface, alpha = 0.92, radius = UI.radius, ox = 0, oy = 0 } = {}) {
     const r = Math.min(radius, h / 2), x = ox - w / 2, y = oy - h / 2;
