@@ -43,7 +43,12 @@ export default class EndScene extends Phaser.Scene {
                     .setTintFill(0x06343a).setAlpha(0.35);
             }
         });
-        this.add.text(W / 2, H * 0.51, de ? `${found.filter(id => cast.some(c => c.id === id)).length} von ${cast.length} Freunden befreit` : `${found.filter(id => cast.some(c => c.id === id)).length} of ${cast.length} friends freed`, {
+        // Said as what the child has, never as a failing score: the missing friends are a reason to play again.
+        const n = found.filter(id => cast.some(c => c.id === id)).length, left = cast.length - n;
+        const friendsLine = n === cast.length ? (de ? `Alle ${n} Freunde sind dabei!` : `All ${n} friends came along!`)
+            : n === 0 ? (de ? `${left} Freunde warten noch irgendwo auf dich` : `${left} friends are still waiting for you somewhere`)
+                : (de ? `${n} Freunde sind mit dir geschwommen · ${left} warten noch` : `${n} friends swam with you · ${left} still waiting`);
+        this.add.text(W / 2, H * 0.51, friendsLine, {
             fontFamily: 'Arial', fontSize: '44px', color: '#ffffff', fontStyle: 'bold', stroke: '#0a3f6e', strokeThickness: 8
         }).setOrigin(0.5);
 
