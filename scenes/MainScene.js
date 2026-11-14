@@ -50,6 +50,8 @@ import GardenEelLayer from '../game/level/GardenEelLayer.js';
 import StingrayLayer from '../game/level/StingrayLayer.js';
 import NudiGardenLayer from '../game/level/NudiGardenLayer.js';
 import DumboLayer from '../game/level/DumboLayer.js';
+import { powersOf, magnetStep, POWER_WORDS } from '../game/friendPowers.js';
+import BonusCoins from '../game/level/BonusCoins.js';
 import DolphinLayer from '../game/level/DolphinLayer.js';
 import OctopusLayer from '../game/ai/OctopusLayer.js';
 import ContainerLayer from '../game/level/ContainerLayer.js';
@@ -253,7 +255,8 @@ export default class MainScene extends Phaser.Scene {
         this.school = new FriendSchool(this);
         for (const ch of this.journey.list) if (ch.friend && this.journey.has(ch.friend.id)) this.school.add(ch.friend);
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y),
-            (ch, x, y) => this.school.add(ch.friend, x, y));
+            (ch, x, y) => { this.school.add(ch.friend, x, y); this.powerNews(ch.friend.id); });
+        this.shellUsed = 0;      // hits Schildi's shell has taken since the last nest (spec 5.0r)
         // The great whale of the open blue: free her from the net and she carries you east (spec 9.0).
         const whaleAt = this.journey.event(WHALE_SCENE.id);
         this.whale = this.ambientMode || !whaleAt ? null
@@ -865,7 +868,17 @@ export default class MainScene extends Phaser.Scene {
     }
 
     /** Swam into a nest: coins are safe, this is the new restart point. */
+    /** The powers of the friends in the school (spec 5.0r). */
+    powers() { return powersOf(this.school ? this.school.friends.map(f => f.character.id) : []); }
+
+    /** A friend has joined: say once what it can do. */
+    powerNews(id) {
+        const w = POWER_WORDS[id];
+        if (w) this.time.delayedCall(2600, () => this.announce('', w[this.lang] || w.en));
+    }
+
     reachNest(nest) {
+        this.shellUsed = 0;      // Schildi's shell is ready again
         if (this.perfTour) return;      // the perf tour only measures: no cheers, questions or end screen
         const de = this.lang === 'de';
         const first = nest.index > this.nestIndex;
@@ -1367,8 +1380,14 @@ export default class MainScene extends Phaser.Scene {
     }
 
     collect() {
-        const p = this.fish.pos, fr = this.fish.radius;
+        const p = this.fish.pos, fr = this.fish.radius, mag = this.powers().magnet;
+        BonusCoins.magnet = mag;      // the set pieces' and the route's coins feel it too
         for (const c of this.level.coins) {
+            if (mag && c.img.active) {      // Hüpfi's power (spec 5.0r): coins in reach drift to Lompi
+                const s = magnetStep(c.img.x, c.img.y, p.x, p.y, mag);
+                // The coin's stored place moves too: the bob sets img.y from c.y every frame.
+                if (s) { if (!c.pulled) { this.tweens.killTweensOf(c.img); c.pulled = true; } const lift = c.y - c.img.y; c.img.setPosition(s.x, s.y); c.x = s.x; c.y = s.y + lift; }
+            }
             if (!c.img.active || p.distance(c.img) > fr + c.r) continue;
             const { x, y } = c.img;
             this.tweens.killTweensOf(c.img);
@@ -1418,6 +1437,14 @@ export default class MainScene extends Phaser.Scene {
 
     /** Something hurt the fish from (x, y). Returns true when it went down. */
     hurt(x, y, amount = this.character.armor ?? 1) {
+        const shell = this.powers().shell;
+        if (shell && this.shellUsed < shell.hits && this.fish.hit(new Phaser.Math.Vector2(x, y))) {      // Schildi's shell takes it (spec 5.0r)
+            this.shellUsed++;
+            play('shell');
+            this.chainEnd(this.chain.end());
+            this.announce('', this.lang === 'de' ? 'Schildis Panzer hat dich geschützt!' : "Schildi's shell protected you!");
+            return false;
+        }
         if (!this.fish.hit(new Phaser.Math.Vector2(x, y))) return false;
         this.chainEnd(this.chain.end());
         play('hit');
