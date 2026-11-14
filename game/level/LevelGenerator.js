@@ -1,3 +1,4 @@
+import { createPool, poolSize } from './workerPool.js';
 import { rescueSpots } from '../rescues.js';
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
@@ -38,7 +39,10 @@ export const LEVEL = {
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
     spawn: FIELD.spawn,
-    margin: 1,            // extra chunks generated around the view
+    margin: 1,            // extra chunks generated around the view ...
+    leadS: 2.5,           // ... and in the direction the view moves, as many more as it covers in this many seconds (a fast swimmer never meets a chunk being made) ...
+    leadMax: 3,           // ... at most this many
+    leadEase: 0.1,        // share of the way the view's speed estimate moves to the newest frame's
     buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
     buildRushMs: 9,       // ... and this much while a chunk in view is not complete yet (a hole in the picture is worse than a slower frame)
     earlyPerFrame: 3,     // chunks that get their early collision per frame
@@ -246,7 +250,8 @@ export default class LevelGenerator {
         this.ready = [];            // grids that came back, waiting to be drawn
         const mats = this.loadMaterials();
         try {
-            this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
+            // Several workers when the device has the cores (workerPool.js): shading a chunk is the slow part of the world's making.
+            this.worker = createPool(() => new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' }), poolSize(navigator.hardwareConcurrency));
             this.worker.onmessage = e => {
                 for (const t of e.data.islands || []) this.field.setIslandTile(t.key, t.state, t.near);
                 this.pending.delete(e.data.key); this.ready.push(e.data);
@@ -354,8 +359,16 @@ export default class LevelGenerator {
 
     update(camX, camY) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
-        const x0 = Math.floor(camX / CH) - LEVEL.margin, x1 = Math.floor((camX + W) / CH) + LEVEL.margin;
-        const y0 = Math.max(0, Math.floor(camY / CH) - LEVEL.margin), y1 = Math.floor((camY + H) / CH) + LEVEL.margin;
+        // How fast the view moves (px per s, eased; a jump is not a speed) and how many chunks that is ahead.
+        const dt = Math.max(1e-3, this.scene.game.loop.delta / 1000), vel = this.camVel || (this.camVel = { x: 0, y: 0, at: null });
+        if (vel.at && Math.abs(camX - vel.at.x) < W && Math.abs(camY - vel.at.y) < H) {
+            vel.x += ((camX - vel.at.x) / dt - vel.x) * LEVEL.leadEase; vel.y += ((camY - vel.at.y) / dt - vel.y) * LEVEL.leadEase;
+        }
+        vel.at = { x: camX, y: camY };
+        const lead = v => Math.min(LEVEL.leadMax, Math.ceil(Math.abs(v) * LEVEL.leadS / CH));
+        const ax = lead(vel.x), ay = lead(vel.y);
+        const x0 = Math.floor(camX / CH) - LEVEL.margin - (vel.x < 0 ? ax : 0), x1 = Math.floor((camX + W) / CH) + LEVEL.margin + (vel.x > 0 ? ax : 0);
+        const y0 = Math.max(0, Math.floor(camY / CH) - LEVEL.margin - (vel.y < 0 ? ay : 0)), y1 = Math.floor((camY + H) / CH) + LEVEL.margin + (vel.y > 0 ? ay : 0);
         const wanted = (cx, cy) => cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
         const missing = [];
         for (let cy = y0; cy <= y1; cy++) {
@@ -399,7 +412,11 @@ export default class LevelGenerator {
         // Finished maths become chunks step by step, as far as the frame's budget goes; results nobody needs any more are dropped.
         while (budget && (this.job || this.ready.length)) {
             if (!this.job) {
-                const r = this.ready.shift();
+                // The nearest of the finished ones first: with the look-ahead more come back than one frame builds, and what the view meets first is built first.
+                const mx = (camX + W / 2) / CH - 0.5, my = (camY + H / 2) / CH - 0.5;
+                let best = 0, bestD = Infinity;
+                this.ready.forEach((q, i) => { const [qx, qy] = q.key.split(',').map(Number), d = Math.hypot(qx - mx, qy - my); if (d < bestD) { bestD = d; best = i; } });
+                const r = this.ready.splice(best, 1)[0];
                 const [cx, cy] = r.key.split(',').map(Number);
                 if (!wanted(cx, cy) || this.chunks.has(r.key)) { this.dropEarly(r.key); this.recycle(r); continue; }
                 this.job = this.build(cx, cy, r); this.jobPics = r;
