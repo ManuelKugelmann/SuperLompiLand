@@ -414,8 +414,12 @@ export default class MainScene extends Phaser.Scene {
         document.addEventListener('visibilitychange', saveNow);
         window.addEventListener('pagehide', saveNow);
 
+        const view = this.cameras.main;      // kept for the shutdown below: by then the scene has let go of it
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             saveNow();
+            // The camera's colour grade is a render pipeline of its own, and it is not destroyed with
+            // the camera: without this, one more stays behind (listening to the renderer) per start of the scene.
+            for (const p of [...(view.postPipelines || [])]) p.destroy();
             this.particles.destroy();
             this.swarms.destroy();
             this.seabirds.destroy();

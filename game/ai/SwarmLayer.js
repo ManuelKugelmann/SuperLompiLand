@@ -144,7 +144,9 @@ export default class SwarmLayer {
      */
     arrive(cx, cy) {
         const native = Object.keys(SPECIES).filter(id => SPECIES[id].biomes.includes(this.env.biomeAt(cx)));
-        if (!native.length) return;
+        // Not when a shoal is in view already, and never more than the usual number plus one: coming back to the same nest again and again must not pile them up.
+        const seen = this.swarms.some(s => { const c = s.sim.centre(); return Math.abs(c.x - cx) < SWARMS.inView[0] && Math.abs(c.y - cy) < SWARMS.inView[1]; });
+        if (!native.length || seen || this.swarms.filter(s => !s.home).length > SWARMS.perView) return;
         for (let tries = 0; tries < 12; tries++) {
             const x = cx + (tries % 2 ? -1 : 1) * SWARMS.inView[0] * (0.7 + Math.random() * 0.2), y = cy + (Math.random() - 0.5) * SWARMS.inView[1] * 1.2;
             if (y > 150 && this.env.isOpen(x, y) && this.env.isOpen(x + 120, y) && this.env.isOpen(x - 120, y)) { this.spawn(native[Math.floor(Math.random() * native.length)], x, y); return; }
