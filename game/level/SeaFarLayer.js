@@ -1,4 +1,5 @@
 import { seaShare } from './biomes.js';
+import { PARALLAX, farY } from './parallax.js';
 import { socketView, passing, farWrecks } from './seaFar.js';
 
 export const SEA_FAR_LOOK = {
@@ -149,8 +150,9 @@ export default class SeaFarLayer {
 
         const v = socketView(cam, W, undefined, this.out);
         this.socket.setVisible(!!v && under > 0);
-        // It stands on the bottom of the view and sinks out of it as the camera climbs toward the surface.
-        if (v) this.socket.setPosition(v.x, H * 1.02 + Math.max(0, 500 - camY) * 0.25).setAlpha(v.alpha);
+        // Far away it moves a little up or down with every dive or climb (parallax.js), at every depth: it never rides along with the view.
+        const farBase = farY(H * 1.02, camY, PARALLAX.farSea, PARALLAX.farSeaRest);
+        if (v) this.socket.setPosition(v.x, farBase).setAlpha(v.alpha);
 
         // Far wrecks on the graveyard sea's floor, standing on the bottom of the view like the socket.
         const wrecks = under > 0 ? farWrecks(cam, W) : [];
@@ -159,7 +161,7 @@ export default class SeaFarLayer {
             o.setVisible(!!w && this.scene.textures.exists(w.key));
             if (!o.visible) return;
             if (o.texture.key !== w.key) o.setTexture(w.key);
-            o.setPosition(w.x, H * 1.02 + Math.max(0, 500 - camY) * 0.25).setFlipX(w.flip)
+            o.setPosition(w.x, farBase).setFlipX(w.flip)
                 .setDisplaySize(w.size, w.size * o.frame.height / o.frame.width).setAlpha(L.wreckAlpha * sea);
         });
 

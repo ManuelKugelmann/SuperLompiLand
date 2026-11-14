@@ -1,3 +1,4 @@
+import { PARALLAX, surfaceBand } from './parallax.js';
 import { DEPTH } from '../depths.js';
 import Phaser from 'phaser';
 import { mixColor, waterHue, atLuma, WATER_LIGHT, surfAt } from './biomes.js';
@@ -84,14 +85,14 @@ const SCHOOL_MARGIN = { x: 700, y: 500 };
 const FAR_FISH = { widths: [16, 22, 29, 37], beats: [0.88, 1, 1.12], cell: { w: 46, h: 24 } };
 /**
  * Where far schools swim, among the far scenery (farDepths.js: an object at parallax s
- * draws at depth FarLayers.depthFor(s)): scroll = horizontal parallax, vscroll =
+ * draws at depth FarLayers.depthFor(s)): scroll = parallax (sideways and up and down alike; formerly a separate vscroll) =
  * vertical, depth = draw order, size/alpha shrink and fade with distance.
  */
 const SCHOOL_SLOTS = [
-    { scroll: 0.3, vscroll: 0.18, depth: -18.5, size: 0.6, alpha: 0.32 },    // between far reef and back floor
-    { scroll: 0.38, vscroll: 0.23, depth: -18, size: 0.7, alpha: 0.38 },
-    { scroll: 0.5, vscroll: 0.42, depth: -16.5, size: 0.85, alpha: 0.46 },   // between back floor and mid reef
-    { scroll: 0.56, vscroll: 0.58, depth: -16, size: 0.95, alpha: 0.52 }
+    { scroll: 0.3, depth: -18.5, size: 0.6, alpha: 0.32 },    // between far reef and back floor
+    { scroll: 0.38, depth: -18, size: 0.7, alpha: 0.38 },
+    { scroll: 0.5, depth: -16.5, size: 0.85, alpha: 0.46 },   // between back floor and mid reef
+    { scroll: 0.56, depth: -16, size: 0.95, alpha: 0.52 }
 ];
 
 export default class Backdrop {
@@ -111,6 +112,10 @@ export default class Backdrop {
         this.sun = scene.add.circle(W * 0.72, -420, 110, 0xfffbe0, 0.95).setDepth(-29).setScrollFactor(0, 1);
         this.skyImg = scene.add.image(0, -1400, 'bd_sky').setOrigin(0).setDisplaySize(W, 1460)
             .setDepth(-29.5).setScrollFactor(0, 1);
+        // The surface far away (parallax.js): a bright band that stays at the top edge for the first screens of a dive and slides away slowly.
+        makeGradient(scene, 'bd_far_surface', 250, [[0, 0xd8fbff], [0.3, 0x8fe6f5], [0.96, 0x000000], [1, 0x000000]]);      // 250 tall: not a power of two, so its edges are not wrapped onto each other
+        this.farSurface = scene.add.image(0, 0, 'bd_far_surface').setOrigin(0).setDisplaySize(W, PARALLAX.surface.band).setScrollFactor(0)
+            .setDepth(-29.8).setBlendMode(Phaser.BlendModes.ADD).setVisible(false);
         this.seaFar = new SeaFarLayer(scene);            // the open sea's far view: the next island's socket, marine snow, big shapes passing
         this.sky = new SkyLayer(scene);                  // clouds, birds, the coast and the volcano on the horizon
         // The waterline. `sea` = the water body over the sky: sea colour from the wave line down to a
@@ -231,6 +236,8 @@ export default class Backdrop {
 
         this.sky.update(camX, camY);
         this.seaFar.update(camX, camY, dx, dy, this.scene.game.loop.delta);
+        const band = surfaceBand(camY);
+        this.farSurface.setVisible(band.alpha > 0.01).setY(band.top).setAlpha(band.alpha);
         // Waterline: only when it is on screen.
         const shown = camY < 80, S = WATERLINE.sea;
         for (const part of [this.seaFade, this.foamBack, this.foam, this.caps, this.streaks]) part.setVisible(shown);
@@ -262,7 +269,7 @@ export default class Backdrop {
             // Far away = moves less than the world, by the same factor sideways and up/down.
             // A school keeps its own depth in the water: no wrapping. When it drifts well
             // out of the picture it is quietly placed again just outside the view.
-            const f0 = sc.slot.scroll, v0 = sc.slot.vscroll;
+            const f0 = sc.slot.scroll, v0 = f0;      // the same share up and down as sideways (parallax.js): they never slide against the far reef they swim by
             let sx = sc.wx === null ? NaN : sc.wx - camX * f0;
             let sy = sc.wy === null ? NaN : sc.wy - camY * v0;
             const out = !(sx > -SCHOOL_MARGIN.x && sx < W + SCHOOL_MARGIN.x && sy > -SCHOOL_MARGIN.y && sy < H + SCHOOL_MARGIN.y);
