@@ -185,3 +185,11 @@ test('along every island a nest lies every so often, none in the open sea, none 
     // Every nest is on the route: the lane passes right over it.
     for (const n of f.nests) assert.ok(Math.abs(f.routeY(n.x) - (n.y - ROUTE.aboveNest)) < 60, `route over the nest at ${Math.round(n.x)}`);
 });
+
+test('every nest stands on solid rock: no cave or clearing opens under its plate', () => {
+    const f = createField(1337);
+    for (const nest of f.nests.slice(0, 12)) {
+        for (let dx = -200; dx <= 200; dx += 50) for (let dy = 40; dy <= 480; dy += 40)
+            assert.ok(f.density(nest.x + dx, nest.y + dy) > FIELD.threshold, `nest ${nest.index} at +${dx},+${dy}`);
+    }
+});

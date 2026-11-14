@@ -15,6 +15,7 @@ export const FIELD = {
     maxDepth: 5600,               // deepest regular seabed (the abyss goes further)
     nestRadius: 230,              // half width of the sand basin a nest lies in
     nestRim: 16,                  // how far its rim stands above the middle
+    nestFoot: 700,                // px of solid rock under every nest's basin (fading out over its last 200 px)
     crestRock: 1.4,               // density inside the reef crest (the calm route still cuts its channel through)
     foot: 0.32,                   // how much rock is added right above a coast's seabed ...
     footReach: 460,               // ... fading out this far above it
@@ -243,13 +244,15 @@ export function createField(seed) {
                 }
                 // The nest lies in a shallow sand basin with a raised rim, levelled into
                 // the seabed, so it sits right on any slope instead of floating or sinking.
-                const R = FIELD.nestRadius, reach = R + 170;
-                if (dx < reach && Math.abs(y - nest.y) < 260) {
+                // Under it the rock goes on down (FIELD.nestFoot): no cave or pool clearing may
+                // open beneath the plate (a dark hole under the first nest looked like a glitch).
+                const R = FIELD.nestRadius, reach = R + 170, foot = FIELD.nestFoot;
+                if (dx < reach && y - nest.y < foot && nest.y - y < 260) {
                     const u = dx / R;
                     const rim = u < 1 ? u * u : Math.max(0, 1 - (dx - R) / 170);       // 0 in the middle, 1 on the rim, back to 0 outside
                     const ground = nest.y - FIELD.nestRim * rim;
                     const side = dx <= R ? 1 : smooth01(1 - (dx - R) / 170);
-                    const w = side * smooth01(1 - Math.abs(y - nest.y) / 260);
+                    const w = side * (y <= nest.y ? smooth01(1 - (nest.y - y) / 260) : smooth01((foot - (y - nest.y)) / 200));
                     n += (FIELD.threshold + (y - ground) / 320 - n) * w;
                 }
             }
