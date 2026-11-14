@@ -5,13 +5,9 @@
 <!-- devlog:start -->
 ## Dev log
 
-**Nests rebuilt: a level sand basin with raked-sand relief and shells** — [`da155c1`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/da155c1) · 2026-11-14 00:08
+**Chains of jumps, flips and specials; bird-like flight; a special of its own for every character** — [`56b92fc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/56b92fc) · 2026-11-14 01:23
 
-![Nests rebuilt: a level sand basin with raked-sand relief and shells](docs/devlog/15-nests-rebuilt-a-level-sand-basin-with-raked-sand.jpg)
-
-**Lompi in 3D: four techniques compared with the same light and pose** — [`9c70f65`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/9c70f65) · 2026-11-13 23:04
-
-![Lompi in 3D: four techniques compared with the same light and pose](docs/devlog/14-lompi-in-3d-four-techniques-compared-with-the-sa.jpg)
+![Chains of jumps, flips and specials; bird-like flight; a special of its own for every character](docs/devlog/17-chains-of-jumps-flips-and-specials-bird-like-fli.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->

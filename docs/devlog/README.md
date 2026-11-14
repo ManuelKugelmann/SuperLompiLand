@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Chains of jumps, flips and specials; bird-like flight; a special of its own for every character
+
+[`56b92fc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/56b92fc) · 2026-11-14 01:23
+
+![Chains of jumps, flips and specials; bird-like flight; a special of its own for every character](17-chains-of-jumps-flips-and-specials-bird-like-fli.jpg)
+
 ## Shoals: anthias, tangs and silversides that part around Lompi and flee from Sharky
 
 [`7dc9bf4`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/7dc9bf4) · 2026-11-14
