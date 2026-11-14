@@ -31,6 +31,7 @@ export const SET_LOOK = {
     column: [240, 40],      // a nest's column of light: its width, and how far under the surface it ends
     columnAlpha: 0.55,
     columnTint: 0xffc84a,   // warm gold: home is down here
+    nestColumnDepth: 3.9,   // an ordinary nest's column stands behind the creatures (tester: on top it washed the starfish on the first nest out to a pale blob)
     columnDepth: 43,        // above the scene's light and vignette layers, so it reads in bright water too
     sparks: 5,              // sparkles rising in the column nearest to the fish ...
     sparkRise: 170,         // ... at this many px per second ...
@@ -76,9 +77,9 @@ export default class SetPieceLayer {
         // Every nest stands in a thin column of light that reaches up to the surface: it marks the
         // savepoint from wherever you pass, and swimming through it is enough to reach the nest.
         // One picture, standing on whichever nest is nearest to the fish (nests lie far apart).
-        this.column = scene.add.image(0, 0, 'bd_ray').setOrigin(0.5, 1).setFlipY(true).setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth).setVisible(false);
+        this.column = scene.add.image(0, 0, 'bd_ray').setOrigin(0.5, 1).setFlipY(true).setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.nestColumnDepth).setVisible(false);
         this.nests = nests;
-        this.sparks = Array.from({ length: SET_LOOK.sparks }, () => scene.add.image(0, 0, 'bd_glow').setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth).setVisible(false));
+        this.sparks = Array.from({ length: SET_LOOK.sparks }, () => scene.add.image(0, 0, 'bd_glow').setTint(SET_LOOK.columnTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.nestColumnDepth).setVisible(false));
         // The beacon: a column of warm light standing on the grand nest, fading out far above it.
         const [bw, bh] = SET_PIECES.descent.beacon;
         this.beacon = scene.add.image(nest.x, nest.y, 'bd_ray').setOrigin(0.5, 1).setFlipY(true).setDisplaySize(bw, bh)

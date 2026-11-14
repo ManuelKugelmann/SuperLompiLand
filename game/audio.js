@@ -86,6 +86,64 @@ function noise({ at = 0, dur = 0.3, vol = 0.3, from = 1200, to = 300, q = 0.8 })
     src.stop(t + dur + 0.02);
 }
 
+/**
+ * The crackle of a splash, made once: overlapping grains of noise, each a tiny drop that decays in a
+ * few ms; dense at the start, thinning out as the water settles (about 0.75 s).
+ */
+let SPLASH_BUF = null;
+function splashBuffer() {
+    if (SPLASH_BUF) return SPLASH_BUF;
+    const sr = ctx.sampleRate, n = Math.round(sr * 0.75), buf = ctx.createBuffer(1, n, sr), d = buf.getChannelData(0);
+    let next = 0;
+    for (let i = 0; i < n; i++) {
+        const u = i / n;
+        if (i >= next) {
+            const swell = Math.min(1, u / 0.06), len = Math.round(sr * (0.004 + Math.random() * 0.016)), amp = swell * (1 - u) ** 1.3 * (0.3 + Math.random() * 0.7);
+            for (let j = 0; j < len * 4 && i + j < n; j++) d[i + j] += (Math.random() * 2 - 1) * amp * Math.exp(-j / len);
+            next = i + Math.round(sr * (0.0006 + u * u * 0.012) * (0.5 + Math.random()));
+        }
+    }
+    const attack = Math.round(sr * 0.03);
+    for (let i = 0; i < attack; i++) d[i] *= i / attack;
+    let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]));
+    for (let i = 0; i < n; i++) d[i] /= peak || 1;
+    SPLASH_BUF = buf;
+    return buf;
+}
+
+/** Low-passed noise with a soft attack: running water, never a click. */
+function wash({ at = 0, dur = 0.4, vol = 0.1, from = 1500, to = 400, attack = 0.02 }) {
+    const t = ctx.currentTime + at;
+    const src = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), g = ctx.createGain();
+    src.buffer = noiseBuf;
+    src.loop = true;
+    filter.type = 'lowpass';
+    filter.Q.value = 0.5;
+    filter.frequency.setValueAtTime(from, t);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(60, to), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(filter).connect(g).connect(master);
+    src.start(t);
+    src.stop(t + dur + 0.05);
+}
+
+/** One bubble: a short sine whose pitch rises as it leaves the water, with a soft start. */
+function bloop({ at = 0, f = 600, dur = 0.07, vol = 0.06 }) {
+    const t = ctx.currentTime + at;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.exponentialRampToValueAtTime(f * 1.6, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+}
+
 // Vowel formants (F1, F2) in Hz for a small, bright creature voice.
 const VOWEL = { a: [900, 1500], e: [600, 2300], i: [380, 2900], o: [560, 1050], u: [380, 950], ae: [800, 1900] };
 
@@ -140,6 +198,11 @@ function bell({ f, at = 0, dur = 0.6, vol = 0.06 }) {
 
 let coinStreak = 0, lastCoin = 0, lastVoice = -1;
 
+/** The coin's level against the rest of the effects (tester feedback 2026-11-14: it was too loud). */
+const COIN_VOL = 0.6;
+/** The splash in and out of the water sits with the other effects (it was 8-10 dB under them). */
+const SPLASH_VOL = 2.3;
+
 const SOUNDS = {
     /**
      * A coin: the next note of the streak melody (game/music/melody.js), snapped to the
@@ -155,9 +218,11 @@ const SOUNDS = {
         }
         const at = musicClock.untilGrid(nowSeconds(), 4);
         const bright = Math.min(0.08, 0.02 * (note.multiplier - 1));
-        tone({ f: note.hz, type: 'triangle', at, dur: 0.18, vol: 0.2 + bright });
-        tone({ f: note.hz * 2, type: 'sine', at: at + 0.02, dur: 0.12, vol: 0.07 + bright });
-        if (note.multiplier > 1) tone({ f: note.harmonyHz, type: 'sine', at, dur: 0.16, vol: 0.06 + bright });
+        // Tester: the coin was too loud next to everything else; coins come in long trails, so it sits
+        // about 4.5 dB lower than it was (COIN_VOL), still the brightest small sound.
+        tone({ f: note.hz, type: 'triangle', at, dur: 0.18, vol: COIN_VOL * (0.2 + bright) });
+        tone({ f: note.hz * 2, type: 'sine', at: at + 0.02, dur: 0.12, vol: COIN_VOL * (0.07 + bright) });
+        if (note.multiplier > 1) tone({ f: note.harmonyHz, type: 'sine', at, dur: 0.16, vol: COIN_VOL * (0.06 + bright) });
         if (note.flourish) {
             const step = 60 / musicClock.bpm / 4;
             note.flourish.forEach((f, i) => tone({ f, type: 'triangle', at: at + (i + 1) * step, dur: 0.22, vol: 0.16 }));
@@ -250,10 +315,17 @@ const SOUNDS = {
     // A seabird calls before it dives (spec 5.0d): two harsh, falling croaks.
     cry() { [0, 0.16].forEach((at, i) => { tone({ f: 980 - i * 120, to: 620 - i * 80, type: 'sawtooth', dur: 0.13, vol: 0.07, at }); noise({ dur: 0.12, vol: 0.05, from: 1800, to: 900, q: 2, at }); }); },
     splash(strength = 1) {
-        // Soft and airy; a hard dive is only a little louder than a gentle one.
-        const v = Math.min(0.14, 0.04 + strength * 0.006);
-        noise({ dur: 0.4, vol: v, from: 3200, to: 900, q: 0.4 });
-        noise({ at: 0.06, dur: 0.5, vol: v * 0.45, from: 1200, to: 400, q: 0.7 });
+        // A real splash (tester: the old one "popped like bubble wrap"): a soft body of water noise and a
+        // dense cloud of tiny bubbles (dozens in a few tenths of a second, each a quick rising chirp), so
+        // no single pop stands out. Every part fades in; a hard dive is a little louder and fuller.
+        const k = SPLASH_VOL * Math.min(1, 0.35 + strength * 0.05);
+        wash({ dur: 0.5, vol: 0.1 * k, from: 2200, to: 500, attack: 0.025 });
+        tone({ f: 130, to: 60, type: 'sine', dur: 0.2, vol: 0.08 * k });
+        const n = Math.round(24 + 30 * k);
+        for (let i = 0; i < n; i++) {
+            const u = Math.random() ** 1.7;                                   // most bubbles early
+            bloop({ at: 0.01 + u * 0.4, f: 500 + Math.random() * 1800, dur: 0.012 + Math.random() * 0.025, vol: (0.012 + Math.random() * 0.016) * k * (1 - u * 0.6) });
+        }
     },
     hit() { tone({ f: 190, to: 70, type: 'square', dur: 0.22, vol: 0.22 }); noise({ dur: 0.12, vol: 0.2, from: 400, to: 150 }); },
     /**

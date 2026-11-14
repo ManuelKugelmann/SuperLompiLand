@@ -572,7 +572,9 @@ export default class MainScene extends Phaser.Scene {
             de ? `${this.journey.count} von ${this.journey.total} Freunden gefunden` : `${this.journey.count} of ${this.journey.total} friends found`);
         for (let i = 0; i < 9; i++) {
             const a = (i / 9) * Math.PI * 2;
-            const heart = this.add.text(x, y, '♥', { fontFamily: 'Arial', fontSize: '60px', color: '#ff6b9a', stroke: '#ffffff', strokeThickness: 8 }).setOrigin(0.5).setDepth(8);
+            // The painted heart (tester: the pink text hearts with a white line looked old-school); text only if the art is missing.
+            const heart = (this.textures.exists('heart_full') ? this.add.image(x, y, 'heart_full').setDisplaySize(64, 64)
+                : this.add.text(x, y, '♥', { fontFamily: 'Arial', fontSize: '60px', color: '#ff6b9a', stroke: '#ffffff', strokeThickness: 8 }).setOrigin(0.5)).setDepth(8);
             this.tweens.add({ targets: heart, x: x + Math.cos(a) * 230, y: y + Math.sin(a) * 180 - 60, alpha: 0, duration: 1300, ease: 'Sine.easeOut', onComplete: () => heart.destroy() });
         }
         this.events.emit('journey-free', ch);

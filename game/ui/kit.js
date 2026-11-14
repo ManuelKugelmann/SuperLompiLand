@@ -84,8 +84,40 @@ export function pillButton(scene, x, y, w, h, label, onTap, { size = 30 } = {}) 
     };
 }
 
+/** The painted heart pictures (scripts/fx/hearts.py), loaded with the art. */
+export const HEART_ART = ['heart_full', 'heart_half', 'heart_empty'];
+export const HEART_FILES = Object.fromEntries(HEART_ART.map(k => [k, `img/ui/${k}.png`]));
+
+function paintedHearts(scene, x, y, max, size) {
+    const step = size * 1.08, hearts = [];
+    for (let i = 0; i < max; i++) {
+        const cx = x + i * step + size / 2;
+        const back = scene.add.image(cx, y, 'heart_empty').setDisplaySize(size, size);
+        const front = scene.add.image(cx, y, 'heart_full').setDisplaySize(size, size);
+        hearts.push({ back, front });
+    }
+    let shown = max;
+    return {
+        set(value) {
+            hearts.forEach((h, i) => {
+                const fill = Math.max(0, Math.min(1, value - i));         // supports half hearts
+                h.front.setVisible(fill > 0).setTexture(fill >= 1 ? 'heart_full' : 'heart_half').setDisplaySize(size, size);
+            });
+            const changed = hearts[Math.max(0, Math.min(hearts.length - 1, Math.ceil(value < shown ? value : value - 1)))];
+            if (changed && value !== shown) {
+                const s = changed.front.scaleX;
+                scene.tweens.add({ targets: [changed.back, changed.front], scaleX: s * 1.35, scaleY: s * 1.35, duration: 140, yoyo: true });
+            }
+            shown = value;
+        }
+    };
+}
+
 /** A row of hearts as the health display. Returns { set(value, max) }. */
 export function heartRow(scene, x, y, max, size = 46) {
+    // The painted hearts (tester: the pink flat text hearts with a white line looked old-school):
+    // a glass heart behind, a glossy full or half heart in front. Text hearts only if the art is missing.
+    if (HEART_ART.every(k => scene.textures.exists(k))) return paintedHearts(scene, x, y, max, size);
     const hearts = [];
     for (let i = 0; i < max; i++) {
         const back = scene.add.text(x + i * (size + 6), y, '♥', { fontFamily: UI.font, fontSize: `${size}px`, color: '#06343a' })
