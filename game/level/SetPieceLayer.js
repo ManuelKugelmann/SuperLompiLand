@@ -37,7 +37,9 @@ export const SET_LOOK = {
     sparkSize: [26, 54],    // ... this big (px) ...
     sparkNear: 5000,        // the column and its sparkles show when the fish is within this many px of the nest (in x)
     beaconTint: 0xffd9a0,
-    beaconAlpha: 0.42
+    beaconAlpha: 0.42,
+    poolSize: 1500,         // px across the warm light pool on the grand nest: the brightest place in the dark trench (spec 5.0m)
+    poolAlpha: 0.55
 };
 
 // How each picture that can stand in for the ship is painted (measured on the file): where the
@@ -80,7 +82,11 @@ export default class SetPieceLayer {
         // The beacon: a column of warm light standing on the grand nest, fading out far above it.
         const [bw, bh] = SET_PIECES.descent.beacon;
         this.beacon = scene.add.image(nest.x, nest.y, 'bd_ray').setOrigin(0.5, 1).setFlipY(true).setDisplaySize(bw, bh)
-            .setTint(SET_LOOK.beaconTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(3);
+            .setTint(SET_LOOK.beaconTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth);
+        // ... and a pool of the same warm light around the nest itself. Both stand above the scene's light layer: the
+        // trench is the darkest place of the journey, and the goal must shine in it, not be dimmed with it.
+        this.pool = scene.add.image(nest.x, nest.y - 80, 'bd_glow').setDisplaySize(SET_LOOK.poolSize, SET_LOOK.poolSize * 0.6)
+            .setTint(SET_LOOK.beaconTint).setBlendMode(Phaser.BlendModes.ADD).setDepth(SET_LOOK.columnDepth);
     }
 
     /**
@@ -171,7 +177,9 @@ export default class SetPieceLayer {
     /** Per frame: the lights breathe, and the ship's outside thins while the fish is behind it. `t` s, `fish` = { x, y }, `radius` px, `dt` s. */
     update(t, fish, radius, dt) {
         this.lanterns.forEach((l, i) => l.setAlpha(this.lanternAlpha * (0.72 + 0.28 * Math.sin(t * 1.3 + i * 2.1) * Math.sin(t * 3.7 + i))));
-        this.beacon.setAlpha(SET_LOOK.beaconAlpha * (0.8 + 0.2 * Math.sin(t * 0.7)));
+        const pulse = 0.8 + 0.2 * Math.sin(t * 0.7);
+        this.beacon.setAlpha(SET_LOOK.beaconAlpha * pulse);
+        this.pool.setAlpha(SET_LOOK.poolAlpha * pulse);
         // The column of light and its rising sparkles stand on the nest nearest to the fish.
         let near = null;
         for (const n of this.nests) if (Math.abs(n.x - fish.x) < SET_LOOK.sparkNear && (!near || Math.abs(n.x - fish.x) < Math.abs(near.x - fish.x))) near = n;

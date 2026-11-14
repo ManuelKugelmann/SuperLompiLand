@@ -103,6 +103,9 @@ const WORLD = {
     cameraEase: 0.88,     // per-step camera lag (lower = snappier)
     lookAhead: 9,         // camera leads the fish by velocity * this
     refitAt: 0.03,        // the picture fills AND fits the screen (user 2026-11-14): a settled shape change beyond this share lays the game out again
+    // Depth darkness (0 surface .. 1 deepest) as [from y, to y, share]: bright down to the reef floor, then the trench
+    // floor and the grand nest are the darkest place on the journey (spec 5.0m: glow takes over there), the abyss pit the rest.
+    darkness: [[2200, 5600, 0.8], [5600, 8600, 0.2]],
     caveDepth01: 0.8,     // how deep the music is played inside the side cave (0 surface .. 1 deepest)
     nightDepth01: 0.7,    // at night the score plays as if this deep: sparser and softer
     wakeS: 1.6,           // s the whale's wake carries the fish on after her send-off
@@ -1537,7 +1540,7 @@ export default class MainScene extends Phaser.Scene {
         // near the surface, taking on the biome's water colour and dimming with depth.
         const bl = biomeBlendAt(view.x);
         // Bright down to the reef floor, dimming only in real depth; the abyss is dark.
-        const depth01 = Phaser.Math.Clamp((view.y - 2200) / 3400, 0, 1) * 0.55 + Phaser.Math.Clamp((view.y - 5600) / 3000, 0, 1) * 0.45;
+        const depth01 = WORLD.darkness.reduce((d, [from, to, share]) => d + Phaser.Math.Clamp((view.y - from) / (to - from), 0, 1) * share, 0);
         // Darkness only by depth (spec 5.0h): the biome gives the light its hue at one brightness.
         // ... and depth darkens toward a deep version of that same hue, so a deep wreck stays rusty and the trench indigo.
         // Spec 5.0j: skylight (a slow day/sunset/night cycle, storms), the biome's hue, its sediment,
