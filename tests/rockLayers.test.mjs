@@ -181,3 +181,25 @@ test('layer chunks meet without a seam: baked with their neighbours\' rock, edge
     assert.ok(n > 40, `border texels with rock (${n})`);
     assert.ok(worst < 14, `largest extra step at a chunk border: ${worst}`);
 });
+
+test('no rock floats in a layer: small pieces that touch no edge are dropped, rock reaching an edge stays', async () => {
+    const { dropLooseRock, LOOSE_ROCK } = await import('../game/level/rockLayerTable.js');
+    const S = 100, img = new Uint8ClampedArray(S * S * 4);
+    const fill = (x0, y0, x1, y1) => { for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) img[(y * S + x) * 4 + 3] = 255; };
+    fill(10, 60, 90, 100);      // ground, reaching the bottom edge
+    fill(40, 20, 52, 26);       // a small slab hanging in the water
+    dropLooseRock(img, S);
+    assert.equal(img[(23 * S + 45) * 4 + 3], 0, 'the floating slab is gone');
+    assert.equal(img[(80 * S + 50) * 4 + 3], 255, 'the ground stays');
+    assert.ok(LOOSE_ROCK.minArea > 72);
+    // Over a stretch of trench and lagoon, every remaining piece in the layer pictures reaches an edge or is big.
+    const { layerPicture, LAYER_SHADE } = await import('../game/level/rockLayerTable.js');
+    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L, { route: x => createField(1337).routeY(x) }), P = LAYER_SHADE.rockSize;
+    for (const [cx, cy] of [[23, 0], [538, 1], [538, 2]]) {
+        const pic = layerPicture(f, 1337 + L.seed, L, cx, cy), copy = pic.slice();
+        dropLooseRock(copy, P, { ...LOOSE_ROCK, minArea: LOOSE_ROCK.minArea });
+        // (Inside a cropped picture a piece may touch its border because it goes on in the neighbour: only fully enclosed small ones would be loose.)
+        let changed = 0; for (let i = 3; i < pic.length; i += 4) if (pic[i] !== copy[i]) changed++;
+        assert.ok(changed < 40, `chunk ${cx},${cy}: ${changed} texels of loose rock left`);
+    }
+});

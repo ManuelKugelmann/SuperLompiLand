@@ -429,12 +429,45 @@ function trenchSpecks(rgba, size, ox, oy, span, cfg = TRENCH_WALL) {
  */
 export const LAYER_MARGIN = 40;
 
+/**
+ * Rock never floats, in any layer (tester: "stones can't float in the water"): a piece of rock in a
+ * layer picture smaller than `minArea` texels that touches none of the picture's edges is dropped.
+ * Real rock reaches the ground or goes on past the picture; with LAYER_MARGIN of neighbour rock
+ * around, a loose piece is seen whole from every chunk it shows in, so all drop it alike.
+ */
+export const LOOSE_ROCK = { minArea: 2500, alpha: 8 };
+
+/** Clear the loose rock pieces (LOOSE_ROCK) of an RGBA picture `size` texels square, in place. */
+export function dropLooseRock(rgba, size, cfg = LOOSE_ROCK) {
+    const n = size * size, label = new Int32Array(n), queue = new Int32Array(n);
+    let id = 0;
+    for (let s = 0; s < n; s++) {
+        if (label[s] || rgba[s * 4 + 3] <= cfg.alpha) continue;
+        // One piece: flood it, note its size and whether it reaches an edge.
+        id++;
+        let head = 0, tail = 0, edge = false;
+        queue[tail++] = s; label[s] = id;
+        while (head < tail) {
+            const q = queue[head++], x = q % size, y = (q - x) / size;
+            if (x === 0 || y === 0 || x === size - 1 || y === size - 1) edge = true;
+            for (const o of [x > 0 ? q - 1 : -1, x < size - 1 ? q + 1 : -1, y > 0 ? q - size : -1, y < size - 1 ? q + size : -1]) {
+                if (o < 0 || label[o] || rgba[o * 4 + 3] <= cfg.alpha) continue;
+                label[o] = id; queue[tail++] = o;
+            }
+        }
+        if (edge || tail >= cfg.minArea) continue;
+        for (let k = 0; k < tail; k++) rgba[queue[k] * 4 + 3] = 0;
+    }
+    return rgba;
+}
+
 /** One layer chunk's picture (RGBA, LAYER_SHADE.rockSize squared), baked with LAYER_MARGIN. */
 export function layerPicture(field, seed, layer, cx, cy, M = LAYER_MARGIN) {
     const S = LAYER_SHADE.rockSize, B = S + 2 * M, { ox, oy, span } = layerChunkRect(layer, cx, cy), step = span / S;
     const bx = ox - M * step, by = oy - M * step, bspan = span * B / S;
     const { rock } = shadeChunk(field, seed, bx, by, bspan, { ...LAYER_SHADE, rockSize: B, grainAt: [cx * S - M, cy * S - M] });
     fogLayer(rock, B, bx, by, bspan, layer);
+    dropLooseRock(rock, B);
     const out = new Uint8ClampedArray(S * S * 4);
     for (let y = 0; y < S; y++) out.set(rock.subarray(((y + M) * B + M) * 4, ((y + M) * B + M + S) * 4), y * S * 4);
     return out;
