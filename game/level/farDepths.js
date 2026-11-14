@@ -44,7 +44,7 @@ export const FAR_KINDS = {
     blue: { per: 0, kinds: [] },
     wreck: { per: 0, kinds: [] },
     shore: { per: 1, kinds: pick(['boulders', 3], ['kelp', 0.6]) },
-    harbour: { per: 0.9, kinds: pick(['piers', 3], ['hulls', 1], ['boulders', 1]) },
+    harbour: { per: 0.9, kinds: pick(['piers', 1], ['hulls', 1], ['boulders', 2]) },   // few far piers: rows at several depths stack into a stair of deck tops
     trench: { per: 0, kinds: [] }
 };
 
