@@ -77,7 +77,7 @@ export const BIOMES = [
         id: 'harbour', name: { de: 'Hafen', en: 'Harbour' },
         rock: [0xb7b9b0, 0x8d9088, 0x676b66, 0x4a4e4c, 0x353838], water: [0x6f8f3a, 0.26], open: 0.08,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
-        props: { trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
+        props: { pier: 1, trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
         landmark: 'trawler',
         friends: { friend_snail: 1, friend_nudibranch: 1 },
         hazards: { hazard_net: 4, hazard_buoy: 3, mine: 2, spikes: 2 }

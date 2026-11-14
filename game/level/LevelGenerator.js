@@ -71,6 +71,11 @@ export const PROPS = {
     // Hulls share one slot per chunk, and only every third chunk column has one, so they never overlap.
     wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: [1300, 1900], sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
     trawler: { keys: ['trawler_1', 'cutter_1'], width: [880, 1150], sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
+    // Pier (generated art): stands at the surface, not on a floor spot (pierAt / drawPier).
+    // `piles` = pile positions across the deck (under the deck's own stubs), `pileSlices` = where the pile art is cut
+    // into band (above a) and foot (below b); the wood between is the tileable pier_pile_mid, `above` = share of the deck above the waterline.
+    pier: { keys: ['pier_deck', 'pier_pile', 'pier_pile_mid'], width: [1300, 1600], surface: true, every: 4, chance: 0.5, max: 1,
+        piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileSlices: [0.47, 0.58], above: 0.2, depth: -3, tint: 0xc4d0d4 },
     rowboat: { keys: ['rowboat_1'], width: [420, 560], sink: 0.2, reach: 0.2, flat: 0.35, depth: -1, max: 1 },
     // Generated art (FLUX.2 klein, Replicate): plants between the kelp stalks.
     seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, reach: 0.2, flat: 0.6, depth: -1, max: 2, sway: 0.6 },
@@ -379,8 +384,8 @@ export default class LevelGenerator {
             // The biome's landmark comes first where the player arrives (biomes.js), on any floor
             // that can carry it; the every-third-column rule is for the random ones.
             const must = landmarkGroup(cx, CH);
-            const exists = g => PROPS[g] && (used[slot(g)] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
-            for (let k = must ? -1 : 0; k < count; k++) {
+            const exists = g => PROPS[g] && !PROPS[g].surface && (used[slot(g)] || 0) < PROPS[g].max && cx % (PROPS[g].every || 1) === 0 && PROPS[g].keys.some(has);
+            for (let k = must && !PROPS[must]?.surface ? -1 : 0; k < count; k++) {
                 const forced = k < 0;
                 if (forced && !PROPS[must].keys.some(has)) continue;
                 const group = forced ? must : pickWeighted(rng, biome.props, exists);
@@ -416,6 +421,10 @@ export default class LevelGenerator {
                 if (p.tint) img.setTint(p.tint);
             }
         }
+
+        // --- Pier: deck at the surface, piles down to the rock (spans chunks) --
+        const pier = this.pierAt(cx, biome);
+        if (pier) this.drawPier(chunk, pier, oy, keep);
 
         // --- Bubble plants: a column of bubbles that carries the fish upward --
         const abyssFloor = Math.abs(mid - ABYSS.x) < CH && oy + CH > floorY(ABYSS.x) - 400;
@@ -759,6 +768,67 @@ export default class LevelGenerator {
                 ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, size, size * 0.72, rnd() - 0.5, 0, Math.PI * 2); ctx.fill();
             }
             tex.refresh();
+        }
+    }
+
+    /**
+     * The pier standing in chunk column `cx`, or null: decided per column (its own random
+     * stream), so every chunk of the column draws its share of the same pier. It stands
+     * only where every pile reaches rock.
+     */
+    pierAt(cx, biome) {
+        this.piers ??= new Map();
+        if (this.piers.has(cx)) return this.piers.get(cx);
+        const p = PROPS.pier, s = this.scene;
+        let pier = null;
+        if (biome.props?.pier && p.keys.every(k => s.textures.exists(k))) {
+            const rng = new Phaser.Math.RandomDataGenerator([`${LEVEL.seed}:${cx}:pier`]);
+            const chosen = landmarkGroup(cx, CH) === 'pier' || (cx % p.every === 0 && rng.frac() < p.chance);
+            if (chosen) {
+                const w = rng.realInRange(p.width[0], p.width[1]), x0 = cx * CH + CH / 2;
+                const deck = s.textures.getFrame('pier_deck');
+                const deckH = w * deck.height / deck.width, deckTop = -deckH * p.above;
+                const ground = x => { for (let y = 0; y < LEVEL.maxDepth; y += 24) if (this.density(x, y) > LEVEL.threshold) return y; return null; };
+                const piles = p.piles.map(f => ({ x: x0 + (f - 0.5) * w, ground: ground(x0 + (f - 0.5) * w) }));
+                if (piles.every(q => q.ground !== null)) pier = { x0, w, deckTop, deckH, piles };
+            }
+        }
+        this.piers.set(cx, pier);
+        return pier;
+    }
+
+    /**
+     * This chunk's share of a pier: the deck where it lies in the chunk, and each pile as a
+     * vertical 3-slice — barnacle band on top, a seamless wood strip tiled down through
+     * the chunks, the overgrown foot sunk into the rock.
+     */
+    drawPier(chunk, pier, oy, keep) {
+        const s = this.scene, p = PROPS.pier, y1 = oy + CH;
+        const tex = s.textures.get('pier_pile');
+        if (!tex.has('top')) {
+            const src = tex.getSourceImage(), W = src.width, H = src.height;
+            const [a, b] = p.pileSlices;
+            tex.add('top', 0, 0, 0, W, Math.round(H * a));
+            tex.add('foot', 0, 0, Math.round(H * b), W, H - Math.round(H * b));
+        }
+        const fw = tex.get('top').width, pw = pier.w * p.pileWidth, k = pw / fw;
+        const piece = (frame, x, y, h) => keep(s.add.image(x, y, 'pier_pile', frame).setOrigin(0.5, 0)
+            .setDisplaySize(pw, h).setDepth(p.depth).setTint(p.tint));
+        if (Math.max(0, pier.deckTop) >= oy && Math.max(0, pier.deckTop) < y1) {      // the deck pokes above the surface
+            keep(s.add.image(pier.x0, pier.deckTop, 'pier_deck').setOrigin(0.5, 0)
+                .setDisplaySize(pier.w, pier.deckH).setDepth(p.depth + 0.01).setTint(p.tint));
+        }
+        for (const q of pier.piles) {
+            const top = pier.deckTop + pier.deckH * 0.9, topH = tex.get('top').height * k;
+            const footH = tex.get('foot').height * k, foot = q.ground + pw * 0.5 - footH;
+            if (top >= oy && top < y1) piece('top', q.x, top, topH);
+            if (foot >= oy && foot < y1) piece('foot', q.x, foot, footH);
+            const m0 = Math.max(oy, top + topH - 2), m1 = Math.min(y1, foot + 2);
+            if (m1 > m0) {        // seamless wood strip, tiled by world y so chunk joins don't show
+                const mid = keep(s.add.tileSprite(q.x, m0, fw, (m1 - m0) / k, 'pier_pile_mid')
+                    .setOrigin(0.5, 0).setScale(k).setDepth(p.depth - 0.01).setTint(p.tint));
+                mid.tilePositionY = m0 / k;
+            }
         }
     }
 
