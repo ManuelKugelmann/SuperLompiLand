@@ -237,7 +237,7 @@ export default class StormLayer {
             L.streak.forEach((st, i) => {
                 const w = d.halfWidth * 2 * st.width;
                 const strip = (y, h, a0, a1) => {
-                    const t = scene.add.tileSprite(x, y, w, h, TEX.col).setOrigin(0.5, 0).setDepth(2.6 + i * 0.05).setTileScale(w / 256, st.scale);   // one tile across: the soft sides are the strip's sides
+                    const t = scene.add.tileSprite(x, y, w, h, TEX.col).setOrigin(0.5, 0).setDepth(2.3 + i * 0.05).setTileScale(w / 256, st.scale);   // one tile across: the soft sides are the strip's sides
                     t.setAlpha(a0 * st.alpha, a0 * st.alpha, a1 * st.alpha, a1 * st.alpha);
                     t.dir = dir; t.speed = st.speed; t.cx = x; t.y0 = y - top; t.phase = i * 1.7 + (dir > 0 ? 0 : 3);
                     o.columns.push(t);
@@ -247,7 +247,7 @@ export default class StormLayer {
         }
         // The whirl turns in a flattened container, so it reads as a funnel seen from the side.
         o.spin = scene.add.image(0, 0, TEX.whirl);
-        o.whirl = scene.add.container(cols.down, top + 10, [o.spin]).setDepth(2.9).setScale(2.6, 1.1);
+        o.whirl = scene.add.container(cols.down, top + 10, [o.spin]).setDepth(2.45).setScale(2.6, 1.1);
         o.all = [...o.columns, o.whirl];
         return o;
     }
