@@ -87,7 +87,6 @@ const FRIENDS = {
     friend_seahorse: { size: 120, every: 3, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
     friend_starfish: { size: 170, ground: true, anim: 'sit', soft: 0.2, upright: true, crawl: { speed: 0.1, range: 160 } },
-    friend_snail: { size: 160, ground: true, anim: 'sit', soft: 0.3, upright: true, crawl: { speed: 0.18, range: 240 } },
     friend_nudibranch: { size: 190, ground: true, anim: 'sit', soft: 0.8, upright: true, crawl: { speed: 0.26, range: 300 } },
     urchin: { size: 140, ground: true, anim: 'throb', soft: 0.2, upright: true, crawl: { speed: 0.05, range: 90 } },
     // The anglerfish art faces left (tail on the right); it lights the deep, its lure sways as a soft part.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust, easing, easeRest, easingDown, easeRestDown } from '../game/controls/assist.js';
+import { ASSIST, slideDir, climbForce, holdLift, restDepth, steersDown, levelThrust, easing, easeRest, easingDown, easeRestDown, stickLift, stickSmooth } from '../game/controls/assist.js';
 
 // A seabed step: rock below y 1000 west of x 500, and below y 800 east of it (a 200 px step up).
 const step = (x, y) => y < (x < 500 ? 1000 : 800);
@@ -111,4 +111,19 @@ test('the mirror: a depth far above the lane that the player did not choose sink
     for (let i = 0; i < 60 * 60; i++) { on = easingDown(rest, laneTop, false, on); if (on) rest = easeRestDown(rest, laneTop, 1 / 60); }
     assert.equal(rest, laneTop - A.stop, 'once started it goes on to the lane edge');
     assert.equal(on, false);
+});
+
+test('the stick steers level inside a dead band, gently beyond it, and its up or down part follows the thumb smoothly', () => {
+    const S = ASSIST.stick, deg = a => [Math.cos(a * Math.PI / 180), Math.sin(a * Math.PI / 180)];
+    assert.equal(stickLift(...deg(S.deadDeg - 1)), 0, 'a little down of level: still level');
+    assert.equal(stickLift(...deg(-S.deadDeg + 1)), 0);
+    assert.ok(stickLift(...deg(S.deadDeg + 1)) > 0 && stickLift(...deg(S.deadDeg + 1)) < 0.02, 'no jump at the edge of the band');
+    assert.ok(stickLift(...deg(45)) > 0 && stickLift(...deg(45)) < Math.sin(Math.PI / 4) * S.gain, 'less up and down than the thumb');
+    assert.ok(Math.abs(stickLift(0, 1) - S.gain) < 1e-9, 'straight down: the full, turned-down part');
+    assert.equal(stickLift(...deg(-60)), -stickLift(...deg(60)), 'the same upward');
+    let y = 0;
+    for (let i = 0; i < 15; i++) y = stickSmooth(y, 0.5, 1 / 60);
+    assert.ok(y > 0.25 && y < 0.4, `after ${S.smoothS} s most of the way (${y.toFixed(2)})`);
+    for (let i = 0; i < 120; i++) y = stickSmooth(y, 0.5, 1 / 60);
+    assert.ok(Math.abs(y - 0.5) < 0.01);
 });

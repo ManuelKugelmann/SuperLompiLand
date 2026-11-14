@@ -416,8 +416,7 @@ export default class MainScene extends Phaser.Scene {
             }
         });
 
-        // Bubble cannons and bounce pads along the streams (game/level/boosters.js).
-        // Cannons and pads are optional: none inside the calm route.
+        // Bounce pads under the streams (game/level/boosters.js): optional, none inside the calm route.
         this.boosters = new BoosterLayer(this, this.flow, (x, y) => y > 60 && this.density(x, y) <= LEVEL.threshold
             && Math.abs(y - this.level.field.routeY(x)) > ROUTE.halfWidth);
 
@@ -1549,13 +1548,12 @@ export default class MainScene extends Phaser.Scene {
         this.speedLines.update(delta, v.x, v.y, !this.relaxed && this.chain.flow);
         this.drawFlow(delta);
         if (this.aiDebug) this.drawAi();
-        const shot = this.boosters.update(this.cameras.main.worldView, this.fish, this.time.now);
-        if (shot) {
-            play(shot === 'cannon' ? 'cannon' : 'boing');
-            this.chainMove(shot);
-            if (shot === 'pad') this.bookEntry('friend_jellyfish');     // the pad is a big moon jelly
-            this.fish.squash = shot === 'cannon' ? 0.3 : -0.3;
-            this.particles.spawn('bubble', this.fish.sprite.x, this.fish.sprite.y, shot === 'cannon' ? 14 : 6, { radius: 10, spread: 60 });
+        if (this.boosters.update(this.cameras.main.worldView, this.fish, this.time.now)) {
+            play('boing');
+            this.chainMove('pad');
+            this.bookEntry('friend_jellyfish');     // the pad is a big moon jelly
+            this.fish.squash = -0.3;
+            this.particles.spawn('bubble', this.fish.sprite.x, this.fish.sprite.y, 6, { radius: 10, spread: 60 });
         }
         this.particles.update(delta / 1000);
         const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step

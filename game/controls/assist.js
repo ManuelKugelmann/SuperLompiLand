@@ -30,6 +30,11 @@ export const ASSIST = {
         rise: 40,        // px per second by which the held depth then rises toward that edge
         level: 0.15      // the pull counts as level (the hold keeps working during it) while its up or down part is below this share
     },
+    stick: {
+        deadDeg: 20,     // a stick within this many degrees of level steers level: the depth is kept (playtest: "always above or below the line of coins")
+        gain: 0.6,       // beyond that, its up or down part counts this much
+        smoothS: 0.25    // s over which the up or down part follows the thumb
+    },
     level: {
         flat: 0.4,       // the pull counts as "mostly sideways" while its up or down part is below this share of it
         damp: 0.09,      // share of a full stroke per px/step of unwanted speed up or down
@@ -123,4 +128,19 @@ export function easingDown(rest, laneTop, chosen, was, cfg = ASSIST.lane) {
 /** The held depth a moment later while it is eased down: by `sink` px per second, no deeper than the lane's upper edge. `dt` s. */
 export function easeRestDown(rest, laneTop, dt, cfg = ASSIST.lane) {
     return Math.min(laneTop - cfg.stop, rest + cfg.sink * dt);
+}
+
+/**
+ * The stick's up or down part as it steers: nothing inside the dead band round level (it grows
+ * from zero at the band's edge, no jump), turned down by `gain` beyond it. `x`, `y` = the stick
+ * (each -1..1).
+ */
+export function stickLift(x, y, cfg = ASSIST.stick) {
+    const band = Math.abs(x) * Math.tan(cfg.deadDeg * Math.PI / 180), over = Math.abs(y) - band;
+    return over <= 0 ? 0 : Math.sign(y) * over * cfg.gain;
+}
+
+/** The smoothed up or down part a moment later: it follows `want` over `smoothS`. `dt` s. */
+export function stickSmooth(now, want, dt, cfg = ASSIST.stick) {
+    return now + (want - now) * (1 - Math.exp(-dt / cfg.smoothS));
 }

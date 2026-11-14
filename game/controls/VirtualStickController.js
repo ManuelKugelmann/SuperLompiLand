@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import SteerAssist from './SteerAssist.js';
-import { ASSIST } from './assist.js';
+import { ASSIST, stickLift, stickSmooth } from './assist.js';
 import ControllerBase from './ControllerBase.js';
 
 /**
@@ -14,6 +14,7 @@ export default class VirtualStickController extends ControllerBase {
         this.R = 150;
         this.vec = new Phaser.Math.Vector2(0, 0);
         this.aim = new Phaser.Math.Vector2();
+        this.lift = 0;      // the stick's smoothed up or down part
         this.assist = new SteerAssist(this.scene, this.fish);
         this.active = false;
         this.pointerId = null;
@@ -76,7 +77,13 @@ export default class VirtualStickController extends ControllerBase {
         // The stick's direction with the shared steering help: steps climbed, the depth held when the thumb lets go.
         this.assist.ease(dt);
         const len = this.vec.length();
-        if (this.active && len > 0.05) this.assist.pull(this.aim.copy(this.vec).scale(1 / len), Math.min(1, len), 1, this.vec.y / len > ASSIST.hold.diveDir);
-        else this.assist.rest(false);      // no brake: the stick lets the fish glide on
+        // Up and down are calmer than the thumb: level within a dead band, turned down beyond it, and smoothed (ASSIST.stick).
+        this.lift = stickSmooth(this.lift, this.active ? stickLift(this.vec.x, this.vec.y) : 0, dt / 1000);
+        if (this.active && len > 0.05) {
+            const aim = this.aim.set(this.vec.x, this.lift), strength = Math.min(1, Math.max(len, aim.length()));
+            if (aim.lengthSq() < 1e-6) aim.set(this.fish.facing, 0);      // straight up or down inside the smoothing's first moment: keep going the way it faces
+            aim.normalize();
+            this.assist.pull(aim, strength, 1, aim.y > ASSIST.hold.diveDir);
+        } else this.assist.rest(false);      // no brake: the stick lets the fish glide on
     }
 }
