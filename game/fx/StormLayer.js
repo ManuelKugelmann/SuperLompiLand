@@ -4,6 +4,7 @@ import { ensureFoam, SURF_ART } from './SurfLayer.js';
 
 export const STORM_LOOK = {
     // Darkness only by depth (spec 5.0h): the storm shows itself by colour, shadow bands and churn.
+    stripsPerFrame: 1, // of the downwelling's streak strips are made per frame (each has a canvas of its own: 3-7 ms)
     sky: 0.55,         // how overcast the sky gets in the middle of the storm (a grey, not a darkening)
     churn: 0x5d7f76,   // the storm's churned grey-green water: its walls and the side of the view toward it shift to this hue
     rain: 1100,        // px above the waterline the rain falls from
@@ -241,7 +242,7 @@ export default class StormLayer {
 
     /** The downwelling's two columns: streaks at three depths, a whirl at the top of the one going down. */
     buildCurrent() {
-        const scene = this.scene, L = STORM_LOOK, d = WEATHER.down, cols = this.cols, top = d.top, bottom = d.routeY + 250, o = { columns: [] };
+        const scene = this.scene, L = STORM_LOOK, d = WEATHER.down, cols = this.cols, top = d.top, bottom = d.routeY + 250, o = { columns: [], all: [], todo: [] };
         // Each column: three stacked strips per depth of streaks; the end strips fade (per-corner
         // alpha), so the current eases in under the surface and out at depth. All in world space,
         // exactly where the water pulls.
@@ -253,15 +254,16 @@ export default class StormLayer {
                     const t = scene.add.tileSprite(x, y, w, h, TEX.col).setOrigin(0.5, 0).setDepth(2.3 + i * 0.05).setTileScale(w / 256, st.scale);   // one tile across: the soft sides are the strip's sides
                     t.setAlpha(a0 * st.alpha, a0 * st.alpha, a1 * st.alpha, a1 * st.alpha);
                     t.dir = dir; t.speed = st.speed; t.cx = x; t.y0 = y - top; t.phase = i * 1.7 + (dir > 0 ? 0 : 3);
-                    o.columns.push(t);
+                    o.columns.push(t); o.all.push(t);
                 };
-                strip(top, f0, 0, 1); strip(top + f0, mid, 1, 1); strip(top + f0 + mid, f1, 1, 0);
+                // Each strip is a tile sprite with a canvas of its own (a few ms to make): they are made a few per frame (update), not all at once.
+                o.todo.push(() => strip(top, f0, 0, 1), () => strip(top + f0, mid, 1, 1), () => strip(top + f0 + mid, f1, 1, 0));
             });
         }
         // The whirl turns in a flattened container, so it reads as a funnel seen from the side.
         o.spin = scene.add.image(0, 0, TEX.whirl);
         o.whirl = scene.add.container(cols.down, top + 10, [o.spin]).setDepth(2.45).setScale(2.6, 1.1);
-        o.all = [...o.columns, o.whirl];
+        o.all.push(o.whirl);
         return o;
     }
 
@@ -349,6 +351,7 @@ export default class StormLayer {
         if (nearCurrent && !this.currentSet) this.currentSet = this.buildCurrent();
         if (!nearCurrent && this.currentSet) { for (const o of this.currentSet.all) o.destroy(); this.currentSet = null; }
         const cur = this.currentSet;
+        for (let k = 0; cur && k < L.stripsPerFrame && cur.todo.length; k++) cur.todo.shift()();
         if (cur) for (const c of cur.columns) {
             const seen = c.cx > camX - d.halfWidth - W && c.cx < camX + W + d.halfWidth + W;   // from a screen away
             c.setVisible(seen);
