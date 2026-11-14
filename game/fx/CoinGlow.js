@@ -38,13 +38,22 @@ export default class CoinGlow {
         let n = 0;
         if (k > 0.01) {
             const view = this.scene.cameras.main.worldView;
-            for (const o of this.scene.children.list) {
-                if (o.texture?.key !== 'coin' || !o.visible || !o.active) continue;
-                if (o.x < view.x - 80 || o.x > view.right + 80 || o.y < view.y - 80 || o.y > view.bottom + 80) continue;
+            const glint = (x, y, alpha) => {
+                if (x < view.x - 80 || x > view.right + 80 || y < view.y - 80 || y > view.bottom + 80) return;
                 const b = this.bobs[n] || (this.bobs[n] = this.blitter.create(0, 0));
-                b.setVisible(true); b.alpha = k * o.alpha;
-                b.x = o.x - G.size / 2; b.y = o.y - G.size / 2;
+                b.setVisible(true); b.alpha = k * alpha;
+                b.x = x - G.size / 2; b.y = y - G.size / 2;
                 n++;
+            };
+            for (const o of this.scene.children.list) {
+                if (!o.visible || !o.active) continue;
+                const key = o.texture?.key;
+                if (key === 'coin') glint(o.x, o.y, o.alpha);
+                else if (o.type === 'Blitter' && key?.startsWith('coin@')) {
+                    // Set-piece coins (BonusCoins) are bobs of one Blitter.
+                    const half = o.frame.width / 2;
+                    for (const bob of o.children.list) if (bob.visible) glint(o.x + bob.x + half, o.y + bob.y + half, bob.alpha);
+                }
             }
         }
         for (let i = n; i < this.bobs.length; i++) this.bobs[i].setVisible(false);

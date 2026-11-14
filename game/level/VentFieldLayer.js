@@ -1,3 +1,5 @@
+import { scaledTexture } from '../fx/scaledTexture.js';
+import BonusCoins from './BonusCoins.js';
 import { VENT_FIELD, ventSpot, chimneyAt, chimneyHeight, ventLift, ventCoins } from './ventField.js';
 
 /**
@@ -15,7 +17,7 @@ export const VENT_LOOK = {
     wormDepth: 1.7,
     glowDepth: 41,           // the mouths' glow is a light of its own, above the deep's darkness (MainScene ambient, 40)
     glow: 440,               // px across a mouth's glow
-    coin: 64
+    worm: 0.75               // tube worm clusters drawn at this share of their picture
 };
 
 // Texture keys: painted pictures loaded under these keys replace the drawn ones.
@@ -74,8 +76,12 @@ export default class VentFieldLayer {
     }
 
     build() {
-        const s = this.scene, L = VENT_LOOK, items = [], coins = [];
+        const s = this.scene, L = VENT_LOOK, items = [], points = [];
         this.mouths = [];
+        // Worms and glows are bobs of one Blitter each (Blitter bobs cannot scale: baked once at their size).
+        const wormKey = scaledTexture(s, WORM, 160 * L.worm, 154 * L.worm) || WORM, glowKey = scaledTexture(s, GLOW, L.glow) || GLOW;
+        const worms = s.add.blitter(0, 0, wormKey).setDepth(L.wormDepth), glows = s.add.blitter(0, 0, glowKey).setDepth(L.glowDepth).setBlendMode('ADD');
+        const ww = s.textures.get(wormKey).getSourceImage().width, wh = s.textures.get(wormKey).getSourceImage().height, gs = s.textures.get(glowKey).getSourceImage().width;
         for (let i = 0; i < VENT_FIELD.chimneys; i++) {
             const c = chimneyAt(i), ground = this.groundY(c.x);
             if (ground === null) continue;
@@ -84,23 +90,17 @@ export default class VentFieldLayer {
             const img = s.add.image(c.x, ground + 20, CHIMNEY).setOrigin(0.5, 1).setDepth(L.depth);
             img.setDisplaySize(c.width, h + 20);
             const mouth = { x: c.x, y: ground - h + 8, phase: c.phase };
-            const glow = s.add.image(mouth.x, mouth.y, GLOW).setDepth(L.glowDepth).setBlendMode('ADD').setDisplaySize(L.glow, L.glow);
-            const worms = [];
+            mouth.glow = glows.create(mouth.x - gs / 2, mouth.y - gs / 2);
             for (let k = 0; k < 2; k++) {
-                const w = s.add.image(c.x + (k ? 1 : -1) * c.width * 0.55, ground + 8, WORM).setOrigin(0.5, 1).setDepth(L.wormDepth).setFlipX(!!k);
-                w.setScale((0.45 + 0.05 * c.worms) * (k ? 0.8 : 1));
-                worms.push(w);
+                const b = worms.create(c.x + (k ? 1 : -1) * c.width * 0.55 - ww / 2, ground + 8 - wh);
+                b.flipX = !!k;
             }
-            ventCoins(mouth, route).forEach((p, k) => {
-                const id = `${i}:${k}`;
-                if (this.taken.has(id)) return;
-                const img2 = s.textures.exists('coin') ? s.add.image(p.x, p.y, 'coin').setDisplaySize(L.coin, L.coin) : s.add.circle(p.x, p.y, L.coin / 2, 0xffd23f);
-                coins.push({ img: img2.setDepth(2.5), id, x: p.x, y: p.y });
-            });
+            ventCoins(mouth, route).forEach((p, k) => { if (!this.taken.has(`${i}:${k}`)) points.push({ x: p.x, y: p.y, id: `${i}:${k}` }); });
             this.mouths.push(mouth);
-            items.push(img, glow, ...worms);
-            mouth.glow = glow;
+            items.push(img);
         }
+        items.push(worms, glows);
+        const coins = new BonusCoins(s, points, 2.5, (x, y) => { const p = points.find(q => q.x === x && q.y === y); if (p) this.taken.add(p.id); this.onCoin(x, y); });
         return { items, coins };
     }
 
@@ -112,7 +112,7 @@ export default class VentFieldLayer {
             if (fish.x < sp.x0 - L.near || fish.x > sp.x1 + L.near || !this.scene.buildSlot()) return;
             this.live = this.build();
         }
-        for (const m of this.mouths) m.glow.setAlpha(0.75 + 0.25 * Math.sin(t * 1.7 + m.phase));
+        for (const m of this.mouths) m.glow.alpha = 0.75 + 0.25 * Math.sin(t * 1.7 + m.phase);
         // Smoke puffs from the mouths in view; the shared particles carry it up with the water.
         this.puffAt -= delta;
         if (this.puffAt <= 0) {
@@ -124,12 +124,7 @@ export default class VentFieldLayer {
                 this.scene.particles.spawn('steam', m.x, m.y - 6, 2, { radius: 10, spread: 20, vy: -140 });
             }
         }
-        const r = (fish.radius || 40) + L.coin / 2;
-        this.live.coins = this.live.coins.filter(c => {
-            if (Math.hypot(c.x - fish.x, c.y - fish.y) > r) return true;
-            this.taken.add(c.id); c.img.destroy(); this.onCoin(c.x, c.y);
-            return false;
-        });
+        this.live.coins.update(fish, fish.radius || 40, t);
         if (!this.seen && this.mouths.some(m => Math.hypot(m.x - fish.x, m.y - fish.y) < VENT_FIELD.seen)) { this.seen = true; this.onSeen('vent_field'); }
     }
 
@@ -142,7 +137,7 @@ export default class VentFieldLayer {
 
     clear() {
         for (const o of this.live.items) o.destroy();
-        for (const c of this.live.coins) c.img.destroy();
+        this.live.coins.destroy();
         this.live = null; this.mouths = [];
     }
 }
