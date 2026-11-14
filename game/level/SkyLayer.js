@@ -14,8 +14,9 @@ export const SKY = {
     // Every island stands on rock that goes on down under the water (user: nothing ends at the
     // waterline): a socket under each near coast piece, as wide as it at the top, widening and fading
     // into the water over `deep` px. Drawn just over the sea sheet, behind everything that plays.
-    // It stands as far off as the island: hazy, water-tinted, soft-edged, gone in the deep blue below.
-    socket: { deep: 620, depth: -27.9, tint: 0x5f9daa, alpha: 0.5, top: 0.62, fit: 0.78 }      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
+    // It stands as far off as the island (on the horizon): hazy, water-tinted, soft-edged, `deep` x the
+    // piece's size tall, gone in the blue below.
+    socket: { deep: 700, depth: -27.9, tint: 0x6fb0bb, alpha: 0.34, top: 0.62, fit: 0.78 }      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
 };
 
 /** The rock socket under an island (drawn once, procedural): a dark rock mass with a jagged outline and ledges, fading downward. */
@@ -201,7 +202,7 @@ export default class SkyLayer {
             if (!onScreen(sx, d.half, W)) continue;
             const o = this.sockets[used] || (this.sockets[used] = this.scene.add.image(0, 0, 'coast_socket').setOrigin(0.5, 0).setScrollFactor(0, 1).setDepth(K.depth).setTint(K.tint).setAlpha(K.alpha));
             used++;
-            o.setVisible(true).setPosition(sx, SKY.baseY - 6).setDisplaySize(d.half * 2 * K.fit / K.top, K.deep).setFlipX(d.flip);
+            o.setVisible(true).setPosition(sx, SKY.baseY - 6).setDisplaySize(d.half * 2 * K.fit / K.top, K.deep * d.item.size).setFlipX(d.flip);
         }
         for (let i = used; i < this.sockets.length; i++) this.sockets[i].setVisible(false);
     }
