@@ -13,7 +13,7 @@ import { feedbackMenuItems, flushFeedbackQueue } from '../game/feedback.js';
 import { play, soundMenuItem } from '../game/audio.js';
 import { SCENE_KEYS } from './keys.js';
 import { MATERIALS } from '../game/level/materials.js';
-import { PROPS } from '../game/level/LevelGenerator.js';
+import { PROPS, KELP_STALKS } from '../game/level/LevelGenerator.js';
 import { openCredits } from '../game/credits.js';
 import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
 import { fitToWindow, fitsWindow } from '../game/orientation.js';
@@ -69,6 +69,7 @@ export default class IntroScene extends Phaser.Scene {
         for (const [key, file] of Object.entries(IMAGES)) {
             if (!this.textures.exists(key)) this.load.image(key, `img/${file}`);
         }
+        for (const key of KELP_STALKS) if (!this.textures.exists(key)) this.load.image(key, `img/plants/${key}.webp`);
         for (const p of Object.values(PROPS)) {
             for (const key of p.keys) if (!this.textures.exists(key)) this.load.image(key, `img/props/${key}.webp`);
         }

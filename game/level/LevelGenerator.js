@@ -75,6 +75,10 @@ export const PROPS = {
     kelpclump: { keys: ['kelp_2'], width: [170, 260], sink: 0.04, flat: 0.5, depth: -1, max: 2 }
 };
 
+/** Painted kelp stalks (generated art, public/img/plants/); the procedural 'kelp' strip is the fallback. */
+export const KELP_STALKS = ['kelp_stalk_1', 'kelp_stalk_2', 'kelp_stalk_3'];
+const KELP_BACK_TINT = 0x5f8f86;   // stalks behind the play plane: hazier, toward the water colour
+
 // One turn of the colour wheel, saturated and bright, looked up instead of converted every frame.
 const RAINBOW = Array.from({ length: 96 }, (_, i) => Phaser.Display.Color.HSVToRGB(i / 96, 0.75, 1).color);
 
@@ -323,14 +327,11 @@ export default class LevelGenerator {
                 if (rng.frac() < 0.5) img.setFlipX(true);
                 corals++;
             } else if (roll < biome.coral + biome.kelp && stalks < 6) {
-                const h = rng.between(260, 620);
-                const stalk = makeCritter(s, 'kelp', f.x + up.x * h * 0.48, f.y + up.y * h * 0.48, h * 0.19, 'sway',
-                    { root: 'bottom', speed: rng.realInRange(0.5, 0.9), scaleY: h / 512 });
-                stalk.setDepth(rng.frac() < 0.25 ? 7 : -4);
-                stalk.isPlant = true;
-                stalk.bend = 0;
-                keep(stalk);
-                this.animated.push(stalk);
+                this.addKelp(chunk, f, rng.between(300, 680), rng.frac() < 0.25 ? 7 : -4, rng);
+                // Kelp forests stand in depth: a taller, hazier stalk behind the play plane.
+                if (biome.kelp > 0.5 && rng.frac() < 0.6) {
+                    this.addKelp(chunk, { ...f, x: f.x + rng.between(-160, 160) }, rng.between(700, 1100), -5, rng, KELP_BACK_TINT);
+                }
                 stalks++;
             } else if (!safe && roll > 1 - biome.hazardRate * 0.25) {
                 const key = pickWeighted(rng, floorHazards, has);
@@ -657,6 +658,26 @@ export default class LevelGenerator {
             branch(w / 2, 0, (rnd() - 0.5) * 0.2, 150, 26, 4);
             tex.refresh();
         }
+    }
+
+    /**
+     * A swaying kelp stalk rooted at floor spot `f`, `h` px tall: painted art
+     * (kelp_stalk_*) when loaded, else the procedural strip.
+     */
+    addKelp(chunk, f, h, depth, rng, tint = null) {
+        const s = this.scene;
+        const key = rng.pick(KELP_STALKS.filter(k => s.textures.exists(k))) || 'kelp';
+        const frame = s.textures.getFrame(key);
+        const up = { x: Math.sin(f.angle), y: -Math.cos(f.angle) };
+        const stalk = makeCritter(s, key, f.x + up.x * h * 0.48, f.y + up.y * h * 0.48, h * frame.width / frame.height, 'sway',
+            { root: 'bottom', speed: rng.realInRange(0.5, 0.9), scaleY: h / frame.height });
+        stalk.setDepth(depth);
+        if (rng.frac() < 0.5) stalk.setFlipX?.(true);
+        if (tint !== null) stalk.setColors?.(tint) ?? stalk.setTint?.(tint);
+        stalk.isPlant = depth > -5;      // only stalks in the play plane bend away from the fish
+        stalk.bend = 0;
+        chunk.objects.push(stalk);
+        this.animated.push(stalk);
     }
 
     /** Kelp leaf strip, drawn once; bent every frame like the creatures. */
