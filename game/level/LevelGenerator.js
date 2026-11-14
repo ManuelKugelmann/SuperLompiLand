@@ -47,7 +47,9 @@ const HAZARDS = {
     spikes: { size: 240, r: 62, place: 'floor', lift: 26 },
     hazard_buoy: { size: 170, r: 74, place: 'floor', lift: 104 },
     // The lost anchor hangs on its chain from a hull at the surface: the chain runs all the way up.
-    mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6, chain: true },
+    // An anchor hangs on a chain of at most `reach` px (from a hull at the surface or from rock
+    // above); where that is not possible there is no anchor.
+    mine: { size: 135, r: 62, place: 'water', anim: 'sway', speed: 0.6, chain: true, reach: 1500 },
     // A ghost net never just hangs in the water: where the seabed is within `tether` px below,
     // it is caught on a line to a stone and tugs at it; near the surface it hangs from a float;
     // otherwise it drifts `drift` px to and fro.
@@ -155,6 +157,14 @@ export default class LevelGenerator {
     groundBelow(x, y, reach) {
         for (let d = 20; d <= reach; d += 20) {
             if (this.density(x, y + d) > LEVEL.threshold) return { y: y + d, color: biomeBlendAt(x).a.rock[0] };
+        }
+        return null;
+    }
+
+    /** The underside of the first rock straight above (x, y), or null when the water is open up to the surface. */
+    ceilingAbove(x, y) {
+        for (let at = y - 30; at > 0; at -= 30) {
+            if (this.density(x, at) > LEVEL.threshold) return { y: at + 30 };
         }
         return null;
     }
@@ -467,6 +477,8 @@ export default class LevelGenerator {
 
     addHazard(chunk, key, x, y, rng, angle = 0) {
         const s = this.scene, h = HAZARDS[key];
+        const top = y - h.size * 0.46, rock = h.chain ? this.ceilingAbove(x, top) : null;
+        if (h.chain && top - (rock ? rock.y : 16) > h.reach) return null;
         const img = makeCritter(s, key, x, y, h.size, h.anim || 'still', { ...h, rotation: angle }).setDepth(3);
         this.animated.push(img);
         chunk.objects.push(img);
@@ -477,11 +489,14 @@ export default class LevelGenerator {
                 ease: 'Sine.easeInOut', onYoyo: () => img.face(-1), onRepeat: () => img.face(1)
             });
         } else if (h.chain) {
-            // Nothing hangs from nowhere: the chain continues up out of the picture to the dark
-            // hull of a boat lying at the surface.
+            // Nothing hangs from nowhere, and no chain passes through rock: in open water it runs
+            // up to the dark hull of a boat lying at the surface; under an overhang it ends where
+            // it is caught on the rock above, around a wedged shackle.
             makeLineTexture(s);
-            const top = y - h.size * 0.46;
-            if (top > 40) {
+            if (rock && top - rock.y > 8) {
+                chunk.objects.push(s.add.tileSprite(x, rock.y - 6, 16, top - rock.y + 6, 'hz_chain').setOrigin(0.5, 0).setDepth(2.9));
+                chunk.objects.push(s.add.ellipse(x, rock.y - 2, 34, 22, 0x3b3a3d).setStrokeStyle(4, 0x23222a).setDepth(2.92));
+            } else if (!rock && top > 40) {
                 chunk.objects.push(s.add.tileSprite(x, 16, 16, top - 16, 'hz_chain').setOrigin(0.5, 0).setDepth(2.9));
                 chunk.objects.push(s.add.image(x, 6, 'hz_hull').setOrigin(0.5, 0.35).setDepth(2.95));
             }
