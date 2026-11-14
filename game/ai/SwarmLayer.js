@@ -26,12 +26,43 @@ const frameSize = sp => ({ w: Math.ceil(sp.size * 1.6), h: Math.ceil(sp.size * (
 /** Frames: TAIL tail beats (left, mid, right) and FLASH, the bright flank of a turning fish. */
 const TAIL = [-1, 0, 1], FLASH = TAIL.length;
 
+/** Painted art (optional): `public/img/school/<id>.webp`, loaded as `school_<id>`. */
+export const schoolArt = id => ({ key: `school_${id}`, file: `img/school/${id}.webp` });
+
+/**
+ * Frames from a painted side view (facing right, tail at the left): the back third is
+ * bent up and down in thin vertical strips for the tail beat; the flash frame is the
+ * same image washed toward silver.
+ */
+function paintedFrames(c, img, w, h) {
+    const strips = 12, sw = img.width / strips;
+    [...TAIL, 0].forEach((beat, f) => {
+        const ox = f * w;
+        for (let k = 0; k < strips; k++) {
+            const tail = Math.max(0, 1 - k / (strips * 0.4));          // 1 at the tail tip, 0 from 40 % on
+            const dy = beat * tail * tail * h * 0.14;
+            c.drawImage(img, k * sw, 0, sw + 0.5, img.height, ox + k * w / strips, dy, w / strips + 0.5, h);
+        }
+        if (f === FLASH) {
+            c.save(); c.globalCompositeOperation = 'source-atop'; c.fillStyle = 'rgba(235,240,245,0.5)';
+            c.fillRect(ox, 0, w, h); c.restore();
+        }
+    });
+}
+
 function fishTexture(scene, id, sp) {
     const key = `swarm_${id}`;
     if (scene.textures.exists(key)) return key;
     const { w, h } = frameSize(sp);
     const tex = scene.textures.createCanvas(key, w * (TAIL.length + 1), h);
     const c = tex.getContext();
+    const art = schoolArt(id).key;
+    if (scene.textures.exists(art)) {
+        paintedFrames(c, scene.textures.get(art).getSourceImage(), w, h);
+        [...TAIL, 0].forEach((_, f) => tex.add(f, 0, f * w, 0, w, h));
+        tex.refresh();
+        return key;
+    }
     [...TAIL, 0].forEach((beat, f) => {
         const flash = f === FLASH, ox = f * w, cx = ox + w * 0.56, cy = h / 2;
         const rx = w * (sp.tall ? 0.3 : 0.36), ry = h * (sp.tall ? 0.4 : 0.34);

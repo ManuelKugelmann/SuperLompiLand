@@ -17,6 +17,7 @@ import { PROPS } from '../game/level/LevelGenerator.js';
 import { openCredits } from '../game/credits.js';
 import { rollWords, normalizeSecret, MIN_JOIN, MIN_SECRET, MAX_SECRET } from '../net/secret.js';
 import { fitToWindow, fitsWindow } from '../game/orientation.js';
+import { SPECIES, schoolArt } from '../game/ai/SwarmLayer.js';
 
 export const gameMeta = {
     sceneKey: SCENE_KEYS.INTRO,
@@ -75,6 +76,11 @@ export default class IntroScene extends Phaser.Scene {
         for (const m of MATERIALS) {
             if (!this.textures.exists(`mat_${m}`)) this.load.image(`mat_${m}`, `img/mat/${m}.jpg`);
             if (!this.textures.exists(`mat_${m}_h`)) this.load.image(`mat_${m}_h`, `img/mat/${m}_h.jpg`);
+        }
+        // Painted shoal fish (game/ai/SwarmLayer.js); drawn procedurally while missing.
+        for (const id of Object.keys(SPECIES)) {
+            const { key, file } = schoolArt(id);
+            if (!this.textures.exists(key)) this.load.image(key, file);
         }
         if (!this.cache.json.exists('fins')) this.load.json('fins', 'img/fins.json');
     }
