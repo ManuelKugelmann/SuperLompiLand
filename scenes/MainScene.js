@@ -846,7 +846,7 @@ export default class MainScene extends Phaser.Scene {
     bookToast(e) {
         if (this.ambientMode) return;
         const de = this.lang === 'de', H = this.scale.height;
-        const box = this.add.container(30, H - 170).setScrollFactor(0).setDepth(55).setAlpha(0);
+        const box = this.add.container(30, H - 230).setScrollFactor(0).setDepth(55).setAlpha(0);
         box.add(this.add.rectangle(0, 0, 420, 130, 0x0d3b5c, 0.92).setOrigin(0).setStrokeStyle(3, 0xfff3b0, 0.9));
         if (e.image && this.textures.exists(e.image)) {
             const img = this.add.image(70, 65, e.image);
@@ -856,7 +856,7 @@ export default class MainScene extends Phaser.Scene {
         box.add(this.add.text(140, 24, de ? 'Neu im Riffbuch' : 'New in the reef book', { fontFamily: 'Arial', fontSize: '24px', color: '#fff3b0', fontStyle: 'bold' }));
         box.add(this.add.text(140, 60, e.name[this.lang] || e.name.en, { fontFamily: 'Arial', fontSize: '34px', color: '#ffffff', fontStyle: 'bold' }));
         play('nest');
-        this.tweens.add({ targets: box, alpha: 1, y: H - 190, duration: 300, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: box, alpha: 1, y: H - 250, duration: 300, ease: 'Back.easeOut' });
         this.tweens.add({ targets: box, alpha: 0, delay: 2600, duration: 500, onComplete: () => box.destroy() });
     }
 
