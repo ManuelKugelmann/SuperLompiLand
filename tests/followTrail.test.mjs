@@ -40,3 +40,13 @@ test('neighbours in the chain are further apart than a friend is wide', async ()
         assert.ok(Math.hypot(a.x - c.x, a.y - c.y) >= 250, `slots ${k},${k + 2}`);
     }
 });
+
+test('in a U-turn every friend keeps its side of the path (above or below)', async () => {
+    const { createTrail, chainAt } = await import('../game/followTrail.js');
+    const east = createTrail(), west = createTrail();
+    for (let x = 0; x <= 4000; x += 10) { east.push(x, 500); west.push(4000 - x, 500); }
+    for (let k = 0; k < 6; k++) {
+        const a = chainAt(east, k, { x: 0, y: 0 }), b = chainAt(west, k, { x: 0, y: 0 });
+        assert.equal(Math.sign(a.y - 500), Math.sign(b.y - 500), `slot ${k}`);
+    }
+});

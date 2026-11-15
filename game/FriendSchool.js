@@ -39,7 +39,8 @@ export default class FriendSchool {
         const dir = heading >= 0 ? 1 : -1, n = this.friends.length;
         if (this.nest) this.gathered = Math.min(1, this.gathered + dt / GRAND_NEST.gatherS);
         this.friends.forEach((f, k) => {
-            if (f.x === null) { f.x = fish.x - dir * ESCORT.far * 2; f.y = fish.y; }      // far behind: the step below sets it just outside the view
+            // Far behind (the step below sets it just outside the view), each on its own side and further back: no pile-up as they come in.
+            if (f.x === null) { f.x = fish.x - dir * (ESCORT.far * 2 + k * CHAIN.gap); f.y = fish.y + (k % 2 ? 1 : -1) * CHAIN.side; }
             // In the chain along Lompi's path (user: "chain of friends"), the newest nearest; at the grand nest they gather round him.
             const trail = this.scene.followTrail;
             const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place)

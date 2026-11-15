@@ -25,7 +25,9 @@ export function chainAt(trail, slot, out, cfg = CHAIN) {
     trail.at(d + 40, back);
     const dx = out.x - back.x, dy = out.y - back.y, len = Math.hypot(dx, dy);
     if (len < 1e-6) return out;
-    const side = (slot % 2 ? 1 : -1) * cfg.side;
+    // Every other one below the path, the others above, whichever way he swims: in a U-turn nobody crosses to the
+    // other side through the rest (techartist review: overlaps only during the turn).
+    const side = (slot % 2 ? 1 : -1) * (dx < 0 ? -1 : 1) * cfg.side;
     out.x += (-dy / len) * side; out.y += (dx / len) * side;
     return out;
 }
