@@ -51,7 +51,11 @@ export default class FriendSchool {
                 f.vx ??= 0; f.vy ??= 0;
                 // ... swaying with the music, one wave per bar travelling down the flock (spec 5.0z).
                 const bar = musicClock.phase(nowSeconds()).beat / musicClock.beatsPerBar, sway = Math.sin((bar - k * 0.12) * Math.PI * 2) * CHAIN.sway;
-                flockStep(f, { x: to.x, y: ty + sway }, this.scene.flockMates || [], this.scene.leadVel || { vx: 0, vy: 0 }, dt);
+                // Damped toward how its own place moves (not Lompi's velocity): after he turns, its place still runs on to
+                // the turn point, so it turns once there instead of back and forth (techartist review 2026-11-15).
+                const pv = f.place && dt > 0 ? { vx: (to.x - f.place.x) / dt, vy: (ty + sway - f.place.y) / dt } : { vx: 0, vy: 0 };
+                f.place = { x: to.x, y: ty + sway };
+                flockStep(f, f.place, this.scene.flockMates || [], pv, dt);
             } else escortStep(f, k, to.x, ty, fish.x, dir, dt);
             // Never in rock (it follows the fish's path, which may cut a corner): pushed out along the terrain's slope.
             if (this.scene.level?.rock) { const q = keepOut(f.x, f.y, SCHOOL_LOOK.clear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); f.x = q.x; f.y = q.y; }

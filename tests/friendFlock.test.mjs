@@ -39,3 +39,17 @@ test('by time, not by frame: one long step lands where many short ones do', () =
     flockStep(b, target, [], still, 0.5);
     assert.ok(Math.abs(a.x - b.x) < 25, `${a.x.toFixed(1)} vs ${b.x.toFixed(1)}`);
 });
+
+test('when its place turns round, the friend turns once, not back and forth', () => {
+    const a = { x: 0, y: 0, vx: 0, vy: 0 }, place = { x: 0, y: 0 };
+    let flips = 0, side = 0;
+    for (let i = 0; i < 480; i++) {
+        const v = i < 180 ? 600 : -600;          // the place runs on, then comes back along the path
+        place.x += v * DT;
+        flockStep(a, place, [], { vx: v, vy: 0 }, DT);
+        const s = Math.sign(a.vx);
+        if (s && side && s !== side) flips++;
+        if (s) side = s;
+    }
+    assert.equal(flips, 1);
+});

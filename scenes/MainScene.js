@@ -1067,7 +1067,7 @@ export default class MainScene extends Phaser.Scene {
 
     /** Playing together: just come into the room, Lompi swims in next to the friend (net/meet.js). */
     meetFriend(spot) {
-        if (this.respawning || this.opening) return;
+        if (this.respawning || this.opening) { this.time.delayedCall(1000, () => this.meetFriend(spot)); return; }      // after the opening story or the respawn
         const de = this.lang === 'de';
         this.moveTo(this.safeSpot(spot.x, spot.y), () => this.announce(de ? 'Da ist dein Freund!' : 'There is your friend!', ''));
     }
@@ -1923,9 +1923,8 @@ export default class MainScene extends Phaser.Scene {
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
         this.followTrail.push(sp.x, sp.y);
-        // The flock of friends (game/friendFlock.js): who swims with Lompi, and how fast he goes (px/s).
+        // The flock of friends (game/friendFlock.js): who swims with Lompi.
         this.flockMates = this.school.friends;      // only the chapter friends follow; rescued animals swim home
-        this.leadVel = { vx: sp.body.velocity.x * 60, vy: sp.body.velocity.y * 60 };
         if (!this.ambientMode) this.school.update(sp, this.fish.facing, time / 1000, delta / 1000);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
         else if (this.creaturesWarm && !this.stormWarm && this.buildSlot()) this.stormWarm = !prewarmStorm(this);      // then the storm's pictures, one per frame

@@ -1,14 +1,14 @@
 // A flock of friends (user 2026-11-15: "Boid / flock of friends"): every friend aims at its place along
 // Lompi's path (followTrail.js chainAt) but moves like a schooling fish: a soft spring to that place,
-// keeping its distance from the other friends, and swimming the way Lompi swims. No friend overlaps
+// keeping its distance from the other friends, and swimming the way its place moves. No friend overlaps
 // another, the group stays loose and alive, and it still trails Lompi. Pure, no Phaser.
 
 export const FLOCK = {
     seek: 5,          // 1/s^2: pull toward its place along the path (a spring) ...
-    damp: 3.6,        // 1/s: ... damped toward Lompi's velocity, so it settles without overshooting or lagging
-    sepR: 160,        // px: another friend closer than this pushes it away ...
+    damp: 3.6,        // 1/s: ... damped toward its place's velocity, so it settles without overshooting or lagging
+    sepR: 260,        // px: another friend closer than this pushes it away (about a friend's body width) ...
     sep: 2200,        // px/s^2 at contact, falling to 0 at sepR
-    align: 1.4,       // 1/s: how strongly it takes on Lompi's swimming velocity
+    align: 1.4,       // 1/s: how strongly it takes on its place's velocity
     maxSpeed: 1100,   // px/s: the fastest a friend swims (it can always catch a sprinting Lompi)
     maxDt: 0.05       // s: a long frame is taken in steps of at most this
 };
