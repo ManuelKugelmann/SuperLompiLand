@@ -7,7 +7,7 @@ import { SET_PIECES, ghostShip, pinnacleTop, descentStart } from './setPieces.js
 import { BRANCH, sideCave, ridgeTop, caveAt } from './branches.js';
 import { SEA_ARCH, seaArch } from './seaArch.js';
 import { FINALE, ventSpot, finaleY, terraceTop } from './ventField.js';
-import { BIOMES, BLEND, LANDMARK, WORLD_WEST, WORLD_END, ABYSS, zoneOpen, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass } from './biomes.js';
+import { BIOMES, BLEND, LANDMARK, WORLD_WEST, WORLD_END, ABYSS, zoneOpen, biomeBlendAt, biomeIndexAt, floorY, seaShare, REEF_CREST, reefCrest, reefCrestTop, reefCrestX, reefPass, dropOffShare } from './biomes.js';
 
 export const FIELD = {
     threshold: 0.53,              // density above this is rock
@@ -29,7 +29,10 @@ export const FIELD = {
     islandTile: 40,               // nodes a side: floating rock is looked for tile by tile ...
     islandHalo: 20,               // ... each with this many nodes of the world around it in view (a floating rock up to this big is found whole)
     islandCap: 0.12,              // a floating rock's density is put this far under the threshold (it becomes water)
-    terraceLump: 35               // px the finale's terraces are lumpy by
+    terraceLump: 35,              // px the finale's terraces are lumpy by
+    // Where an island drops off into the open sea, the wall's line wanders with depth: bulges, ledges and
+    // overhangs instead of one straight cut (a peer's shot at the reef's drop-off read as a cut).
+    wallBend: { amp: 280, scale: 340, fine: 80, fineScale: 70, reach: 1500 }
 };
 
 // The calm main route (spec 5.2c): one lane of open water through the whole journey, from
@@ -196,7 +199,9 @@ export function createField(seed, islands = 'own') {
     const raw = (x, y, withNests = true) => {
         // Two broad octaves only: big soft blobs and winding passages, no jagged detail.
         let n = 0.72 * vnoise(x / 1000, y / 1000, seed) + 0.28 * vnoise(x / 420, y / 420, seed + 7);
-        const col = columnAt(x), fy = col.fy;
+        const wb = FIELD.wallBend, near = dropOffShare(x, wb.reach);
+        const bend = near > 0 ? near * (wb.amp * (vnoise(y / wb.scale, 3.1, seed + 61) * 2 - 1) + wb.fine * (vnoise(y / wb.fineScale, 5.3, seed + 62) * 2 - 1)) : 0;
+        const col = columnAt(x + bend), fy = col.fy;
         n -= col.open;                                                   // beach / open sea have less rock
         if (y < 520) n -= ((520 - y) / 520) * 0.6;                       // open water under the surface
         if (y > fy) n += (y - fy) / 380 + FIELD.foot * (1 - col.sea);     // the seabed (with the coast's foot, see below: no step at the bottom)

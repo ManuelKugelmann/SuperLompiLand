@@ -2,7 +2,7 @@ import test from 'node:test';
 import { SEA_ARCH, seaArch } from '../game/level/seaArch.js';
 import assert from 'node:assert/strict';
 import { FIELD, createField, chunkGrids, gridRows, ROUTE, cruiseY, nestReached, nestSpots } from '../game/level/density.js';
-import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS, REEF_CREST, reefCrest, reefCrestX } from '../game/level/biomes.js';
+import { BIOMES, floorY, WORLD_WEST, WORLD_END, ABYSS, REEF_CREST, reefCrest, reefCrestX, SEABED } from '../game/level/biomes.js';
 import { detour } from '../game/level/weather.js';
 import { ghostShip } from '../game/level/setPieces.js';
 import { ventSpot } from '../game/level/ventField.js';
@@ -109,8 +109,9 @@ test('the open sea is clear water: no rock hangs between the surface and just ab
         const f = createField(seed);
         for (const b of BIOMES) {
             if (b.zone !== 'sea') continue;
-            // From just past the island's edge to just before the next; not at the abyss, whose shaft is narrower than its floor.
-            for (let x = b.from + 320; x < b.from + b.width - 920; x += 170) {
+            // From past the island's drop-off wall (SEABED.dropOff: the wall itself, with its bulges and ledges: FIELD.wallBend) to just before the next;
+            // not at the abyss, whose shaft is narrower than its floor.
+            for (let x = b.from + SEABED.dropOff; x < b.from + b.width - 920; x += 170) {
                 if (Math.abs(x - ABYSS.x) < ABYSS.halfWidth * 3) continue;
                 if (Math.abs(x - ghostShip().x) < 3500) continue;      // the ghost ship's pinnacle is deliberate rock out here ...
                 if (x > ventSpot().x0 - 3000) continue;                // ... and so is the finale's staircase of terraces under the vent field
