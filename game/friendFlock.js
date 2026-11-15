@@ -10,7 +10,8 @@ export const FLOCK = {
     sep: 2200,        // px/s^2 at contact, falling to 0 at sepR
     align: 1.4,       // 1/s: how strongly it takes on its place's velocity
     maxSpeed: 1100,   // px/s: the fastest a friend swims (it can always catch a sprinting Lompi)
-    maxDt: 0.05       // s: a long frame is taken in steps of at most this
+    maxDt: 0.05,      // s: a long frame is taken in steps of at most this
+    minGap: 150       // px: closer than this two friends are pushed apart at once (hard limit, e.g. in a sharp U-turn)
 };
 
 /**
@@ -35,6 +36,22 @@ export function flockStep(a, target, others, lead, dt, cfg = FLOCK) {
         const sp = Math.hypot(a.vx, a.vy);
         if (sp > cfg.maxSpeed) { a.vx *= cfg.maxSpeed / sp; a.vy *= cfg.maxSpeed / sp; }
         a.x += a.vx * h; a.y += a.vy * h;
+    }
+    return a;
+}
+
+/**
+ * The hard limit under the soft separation (techartist review: in a sharp U-turn friends on the same side
+ * met head-on): every other friend closer than `minGap` to `a` and `a` itself each move half the overlap
+ * apart. Moves them; returns `a`.
+ */
+export function keepApart(a, others, cfg = FLOCK) {
+    for (const o of others) {
+        if (o === a) continue;
+        const dx = a.x - o.x, dy = a.y - o.y, d = Math.hypot(dx, dy);
+        if (d >= cfg.minGap) continue;
+        const half = (cfg.minGap - d) / 2, nx = d > 1e-6 ? dx / d : 0, ny = d > 1e-6 ? dy / d : 1;
+        a.x += nx * half; a.y += ny * half; o.x -= nx * half; o.y -= ny * half;
     }
     return a;
 }

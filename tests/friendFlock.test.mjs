@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOCK, flockStep } from '../game/friendFlock.js';
+import { FLOCK, flockStep, keepApart } from '../game/friendFlock.js';
 
 const DT = 1 / 60, still = { vx: 0, vy: 0 };
 
@@ -52,4 +52,15 @@ test('when its place turns round, the friend turns once, not back and forth', ()
         if (s) side = s;
     }
     assert.equal(flips, 1);
+});
+
+test('keepApart: two friends on one spot or close are set exactly minGap apart', () => {
+    const a = { x: 0, y: 0 }, b = { x: 30, y: 0 }, c = { x: 0, y: 0 }, d = { x: 0, y: 0 };
+    keepApart(a, [a, b]);
+    assert.ok(Math.abs(Math.hypot(a.x - b.x, a.y - b.y) - FLOCK.minGap) < 1e-9);
+    keepApart(c, [d]);
+    assert.ok(Math.abs(Math.hypot(c.x - d.x, c.y - d.y) - FLOCK.minGap) < 1e-9);
+    const far = { x: 500, y: 0 }, e = { x: 0, y: 0 };
+    keepApart(e, [far]);
+    assert.equal(e.x, 0);
 });
