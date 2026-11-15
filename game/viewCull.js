@@ -30,6 +30,12 @@ export function reachOf(o) {
     return o.cullReach;
 }
 
+/** An unturned picture: whether its own box (from its origin and display size) touches the view; far tighter than its reach round x, y. */
+export function boxTouches(o, cx, cy, hw, hh) {
+    const w = o.displayWidth, h = o.displayHeight;
+    return Math.abs(o.x + (0.5 - o.originX) * w - cx) < hw + w / 2 && Math.abs(o.y + (0.5 - o.originY) * h - cy) < hh + h / 2;
+}
+
 /**
  * One pass over a scene's objects: those outside the camera's view are taken off that camera
  * (cameraFilter), those inside put back. `view` = the camera's world view ({ centerX, centerY,
@@ -41,7 +47,7 @@ export function cullToView(objects, view, camId, cfg = VIEW_CULL) {
     for (const o of objects) {
         if (o.cullKind === undefined) o.cullKind = cfg.kinds.includes(o.type);      // found out once per object
         if (!o.cullKind || o.scrollFactorX !== 1 || o.scrollFactorY !== 1 || o.noCull) continue;
-        const out = !touchesView(o.x, o.y, reachOf(o), cx, cy, hw, hh);
+        const out = !(o.rotation === 0 && !o.points ? boxTouches(o, cx, cy, hw, hh) : touchesView(o.x, o.y, reachOf(o), cx, cy, hw, hh));
         if (out) off++;
         if (out !== o.culled) { o.culled = out; if (out) o.cameraFilter |= camId; else o.cameraFilter &= ~camId; }
     }

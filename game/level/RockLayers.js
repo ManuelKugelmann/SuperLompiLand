@@ -18,6 +18,7 @@ import ChunkAtlas from './ChunkAtlas.js';
  *   update():  this.rockLayers.update(camX, camY)
  */
 const FADE_IN_MS = 600;     // a new chunk fades in over this long (never pops in with hard edges)
+const CULL_MARGIN = 32;     // px round the screen within which a layer chunk is drawn
 const ATLAS_CHUNKS = 25;    // chunks a layer's atlas holds: the wanted window on a phone in landscape and part of the ring kept round it (a full one drops the furthest kept chunk)
 
 export default class RockLayers {
@@ -65,8 +66,12 @@ export default class RockLayers {
                 }
             }
             for (const [id, c] of l.chunks) {
-                const [cx, cy] = id.split(',').map(Number);
-                if (cx >= x0 - 1 && cx <= x1 + 1 && cy >= y0 - 1 && cy <= y1 + 1) continue;
+                const [cx, cy] = c === 'pending' ? id.split(',').map(Number) : c.at;
+                if (cx >= x0 - 1 && cx <= x1 + 1 && cy >= y0 - 1 && cy <= y1 + 1) {
+                    // Kept round the view, drawn only where it is on screen (Phaser draws every visible picture, on screen or not).
+                    if (c !== 'pending') c.img.visible = cx * L + L > lx - CULL_MARGIN && cx * L < lx + W + CULL_MARGIN && cy * L + L > ly - CULL_MARGIN && cy * L < ly + H + CULL_MARGIN;
+                    continue;
+                }
                 if (c !== 'pending') this.drop(l, c);
                 l.chunks.delete(id);
             }
@@ -123,7 +128,7 @@ export default class RockLayers {
         const img = scene.add.image(cx * L, cy * L, tex, frame).setOrigin(0).setScrollFactor(def.s)
             .setDisplaySize(L + 1, L + 1).setDepth(def.depth).setTint(mix(0xffffff, 0x000000, 1 - def.dark)).setAlpha(0);
         scene.tweens.add({ targets: img, alpha: 1, duration: FADE_IN_MS });
-        return { img, ...out };
+        return { img, at: [cx, cy], ...out };
     }
 
     destroy() {

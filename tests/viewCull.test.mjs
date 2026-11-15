@@ -47,3 +47,13 @@ test('only objects at their own place in the world are judged, and another camer
     cullToView([other], view, 1);
     assert.equal(other.cameraFilter, 4, 'the other camera’s bit stays');
 });
+
+test('an unturned picture is judged by its own box: a terrain chunk (origin top left) two chunks off the view is culled, one at the edge is not', () => {
+    const pad = VIEW_CULL.pad, edgeX = view.centerX + view.width / 2 + pad;
+    const chunk = x => img(x, 0, 960, 960, { rotation: 0, originX: 0, originY: 0 });
+    const near = chunk(edgeX - 10), far = chunk(edgeX + 960), left = chunk(view.centerX - view.width / 2 - pad - 950);
+    cullToView([near, far, left], view, 1);
+    assert.equal(near.culled, false);
+    assert.equal(far.culled, true);
+    assert.equal(left.culled, false, 'its right edge reaches into the margin');
+});
