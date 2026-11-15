@@ -13,6 +13,7 @@
 //             wave tops per flight within `reach` px of the water, each keeping `refresh` of the speed
 //   armor     share of hazard damage taken (1 = normal)
 //   spine     the body wave (rig/cards.js CARDS.spine), e.g. { tail: 0 } for a rigid body
+//   wave      waving hello (rig/wave.js): { part (parts/rig.json name), lift (rad, else WAVE.lift) }; none: a happy wiggle
 //   states[].face  eyes and mouth, when not the picture's own (rig/faces.js FACES)
 //
 // The specials other than Lompi's puff are first proposals, to be tuned by play.
@@ -22,7 +23,7 @@ const one = (key, width, radius, wiggle, extra = {}) => ({ normal: { key, width,
 export const CHARACTERS = [
     {
         id: 'lompi', name: 'Lompi', blurb: { de: 'Bläst sich auf und bleibt stehen', en: 'Puffs up and stops dead' },
-        special: 'puff', soft: 0.6,
+        special: 'puff', soft: 0.6, wave: { part: 'pectoral', lift: 0.7 },
         spine: { tail: 0 },      // a boxy puffer: rigid body, only its fins and tail fin beat
         states: {
             normal: { key: 'puffer_normal', width: 170, radius: 56, air: 0.03, bounce: 0.35, wiggle: 30 },
@@ -32,6 +33,7 @@ export const CHARACTERS = [
     {
         id: 'shark', name: 'Sharky', blurb: { de: 'Schnell, träge in der Kurve · Sprint, bis zu 5-mal tippen', en: 'Fast, wide turns · sprint, tap up to 5 times' },
         special: 'sprint', thrust: 1.15, maxSpeed: 1.25, drag: 0.85, turn: 0.55, soft: 0.3,
+        wave: { part: 'pectoral', lift: 1.9 },
         fright: 2.2,   // a fish-eater: small fish keep this much more distance and never let him in (boids.js)
         states: one('player_shark', 250, 62, 64)      // wiggle: a shark drives with its tail, the rear body following in a strong wave
     },
@@ -41,16 +43,17 @@ export const CHARACTERS = [
         // Wings: while fast they carry most of the weight, so it skims along just above the waves;
         // touching a wave top on the way down bounces it up again a few times, like a real flying fish.
         glide: { lift: 0.85, speed: 9, skips: 3, reach: 28, refresh: 1.04 },
+        wave: { part: 'wing' },
         states: one('player_flyingfish', 230, 50, 26)
     },
     {
         id: 'firefish', name: 'Feuerfisch', blurb: { de: 'Wendig · Flossenfächer', en: 'Nimble · fin fan' },
-        special: 'fan', thrust: 0.95, drag: 1.25, turn: 1.6, soft: 1,
+        special: 'fan', thrust: 0.95, drag: 1.25, turn: 1.6, soft: 1, wave: { part: 'fan' },
         states: one('player_firefish', 210, 60, 18)
     },
     {
         id: 'turtle', name: 'Schildi', blurb: { de: 'Langsam, hält viel aus · rollt als Panzer', en: 'Slow but tough · rolls as a shell' },
-        special: 'shell', thrust: 0.7, maxSpeed: 0.75, drag: 1.1, turn: 0.7, armor: 0.5, anim: 'paddle', soft: 0.35,
+        special: 'shell', thrust: 0.7, maxSpeed: 0.75, drag: 1.1, turn: 0.7, armor: 0.5, anim: 'paddle', soft: 0.35, wave: { part: 'flipper' },
         states: one('friend_turtle', 250, 70, 14)
     },
     {

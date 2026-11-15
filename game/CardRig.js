@@ -7,6 +7,7 @@ import RigMouth from './rig/RigMouth.js';
 import { faceOf } from './rig/faces.js';
 import { Breath, BREATH, instanceSeed } from './rig/breath.js';
 import { CHARACTERS } from './characters.js';
+import { Wave, WAVE } from './rig/wave.js';
 import { CARDS, poseGap, turnWidth, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
 
 /** Where the part cards come from (scripts/parts/bake.py). */
@@ -66,7 +67,9 @@ export default class CardRig {
         };
         this.placeEye = (a, out) => this.pointAt(this.pt.set.eyeAt[this.pt.set.eyes.spec.at.indexOf(a)], out);
         this.eyeView = { rotation: 0, facing: 1, alpha: 1 };
+        this.eyeOpts = { scared: 0, happy: 0 };
         this.ahead = { x: 0, y: 0 };
+        this.waving = new Wave();      // waving hello (rig/wave.js)
         this.cam = scene.cameras.main;
         // The rainbow sheen is the playables' mark (spec 10.0 lookdev): sharks, mantas, whales and other animals keep their own colours.
         this.sheen = CHARACTERS.some(c => c.id === character.id) ? 1 : 0;
@@ -149,6 +152,7 @@ export default class CardRig {
             return { s: best, dx: ex - (c.pivot[0] + c.lx[i]), dy: ey - (c.pivot[1] + c.ly[i]) };
         };
         set.bodyEntry = body;
+        set.waveEntry = this.char.wave ? entries.find(e => e.name === this.char.wave.part && !e.mirror) || null : null;
         const face = faceOf(st);
         if (face?.eyes) {
             // Living eyes (rig/RigEyes.js).
@@ -198,6 +202,9 @@ export default class CardRig {
     draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, lean = 0, beat, spread = 0 }) {
         const view = this.view, set = this.sets[this.state], [W, H] = set.size;
         view.x = x; view.y = y;
+        // Waving hello (rig/wave.js): the body bobs once (the picture only, not its place).
+        const hello = this.waving.step(frames / 60);
+        y += hello.bob * H * view.baseScale * this.zoom;
         // Out of the picture: not posed (posing the cards was the largest script cost of a creature-rich
         // stretch on a slow phone). Its cards only follow its place, so nothing of it is left standing in view.
         const wv = this.cam.worldView, reach = Math.max(W, H) * view.baseScale * this.zoom + CARDS.offView;
@@ -210,7 +217,7 @@ export default class CardRig {
         // On the slow tiers a rig is posed only every few frames, the rigs taking turns: in between its cards follow its
         // place, and the next pose catches up the frames it skipped (its swimming beat stays in time).
         const every = poseGap(x, y, this.scene.cameras.main.midPoint);      // off the middle of the view, half as often again
-        if (every > 1 && !this.alwaysPose && !this.turning && ++this.poseTurn % every) {
+        if (every > 1 && !this.alwaysPose && !this.turning && !hello.on && ++this.poseTurn % every) {
             for (const e of set.entries) e.rope.setPosition(x, y);
             const sdx = x - (this.lastX ?? x), sdy = y - (this.lastY ?? y);
             set.eyes?.shift(sdx, sdy); set.mouth?.shift(sdx, sdy);
@@ -259,6 +266,9 @@ export default class CardRig {
         const steerBend = flip * this.steer * CARDS.steerBend * W;
         // Idle rocking about the vertical axis keeps the volume visible, not only in turns.
         if (!this.turning) yaw = (CARDS.sway + CARDS.swayMore * drive) * Math.sin(ph * 0.31);
+        // Waving: it turns toward the viewer (less so mid-turn, already edge-on); without a fin to wave it wiggles.
+        yaw += hello.yaw * Math.cos(yaw) ** 2;
+        if (!set.waveEntry) rotation += hello.wiggle;
 
         // Body motion per style (the same styles as Rig): bend in picture px, plus pumping and rocking.
         const style = this.char.anim || 'swim';
@@ -298,11 +308,11 @@ export default class CardRig {
         for (const e of set.poseOrder) {
             if (e.body) { poseBody(e.card, bend, set.size, e.posed); continue; }
             const [px, py] = e.card.pivot, p = e.parentEntry;
-            let turn = 0;
+            let turn = e === set.waveEntry ? hello.k * (this.char.wave.lift ?? WAVE.lift) + hello.fin : 0;
             if (p) {
                 // On its parent: where the parent's card carries this part's pivot, turned with it.
                 carryPoint(p.card, p.part, m, p.at, px - p.card.pivot[0], py - p.card.pivot[1], p.turn, CARRY);
-                at[0] = CARRY.x; at[1] = CARRY.y; turn = CARRY.a;
+                at[0] = CARRY.x; at[1] = CARRY.y; turn += CARRY.a;
             } else {
                 BEND.z = 0;
                 bend(px / W + 0.5, py / H + 0.5, BEND);
@@ -339,13 +349,14 @@ export default class CardRig {
         P.verts = set.bodyEntry.rope.vertices; P.cr = Math.cos(rotation); P.sr = Math.sin(rotation);
         P.x = x; P.y = y; P.sx = sx; P.sy = sy; P.flip = flip; P.wide = turnWidth(yaw); P.set = set;
         if (br.blub && set.mouthAt && this.shown && spread < 0.5) { this.pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); set.mouth.blub(); }
-        if (set.mouth) { this.pointAt(set.mouthAt, MOUTH); set.mouth.update(MOUTH, H, rotation, this.shown ? view.alpha : 0, frames / 60); }
+        if (set.mouth) { this.pointAt(set.mouthAt, MOUTH); set.mouth.update(MOUTH, H, rotation, this.shown ? view.alpha : 0, frames / 60, flip, hello.happy); }
         if (set.eyes) {
             if (!this.shown) set.eyes.hide();
             else {
                 const ahead = this.ahead; ahead.x = x + flip * 400 + vx * 30; ahead.y = y + vy * 30;
                 const V = this.eyeView; V.rotation = rotation; V.facing = flip; V.alpha = view.alpha;
-                set.eyes.update(this.placeEye, V, this.look || ahead, frames / 60, { scared: this.scared || 0 });
+                const O = this.eyeOpts; O.scared = this.scared || 0; O.happy = hello.happy;
+                set.eyes.update(this.placeEye, V, this.look || ahead, frames / 60, O);
             }
         }
     }
@@ -355,6 +366,9 @@ export default class CardRig {
 
     /** The mouth opens into a little o and closes (a coin taken, a breath's bubble). */
     blub() { this.sets[this.state].mouth?.blub(); return this; }
+
+    /** Wave hello (rig/wave.js): the profile's `wave` fin waves, the face beams; it overlays swimming. */
+    wave() { this.waving.start(); return this; }
 
     destroy() {
         for (const set of Object.values(this.sets)) { for (const e of set.entries) e.rope.destroy(); set.eyes?.destroy(); set.mouth?.destroy(); }

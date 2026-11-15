@@ -3,6 +3,8 @@ import { CHARACTERS } from './characters.js';
 import { softnessMap, SoftHalo } from './rig/soft.js';
 import { CARDS, poseGap, makeSpine, spineTable, spineAt } from './rig/cards.js';
 import RigEyes from './rig/RigEyes.js';
+import RigMouth from './rig/RigMouth.js';
+import { Wave, WAVE } from './rig/wave.js';
 import { holedTexture } from './rig/eyeHoles.js';
 import { faceOf } from './rig/faces.js';
 import { Breath, BREATH, instanceSeed } from './rig/breath.js';
@@ -101,7 +103,9 @@ export default class Rig {
             o.x = P.x + lx * P.cos - ly * P.sin; o.y = P.y + lx * P.sin + ly * P.cos; o.sx = Math.abs(P.scaleX); o.sy = Math.abs(P.scaleY);
         };
         this.eyeView = { rotation: 0, facing: 1, alpha: 1 };
+        this.eyeOpts = { scared: 0, happy: 0 };
         this.ahead = { x: 0, y: 0 };
+        this.waving = new Wave();      // waving hello (rig/wave.js)
         for (const [name, st] of Object.entries(character.states)) {
             const key = scene.textures.exists(st.key) ? st.key : DEFAULT_STATES.normal.key;
             // With the layered art (body without side fin + the fin on its own)
@@ -120,6 +124,7 @@ export default class Rig {
             // Living eyes and the mouth (rig/faces.js): only with the painted picture they were measured on.
             view.face = face;
             if (face?.eyes) view.eyes = new RigEyes(scene, face.eyes, instanceSeed()).setDepth(depth - 0.005);
+            if (face?.mouth) view.mouth = new RigMouth(scene).setDepth(depth + 0.004);      // the grin when waving
             if (layered) {
                 const fin = scene.add.image(x, y, `${key}_fin`).setDepth(depth + 0.1).setVisible(false);
                 fin.setOrigin((pivot.pivotX - pivot.finX) / fin.width, (pivot.pivotY - pivot.finY) / fin.height);
@@ -142,7 +147,7 @@ export default class Rig {
         this.state = this.views[name] ? name : 'normal';
         this.view = this.views[this.state];
         this.view.setPosition(old.x, old.y).setRotation(old.rotation).setAlpha(old.alpha).setVisible(this.shown);
-        if (old !== this.view) { old.setVisible(false); old.fin?.setVisible(false); old.eyes?.hide(); this.view.grid.halo.fresh = true; }
+        if (old !== this.view) { old.setVisible(false); old.fin?.setVisible(false); old.eyes?.hide(); old.mouth?.hide(); this.view.grid.halo.fresh = true; }
         this.view.fin?.setVisible(this.shown);
     }
 
@@ -151,14 +156,14 @@ export default class Rig {
         this.view.setVisible(on);
         this.view.fin?.setVisible(on);
         this.overlay?.setVisible(on && !this.overlayOff);
-        if (!on) this.view.eyes?.hide();
+        if (!on) { this.view.eyes?.hide(); this.view.mouth?.hide(); }
         return this;
     }
 
     setAlpha(a) { this.view.setAlpha(a); return this; }
 
     setDepth(d) {
-        for (const v of Object.values(this.views)) { v.setDepth(d); v.fin?.setDepth(d + 0.1); v.eyes?.setDepth(d - 0.005); }
+        for (const v of Object.values(this.views)) { v.setDepth(d); v.fin?.setDepth(d + 0.1); v.eyes?.setDepth(d - 0.005); v.mouth?.setDepth(d + 0.004); }
         return this;
     }
 
@@ -177,17 +182,20 @@ export default class Rig {
      */
     draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, flowX = 0, flowY = 0, lean = 0, beat }) {
         const view = this.view, grid = view.grid, halo = grid.halo;
+        // Waving hello (rig/wave.js): the picture bobs once.
+        const hello = this.waving.step(frames / 60);
+        y += hello.bob * view.frame.height * Math.abs(view.baseScale * this.zoom);
         view.setPosition(x, y);
         // On the slow tiers a rig is bent anew only every few frames, the rigs taking turns (CARDS.poseEvery): in between
         // it moves as it is, fin, overlay and eyes along, and the next pose catches up the frames it skipped.
         const dx = x - (this.lastX ?? x), dy = y - (this.lastY ?? y);
         this.lastX = x; this.lastY = y;
-        const wantFacing = facing ?? (Math.abs(vx) > 0.8 ? (vx < 0 ? -1 : 1) : this.facing);
+        const want = facing ?? (Math.abs(vx) > 0.8 ? (vx < 0 ? -1 : 1) : this.facing);
         const every = poseGap(x, y, this.scene.cameras.main.midPoint);      // off the middle of the view, half as often again
-        if (every > 1 && !this.alwaysPose && wantFacing === this.facing && ++this.poseTurn % every) {
+        if (every > 1 && !this.alwaysPose && want === this.facing && !hello.on && ++this.poseTurn % every) {
             if (view.fin) { view.fin.x += dx; view.fin.y += dy; }
             this.overlay?.setPosition(x, y);
-            view.eyes?.shift(dx, dy);
+            view.eyes?.shift(dx, dy); view.mouth?.shift(dx, dy);
             this.owed += frames;
             return;
         }
@@ -197,7 +205,6 @@ export default class Rig {
         // nose follows the movement. The art faces right; heading left it is
         // mirrored vertically so it never swims belly-up.
         const speed = Math.hypot(vx, vy);
-        const want = facing ?? (Math.abs(vx) > 0.8 ? (vx < 0 ? -1 : 1) : this.facing);
         if (want !== this.facing) {
             // Turning round mirrors the body; mirror its angle too so it flips
             // in place instead of rolling over its back.
@@ -216,6 +223,9 @@ export default class Rig {
         // Art drawn nose-left is mirrored once, so everything below sees a nose on the right.
         const left = !!this.char.facesLeft;
         let scaleX = sc * (1 + sq) * (left ? -1 : 1), scaleY = sc * (1 - sq) * flip, rotation = this.angle + lean;
+        // Waving: a flat picture turns toward the viewer by narrowing a little; without a fin to wave it wiggles.
+        scaleX *= 1 - (1 - Math.cos(hello.yaw)) * 1.5;
+        if (!view.fin) rotation += hello.wiggle;
 
         // --- Primary motion (procedural), driven by how hard the character swims
         // and how fast it moves (being carried is not swimming). Idle = a slow,
@@ -339,7 +349,7 @@ export default class Rig {
             fin.setPosition(x + lx * cos - ly * sin, y + lx * sin + ly * cos);
             fin.setScale(scaleX, scaleY);
             const flap = Math.sin(ph * 1.15) * Phaser.Math.DegToRad(RIG.finFlapMin + drive * RIG.finFlapMore);
-            fin.rotation = rotation + flap * flip;
+            fin.rotation = rotation + (flap + hello.k * (this.char.wave?.lift ?? WAVE.lift) + hello.fin) * flip;      // (lifted and waved when waving hello)
             fin.setAlpha(view.alpha);
         }
 
@@ -355,8 +365,13 @@ export default class Rig {
                     // Mirrored upside down when heading left (see above): seen upright, that is a left-facing eye.
                     const V = this.eyeView; V.rotation = flip < 0 ? rotation - Math.PI : rotation; V.facing = flip; V.alpha = view.alpha;
                     const ahead = this.ahead; ahead.x = x + flip * 400 + vx * 30; ahead.y = y + vy * 30;
-                    view.eyes.update(this.place, V, this.look || ahead, frames / 60, { scared: this.scared || 0 });
+                    const O = this.eyeOpts; O.scared = this.scared || 0; O.happy = hello.happy;
+                    view.eyes.update(this.place, V, this.look || ahead, frames / 60, O);
                 }
+            }
+            if (view.mouth && (hello.on || view.mouth.grinImg)) {      // (only while waving: no cost for the animals that never do)
+                this.place(face.mouth, MOUTH);
+                view.mouth.update(MOUTH, view.frame.height, flip < 0 ? rotation - Math.PI : rotation, this.shown ? view.alpha : 0, frames / 60, flip, hello.happy);
             }
             if (br.blub && face.mouth && this.shown && y > 0) { this.place(face.mouth, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); }
         }
@@ -376,6 +391,9 @@ export default class Rig {
     /** Where the eyes look (a world point; null: ahead), and how frightened they are (0..1). */
     lookAt(point, scared = 0) { this.look = point; this.scared = scared; return this; }
 
+    /** Wave hello (rig/wave.js): the side fin waves (or the body wiggles), the face beams; it overlays swimming. */
+    wave() { this.waving.start(); return this; }
+
     /** The overlay off or on again (a quality tier without the sheen), whatever culling does with the body. */
     setOverlay(on) { this.overlayOff = !on; this.overlay?.setVisible(on && this.shown !== false); return this; }
 
@@ -389,7 +407,7 @@ export default class Rig {
     }
 
     destroy() {
-        for (const v of Object.values(this.views)) { v.fin?.destroy(); v.eyes?.destroy(); v.destroy(); }
+        for (const v of Object.values(this.views)) { v.fin?.destroy(); v.eyes?.destroy(); v.mouth?.destroy(); v.destroy(); }
         this.overlay?.destroy();
     }
 }

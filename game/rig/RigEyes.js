@@ -18,7 +18,9 @@ export const RIG_EYES = {
     iris: 0.66,         // iris radius, share of the smaller half size of the hole
     pupil: 0.52,        // pupil radius, share of the iris (Gaze scales it with light and fright)
     travel: 0.36,       // how far the iris moves at full gaze, share of the half size
-    lids: 8,            // frames of the lid, open .. closed
+    lids: 8,            // frames of the lid, open .. closed (and of the smiling lower lid)
+    smile: 0.62,        // a beaming eye's lower lid rises this share of the eye (its arch higher still)
+    squint: 0.3,        // ... and the upper lid comes down this far
     look: 0.35          // gaze target scale: px off / eye radius px * this = eye radii (as the viewer)
 };
 
@@ -64,6 +66,21 @@ function ensureTextures(scene, E = RIG_EYES) {
         }
         t.refresh();
     }
+    if (!scene.textures.exists('rig_eye_smile')) {
+        // The happy squint (rig/wave.js): the lower lid rises with an upward arch, so the open eye is a smiling arc.
+        const t = scene.textures.createCanvas('rig_eye_smile', S * E.lids, S), c = t.getContext();
+        for (let f = 0; f < E.lids; f++) {
+            const ox = f * S, rise = f / (E.lids - 1), mid = S - rise * S * E.smile, side = mid + h * 0.55 * rise;
+            c.save(); c.beginPath(); c.ellipse(ox + h, h, h, h, 0, 0, Math.PI * 2); c.clip();
+            c.fillStyle = '#ffffff';
+            c.beginPath(); c.moveTo(ox, S); c.lineTo(ox, side); c.quadraticCurveTo(ox + h, 2 * mid - side, ox + S, side); c.lineTo(ox + S, S); c.closePath(); c.fill();
+            c.strokeStyle = 'rgba(40,40,40,0.55)'; c.lineWidth = 5;
+            c.beginPath(); c.moveTo(ox, side); c.quadraticCurveTo(ox + h, 2 * mid - side, ox + S, side); c.stroke();
+            c.restore();
+            t.add(f, 0, ox, 0, S, S);
+        }
+        t.refresh();
+    }
 }
 
 export default class RigEyes {
@@ -86,8 +103,9 @@ export default class RigEyes {
             e.pupil = s.add.image(0, 0, 'rig_eye_white').setTint(0x05080c);
             e.shine = s.add.image(0, 0, 'rig_eye_white');
             e.lid = s.add.image(0, 0, 'rig_eye_lid', 0).setTint(spec.lid);
+            e.smile = s.add.image(0, 0, 'rig_eye_smile', 0).setTint(spec.lid).setVisible(false);
         }
-        this.parts = this.eyes.flatMap(e => [e.white, e.iris, e.pupil, e.shine, e.lid]);
+        this.parts = this.eyes.flatMap(e => [e.white, e.iris, e.pupil, e.shine, e.lid, e.smile]);
         for (const p of this.parts) p.noCaustics = true;
         this.setDepth(this.depth);
     }
@@ -105,8 +123,9 @@ export default class RigEyes {
      * Place and animate the eyes. `place(at, out)` writes where the eye's middle is on screen (out.x,
      * out.y) and the body's scale there across and along (out.sx with the turn's narrowing, out.sy);
      * `view` = { rotation, facing, alpha }, `look` = the world point to look at (or null: ahead), `dt`
-     * seconds. While the picture shows, the eyes always do (its holes would show the water); the
-     * lowest tier blinks by squeezing (no lid).
+     * seconds, `opts` = { scared, happy } (0..1; happy: squinted into smiling arcs, rig/wave.js).
+     * While the picture shows, the eyes always do (its holes would show the water); the lowest tier
+     * blinks and beams by squeezing (no lids).
      */
     update(place, view, look, dt, opts) {
         const E = this.E, q = QUALITY[this.scene.quality?.tier ?? 'high'];
@@ -123,7 +142,8 @@ export default class RigEyes {
                 tx = ax * view.facing / (r * ky) * E.look; ty = -ay / (r * ky) * E.look;
             }
             const g = e.gaze.update(dt, { x: tx, y: ty }, opts);
-            const shut = q.lids ? 1 : 1 - Math.max(0, (g.lid - EYES_REST) / (1 - EYES_REST));
+            const happy = opts?.happy || 0, lid = Math.max(g.lid, happy * E.squint);
+            const shut = q.lids ? 1 : (1 - Math.max(0, (lid - EYES_REST) / (1 - EYES_REST))) * (1 - happy * E.smile * 0.6);
             const ox = g.x * E.travel * rx * view.facing, oy = -g.y * E.travel * ry;
             const ix = P.x + ox * cr - oy * sr, iy = P.y + ox * sr + oy * cr;
             const ir = r * E.iris, pr = ir * E.pupil * g.pupil * (this.spec.pupil ?? 1);
@@ -132,7 +152,10 @@ export default class RigEyes {
             e.pupil.setPosition(ix, iy).setRotation(view.rotation).setScale(pr * 2 * kx / W, pr * 2 * ky * shut / W);
             e.shine.setPosition(ix - ir * 0.35 * view.facing * kx, iy - ir * 0.4 * ky).setScale(ir * 0.55 * kx / W, ir * 0.55 * ky * shut / W);
             e.lid.setVisible(!!q.lids);
-            if (q.lids) e.lid.setFrame(Math.round(g.lid * (E.lids - 1))).setPosition(P.x, P.y).setRotation(view.rotation).setScale(rx * 2 * E.cover / W, ry * 2 * E.cover / W);
+            if (q.lids) e.lid.setFrame(Math.round(lid * (E.lids - 1))).setPosition(P.x, P.y).setRotation(view.rotation).setScale(rx * 2 * E.cover / W, ry * 2 * E.cover / W);
+            const smiling = !!q.lids && happy > 0.02;
+            e.smile.setVisible(smiling);
+            if (smiling) e.smile.setFrame(Math.round(happy * (E.lids - 1))).setPosition(P.x, P.y).setRotation(view.rotation).setScale(rx * 2 * E.cover / W, ry * 2 * E.cover / W);
         }
         for (const e of this.eyes) for (const p of [e.white, e.iris, e.pupil, e.shine]) p.setVisible(true);      // (each lid follows the tier, above)
         for (const p of this.parts) p.setAlpha(view.alpha);
