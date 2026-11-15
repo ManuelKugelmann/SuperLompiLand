@@ -21,6 +21,9 @@ const FADE_IN_MS = 600;     // a new chunk fades in over this long (never pops i
 const CULL_MARGIN = 32;     // px round the screen within which a layer chunk is drawn
 const ATLAS_CHUNKS = 25;    // chunks a layer's atlas holds: the wanted window never asks for more (layerWindow.js); kept ones round it give their places up
 const KEY = 'layer:';       // the pool's answers for the layers: 'layer:<layer>:<cx>,<cy>'
+// Rows of a chunk's picture sent to the graphics card per frame: a whole near chunk (510 px square, 1 MB) at once took up to
+// 28 ms in one frame at a 10x slower CPU (the worst frames of a fast swim); in strips it is spread over a few frames.
+const UPLOAD_ROWS = 128;
 
 export default class RockLayers {
     constructor(scene) {
@@ -28,7 +31,8 @@ export default class RockLayers {
         this.layers = ROCK_LAYERS.map(def => ({ def, chunks: new Map(), atlas: this.atlasFor(def) }));   // "cx,cy" -> { at: [cx, cy], img, key | place } (no img: asked for)
         this.ready = [];
         // A lost WebGL context comes back with empty textures: the layers' chunks are dropped and asked for again.
-        const r = scene.game.renderer, restore = () => { for (const l of this.layers) { for (const c of l.chunks.values()) if (c.img) this.drop(l, c); l.chunks.clear(); } this.ready.length = 0; };
+        const r = scene.game.renderer, restore = () => { this.stopLoading(); for (const l of this.layers) { for (const c of l.chunks.values()) if (c.img) this.drop(l, c); l.chunks.clear(); } this.ready.length = 0; };
+        this.loading = null;      // the chunk going up to the atlas a strip a frame: { l, r, place, y }
         if (r?.on) { r.on('restorewebgl', restore); this.offRestore = () => r.off('restorewebgl', restore); }
         this.vel = { x: 0, y: 0, atX: 0, atY: 0, known: false };
         this.worker?.route(KEY, e => { const a = e.data; a.id = a.key.slice(a.key.lastIndexOf(':') + 1); this.ready.push(a); }, { later: true });      // the play plane's chunks first
@@ -84,19 +88,48 @@ export default class RockLayers {
             l.want = [x0, x1, y0, y1, lx + W / 2, ly + H / 2];
             l.full = false;
         });
-        // Show at most one finished chunk per frame; ones nobody waits for any more are dropped. One whose layer has no room
-        // yet waits in the queue, and the next chunk gets its turn (review: a full layer at the head starved the other layer);
-        // a layer found full is not tried again this frame (review: every waiting chunk searched the full atlas).
-        for (let k = 0; k < this.ready.length; k++) {
+        // One finished chunk at a time goes up to its atlas, a strip a frame, and is shown when it is all there. Ones nobody waits
+        // for any more are dropped. One whose layer has no room yet waits in the queue, and the next chunk gets its turn (review:
+        // a full layer at the head starved the other layer); a layer found full is not tried again this frame (review: every
+        // waiting chunk searched the full atlas).
+        if (!this.loading) for (let k = 0; k < this.ready.length; k++) {
             const r = this.ready[k], l = this.layers[r.layer], c = l.chunks.get(r.id);
             if (!c || c.img) { this.ready.splice(k--, 1); continue; }
             if (l.full) continue;
-            const shown = this.show(l, r);
-            if (!shown) { l.full = true; continue; }
+            if (!l.atlas) { this.ready.splice(k, 1); this.show(l, r, this.onCanvas(l, r)); break; }
+            const place = this.place(l);
+            if (place === null) { l.full = true; continue; }
             this.ready.splice(k, 1);
-            l.chunks.set(r.id, shown);
+            this.loading = { l, r, place, y: 0 };
             break;
         }
+        if (this.loading) this.loadStrip();
+    }
+
+    /** The next strip of the chunk going up; when all of it is there, it is shown. One no longer wanted gives its place back. */
+    loadStrip() {
+        const ld = this.loading, { l, r } = ld, c = l.chunks.get(r.id), S = layerSize(l.def);
+        if (!c || c.img) { this.stopLoading(); return; }
+        const rows = Math.min(UPLOAD_ROWS, S - ld.y);
+        l.atlas.upload(ld.place, r.rock, ld.y, rows);
+        if ((ld.y += rows) < S) return;
+        this.loading = null;
+        this.show(l, r, { tex: l.atlas.key, frame: String(ld.place), place: ld.place });
+    }
+
+    stopLoading() {
+        if (this.loading) this.loading.l.atlas.give(this.loading.place);
+        this.loading = null;
+    }
+
+    /** Without an atlas: the chunk's picture on a canvas of its own, from the chunk canvas pool. */
+    onCanvas(l, r) {
+        const scene = this.scene, S = layerSize(l.def), key = `rl:${l.def.id}:${r.key}`;
+        if (scene.textures.exists(key)) scene.textures.remove(key);
+        const canvas = scene.level.canvasFor(key, S, S);
+        canvas.context.putImageData(new ImageData(new Uint8ClampedArray(r.rock.buffer), S, S), 0, 0);
+        canvas.refresh();
+        return { tex: key, key };
     }
 
     /** A free place in the layer's atlas; when it is full, the kept chunk furthest outside the wanted window gives its place up. */
@@ -117,33 +150,19 @@ export default class RockLayers {
         return l.atlas.take();
     }
 
-    /** A finished chunk on screen: { img, place } in the atlas (or { img, key } on a canvas), or null when the atlas has no room yet. */
-    show(l, r) {
-        const scene = this.scene, L = LAYER_CHUNK, def = l.def, S = layerSize(def);
-        const [cx, cy] = l.chunks.get(r.id).at;
-        let tex, frame, out;
-        if (l.atlas) {
-            const i = this.place(l);
-            if (i === null) return null;
-            l.atlas.upload(i, r.rock, 0, S);
-            tex = l.atlas.key; frame = String(i); out = { place: i };
-        } else {
-            const key = `rl:${def.id}:${r.key}`;
-            if (scene.textures.exists(key)) scene.textures.remove(key);
-            const canvas = scene.level.canvasFor(key, S, S);
-            canvas.context.putImageData(new ImageData(new Uint8ClampedArray(r.rock.buffer), S, S), 0, 0);
-            canvas.refresh();
-            tex = key; out = { key };
-        }
+    /** A chunk whose picture is ready (`tex`, `frame`) on screen, fading in: { img, at, place } in the atlas, { img, at, key } on a canvas. */
+    show(l, r, { tex, frame, ...out }) {
+        const scene = this.scene, L = LAYER_CHUNK, def = l.def, at = l.chunks.get(r.id).at;
         // The fog toward the water is baked in by the worker (fogLayer); a slight darkening on top.
-        const img = scene.add.image(cx * L, cy * L, tex, frame).setOrigin(0).setScrollFactor(def.s)
+        const img = scene.add.image(at[0] * L, at[1] * L, tex, frame).setOrigin(0).setScrollFactor(def.s)
             .setDisplaySize(L + 1, L + 1).setDepth(def.depth).setTint(mix(0xffffff, 0x000000, 1 - def.dark)).setAlpha(0);
         scene.tweens.add({ targets: img, alpha: 1, duration: FADE_IN_MS });
-        return { img, at: [cx, cy], ...out };
+        l.chunks.set(r.id, { img, at, ...out });
     }
 
     destroy() {
         this.offRestore?.();      // the pool is the world's: it ends with the scene (MainScene)
+        this.stopLoading();
         for (const l of this.layers) {
             for (const c of l.chunks.values()) if (c.img) this.drop(l, c);
             l.chunks.clear();
