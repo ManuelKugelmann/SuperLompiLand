@@ -55,7 +55,7 @@ export const LEVEL = {
     margin: 1,            // extra chunks generated around the view ...
     leadS: 2.5,           // ... and in the direction the view moves, as many more as it covers in this many seconds (a fast swimmer never meets a chunk being made) ...
     leadMax: 3,           // ... at most this many (the quality tier may set fewer: this.leadMax, QUALITY lead)
-    leadEase: 0.1,        // share of the way the view's speed estimate moves to the newest frame's
+    leadEase: 0.1,        // share of the way the view's speed estimate moves to the newest frame's (per 60th of a second)
     buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
     buildRushMs: 9,       // ... and this much while a chunk in view is not complete yet (a hole in the picture is worse than a slower frame)
     earlyPerFrame: 3,     // chunks that get their early collision per frame
@@ -398,7 +398,8 @@ export default class LevelGenerator {
         // How fast the view moves (px per s, eased; a jump is not a speed) and how many chunks that is ahead.
         const dt = Math.max(1e-3, this.scene.game.loop.delta / 1000), vel = this.camVel || (this.camVel = { x: 0, y: 0, at: null });
         if (vel.at && Math.abs(camX - vel.at.x) < W && Math.abs(camY - vel.at.y) < H) {
-            vel.x += ((camX - vel.at.x) / dt - vel.x) * LEVEL.leadEase; vel.y += ((camY - vel.at.y) / dt - vel.y) * LEVEL.leadEase;
+            const k = 1 - Math.pow(1 - LEVEL.leadEase, dt * 60);      // by time: the same at 30 and at 60 frames a second
+            vel.x += ((camX - vel.at.x) / dt - vel.x) * k; vel.y += ((camY - vel.at.y) / dt - vel.y) * k;
         }
         vel.at = { x: camX, y: camY };
         const lead = v => Math.min(this.leadMax ?? LEVEL.leadMax, Math.ceil(Math.abs(v) * LEVEL.leadS / CH));
@@ -515,6 +516,9 @@ export default class LevelGenerator {
 
     /** Per frame: bend / pulse every creature and plant. `t` in seconds; `others` = the other players in the room; `waves` = time in waves (surf.js). */
     animate(t, fish, speed = 0, others = null, waves = 0) {
+        // Everything here moves by the clock (playtest: "speeds time-based, not frame-based"): `steps` = 60ths of a second since the last frame.
+        const steps = Math.min(4, Math.max(0, (t - (this.animT ?? t)) * 60));
+        this.animT = t;
         // Only what can be on screen is bent and drawn: chunks are loaded well beyond the view.
         const vw = this.scene.scale.width * LEVEL.liveView, vh = this.scene.scale.height * LEVEL.liveView;
         const inView = o => !fish || (Math.abs(o.x - fish.x) < vw && Math.abs(o.y - fish.y) < vh);
@@ -533,7 +537,9 @@ export default class LevelGenerator {
                 // Swimming past pushes plants aside; they swing back when it is calm.
                 const dx = o.x - fish.x, d = Math.hypot(dx, o.y - fish.y);
                 const push = d < LEVEL.wakeRadius ? Math.sign(dx || 1) * (1 - d / LEVEL.wakeRadius) * Math.min(1, speed / 9) : 0;
-                o.bend += (push + surge - o.bend) * 0.1;
+                const since = Math.min(8, Math.max(0, (t - (o.bendT ?? t)) * 60));      // 60ths of a second since this plant was last bent (it may wait its turn)
+                o.bendT = t;
+                o.bend += (push + surge - o.bend) * (1 - Math.pow(0.9, since));
             }
             o.animate(t, o.bend || 0);
         }
@@ -542,12 +548,19 @@ export default class LevelGenerator {
         if (fish) {
             // A jump of more than a body length in one frame is a respawn or a teleport, not a rush.
             const jx = fish.x - this.chainBody.x, jy = fish.y - this.chainBody.y, moved = Math.hypot(jx, jy) < 90;
-            this.chainBody.vx = moved ? jx : 0; this.chainBody.vy = moved ? jy : 0;
+            this.chainBody.vx = moved && steps > 0 ? jx / steps : 0; this.chainBody.vy = moved && steps > 0 ? jy / steps : 0;      // px per 60th of a second
             this.chainBody.x = fish.x; this.chainBody.y = fish.y;
         }
+        // Ropes step in 60ths of a second, as many as have passed (at most 3 a frame): the same swing at any frame rate.
+        this.ropeDue = (this.ropeDue || 0) + steps;
+        const ropeSteps = Math.min(3, Math.floor(this.ropeDue));
+        this.ropeDue -= Math.floor(this.ropeDue);
+        const body = this.chainBody.active ? this.chainBody : null;
         for (const c of this.chains) {
             if (!c.active) continue;
-            const r = stepRope(c.sim, t, this.chainBody.active ? this.chainBody : null), last = r.n - 1, pts = c.points;
+            for (let k = 1; k < ropeSteps; k++) stepRope(c.sim, t, body);
+            if (!ropeSteps) continue;
+            const r = stepRope(c.sim, t, body), last = r.n - 1, pts = c.points;
             for (let i = 0; i <= last; i++) { pts[i].x = r.x[i] - c.x; pts[i].y = r.y[i] - c.y; }
             c.setDirty();
             if (c.weight.active) {
@@ -559,7 +572,9 @@ export default class LevelGenerator {
         for (const l of this.tethers) {
             if (!l.active || !l.follow.active) continue;
             this.lineEnd.x = l.follow.x; this.lineEnd.y = l.follow.y + l.hang;
-            const r = stepRope(l.sim, t, this.chainBody.active ? this.chainBody : null, LINE, this.lineEnd), pts = l.points;
+            for (let k = 1; k < ropeSteps; k++) stepRope(l.sim, t, body, LINE, this.lineEnd);
+            if (!ropeSteps) continue;
+            const r = stepRope(l.sim, t, body, LINE, this.lineEnd), pts = l.points;
             for (let i = 0; i < r.n; i++) { pts[i].x = r.x[i] - l.x; pts[i].y = r.y[i] - l.y; }
             l.setDirty();
         }

@@ -27,7 +27,7 @@ export function createRope(x, y0, y1, cfg = ROPE) {
 }
 
 /**
- * One step. `t` in seconds (swell); `body` = { x, y, vx, vy } of a swimmer or null.
+ * One step of a 60th of a second (the caller steps as many as have passed). `t` in seconds (swell); `body` = { x, y, vx, vy } of a swimmer or null.
  * The first node never moves. With `end` = { x, y } the last node is held there too
  * (whatever it is tied to moves it); without, it is the free, weighted end.
  */

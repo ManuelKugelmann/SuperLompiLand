@@ -71,6 +71,8 @@ export default class BaitBallLayer {
 
     /** Per frame. `fish` = { x, y }, `view` = the fish's drawn image (faded while hidden), `t` s. */
     update(fish, view, radius, t) {
+        const ease = 1 - Math.pow(0.85, Math.min(4, Math.max(0, (t - (this.lastT ?? t)) * 60)));      // by the clock
+        this.lastT = t;
         const L = BAITBALL_LOOK;
         const d = Math.abs(fish.x - this.slot.x);
         if (this.live && d > L.far) this.drop();
@@ -90,7 +92,7 @@ export default class BaitBallLayer {
                 const S = SWIRL.plunge.scatter, qx = x - v.puff.x, qy = y - v.puff.y, q = Math.hypot(qx, qy), age = t - v.puff.t;
                 if (q < S.reach && age < S.fade) { const k = S.push * (1 - q / S.reach) * (1 - age / S.fade) / Math.max(q, 1); px += qx * k; py += qy * k; }
             }
-            f.ox += (px - f.ox) * 0.15; f.oy += (py - f.oy) * 0.15;
+            f.ox += (px - f.ox) * ease; f.oy += (py - f.oy) * ease;
             f.bob.flipX = F.dir < 0;
             f.bob.alpha = 1 - L.coreFade * F.core;      // the water shows through the deep core: darker, bluer
             f.bob.setFrame(F.turn > L.flashAt ? 3 : Math.floor(t * 9 + f.i) % 3);

@@ -207,7 +207,7 @@ export default class Backdrop {
             if (cfg === C) {
                 A[i] = (C.rest + (1 - C.rest) * crest * crest) * line;
                 const surf = surfAt(x);
-                if (surf > SP.surf && crest > SP.crest && Math.random() < SP.chance) {
+                if (surf > SP.surf && crest > SP.crest && Math.random() < 1 - Math.pow(1 - SP.chance, this.steps ?? 1)) {
                     const v = SP.speed[0] + Math.random() * (SP.speed[1] - SP.speed[0]);
                     this.scene.particles?.spawn('spray', x, y - 4, SP.n, { radius: 10, spread: 70, vy: -v });
                 }
@@ -228,6 +228,8 @@ export default class Backdrop {
 
     update(camX, camY, dx, dy, surface) {
         const W = this.scene.scale.width, H = this.scene.scale.height;
+        const steps = Math.min(4, this.scene.game.loop.delta / (1000 / 60));      // 60ths of a second this frame: drifts and chances go by the clock
+        this.steps = steps;
         const depth = Phaser.Math.Clamp((camY + H / 2) / this.maxDepth, 0, 1);
         // Each biome colours the water; neighbours fade into each other.
         // hue only: darkness comes from depth (spec 5.0h); backdrop = how far the biome hue replaces the open-sea blue
@@ -286,7 +288,7 @@ export default class Backdrop {
                 sx = side; sy = Phaser.Math.Between(120, H - 160);
                 sc.wx = sx + camX * f0; sc.wy = sy + camY * v0;
             }
-            sc.wx += sc.dir * sc.speed;
+            sc.wx += sc.dir * sc.speed * steps;
             sx = sc.wx - camX * f0;
             sy = sc.wy - camY * v0;
             const surfaceY = -camY * v0 + 60;   // the waterline as seen in this far layer
@@ -306,8 +308,8 @@ export default class Backdrop {
         for (let i = 0; i < this.bubbles.length; i++) {
             const b = this.bubbles[i];
             if (i >= drifting) { b.setVisible(false); continue; }
-            b.y -= b.speed + dy * 0.5;
-            b.x += Math.sin(t * 1.4 + b.phase) * 0.5 - dx * 0.5;
+            b.y -= b.speed * steps + dy * 0.5;
+            b.x += Math.sin(t * 1.4 + b.phase) * 0.5 * steps - dx * 0.5;
             b.setVisible(camY + b.y > 40); // no bubbles in the sky
             if (b.y < -60 || b.y > H + 80 || b.x < -80 || b.x > W + 80) this.resetBubble(b, b.y > H + 80 || b.x < -80 || b.x > W + 80);
         }

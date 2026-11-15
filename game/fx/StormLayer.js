@@ -292,6 +292,7 @@ export default class StormLayer {
 
     /** Per frame; `camX`, `camY` = the camera's top left in the world, `particles` = the scene's particle layer. */
     update(camX, camY, t, delta, particles) {
+        const steps = Math.min(4, delta / (1000 / 60));      // 60ths of a second this frame: chances go by the clock
         const W = this.scene.scale.width, H = this.scene.scale.height, L = STORM_LOOK, dt = delta / 1000;
         const kl = stormShare(camX), kr = stormShare(camX + W), k = stormShare(camX + W / 2);
         const near = Math.max(kl, kr), on = near > 0.01;
@@ -354,7 +355,7 @@ export default class StormLayer {
                 return;
             }
             const sx = camX + W + 100, ky = stormShare(sx);
-            if (camY > S.depth + 100 || ky < 0.2 || R() > 0.02 + 0.08 * ky) { o.setVisible(false); return; }
+            if (camY > S.depth + 100 || ky < 0.2 || R() > 1 - Math.pow(1 - (0.02 + 0.08 * ky), steps)) { o.setVisible(false); return; }      // a chance per 60th of a second
             o.setPosition(sx, 10 + R() * S.depth * 0.9).setVisible(true).setScale(scale * (0.6 + R() * 0.7)).setAlpha(0.6 + R() * 0.35);
             o.vx = -(speeds[0] + R() * (speeds[1] - speeds[0])) * ky; o.spin = (R() - 0.5) * spin; o.seed = R() * 9; o.life = 6;
         };
@@ -362,7 +363,7 @@ export default class StormLayer {
             for (const o of set.torn) fly(o, L.tornSpeed, 0.55, 1.5);
             for (const o of set.debris) fly(o, L.debrisSpeed, 1, 3.2);
         }
-        if (on && camY < S.depth && R() < near * 0.5) {
+        if (on && camY < S.depth && R() < 1 - Math.pow(1 - near * 0.5, steps)) {
             particles.spawn('bubble', camX + W * (0.3 + R() * 0.8), 20 + R() * S.depth * 0.8, 2, { vx: -600 * near, vy: 0, spread: 60 });
         }
 
