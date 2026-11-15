@@ -2,6 +2,16 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## The story plays in the real lagoon, depth you can see, a barracuda to hide from
+
+[`d24d39f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/d24d39f) · 2026-11-15 01:30
+
+![The volcano erupts in the lagoon at the start: red light from the east, ash, the friends about to scatter](30-the-story-plays-in-the-real-lagoon.jpg)
+
+![Diving in the open blue at 9, 17, 51 and 180 m: the water darkens by metres](30b-depth-you-can-see.jpg)
+
+![A barracuda passes: Lompi hides at the softly lit spot behind the reef slope](30c-hide-from-the-barracuda.jpg)
+
 ## Smooth shoals, quality that follows the phone
 
 [`8c36b7a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8c36b7a) · 2026-11-14 22:34
