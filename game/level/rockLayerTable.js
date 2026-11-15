@@ -498,6 +498,26 @@ export function dropLooseRock(rgba, size, cfg = LOOSE_ROCK) {
     return rgba;
 }
 
+/**
+ * How many rock texels float (user: "no flying rocks in bg"): rock not connected to the bottom row of a
+ * picture, 4-neighbour flood from the bottom. `solid(x, y)` tells rock; `W` x `H` texels, y down. For
+ * stacked layer pictures that end on the seabed, 0 means every piece stands on it.
+ */
+export function floatingTexels(solid, W, H) {
+    const seen = new Uint8Array(W * H), q = [];
+    for (let x = 0; x < W; x++) if (solid(x, H - 1)) { seen[(H - 1) * W + x] = 1; q.push((H - 1) * W + x); }
+    while (q.length) {
+        const k = q.pop(), x = k % W, y = (k - x) / W;
+        if (x > 0 && !seen[k - 1] && solid(x - 1, y)) { seen[k - 1] = 1; q.push(k - 1); }
+        if (x < W - 1 && !seen[k + 1] && solid(x + 1, y)) { seen[k + 1] = 1; q.push(k + 1); }
+        if (y > 0 && !seen[k - W] && solid(x, y - 1)) { seen[k - W] = 1; q.push(k - W); }
+        if (y < H - 1 && !seen[k + W] && solid(x, y + 1)) { seen[k + W] = 1; q.push(k + W); }
+    }
+    let n = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!seen[y * W + x] && solid(x, y)) n++;
+    return n;
+}
+
 /** A layer's picture size (texels per side): its own rockSize (the near layer is baked finer), else LAYER_SHADE's. */
 export const layerSize = layer => layer.rockSize || LAYER_SHADE.rockSize;
 

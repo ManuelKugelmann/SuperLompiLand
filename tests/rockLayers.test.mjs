@@ -209,24 +209,15 @@ test('no rock floats in a layer: small pieces that touch no edge are dropped, ro
 });
 
 test('shoal ridges in the ship graveyard rise toward the route and never float: all rock connects to the seabed', async () => {
-    const { layerPicture, layerSize } = await import('../game/level/rockLayerTable.js');
+    const { layerPicture, layerSize, floatingTexels } = await import('../game/level/rockLayerTable.js');
     const L = ROCK_LAYERS.find(l => l.id === 'mid'), S = layerSize(L);
     const f = layerField(createField(1337 + L.seed), L, { route: ROUTE_FIELD.routeY });
     for (const x0 of [652000, 670000, 694000]) {
         const cx = Math.floor(x0 * L.s / LAYER_CHUNK), rows = [0, 1, 2, 3, 4].map(cy => layerPicture(f, 1337 + L.seed, L, cx, cy));
         const H = S * rows.length, solid = (x, y) => rows[Math.floor(y / S)][((y % S) * S + x) * 4 + 3] > 128;
-        // Flood from the bottom row (the seabed): every rock texel must be reached.
-        const seen = new Uint8Array(S * H), q = [];
-        for (let x = 0; x < S; x++) if (solid(x, H - 1)) { seen[(H - 1) * S + x] = 1; q.push((H - 1) * S + x); }
-        while (q.length) {
-            const k = q.pop(), x = k % S, y = (k - x) / S;
-            for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
-                if (nx < 0 || ny < 0 || nx >= S || ny >= H || seen[ny * S + nx] || !solid(nx, ny)) continue;
-                seen[ny * S + nx] = 1; q.push(ny * S + nx);
-            }
-        }
-        let rock = 0, loose = 0, high = 0;
-        for (let y = 0; y < H; y++) for (let x = 0; x < S; x++) if (solid(x, y)) { rock++; if (!seen[y * S + x]) loose++; if (y < S * 1.5) high++; }
+        const loose = floatingTexels(solid, S, H);
+        let high = 0;
+        for (let y = 0; y < S * 1.5; y++) for (let x = 0; x < S; x++) if (solid(x, y)) high++;
         assert.equal(loose, 0, `${x0}: rock texels not connected to the seabed`);
         if (x0 !== 694000) assert.ok(high > 2000, `${x0}: ridge reaching up (${high} texels in the upper rows)`);
     }
