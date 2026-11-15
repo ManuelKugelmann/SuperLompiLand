@@ -11,7 +11,6 @@ import { LINE, createRope, stepRope } from './rope.js';
 import Creature from '../Creature.js';
 import { docksSpot } from './docks.js';
 import { foamRing } from './foamRing.js';
-import { PROP_SKIRT, ensureSkirt, skirtTint } from './propSkirt.js';
 import { coinTooNear } from './coinClear.js';
 import { coinNearHook } from './longline.js';
 import { dwellerBand } from './dwellers.js';
@@ -83,8 +82,6 @@ export const LEVEL = {
     rootTries: 4,         // places tried for each root of a chunk
     frontAlpha: 0.75,     // trees and kelp that stand in front of the fish are this see-through, decided when they are built and never changed
     hitSlack: 0.8,        // hazards hit at 80 % of their drawn size (forgiving)
-    rippleMax: 8,         // strips of rippled sand per chunk, at most
-    rippleWidth: 220,     // px: a strip is at least this wide (or as wide as its piece of floor)
     kelpMinDepth: 420,    // no kelp where the water is shallower than this
     propHeadroom: 50,     // a prop's top stays at least this far under the surface
     propSettle: 0.25,     // a prop settles down to the floor under its middle (not only its foot point on a slope), by at most this share of its height
@@ -240,7 +237,6 @@ export default class LevelGenerator {
         this.hazards = [];
         this.friends = [];
         this.animated = [];
-        ensureSkirt(scene);      // sand at the foot of floor props (propSkirt.js)
         this.creatures = [];
         this.lights = [];     // glows that follow a creature
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
@@ -910,30 +906,11 @@ export default class LevelGenerator {
                     const reachesRoute = footY - bh < this.field.routeY(spot.x) + ROUTE.halfWidth;
                     if (!reachesRoute) this.addBlocker(chunk, spot.x + ux * bh / 2, footY + uy * bh / 2, bw, bh, angle);      // where the settled hull really is
                 }
-                // Its foot sits in the sand, not on a picture edge: a soft skirt in front of the base.
-                if (w <= PROP_SKIRT.maxWidth) {
-                    const sw = w * PROP_SKIRT.width, sh = sw * PROP_SKIRT.height;
-                    const skirt = keep(s.add.image(spot.x, footY, PROP_SKIRT.key).setOrigin(0.5, 1 - PROP_SKIRT.sink).setDisplaySize(sw, sh).setRotation(angle).setDepth(PROP_SKIRT.depth));
-                    skirt.setTint(mix(skirtTint(biome.id), waterTone(biome, 170), PROP_SKIRT.water));      // the floor's own sand, in the water's light like the terrain around it
-                    skirt.causticGround = true;      // the net on it as on the sand around it
-                }
                 yield 'props'; if (chunk.dead) return;      // a prop a step: finding its spot probes the rock under it
             }
         }
 
         yield 'props'; if (chunk.dead) return;
-        // --- Rippled sand on the lagoon's flat floor (spec 5.5c "ground surface") ----
-        if (biome.id === 'beach' && s.textures.exists('sand_ripples')) {
-            let strips = 0;
-            for (const f of floors) {
-                if (strips >= LEVEL.rippleMax) break;
-                if (Math.abs(f.angle) > 0.35 || this.nests.some(n => Math.abs(n.x - f.x) < LEVEL.nestClear)) continue;      // flat sand only, and not in a nest's basin
-                const img = keep(s.add.image(f.x, f.y, 'sand_ripples').setOrigin(0.5, 0.1).setRotation(f.angle).setDepth(0.85));
-                img.setScale(Math.max(LEVEL.rippleWidth, f.len * 1.15) / img.width);
-                strips++;
-            }
-        }
-
         // --- Small ground cover: pebbles, shells, mussels, tufts (spec 5.5c) -----
         {
             // Own random stream, like the props: nothing else shifts.

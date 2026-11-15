@@ -153,7 +153,6 @@ export default class IntroScene extends Phaser.Scene {
         for (const a of MANGROVE_TREE_ART) { if (!this.textures.exists(a.key)) this.load.image(a.key, a.file); if (!this.cache.json.exists(a.key)) this.load.json(a.key, a.json); }   // whole mangrove trees and their anchors
         for (const [key, file] of Object.entries({ ...PUP_ART, ...GANNET_ART, ...SEAL_ART, ...SEA_LION_ART, ...SEA_OTTER_ART, ...FERRY_ART })) if (!this.textures.exists(key)) this.load.image(key, file);      // the coder's sights (a line of its own: fewer merge conflicts)
         if (!this.textures.exists(MANTA_ART.key)) this.load.image(MANTA_ART.key, MANTA_ART.file);
-        if (!this.textures.exists('sand_ripples')) this.load.image('sand_ripples', 'img/fx/sand_ripples.webp');
         if (!this.textures.exists(SURF_ART.line.key)) this.load.image(SURF_ART.line.key, SURF_ART.line.file);
         if (!this.textures.exists(SPLASH_ART.key)) this.load.image(SPLASH_ART.key, SPLASH_ART.file);
         for (const a of [...LONGLINE_ART, ...Object.values(TRAWL_ART)]) if (!this.textures.exists(a.key)) this.load.image(a.key, a.file);
