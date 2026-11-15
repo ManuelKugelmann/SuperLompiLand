@@ -7,6 +7,9 @@ import { FIELD, createField } from '../game/level/density.js';
 const T = FIELD.threshold;
 const biome = id => BIOMES.find(b => b.id === id);
 
+// One field for the calm route (building a field per routeY call made the trench chunks take minutes).
+const ROUTE_FIELD = createField(1337);
+
 test('two rock layers at different depths, nearer ones less fogged', () => {
     assert.ok(ROCK_LAYERS.length >= 2);
     const [a, b] = ROCK_LAYERS;
@@ -194,7 +197,7 @@ test('no rock floats in a layer: small pieces that touch no edge are dropped, ro
     assert.ok(LOOSE_ROCK.minArea > 72);
     // Over a stretch of trench and lagoon, every remaining piece in the layer pictures reaches an edge or is big.
     const { layerPicture, layerSize } = await import('../game/level/rockLayerTable.js');
-    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L, { route: x => createField(1337).routeY(x) }), P = layerSize(L);
+    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L, { route: ROUTE_FIELD.routeY }), P = layerSize(L);
     for (const [cx, cy] of [[23, 0], [538, 1], [538, 2]]) {
         const pic = layerPicture(f, 1337 + L.seed, L, cx, cy), copy = pic.slice();
         dropLooseRock(copy, P, { ...LOOSE_ROCK, minArea: LOOSE_ROCK.minArea });
