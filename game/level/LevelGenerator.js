@@ -348,7 +348,9 @@ export default class LevelGenerator {
     /** The friends' rainbow sheen on or off (quality tier `sheen`): off, each friend is one additive picture and one batch break less. */
     setSheen(on) {
         this.sheenOff = !on;
-        for (const c of this.creatures) c.rig?.setOverlay?.(on);
+        // Off: the sheens already made (the first view is built before the tier is known) go for good, not only hidden; new friends get none.
+        for (const c of this.creatures) { if (on) c.rig?.setOverlay?.(true); else if (c.rig?.overlay) { c.rig.overlay.destroy(); c.rig.overlay = null; } }
+        if (!on) this.lights = this.lights.filter(l => l.active);
     }
 
     /** The terrain's lighter shader on or off (the lowest quality tiers: a weak graphics chip), for the chunks there now and those to come. */
@@ -1081,7 +1083,7 @@ export default class LevelGenerator {
             if (p && !onRoute && !rare) {
                 this.addFriend(chunk, key, p.x, p.y, rng);
                 // Kinds that live in pairs come two by two: the mate beside it, if there is room (no rng: the chunk's draws stay as they were).
-                const mate = FRIENDS[key].pair && [[150, -40], [-150, 40], [0, 150]].map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy })).find(q => this.isOpen(q.x, q.y, 0.1) && this.reachable(q.x, q.y));
+                const mate = FRIENDS[key].pair && this.pairs !== false && [[150, -40], [-150, 40], [0, 150]].map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy })).find(q => this.isOpen(q.x, q.y, 0.1) && this.reachable(q.x, q.y));
                 if (mate) this.addFriend(chunk, key, mate.x, mate.y, rng);
             }
         }
@@ -1312,8 +1314,8 @@ export default class LevelGenerator {
         // The sheen is the friend's own picture once more, added on top in travelling
         // rainbow colours: it lies exactly on the body and bends with it.
         // (A grumpy is no friend: no sheen, and it is not greeted; see below.)
-        const sheen = f.grumpy ? null : img.addOverlay(s, f.ground ? 1.05 : 4.05);
-        if (sheen && this.sheenOff) img.rig.setOverlay?.(false);
+        // On a tier without the sheen it is not made at all (an object less per friend; a tier only goes up at the start probe).
+        const sheen = f.grumpy || this.sheenOff ? null : img.addOverlay(s, f.ground ? 1.05 : 4.05);
         if (sheen) {
             sheen.setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
             // Pure colour inside the picture's outline (a tint would only multiply with the body colour).
