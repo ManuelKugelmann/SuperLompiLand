@@ -23,9 +23,9 @@ export const WATER_LIGHT = {
     causticScale: 2.6,    // world size of the caustic tile relative to its 256 px texture
     causticFade: 1500,    // caustics fade faster than the shafts: a shallow-water effect
     grade: 1,             // depth colour grade on the camera (0 = off)
-    gradeSaturation: 0.2, // extra saturation in full sunlight
+    gradeSaturation: 0,   // extra saturation in full sunlight (0 since 2026-11-15, user: "strange tone mapping near surface: drop it")
     gradeAbsorb: 0.5,     // how much red (and some green) is lost in the deep: warm colours fade first
-    gradeExposure: 0.22,  // brightness lift in full sunlight (style guide: shallow water is bright)
+    gradeExposure: 0,     // brightness lift in full sunlight (0: shallow water shows the art as painted; the deep still darkens and loses red)
     fadeTo: 2400,         // depth (px below the surface, about 35 m) where the sunlight and its shafts have faded away
     dither: 0.035         // strength of the fine noise that breaks up colour banding in smooth water (0 = off)
 };
