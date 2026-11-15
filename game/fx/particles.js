@@ -105,12 +105,12 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
     }
     const born = [];      // the slots the last spawn filled
 
+    // The lowest free slot is taken, so the live ones stay packed at the front and every pass walks only up to `top`
+    // (one past the highest live slot), not the whole capacity (74 alive of 900 at the reef on basic). When full, slots are
+    // reused in turn.
+    let top = 0;
     function free() {
-        // Ring search from the last spawn: cheap and fair; when full, the oldest slot is reused.
-        for (let k = 0; k < capacity; k++) {
-            const i = (next + k) % capacity;
-            if (!alive[i]) { next = (i + 1) % capacity; return i; }
-        }
+        for (let i = 0; i < capacity; i++) if (!alive[i]) { if (i >= top) top = i + 1; return i; }
         const i = next;
         next = (next + 1) % capacity;
         count--;
@@ -170,8 +170,9 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
                 const h = Math.min(left, PARTICLES.maxDt);
                 left -= h;
                 tick++;
-                for (let i = 0; i < capacity; i++) if (alive[i]) advance(i, h, env);
+                for (let i = 0; i < top; i++) if (alive[i]) advance(i, h, env);
             }
+            while (top > 0 && !alive[top - 1]) top--;
         },
 
         /**
@@ -179,7 +180,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
          * fn(x, y, size, alpha, color, blend, index, soft).
          */
         forEach(fn) {
-            for (let i = 0; i < capacity; i++) {
+            for (let i = 0; i < top; i++) {
                 if (!alive[i]) continue;
                 const p = presets[kind[i]];
                 const t = age[i] / life[i];
@@ -193,13 +194,13 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
         densityAt(id, px, py, r) {
             const k = PRESET_IDS.indexOf(id);
             let n = 0;
-            for (let i = 0; i < capacity; i++) {
+            for (let i = 0; i < top; i++) {
                 if (alive[i] && kind[i] === k && (x[i] - px) ** 2 + (y[i] - py) ** 2 < r * r) n++;
             }
             return n;
         },
 
-        clear() { alive.fill(0); count = 0; }
+        clear() { alive.fill(0); count = 0; top = 0; }
     };
     return api;
 }
