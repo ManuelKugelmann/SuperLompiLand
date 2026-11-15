@@ -1,0 +1,7 @@
+Recorded sounds (all CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/ - no credit required, given with thanks).
+Trimmed, faded, mono, re-encoded. Licences read on each sound's own page.
+
+splash_a.mp3, splash_b.mp3  "Water splash and sand footsteps" by Peludo, https://opengameart.org/content/water-splash-and-sand-footsteps
+coin_glass.mp3              "Wine Glass Bottle Tap" by Foxfire-, https://freesound.org/s/844259/
+nest_chord.mp3              "Chime" (a glockenspiel chord) by schreibsel, https://freesound.org/s/539915/
+boom_thunder.mp3            "Thunder 12" by LukaCafuka, https://freesound.org/s/795412/
