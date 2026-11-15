@@ -1,5 +1,6 @@
 import { CONTROL_SCHEMES } from '../controls/index.js';
 import { pillButton } from './kit.js';
+import { MENU } from './GameMenu.js';
 
 export const SWITCHER = {
     icon: 84,            // px across of one scheme's icon
@@ -19,11 +20,11 @@ export const CONTROL_ART = Object.fromEntries(CONTROL_SCHEMES.map(s => [`ctrl_${
  */
 export default class ControlSwitcher {
     constructor(scene, activeId, onSelect, onToggleDebug) {
-        const W = scene.scale.width, S = SWITCHER, n = CONTROL_SCHEMES.length, y = S.margin[1];
+        const W = scene.scale.width, S = SWITCHER, n = CONTROL_SCHEMES.length, y = S.margin[1] + MENU.corner;      // in from the corner with the top line
         const lang = scene.registry.get('currentLanguage') === 'en' ? 'en' : 'de';
         this.buttons = {};
         CONTROL_SCHEMES.forEach((s, i) => {
-            const x = W - S.margin[0] - S.icon / 2 - (n - 1 - i) * (S.icon + S.gap), key = `ctrl_${s.id}`;
+            const x = W - S.margin[0] - MENU.corner - S.icon / 2 - (n - 1 - i) * (S.icon + S.gap), key = `ctrl_${s.id}`;
             if (!scene.textures.exists(key)) {      // no icon: the scheme's name in a small pill
                 this.buttons[s.id] = pillButton(scene, x, y, S.icon + S.gap - 6, S.icon * 0.7, s.label[lang], () => onSelect(s.id), { size: 20 });
                 return;

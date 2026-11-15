@@ -6,6 +6,8 @@ import { UI, pillImage, textStyle } from './kit.js';
 // Same items as before: { label, color, callback, closeOnClick }.
 export const MENU = {
     button: 0.13,      // the burger button's size, share of the screen height
+    corner: 34,        // px the corner buttons and the top line keep in from the screen's corners (user: "menu button cut off": a phone's
+                       // rounded corners, often 40 CSS px, cut into a button 5 CSS px from the corner; most phones report no safe inset for them)
     rowH: 0.12,        // a menu button's height, share of the screen height
     gap: 0.025,        // space between buttons, share of the screen height
     colW: 0.3,         // a column's width, share of the screen width

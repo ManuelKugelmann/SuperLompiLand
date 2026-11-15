@@ -63,8 +63,8 @@ export default class HudScene extends Phaser.Scene {
         const hudText = (x, y, size) => this.add.text(x, y, '', softText(parseInt(size, 10)));
         // One line along the top (user: 'HUD in top line'): menu, coins, hearts, depth and place. The
         // left side of a landscape phone stays free for the picture.
-        const rowY = Math.round(this.scale.height * MENU.button * 0.6);
-        let rowX = Math.round(this.scale.height * MENU.button * 1.2) + HUD.rowGap;
+        const rowY = Math.round(this.scale.height * MENU.button * 0.6) + MENU.corner;
+        let rowX = Math.round(this.scale.height * MENU.button * 1.2) + HUD.rowGap + MENU.corner;
         const barX = rowX - HUD.bar.padX;
         if (this.textures.exists('coin')) this.add.image(rowX + 26, rowY, 'coin').setDisplaySize(52, 52);
         this.coinText = hudText(rowX + 58, rowY, '42px').setOrigin(0, 0.5);
@@ -80,7 +80,7 @@ export default class HudScene extends Phaser.Scene {
         this.depthLabel = de ? 'Tiefe' : 'Depth';
 
         // Chain: a soft counter that names the last move; no timer, it simply fades when the chain ends.
-        this.chainText = hudText(Math.round(this.scale.height * MENU.button * 1.2) + HUD.rowGap, rowY + 56, '34px').setAlpha(0);
+        this.chainText = hudText(Math.round(this.scale.height * MENU.button * 1.2) + HUD.rowGap + MENU.corner, rowY + 56, '34px').setAlpha(0);
         const moves = de
             ? { leap: 'Sprung', landing: 'Landung', skim: 'Wellenhüpfer', flip: 'Salto', special: 'Spezial', stream: 'Strömung', trail: 'Melodie', cannon: 'Blubberkanone', pad: 'Hüpfkissen', arch: 'Felsentor', ring: 'Blasenring' }
             : { leap: 'Jump', landing: 'Landing', skim: 'Wave skip', flip: 'Flip', special: 'Special', stream: 'Current', trail: 'Melody', cannon: 'Bubble cannon', pad: 'Bounce pad', arch: 'Sea arch', ring: 'Bubble ring' };
@@ -117,7 +117,7 @@ export default class HudScene extends Phaser.Scene {
             fontFamily: 'Arial', fontSize: '44px', color: '#fff3b0', stroke: '#06243d', strokeThickness: 3, shadow: { offsetY: 3, color: '#031a2c', blur: 14, fill: true }
         }).setOrigin(0.5).setAlpha(0);
 
-        new GameMenu(this, this.scale.height * MENU.button * 0.6, this.scale.height * MENU.button * 0.6, [
+        new GameMenu(this, this.scale.height * MENU.button * 0.6 + MENU.corner, this.scale.height * MENU.button * 0.6 + MENU.corner, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
             { label: de ? 'RIFFBUCH' : 'REEF BOOK', color: 0x1d6f9a, callback: () => main.openBook() },
             { label: de ? 'STEUERUNG' : 'CONTROLS', color: 0x1d6f9a, callback: () => showSwitcher(HUD.switcherMenuMs) },
@@ -143,7 +143,7 @@ export default class HudScene extends Phaser.Scene {
             img.on('pointerdown', () => { this.tweens.add({ targets: [img, face], scale: '*=0.92', yoyo: true, duration: 70 }); onTap(); });
             return face;
         };
-        let x = W - 24 - s / 2;
+        let x = W - 24 - MENU.corner - s / 2;
         // Steering: shows the mode in use; a tap goes to the next one.
         const steerFace = x0 => {
             this.steerIcon = this.add.image(x0, y, '__DEFAULT').setVisible(false);

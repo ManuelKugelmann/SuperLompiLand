@@ -231,7 +231,7 @@ export default class IntroScene extends Phaser.Scene {
             this.perfSum = 0; this.perfN = 0;
         }
 
-        new GameMenu(this, this.scale.height * MENU.button * 0.6, this.scale.height * MENU.button * 0.6, [
+        new GameMenu(this, this.scale.height * MENU.button * 0.6 + MENU.corner, this.scale.height * MENU.button * 0.6 + MENU.corner, [
             { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => { this.registry.set('opening', true); this.scene.start(SCENE_KEYS.MAIN); } },
             soundMenuItem(lang, () => this.scene.restart()),
             ...pwaMenuItems(this, lang),
