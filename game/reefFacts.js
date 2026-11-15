@@ -87,6 +87,18 @@ export const MORE_FACTS = {
     friend_parrotfish: [
         f('Sein Maul ist hart wie ein Schnabel, daher der Name.', 'Its mouth is as hard as a beak, hence the name.'),
         f('Manche Papageifische schlafen nachts in einer Hülle aus Schleim.', 'Some parrotfish sleep at night inside a cover of slime.')],
+    angelfish: [
+        f('Junge Kaiserfische sehen ganz anders aus als die erwachsenen: sie tragen ein anderes Muster.', 'Young angelfish look quite different from the grown-ups: they wear another pattern.'),
+        f('Sie fressen gern Schwämme, die sonst kaum ein Fisch mag.', 'They like to eat sponges, which hardly any other fish will touch.')],
+    rockfish: [
+        f('Manche Drachenköpfe werden über hundert Jahre alt.', 'Some rockfish live to be more than a hundred years old.'),
+        f('Er wartet reglos, bis ein kleiner Fisch nah genug ist, und schnappt dann blitzschnell zu.', 'It waits without moving until a small fish comes close enough, then snaps in a flash.')],
+    flying_squid: [
+        f('Im Flug spreizen sie ihre Flossen und Arme wie kleine Flügel.', 'In flight they spread their fins and arms like little wings.'),
+        f('So entkommen sie hungrigen Fischen, die ihnen nicht in die Luft folgen können.', 'That is how they escape hungry fish, which cannot follow them into the air.')],
+    nautilus: [
+        f('Seine Vorfahren schwammen schon vor 500 Millionen Jahren durchs Meer, lange vor den Dinosauriern.', 'Its ancestors swam the sea 500 million years ago, long before the dinosaurs.'),
+        f('Er hat bis zu neunzig kleine Arme ohne Saugnäpfe.', 'It has up to ninety little arms without suckers.')],
     giant_clam: [
         f('In ihrem bunten Mantel wohnen winzige Algen, die aus Sonnenlicht Nahrung machen.', 'Tiny algae live in its colourful mantle and make food from sunlight.'),
         f('Hat sie einmal ihren Platz gefunden, bleibt sie dort ihr Leben lang.', 'Once it has found its place it stays there for life.')],

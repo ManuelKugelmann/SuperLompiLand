@@ -78,7 +78,7 @@ export const BIOMES = [
         coral: 0.6, kelp: 0.12, coins: 2, friendRate: 0.4, hazardRate: 0.12,
         wallRate: 0.5, wallLife: { coral: 4, seafan: 2, anemone: 1 },
         props: { boulder: 2, seafan: 2, anemone: 2, seagrass: 1 }, propRate: 1.5,
-        friends: { friend_starfish: 2, friend_turtle: 1, friend_seahorse: 1, friend_parrotfish: 2, urchin: 2 },
+        friends: { friend_starfish: 2, friend_turtle: 1, friend_seahorse: 1, friend_parrotfish: 2, angelfish: 2, urchin: 2 },
         hazards: { spikes: 1 }
     },
     {
@@ -88,7 +88,7 @@ export const BIOMES = [
         rockWall: 0,
         coral: 0, kelp: 0, coins: 3, friendRate: 0.45, hazardRate: 0.25,
         props: { boulder: 1, seafan: 1 }, propRate: 0.6,
-        friends: { friend_jellyfish: 4, friend_turtle: 2 }, hazards: { mine: 2, hazard_buoy: 1 }
+        friends: { friend_jellyfish: 4, friend_turtle: 2, flying_squid: 2 }, hazards: { mine: 2, hazard_buoy: 1 }
     },
     {
         // Cold water: anemones and sea fans, no reef corals.
@@ -99,7 +99,7 @@ export const BIOMES = [
         coral: 0, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
         wallRate: 0.3, wallLife: { anemone: 3, seafan: 1, mussel: 1 },
         props: { boulder: 3, kelpclump: 3, anemone: 2, seafan: 1 }, propRate: 1.8,
-        friends: { friend_seahorse: 3, friend_nudibranch: 3, urchin: 1 },
+        friends: { friend_seahorse: 3, friend_nudibranch: 3, rockfish: 1, urchin: 1 },
         hazards: { hazard_net: 2, spikes: 1 }
     },
     {
@@ -111,7 +111,7 @@ export const BIOMES = [
         wallRate: 0.35, wallLife: { mussel: 4, anemone: 1 },
         props: { pier: 1, trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
         landmark: 'pier', spot: 'surface',   // the pier stands at the waterline
-        friends: { friend_nudibranch: 1 },
+        friends: { friend_nudibranch: 1, angelfish: 1 },
         hazards: { hazard_net: 4, hazard_buoy: 3, mine: 2, spikes: 2 }
     },
     {
@@ -123,7 +123,7 @@ export const BIOMES = [
         coral: 0, kelp: 0, coins: 3, friendRate: 0.2, hazardRate: 0.55,
         props: { wreck: 5, trawler: 3, rowboat: 1, barrel: 2, crate: 1, boulder: 1, anemone: 1 }, propRate: 2.4,
         landmark: 'wreck',
-        friends: { friend_starfish: 1, friend_seahorse: 1, urchin: 1 },
+        friends: { friend_starfish: 1, friend_seahorse: 1, nautilus: 2, urchin: 1 },
         hazards: { mine: 4, hazard_buoy: 2, spikes: 2 }
     },
     {
@@ -135,7 +135,7 @@ export const BIOMES = [
         coral: 0.1, kelp: 0.3, coins: 3, friendRate: 0.4, hazardRate: 0.2,
         wallRate: 0.4, wallLife: { seafan: 3, anemone: 2, mussel: 3, coral: 1 },
         props: { boulder: 4, seafan: 2, anemone: 2, kelpclump: 1 }, propRate: 1.8,
-        friends: { friend_starfish: 2, friend_seahorse: 1, friend_nudibranch: 2, urchin: 3 },
+        friends: { friend_starfish: 2, friend_seahorse: 1, friend_nudibranch: 2, rockfish: 2, urchin: 3 },
         hazards: { spikes: 1, hazard_net: 1 }
     },
     {
@@ -146,7 +146,7 @@ export const BIOMES = [
         rockWall: 0.7,
         coral: 0, kelp: 0, coins: 4, friendRate: 0.25, hazardRate: 0.5,
         props: { boulder: 2, anemone: 1 }, propRate: 0.8,
-        friends: { friend_jellyfish: 2, friend_nudibranch: 1, enemy_angler: 4, urchin: 1 },
+        friends: { friend_jellyfish: 2, friend_nudibranch: 1, enemy_angler: 4, nautilus: 2, urchin: 1 },
         hazards: { mine: 3, spikes: 1 }
     }
 ];

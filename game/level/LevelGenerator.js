@@ -50,7 +50,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 43,
+    version: 44,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -94,6 +94,7 @@ export const LEVEL = {
     laneBand: 260,        // px: trails on the main route stay within this band around its middle
     ventClear: 80,        // px a bubble column ends below the calm route's lane ...
     ventMin: 320,         // ... and a column that would be shorter than this is not there at all
+    floorReach: 5000,     // px under its spot within which a floor dweller (FRIENDS `floor`) looks for the seabed
     coinTop: 250          // px under the surface above which no chunk coin lies: near the surface that part of the view is the HUD's band (counter, hearts)
 };
 const CH = LEVEL.cell * LEVEL.cells;
@@ -111,6 +112,13 @@ const FRIENDS = {
     friend_parrotfish: { size: 230, swim: 420, bob: 12, anim: 'swim', soft: 0.35, wiggle: 16, ai: { speed: 0.9, range: 420, turn: 0.03, shy: 0.9 } },
     friend_jellyfish: { size: 150, bob: 60, anim: 'pulse', soft: 1, wiggle: 6, upright: true, ai: { speed: 0.45, range: 260, turn: 0.02, shy: 0.5 } },
     friend_seahorse: { size: 120, every: 3, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
+    // The extended cast (gamedesigner 2026-11-15; pictures 3669043, head to the right). Angelfish pair up by themselves
+    // (loose groups, ai/swimmer.js flockWant); the rockfish guards a patch near the floor; the flying squid keeps
+    // near the surface (`surface`: its home is never deeper than this); the nautilus drifts slowly in the deep.
+    angelfish: { size: 200, swim: 380, bob: 12, anim: 'swim', soft: 0.35, wiggle: 14, ai: { speed: 0.8, range: 380, turn: 0.035, shy: 1 } },
+    rockfish: { size: 220, swim: 400, bob: 8, anim: 'swim', soft: 0.3, wiggle: 12, floor: 110, grumpy: { territory: 260 } },      // `floor`: its home is this many px over the seabed below where it was placed
+    flying_squid: { size: 180, swim: 400, bob: 20, anim: 'swim', soft: 0.6, wiggle: 10, surface: 520, ai: { speed: 1.1, range: 600, turn: 0.04, shy: 1.3 } },
+    nautilus: { size: 160, bob: 30, anim: 'pulse', soft: 0.3, wiggle: 4, upright: true, floor: 400, ai: { speed: 0.35, range: 240, turn: 0.02, shy: 0.8 } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
     friend_starfish: { size: 170, ground: true, anim: 'sit', soft: 0.2, upright: true, crawl: { speed: 0.1, range: 160 } },
     friend_nudibranch: { size: 190, ground: true, anim: 'sit', soft: 0.8, upright: true, crawl: { speed: 0.26, range: 300 } },
@@ -1041,6 +1049,12 @@ export default class LevelGenerator {
         if (rng.frac() < biome.friendRate) {
             const key = pickWeighted(rng, only(biome.friends, k => FRIENDS[k] && !FRIENDS[k].ground), has);
             const p = key && openSpot(FRIENDS[key].swim || 0);
+            if (p && FRIENDS[key].surface && p.y > FRIENDS[key].surface && this.isOpen(p.x, FRIENDS[key].surface, 0.1)) p.y = FRIENDS[key].surface;      // a surface dweller's home is up near the light
+            if (p && FRIENDS[key].floor) {      // a floor dweller's home is just over the seabed below (none within reach: it stays where it was)
+                let y = p.y;
+                while (y < p.y + LEVEL.floorReach && this.isOpen(p.x, y + 20, 0.1)) y += 20;
+                if (y < p.y + LEVEL.floorReach) p.y = Math.max(p.y, y - FRIENDS[key].floor);
+            }
             // Grumpies never live on the calm main route (spec 5.2c): stress stays optional.
             const onRoute = p && FRIENDS[key].grumpy && Math.abs(p.y - this.field.routeY(p.x)) < ROUTE.clear + FRIENDS[key].grumpy.territory * 0.5;
             // A big friend is a sight, not a crowd: `every` = it lives only in every so many chunk columns, and there in one row
