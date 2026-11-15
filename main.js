@@ -12,7 +12,10 @@ const game = bootStandalone({
     config: {
         // Listen on the whole window, not just the canvas: on desktop the mouse
         // keeps steering when it is dragged outside the game area.
-        input: { mouse: { target: window }, touch: { target: window } }
+        input: { mouse: { target: window }, touch: { target: window } },
+        // No multisampling on the canvas (research-performance.md: a cheap win on Mali/Adreno low-end); pictures stay smooth
+        // because their edges are filtered in the textures, not by MSAA.
+        render: { antialiasGL: false, powerPreference: 'high-performance' }
     }
 });
 
