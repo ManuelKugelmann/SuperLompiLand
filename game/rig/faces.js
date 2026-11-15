@@ -23,6 +23,11 @@ export const FACES = {
     // The big animals: small real eyes, kept as glossy beads that blink and look.
     whale: { eyes: { bead: 0x21170f, lid: 0x5c6168, at: [{ x: 940, y: 128, rx: 17, ry: 12 }] } },
     whale_shark: { eyes: { bead: 0x0e0d0d, lid: 0x2c3548, at: [{ x: 855, y: 108, rx: 9, ry: 9 }] } },
+    // The extended cast (pictures only so far: placed once the gamedesigner adds their rows).
+    angelfish: { eyes: { iris: 0x6a3410, lid: 0x1e1f2a, at: [{ x: 194, y: 143, rx: 23, ry: 24 }] }, mouth: { x: 238, y: 178 } },
+    rockfish: { eyes: { iris: 0x2a7a8a, lid: 0xd8743a, at: [{ x: 271, y: 131, rx: 22, ry: 22 }] }, mouth: { x: 335, y: 165 } },
+    flying_squid: { eyes: { bead: 0x1a1220, lid: 0xd890c8, at: [{ x: 304, y: 25, rx: 10, ry: 10 }] } },
+    nautilus: { eyes: { iris: 0x6a3e10, lid: 0xf0d8b8, at: [{ x: 279, y: 118, rx: 18, ry: 20 }] } },
     manta: { eyes: { iris: 0x1e2430, lid: 0x2a3040, at: [{ x: 718, y: 135, rx: 13, ry: 14 }] }, mouth: { x: 735, y: 205 } }
 };
 
