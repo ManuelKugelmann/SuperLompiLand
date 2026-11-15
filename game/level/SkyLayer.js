@@ -19,7 +19,7 @@ export const SKY = {
     // piece's size tall, gone in the blue below.
     socket: { deep: 700, depth: DEPTH.socket, tint: 0x6fb0bb, alpha: 0.34, top: 0.62, fit: 0.78,      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
         far: 0.6, farDepth: DEPTH.socket - 0.04,     // the islands on the far horizon stand on rock too (playtest: "islands only in the background, each with a rocky base"): fainter, behind the near ones
-        kinds: ['palms', 'canopy', 'light', 'stacks', 'port', 'volcano'] }      // the far shapes that are land (a ship is not)
+        kinds: ['palms', 'canopy', 'light', 'stacks', 'port'] }      // the far shapes that are land (a ship is not)
 };
 
 /** The rock socket under an island (drawn once, procedural): a dark rock mass with a jagged outline and ledges, fading downward. */
@@ -55,6 +55,10 @@ function ensureSocket(scene) {
     c.globalCompositeOperation = 'destination-in';            // fade into the water toward the bottom
     const f = c.createLinearGradient(0, 0, 0, H); f.addColorStop(0, 'rgba(0,0,0,1)'); f.addColorStop(0.3, 'rgba(0,0,0,0.8)'); f.addColorStop(0.85, 'rgba(0,0,0,0)');
     c.fillStyle = f; c.fillRect(0, 0, W, H);
+    // ... and toward both sides: no hard edge anywhere (user: "lighting flicker near surface": a socket's rounded side slid across the light).
+    const sides = c.createLinearGradient(0, 0, W, 0);
+    sides.addColorStop(0, 'rgba(0,0,0,0)'); sides.addColorStop(0.22, 'rgba(0,0,0,1)'); sides.addColorStop(0.78, 'rgba(0,0,0,1)'); sides.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = sides; c.fillRect(0, 0, W, H);
     t.refresh();
 }
 
@@ -216,8 +220,7 @@ export default class SkyLayer {
                 const sx = screenX(d.item, cam, W);
                 if (onScreen(sx, d.half, W)) put(sx, d.half, d.item.size, d.near, d.flip);
             }
-            const v = volcanoAt(cam, W), half = this.volcano.width * v.size / 2;
-            if (onScreen(v.x, half, W)) put(v.x, half, v.size, false, false);
+            // (None under the volcano: it stands so far off that its foot is lost in the water's haze, and a socket there read as a lit edge.)
         }
         for (let i = used; i < this.sockets.length; i++) this.sockets[i].setVisible(false);
     }
