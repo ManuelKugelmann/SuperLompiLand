@@ -137,7 +137,7 @@ export default class Rig {
         this.shown = on;
         this.view.setVisible(on);
         this.view.fin?.setVisible(on);
-        this.overlay?.setVisible(on);
+        this.overlay?.setVisible(on && !this.overlayOff);
         if (!on) this.view.eyes?.hide();
         return this;
     }
@@ -360,6 +360,9 @@ export default class Rig {
      */
     /** Where the eyes look (a world point; null: ahead), and how frightened they are (0..1). */
     lookAt(point, scared = 0) { this.look = point; this.scared = scared; return this; }
+
+    /** The overlay off or on again (a quality tier without the sheen), whatever culling does with the body. */
+    setOverlay(on) { this.overlayOff = !on; this.overlay?.setVisible(on && this.shown !== false); return this; }
 
     addOverlay(scene, depth) {
         const v = this.views.normal;

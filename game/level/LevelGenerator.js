@@ -326,6 +326,12 @@ export default class LevelGenerator {
         return a;
     }
 
+    /** The friends' rainbow sheen on or off (quality tier `sheen`): off, each friend is one additive picture and one batch break less. */
+    setSheen(on) {
+        this.sheenOff = !on;
+        for (const c of this.creatures) c.rig?.setOverlay?.(on);
+    }
+
     /** The terrain's lighter shader on or off (the lowest quality tiers: a weak graphics chip), for the chunks there now and those to come. */
     setTerrainLite(on) {
         if (!this.tileAtlas || on === this.terrainLite) return;
@@ -613,6 +619,7 @@ export default class LevelGenerator {
         for (const l of this.lights) {
             if (!l.active || !l.follow.active) continue;
             if (l.hue === undefined) { l.setPosition(l.follow.x, l.follow.y); continue; }
+            if (!l.visible) continue;      // a sheen switched off (quality) or out of view: nothing to colour
             // Rainbow sheen: colours run across the body and shimmer a little.
             l.setAlpha(LEVEL.friendSheen * (0.75 + 0.25 * Math.sin(t * 2 + l.hue * 20)));
             const n = l.colors.length, base = l.hue + t * LEVEL.sheenSpeed;
@@ -1266,6 +1273,7 @@ export default class LevelGenerator {
         // The sheen is the friend's own picture once more, added on top in travelling
         // rainbow colours: it lies exactly on the body and bends with it.
         const sheen = img.addOverlay(s, f.ground ? 1.05 : 4.05);
+        if (sheen && this.sheenOff) img.rig.setOverlay?.(false);
         if (sheen) {
             sheen.setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
             // Pure colour inside the picture's outline (a tint would only multiply with the body colour).

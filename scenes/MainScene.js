@@ -594,6 +594,7 @@ export default class MainScene extends Phaser.Scene {
         this.quality.tier = tier;
         this.level.setCaustics(q.caustics > 0);
         this.level.setTerrainLite(q.liteTerrain);
+        this.level.setSheen(q.sheen > 0);
         this.level.leadMax = q.lead;
         this.level.kelpBack = q.kelpBack; this.level.plantSegments = q.plantSegments; this.level.animEvery = q.animEvery;
         CARDS.poseEvery = q.poseEvery;

@@ -9,7 +9,7 @@ export const QUALITY = {
     // particles: share of every burst that is spawned; shoals: share of a shoal's fish;
     // simEvery / midEvery: a shoal in sight is simulated every so many frames (near the middle / further out);
     // glow: share of the soft glow pictures that are drawn (fish light, deep glow, coin glows); far: share of the far scenery's single objects.
-    // shoalsAround: how many roaming shoals are kept about the view; sheen: share of the rainbow sheen on the fish's rigs (0 = not worked out);
+    // shoalsAround: how many roaming shoals are kept about the view; sheen: the friends' rainbow sheen (0 = off: one additive picture and one batch break less per friend);
     // poseEvery: a creature's rig is posed anew every so many frames (rig/cards.js CARDS.poseEvery);
     // animEvery: a swaying plant is bent anew every so many frames (staggered; those behind the play plane half as often);
     // kelpBack: share of the hazy second kelp stalks behind the play plane; plantSegments: points of a swaying plant's strip;
