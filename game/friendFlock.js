@@ -1,17 +1,20 @@
-// A flock of friends (user 2026-11-15: "Boid / flock of friends"): every friend aims at its place along
-// Lompi's path (followTrail.js chainAt) but moves like a schooling fish: a soft spring to that place,
-// keeping its distance from the other friends, and swimming the way its place moves. No friend overlaps
-// another, the group stays loose and alive, and it still trails Lompi. Pure, no Phaser.
+// A flock of friends as boids (user 2026-11-15: "Boid / flock of friends", then "Chain => boids"): no
+// fixed places. All friends are drawn to one point on Lompi's path a little behind him (cohesion), keep
+// apart from each other (separation) and swim the way that point moves (alignment), so the group stays a
+// loose, living school that swings round after him when he turns. Lompi himself is swum round, sideways.
+// Pure, no Phaser.
 
 export const FLOCK = {
-    seek: 5,          // 1/s^2: pull toward its place along the path (a spring) ...
-    damp: 3.6,        // 1/s: ... damped toward its place's velocity, so it settles without overshooting or lagging
-    sepR: 260,        // px: another friend closer than this pushes it away (about a friend's body width) ...
+    behind: 330,      // px back along Lompi's path: the point the flock gathers round
+    sway: 22,         // px each friend sways up and down, one wave per bar of the music travelling through the flock (spec 5.0z)
+    seek: 5,          // 1/s^2: pull toward the flock's point (a spring) ...
+    damp: 3.6,        // 1/s: ... damped toward that point's velocity, so it settles without overshooting or lagging
+    sepR: 320,        // px: another friend closer than this pushes it away (about a friend's body width) ...
     sep: 2200,        // px/s^2 at contact, falling to 0 at sepR
-    align: 1.4,       // 1/s: how strongly it takes on its place's velocity
+    align: 1.4,       // 1/s: how strongly it takes on that point's velocity
     maxSpeed: 1100,   // px/s: the fastest a friend swims (it can always catch a sprinting Lompi)
     maxDt: 0.05,      // s: a long frame is taken in steps of at most this
-    minGap: 150,      // px: closer than this two friends are eased apart (firm limit, e.g. in a sharp U-turn) ...
+    minGap: 210,      // px (about a friend's width): closer than this two friends are eased apart (firm limit, e.g. in a sharp U-turn) ...
     share: 0.4,       // ... this share of the overlap per step ...
     floor: 0.8,       // ... and never closer than this x minGap
     fixedGap: 170     // px friends keep from Lompi himself (they never cover him)
@@ -47,8 +50,8 @@ export function flockStep(a, target, others, lead, dt, cfg = FLOCK) {
  * The firm limit under the soft separation (techartist review: in a sharp U-turn friends on the same side
  * met head-on). For every other friend closer than `minGap` to `a`: their approach along the line between
  * them stops (an inelastic touch, so the spring cannot push them back in) and `share` of the overlap is
- * taken out this step, but never closer than `floor` x minGap. Smooth: no one-frame pops. `fixed` ({ x, y })
- * is Lompi: friends keep `fixedGap` from him, and he is never moved. Moves `a` (and the others); returns `a`.
+ * taken out this step, but never closer than `floor` x minGap. Smooth: no one-frame pops. `fixed` ({ x, y, vx, vy })
+ * is Lompi: friends keep `fixedGap` from him, stepping aside out of his way, and he is never moved. Moves `a` (and the others); returns `a`.
  */
 export function keepApart(a, others, fixed = null, cfg = FLOCK) {
     for (const o of others) {
@@ -64,7 +67,14 @@ export function keepApart(a, others, fixed = null, cfg = FLOCK) {
     if (fixed) {
         const dx = a.x - fixed.x, dy = a.y - fixed.y, d = Math.hypot(dx, dy);
         if (d < cfg.fixedGap) {
-            const nx = d > 1e-6 ? dx / d : 0, ny = d > 1e-6 ? dy / d : 1;
+            // Out of his way to the side it is already on (techartist: pushed straight away, friends were
+            // bulldozed ahead of him and turned back); standing still, simply away from him.
+            const fv = Math.hypot(fixed.vx || 0, fixed.vy || 0);
+            let nx = d > 1e-6 ? dx / d : 0, ny = d > 1e-6 ? dy / d : 1;
+            if (fv > 1e-6) {
+                const px = -(fixed.vy || 0) / fv, py = (fixed.vx || 0) / fv, side = dx * px + dy * py >= 0 ? 1 : -1;
+                nx = px * side; ny = py * side;
+            }
             const closing = (a.vx || 0) * nx + (a.vy || 0) * ny;
             if (closing < 0) { a.vx -= nx * closing; a.vy -= ny * closing; }
             const move = Math.max((cfg.fixedGap - d) * cfg.share, cfg.fixedGap * cfg.floor - d, 0);

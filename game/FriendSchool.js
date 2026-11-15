@@ -1,13 +1,11 @@
 import { keepOut } from './ai/keepOut.js';
-import { chainAt } from './followTrail.js';
-import { flockStep, keepApart } from './friendFlock.js';
+import { FLOCK, flockStep, keepApart } from './friendFlock.js';
 import { musicClock, nowSeconds } from './audio.js';
-import { CHAIN } from './followTrail.js';
 import { createRig } from './CardRig.js';
 import { ESCORT, schoolPlace, escortStep, belowHud } from './escort.js';
 import { GRAND_NEST, friendAt } from './level/grandNest.js';
 
-export const SCHOOL_LOOK = { depth: 4.6, clear: 40, underSurface: 60 };      // just behind the fish; clear = px each keeps from rock; underSurface = px a side place stays under the waves
+export const SCHOOL_LOOK = { depth: 4.6, clear: 40, underSurface: 60, arrive: 200 };      // just behind the fish; clear = px each keeps from rock; underSurface = px the flock's point stays under the waves; arrive = px between friends coming in
 
 /**
  * The freed friends as a little school behind the fish (escort.js): each on its own rig, the
@@ -38,30 +36,36 @@ export default class FriendSchool {
     update(fish, heading, t, dt) {
         const dir = heading >= 0 ? 1 : -1, n = this.friends.length;
         if (this.nest) this.gathered = Math.min(1, this.gathered + dt / GRAND_NEST.gatherS);
+        // The flock (user: "Chain => boids"): one point on Lompi's path behind him that all friends gather round,
+        // and how fast it moves (they swim its way). Under the waves while he is; never over the HUD's band.
+        const trail = !this.nest && this.scene.followTrail;
+        let flock = null;
+        if (trail) {
+            const p = trail.at(FLOCK.behind, this.anchor || (this.anchor = { x: 0, y: 0 }));
+            const sea = this.scene.surface?.heightAt?.(p.x, t);
+            if (sea !== undefined && fish.y > sea && p.y < sea + SCHOOL_LOOK.underSurface) p.y = sea + SCHOOL_LOOK.underSurface;
+            const y = belowHud(p.y, this.scene.cameras.main.worldView.y);
+            const v = this.last && dt > 0 ? { vx: (p.x - this.last.x) / dt, vy: (y - this.last.y) / dt } : { vx: 0, vy: 0 };
+            this.last = { x: p.x, y };
+            const bar = musicClock.phase(nowSeconds()).beat / musicClock.beatsPerBar;
+            flock = { x: p.x, y, v, bar, lompi: { x: fish.x, y: fish.y, vx: fish.body?.velocity?.x || 0, vy: fish.body?.velocity?.y || 0 } };
+        }
         this.friends.forEach((f, k) => {
-            // Far behind (the step below sets it just outside the view), each on its own side and further back: no pile-up as they come in.
-            if (f.x === null) { f.x = fish.x - dir * (ESCORT.far * 2 + k * CHAIN.gap); f.y = fish.y + (k % 2 ? 1 : -1) * CHAIN.side; }
-            // In the chain along Lompi's path (user: "chain of friends"), the newest nearest; at the grand nest they gather round him.
-            const trail = this.scene.followTrail;
-            const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place)
-                : trail ? chainAt(trail, k, this.pt || (this.pt = { x: 0, y: 0 })) : schoolPlace(k, fish.x, fish.y, dir, t, this.place);
+            // A friend coming in starts far behind (the step below sets it just outside the view), each further back: no pile-up.
+            if (f.x === null) { f.x = fish.x - dir * (ESCORT.far * 2 + k * SCHOOL_LOOK.arrive); f.y = fish.y + (k % 2 ? 1 : -1) * SCHOOL_LOOK.arrive / 2; }
             const ox = f.x, oy = f.y;
-            // A place off to the side of the path stays under the waves while Lompi is under them (only his own leaps take friends out).
-            const sea = !this.nest && trail ? this.scene.surface?.heightAt?.(to.x, t) : undefined;
-            if (sea !== undefined && fish.y > sea && to.y < sea + SCHOOL_LOOK.underSurface) to.y = sea + SCHOOL_LOOK.underSurface;
-            const ty = belowHud(to.y, this.scene.cameras.main.worldView.y);      // its place never over the HUD's band
-            if (!this.nest && trail) {
-                // A flock along Lompi's path (user: "boid / flock of friends"): springy, apart from the others, his way.
+            if (flock) {
+                // A boid: drawn to the flock's point, apart from the others, swimming its way, swaying with the music (one wave per bar
+                // travelling through the flock, spec 5.0z); never through another friend or over Lompi.
                 f.vx ??= 0; f.vy ??= 0;
-                // ... swaying with the music, one wave per bar travelling down the flock (spec 5.0z).
-                const bar = musicClock.phase(nowSeconds()).beat / musicClock.beatsPerBar, sway = Math.sin((bar - k * 0.12) * Math.PI * 2) * CHAIN.sway;
-                // Damped toward how its own place moves (not Lompi's velocity): after he turns, its place still runs on to
-                // the turn point, so it turns once there instead of back and forth (techartist review 2026-11-15).
-                const pv = f.place && dt > 0 ? { vx: (to.x - f.place.x) / dt, vy: (ty + sway - f.place.y) / dt } : { vx: 0, vy: 0 };
-                f.place = { x: to.x, y: ty + sway };
-                flockStep(f, f.place, this.scene.flockMates || [], pv, dt);
-                keepApart(f, this.scene.flockMates || [], fish);      // never through each other or over Lompi, even in a sharp U-turn
-            } else escortStep(f, k, to.x, ty, fish.x, dir, dt);
+                const sway = Math.sin((flock.bar - k * 0.12) * Math.PI * 2) * FLOCK.sway;
+                flockStep(f, { x: flock.x, y: flock.y + sway }, this.scene.flockMates || [], flock.v, dt);
+                keepApart(f, this.scene.flockMates || [], flock.lompi);
+            } else {
+                // At the grand nest they gather round him; without a trail, the old school beside him.
+                const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place) : schoolPlace(k, fish.x, fish.y, dir, t, this.place);
+                escortStep(f, k, to.x, belowHud(to.y, this.scene.cameras.main.worldView.y), fish.x, dir, dt);
+            }
             // Never in rock (it follows the fish's path, which may cut a corner): pushed out along the terrain's slope.
             if (this.scene.level?.rock) { const q = keepOut(f.x, f.y, SCHOOL_LOOK.clear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); f.x = q.x; f.y = q.y; }
             if (!f.rig) {

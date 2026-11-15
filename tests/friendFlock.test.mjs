@@ -68,6 +68,19 @@ test('keepApart: close friends ease apart without a pop, never past the floor, a
     assert.equal(f.x, 0);
 });
 
+test('keepApart: a friend in the way of Lompi steps aside, it is not pushed ahead of him', () => {
+    const lompi = { x: 0, y: 0, vx: 600, vy: 0 }, a = { x: 40, y: 10, vx: 0, vy: 0 };
+    keepApart(a, [], lompi);
+    assert.ok(a.y > 10 && Math.abs(a.x - 40) < 1e-9, `aside: ${a.x.toFixed(1)},${a.y.toFixed(1)}`);
+});
+
+test('a flock aiming at one point spreads into a school instead of a pile', () => {
+    const fs = Array.from({ length: 6 }, (_, i) => ({ x: i * 3, y: 0, vx: 0, vy: 0 }));
+    for (let i = 0; i < 900; i++) for (const f of fs) { flockStep(f, { x: 0, y: 0 }, fs, { vx: 0, vy: 0 }, DT); keepApart(f, fs); }
+    for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) assert.ok(Math.hypot(fs[i].x - fs[j].x, fs[i].y - fs[j].y) >= FLOCK.minGap * FLOCK.floor - 1);
+    for (const f of fs) assert.ok(Math.hypot(f.x, f.y) < 600, 'still together');
+});
+
 test('keepApart: friends move off Lompi, and he is never moved', () => {
     const lompi = { x: 0, y: 0 }, a = { x: 20, y: 0, vx: -200, vy: 0 };
     keepApart(a, [], lompi);
