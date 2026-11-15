@@ -20,4 +20,5 @@ const game = bootStandalone({
 // the device is OS-locked to portrait. The picture always covers the whole screen.
 forceLandscape(game);
 
-if (import.meta.env.DEV) window.__game = game; // console/debug handle, dev only
+// Console/debug handle: in development, and for the push gate's smoke check of the build (scripts/smoke.mjs, `?smoke`).
+if (import.meta.env.DEV || new URLSearchParams(location.search).has('smoke')) window.__game = game;

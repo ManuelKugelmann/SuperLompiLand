@@ -12,6 +12,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "serve": "node scripts/serve.mjs",
+        "smoke": "node scripts/smoke.mjs",
         "test": "node --test \"tests/*.test.mjs\""
     },
     "dependencies": {
