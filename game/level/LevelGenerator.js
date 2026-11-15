@@ -1,4 +1,5 @@
 import { createPool, poolSize } from './workerPool.js';
+import { shareOf } from '../quality.js';
 import { rescueSpots } from '../rescues.js';
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
@@ -1277,7 +1278,9 @@ export default class LevelGenerator {
         }
         chunk.objects.push(s.add.image(f.x, f.y - 26, 'vent_plant').setOrigin(0.5, 64 / 112).setDepth(1));
         // The bubbles: purely visual, looping up the column.
-        for (let i = 0; i < Math.round(height / 110); i++) {
+        // One picture per bubble, so fewer on the slower tiers (quality.js particles share).
+        const columnBubbles = Math.max(2, Math.round(height / 110 * shareOf(s, 'particles')));
+        for (let i = 0; i < columnBubbles; i++) {
             const b = s.textures.exists('bubble') ? s.add.image(f.x, f.y, 'bubble') : s.add.circle(f.x, f.y, 16, 0xffffff, 0.4);
             const size = rng.between(22, 52);
             b.setDisplaySize(size, size).setDepth(6).setAlpha(0.75);

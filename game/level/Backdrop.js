@@ -1,4 +1,5 @@
 import { PARALLAX, surfaceBand } from './parallax.js';
+import { shareOf } from '../quality.js';
 import { DEPTH } from '../depths.js';
 import Phaser from 'phaser';
 import { mixColor, waterHue, atLuma, WATER_LIGHT, surfAt } from './biomes.js';
@@ -300,7 +301,11 @@ export default class Backdrop {
                 f.body.alpha = f.alpha * depthFade;
             }
         }
-        for (const b of this.bubbles) {
+        // As many drifting bubbles as the quality tier's particle share (basic: a few); the rest wait hidden.
+        const drifting = Math.max(3, Math.round(this.bubbles.length * shareOf(this.scene, 'particles')));
+        for (let i = 0; i < this.bubbles.length; i++) {
+            const b = this.bubbles[i];
+            if (i >= drifting) { b.setVisible(false); continue; }
             b.y -= b.speed + dy * 0.5;
             b.x += Math.sin(t * 1.4 + b.phase) * 0.5 - dx * 0.5;
             b.setVisible(camY + b.y > 40); // no bubbles in the sky
