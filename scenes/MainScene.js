@@ -6,7 +6,7 @@ import Player from '../game/Player.js';
 import Multiplayer from '../game/Multiplayer.js';
 import LevelGenerator, { LEVEL } from '../game/level/LevelGenerator.js';
 import { BIOMES, biomeIndexAt, biomeBlendAt, mixColor, spotFor, dropOffView, REEF_CREST , waterHue, WATER_LIGHT, atLuma, floorY } from '../game/level/biomes.js';
-import { UNSTICK, popOut, wedged, Stillness } from '../game/level/unstick.js';
+import { UNSTICK, popOut, wedged, slideOff, Stillness } from '../game/level/unstick.js';
 import Backdrop from '../game/level/Backdrop.js';
 import WaterLight from '../game/fx/WaterLight.js';
 import ParticleLayer from '../game/fx/ParticleLayer.js';
@@ -371,7 +371,8 @@ export default class MainScene extends Phaser.Scene {
                 this.announce(this.lang === 'de' ? 'Eine Langleine!' : 'A longline!', this.lang === 'de' ? 'Weich den Haken aus und befreie die Schildkröte!' : 'Dodge the hooks and free the turtle!');
                 this.bookEntry('longline');
             },
-            sting: (x, y, costs) => { if (costs) this.softHit(x, y); else this.fish.hit(new Phaser.Math.Vector2(x, y)); }
+            sting: (x, y, costs) => { if (costs) this.softHit(x, y); else this.fish.hit(new Phaser.Math.Vector2(x, y)); },
+            freed: () => !!this.rescues?.done.has('longline')
         });
         // World event (spec 5.0t 2): a trawl net along the kelp floor; rise over its headrope or outswim it.
         this.trawl = this.ambientMode ? null : new TrawlLayer(this, {
@@ -1675,6 +1676,15 @@ export default class MainScene extends Phaser.Scene {
         const body = fsp.body, r = this.fish.radius;
         if (this.density(fsp.x, fsp.y) > LEVEL.threshold + UNSTICK.slack) this.popFree(r);
         else if (this.stillness.step(STEP_MS, this.fish.effort > 0.3, Math.hypot(body.velocity.x, body.velocity.y), wedged(this.density, fsp.x, fsp.y, r * 1.15))) this.popFree(r * 1.8);
+        // Resting out of the water on a deck or hull (unstick.js slideOff): after a moment it slides off its nearer end, back into the water.
+        if (this.fish.inAir && Math.hypot(body.velocity.x, body.velocity.y) < UNSTICK.restSpeed) {
+            this.boxRest = (this.boxRest || 0) + STEP_MS;
+            if (this.boxRest > UNSTICK.restMs) {
+                const boxes = [...this.level.blockers].map(b => ({ x0: b.bounds.min.x, x1: b.bounds.max.x, top: b.bounds.min.y }));
+                const side = slideOff(fsp.x, fsp.y, r, boxes);
+                if (side) { fsp.setVelocity(side * UNSTICK.slideSpeed, -2); this.boxRest = 0; }
+            }
+        } else this.boxRest = 0;
         this.fish.afterStep();
     }
 

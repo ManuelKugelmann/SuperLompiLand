@@ -86,3 +86,12 @@ test('wedged means rock on opposite sides; a floor or a single wall is not', () 
     assert.equal(wedged(corner, 10, 50, 56), false, 'a corner still leaves a way out');
     assert.equal(wedged(() => T - 0.2, 0, 500, 56), false);
 });
+
+test('a fish resting on top of a deck slides off its nearer end; one beside or under it does not', async () => {
+    const { slideOff } = await import('../game/level/unstick.js');
+    const deck = [{ x0: 1000, x1: 1600, top: -80 }], r = 56;
+    assert.equal(slideOff(1100, -80 - r, r, deck), -1, 'near the left end: left');
+    assert.equal(slideOff(1500, -80 - r, r, deck), 1, 'near the right end: right');
+    assert.equal(slideOff(900, -80 - r, r, deck), 0, 'beside it');
+    assert.equal(slideOff(1300, 200, r, deck), 0, 'under it');
+});

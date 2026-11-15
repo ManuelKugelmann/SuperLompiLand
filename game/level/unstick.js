@@ -17,7 +17,10 @@ export const UNSTICK = {
     searchStep: 48,      // fallback: rings this far apart ...
     searchMax: 6000,     // ... out to this distance
     stuckMs: 2000,       // pushing without moving for this long = stuck
-    stuckSpeed: 0.7      // px per step: slower than this while pushing counts as not moving
+    stuckSpeed: 0.7,     // px per step: slower than this while pushing counts as not moving
+    // Out of the water on top of a solid box (a pier deck, a hull: review 2026-11-15, a jumping fish came to rest on the deck
+    // and could not swim off): resting this long, it slides off toward the box's nearer end.
+    restMs: 400, restSpeed: 2.5, restGap: 16, slideSpeed: 7
 };
 
 const RING = Array.from({ length: 8 }, (_, i) => [Math.cos(i * Math.PI / 4), Math.sin(i * Math.PI / 4)]);
@@ -70,6 +73,15 @@ export function wedged(density, x, y, radius, cfg = UNSTICK) {
         if (hit[i] && (hit[(i + 3) % 8] || hit[(i + 4) % 8] || hit[(i + 5) % 8])) return true;
     }
     return false;
+}
+
+/**
+ * A body of `radius` at (x, y) resting on top of one of `boxes` ([{ x0, x1, top }], world px): the way to slide off, toward
+ * that box's nearer end (-1 left, 1 right); 0 when it rests on none.
+ */
+export function slideOff(x, y, radius, boxes, cfg = UNSTICK) {
+    for (const b of boxes) if (x >= b.x0 && x <= b.x1 && Math.abs(y + radius - b.top) < cfg.restGap) return x - b.x0 < b.x1 - x ? -1 : 1;
+    return 0;
 }
 
 /** Tracks "pushing but not getting anywhere". Call once per step; returns true when the player counts as stuck. */

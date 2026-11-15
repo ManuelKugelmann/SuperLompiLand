@@ -85,6 +85,8 @@ export default class LonglineLayer {
                 while (bi < this.list.length && this.list[bi].x <= u) {
                     const b = this.list[bi++];
                     hookAt(b, t, LONGLINE, p);
+                    // The turtle's branch, once it is nibbled free, ends a little way down: the bitten-through line, no hook.
+                    if (b.caught && this.on.freed?.()) { p.x = b.x; p.y = b.top + b.len * 0.35; }
                     out.push([b.x, b.top], [p.x, p.y], [b.x + 2, b.top]);      // back up 2 px aside: a path that turns back on itself exactly gives the rope no width there (NaN)
                 }
                 out.push([u, lineY(u, S)]);

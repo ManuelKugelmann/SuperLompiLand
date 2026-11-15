@@ -63,7 +63,8 @@ export default class ContainerLayer {
         const left = this.coinSpots.map((p, k) => ({ ...p, k })).filter(p => !this.taken.has(p.k));
         const coins = new BonusCoins(s, left, L.coinDepth, (x, y) => { const p = left.find(q => q.x === x && q.y === y); if (p) this.taken.add(p.k); this.onCoin(x, y); });
         // Solid below the roof (the roof itself is a bounce pad: CONTAINERS.roof): the fish swims under a container, not through it.
-        const bodies = this.boxes.map(b => s.matter.add.rectangle(b.x, b.y, len * 0.94, h * L.solid, { isStatic: true, angle: b.tilt, friction: 0.05 }));
+        // The open one (both ends open) has none: the fish swims through it along its coins (review: they sat inside a solid body).
+        const bodies = this.boxes.map(b => b.open ? null : s.matter.add.rectangle(b.x, b.y, len * 0.94, h * L.solid, { isStatic: true, angle: b.tilt, friction: 0.05 }));
         return { imgs, shadows, coins, bodies };
     }
 
@@ -72,7 +73,7 @@ export default class ContainerLayer {
         const L = CONTAINER_LOOK, sp = this.span;
         if (this.live && (fish.x < sp.x0 - L.far || fish.x > sp.x1 + L.far)) {
             for (const o of [...this.live.imgs, ...this.live.shadows]) o?.destroy();
-            for (const b of this.live.bodies) this.scene.matter.world.remove(b);
+            for (const b of this.live.bodies) if (b) this.scene.matter.world.remove(b);
             this.live.coins.destroy(); this.live = null;
         }
         if (!this.live) {
@@ -88,8 +89,7 @@ export default class ContainerLayer {
             this.live.shadows[i]?.setY(mid + b.y + CONTAINERS.size[1] * 0.75);
             // Its solid part rides with it, a little under the roof line.
             const body = this.live.bodies[i], down = CONTAINERS.size[1] * (1 - L.solid) / 2, a = img.rotation;
-            Body.setPosition(body, { x: b.x - Math.sin(a) * down, y: mid + b.y + Math.cos(a) * down });
-            Body.setAngle(body, a);
+            if (body) { Body.setPosition(body, { x: b.x - Math.sin(a) * down, y: mid + b.y + Math.cos(a) * down }); Body.setAngle(body, a); }
             if (!this.seen && Math.hypot(fish.x - b.x, fish.y - (mid + b.y)) < L.seen) { this.seen = true; this.onSeen(); }
             // A leap that comes down on its roof bounces off, like off a pad: when the fish's lower edge reaches the drawn roof line.
             const v = fish.body.velocity, roof = roofY(b, mid, fish.x, img.rotation);

@@ -876,7 +876,10 @@ export default class LevelGenerator {
                 // A boat's hull is solid: a box over its visible part, standing on its spot and tilted with it.
                 if (p.block) {
                     const bw = w * p.block[0], bh = h * (1 - p.sink) * p.block[1], ux = Math.sin(angle), uy = -Math.cos(angle);
-                    this.addBlocker(chunk, spot.x + ux * bh / 2, footY + uy * bh / 2, bw, bh, angle);      // where the settled hull really is
+                    // Never a wall across the calm route (review: a hull ~300 px tall on a shallow floor reached into the route band,
+                    // a flat wall the assist does not climb): a hull that reaches the band is passable, like the posts.
+                    const reachesRoute = footY - bh < this.field.routeY(spot.x) + ROUTE.halfWidth;
+                    if (!reachesRoute) this.addBlocker(chunk, spot.x + ux * bh / 2, footY + uy * bh / 2, bw, bh, angle);      // where the settled hull really is
                 }
                 // Its foot sits in the sand, not on a picture edge: a soft skirt in front of the base.
                 if (w <= PROP_SKIRT.maxWidth) {

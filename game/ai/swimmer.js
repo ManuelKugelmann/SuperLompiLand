@@ -130,7 +130,8 @@ export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
     const alarmed = env.alarm && Math.hypot(env.alarm.x - a.x, env.alarm.y - a.y) < scare;
     const mate = a.state !== 'flee' && !alarmed && !(dist < scare && pSpeed > cfg.rush && closing) ? panickedMate(a, env.mates, cfg) : null;
     if (a.state !== 'flee' && (alarmed || (dist < scare && pSpeed > cfg.rush && closing) || mate)) {
-        a.state = 'flee'; a.left = cfg.fleeS; a.fleeWay = mate ? mate.heading : null;      // a fright caught from a mate: the same way it went
+        // A fright caught from a mate: the same way it went, and only for the mate's time left (a full fright each would loop through a group).
+        a.state = 'flee'; a.left = mate ? mate.left : cfg.fleeS; a.fleeWay = mate ? mate.heading : null;
     } else if (a.state === 'flee') {
         if (a.left <= 0) { a.state = 'wander'; a.left = between(a, cfg.roamS); a.cooldown = cfg.greetCooldownS * 0.5; }
     } else if (a.state === 'breathe') {

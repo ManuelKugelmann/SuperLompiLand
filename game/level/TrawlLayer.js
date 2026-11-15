@@ -91,6 +91,8 @@ export default class TrawlLayer {
         if (s.event === 'warn') this.on.warn(sp.x - 600, sp.y);
         if (s.event === 'tow') { this.parts = this.build(); this.on.tow(); }
         if (s.event === 'caught') this.on.caught(sp.x, sp.y);
+        // A catch that took the last heart starts the respawn: the net lets go at once (review: it held the fish at the net through half the respawn).
+        if (this.scene.respawning && s.carry > 0) s.carry = 0;
         if (s.carry > 0) { const h = holdAt(s, w); sp.setPosition(h.x, h.y); sp.setVelocity(TRAWL.speed / 60, 0); }
         if (s.event === 'released') { const h = holdAt(s, w); sp.setPosition(h.x, h.outY); sp.setVelocity(4, -6); this.on.released(); }
         if (s.event === 'gone') this.drop();
