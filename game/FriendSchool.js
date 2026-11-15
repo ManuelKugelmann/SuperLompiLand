@@ -1,5 +1,6 @@
 import { keepOut } from './ai/keepOut.js';
 import { chainAt } from './followTrail.js';
+import { flockStep } from './friendFlock.js';
 import { createRig } from './CardRig.js';
 import { ESCORT, schoolPlace, escortStep, belowHud } from './escort.js';
 import { GRAND_NEST, friendAt } from './level/grandNest.js';
@@ -42,7 +43,12 @@ export default class FriendSchool {
             const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place)
                 : trail ? chainAt(trail, k, this.pt || (this.pt = { x: 0, y: 0 })) : schoolPlace(k, fish.x, fish.y, dir, t, this.place);
             const ox = f.x, oy = f.y;
-            escortStep(f, k, to.x, belowHud(to.y, this.scene.cameras.main.worldView.y), fish.x, dir, dt);      // its place never over the HUD's band
+            const ty = belowHud(to.y, this.scene.cameras.main.worldView.y);      // its place never over the HUD's band
+            if (!this.nest && trail) {
+                // A flock along Lompi's path (user: "boid / flock of friends"): springy, apart from the others, his way.
+                f.vx ??= 0; f.vy ??= 0;
+                flockStep(f, { x: to.x, y: ty }, this.scene.flockMates || [], this.scene.leadVel || { vx: 0, vy: 0 }, dt);
+            } else escortStep(f, k, to.x, ty, fish.x, dir, dt);
             // Never in rock (it follows the fish's path, which may cut a corner): pushed out along the terrain's slope.
             if (this.scene.level?.rock) { const q = keepOut(f.x, f.y, SCHOOL_LOOK.clear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); f.x = q.x; f.y = q.y; }
             if (!f.rig) {

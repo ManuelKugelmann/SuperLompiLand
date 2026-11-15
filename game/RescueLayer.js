@@ -1,5 +1,6 @@
 import { keepOut } from './ai/keepOut.js';
 import { createTrail, chainAt, CHAIN } from './followTrail.js';
+import { flockStep } from './friendFlock.js';
 import { belowHud } from './escort.js';
 import Phaser from 'phaser';
 import { play, musicClock, nowSeconds } from './audio.js';
@@ -50,7 +51,6 @@ export const RESCUE_LOOK = {
     happyRadius: 90,
     alongMax: 6,         // ... then it swims along with the fish for good (tester: "they follow, then vanish: strange"); beyond this many the one that has followed longest swims back home (never fades: user 2026-11-15), and says goodbye ...
     // ... in the chain along the fish's own path (user: "chain of friends"; spacing: followTrail.js CHAIN), after the chapter friends
-    alongEase: 0.09,     // ... easing there by this share per step (keeps up with a sprinting fish) ...
     alongClear: 36,      // ... and keeping this many px from rock (ai/keepOut.js)
     homeEase: 0.03,      // a friend swimming home eases there by this share per step, then circles its old place
     nibbleBubbles: 5,    // bubbles (and a nibble sound) per second while a fish nibbles a line through
@@ -91,6 +91,13 @@ export default class RescueLayer {
         // A trap on the seabed lies below the view from the route: a trail of coins leads down to it.
         const n = L.trail, trail = ground === null ? null : new BonusCoins(s, Array.from({ length: n }, (_, i) => ({ x: x - 120 + 120 * i / (n - 1), y: ry + 130 + (y - 260 - ry) * i / (n - 1) })), 2, this.onCoin);
         return { spot, x, y, px: x, py: y, img, glow, net, ghost, shadow, trail, state: 'caught', left: 0, seed: x * 0.013, lying: ground !== null, call: 0, held: 0 };
+    }
+
+    /** The rescued animals swimming with Lompi, as flock mates ({ x, y }) for the flock of friends. */
+    flockMates() {
+        const out = [];
+        for (const a of this.actors.values()) if (a.state === 'along' && a.flock) out.push(a.flock);
+        return out;
     }
 
     /** The nearest animal still in its trap within calling distance of the fish, or null (for the edge pointer). */
@@ -173,7 +180,6 @@ export default class RescueLayer {
                 a.px = a.x + Math.sin(k) * L.happyRadius; a.py = a.y - (1 - Math.cos(k)) * L.happyRadius * 0.7;
                 if (a.left <= 0) { a.state = 'along'; a.left = Infinity; a.joined = this.joined = (this.joined || 0) + 1; }
             } else {
-                const k = 1 - Math.pow(1 - L.alongEase, frames);
                 if (a.state === 'along') {
                     // Its place in the chain along the fish's path: the newest nearest the fish, older ones further back.
                     const i = this.joined - a.joined;
@@ -182,9 +188,12 @@ export default class RescueLayer {
                     // The chain sways with the music: one wave per bar, travelling down the line (spec 5.0z).
                     const ph = musicClock.phase(nowSeconds()), bar = ph.beat / musicClock.beatsPerBar;
                     const sway = Math.sin((bar - i * 0.12) * Math.PI * 2) * CHAIN.sway;
-                    a.px += (at.x - a.px) * k; a.py += (belowHud(at.y + sway, this.scene.cameras.main.worldView.y) - a.py) * k;      // never over the HUD's band
+                    // In the flock of friends (game/friendFlock.js): its place along the path, apart from the others.
+                    a.flock ??= { x: a.px, y: a.py, vx: 0, vy: 0 };
+                    flockStep(a.flock, { x: at.x, y: belowHud(at.y + sway, this.scene.cameras.main.worldView.y) }, this.scene.flockMates || [], this.scene.leadVel || { vx: 0, vy: 0 }, delta / 1000);      // never over the HUD's band
+                    a.px = a.flock.x; a.py = a.flock.y;
                     // ... and never in rock (the path may cut a corner).
-                    if (this.scene.level?.rock) { const q = keepOut(a.px, a.py, L.alongClear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); a.px = q.x; a.py = q.y; }
+                    if (this.scene.level?.rock) { const q = keepOut(a.px, a.py, L.alongClear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); a.px = q.x; a.py = q.y; a.flock.x = a.px; a.flock.y = a.py; }
                 } else {
                     // Home: back to its old place, then it circles there, happy; it is simply left behind as the fish swims on.
                     const h = 1 - Math.pow(1 - L.homeEase, frames);
