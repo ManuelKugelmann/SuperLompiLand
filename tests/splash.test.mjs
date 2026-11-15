@@ -40,3 +40,13 @@ test('crown drops fly up and out on both sides; column drops go up and follow th
     for (let i = 0; i < leap.drops; i++) { dropVelocity(leap, i, 600, rnd, v); assert.ok(v.vy < 0); sum += v.vx; }
     assert.ok(sum / leap.drops > 0, 'carried along with the fish');
 });
+
+test('a swell crest running up a post throws spray once, more when it rises fast; nothing while it stays low or falls', async () => {
+    const { postSpray } = await import('../game/fx/splash.js');
+    const c = SPLASH.post.crest;
+    assert.equal(postSpray(0, -5), 0, 'below the crest line');
+    assert.ok(postSpray(-c + 1, -c - 1) > 0, 'rising past it');
+    assert.equal(postSpray(-c - 1, -c - 3), 0, 'already above: once only');
+    assert.equal(postSpray(-c - 1, -c + 1), 0, 'falling');
+    assert.ok(postSpray(-c + 6, -c - 6) > postSpray(-c + 1, -c - 1), 'faster, bigger');
+});

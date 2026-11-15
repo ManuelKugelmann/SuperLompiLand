@@ -18,7 +18,10 @@ export const SPLASH = {
     width: [2, 3.6],      // spring columns the kick spreads over
     foam: { w: [110, 460], grow: [2, 3.6], life: [0.8, 2] },   // foam patch: width px, how far it spreads, seconds
     bubbles: [3, 26],     // bubbles pulled under on an entry
-    deep: [40, 190]       // px down to which they are pulled
+    deep: [40, 190],      // px down to which they are pulled
+    // Where a swell crest runs up a post (a pier's piles; user: "splashes at posts"): the water rising past `crest` px over
+    // the calm line throws `drops` droplets up to `up` px/s, more the faster it rises (`full` px per frame = the biggest).
+    post: { crest: 14, full: 4, drops: [2, 7], up: [180, 420], side: 70 }
 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -42,6 +45,12 @@ export function splashShape(speed, entering, cfg = SPLASH) {
         foam: { w: range(cfg.foam.w, k), grow: range(cfg.foam.grow, k), life: range(cfg.foam.life, k) },
         bubbles: entering ? Math.round(range(cfg.bubbles, k)) : 0, deep: range(cfg.deep, k)
     };
+}
+
+/** A crest running up a post: 0 when the water at the post did not just rise past the crest line, else its size 0..1 (by how fast it rose). */
+export function postSpray(prevY, y, cfg = SPLASH.post) {
+    if (!(prevY > -cfg.crest && y <= -cfg.crest)) return 0;
+    return Math.min(1, Math.max(0.15, (prevY - y) / cfg.full));
 }
 
 /**

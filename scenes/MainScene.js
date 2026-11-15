@@ -1744,6 +1744,11 @@ export default class MainScene extends Phaser.Scene {
         }
         this.particles.update(delta / 1000);
         this.splashes.update(delta / 1000, this.time.now / 1000);
+        // Swell crests splash up the pier posts in view (SplashLayer.posts).
+        const posts = this.postXs || (this.postXs = []), cv = this.cameras.main.worldView;
+        posts.length = 0;
+        if (cv.y < 300) for (const pier of this.level.piers?.values() || []) if (pier) for (const q of pier.piles) if (q.x > cv.x - 100 && q.x < cv.right + 100) posts.push(q.x);
+        this.splashes.posts(posts, this.time.now / 1000);
         const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step
         pl.x = view.x; pl.y = view.y; pl.vx = v.x * 60; pl.vy = v.y * 60; pl.fright = this.character.fright || 1;
         // In a room, friends are players for the shoals too (spec ch.13 "Creatures in a room").

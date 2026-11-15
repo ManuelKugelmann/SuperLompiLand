@@ -1,4 +1,4 @@
-import { splashShape, dropVelocity } from './splash.js';
+import { SPLASH, splashShape, dropVelocity, postSpray } from './splash.js';
 import { ensureFoam, SURF_ART } from './SurfLayer.js';
 
 /** The painted foam patch (loaded by the title screen): wide and flat, made to lie on the wave line. Missing: the surf's foam puffs. */
@@ -41,6 +41,20 @@ export default class SplashLayer {
         p.img.setVisible(true).setFlipX(Math.random() < 0.5);
         Object.assign(p, { age: 0, life: s.foam.life, width: s.foam.w, grow: s.foam.grow, x });
         return s;
+    }
+
+    /** Per frame: where a swell crest runs up one of the posts at `xs` (world x of each), a little spray is thrown. `t` = the surface's time in s. */
+    posts(xs, t) {
+        const P = SPLASH.post, prev = this.postPrev || (this.postPrev = new Map()), seen = new Set();
+        for (const x of xs) {
+            seen.add(x);
+            const y = this.surface.heightAt(x, t), k = prev.has(x) ? postSpray(prev.get(x), y) : 0;
+            prev.set(x, y);
+            if (!k) continue;
+            const n = Math.round(P.drops[0] + (P.drops[1] - P.drops[0]) * k);
+            for (let i = 0; i < n; i++) this.scene.particles?.spawn('drop', x + (Math.random() - 0.5) * 30, y - 4, 1, { vx: (Math.random() - 0.5) * 2 * P.side, vy: -(P.up[0] + (P.up[1] - P.up[0]) * k * Math.random()), spread: 15 });
+        }
+        for (const x of prev.keys()) if (!seen.has(x)) prev.delete(x);
     }
 
     /** Per frame: the foam patches ride the waves, spread and fade. `t` = the surface's time in s. */
