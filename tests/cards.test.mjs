@@ -86,3 +86,11 @@ test('spine wave: still at rest, rigid front, travels to the tail, keeps the spi
     for (let i = 1; i <= 64; i++) { spineAt(t, i / 64, o); const x = -i / 64 + o.dx, z = o.z; spineAt(t, (i - 1) / 64, o); const x0 = -(i - 1) / 64 + o.dx; len += Math.hypot(x - x0, z - o.z); }
     assert.ok(Math.abs(len - 1) < 0.01, 'length ' + len);
 });
+
+test('on a slow tier a rig far off the middle of the view is posed half as often again; on full tiers every frame', async () => {
+    const { poseGap, CARDS } = await import('../game/rig/cards.js');
+    const slow = { ...CARDS, poseEvery: 3 }, mid = { x: 0, y: 0 };
+    assert.equal(poseGap(100, 50, mid, slow), 3);
+    assert.equal(poseGap(CARDS.farPose + 10, 0, mid, slow), 6);
+    assert.equal(poseGap(5000, 0, mid, { ...CARDS, poseEvery: 1 }), 1);
+});

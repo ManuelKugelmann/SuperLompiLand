@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTERS } from './characters.js';
 import { softnessMap, SoftHalo } from './rig/soft.js';
-import { CARDS, makeSpine, spineTable, spineAt } from './rig/cards.js';
+import { CARDS, poseGap, makeSpine, spineTable, spineAt } from './rig/cards.js';
 import RigEyes from './rig/RigEyes.js';
 import { holedTexture } from './rig/eyeHoles.js';
 import { faceOf } from './rig/faces.js';
@@ -183,7 +183,8 @@ export default class Rig {
         const dx = x - (this.lastX ?? x), dy = y - (this.lastY ?? y);
         this.lastX = x; this.lastY = y;
         const wantFacing = facing ?? (Math.abs(vx) > 0.8 ? (vx < 0 ? -1 : 1) : this.facing);
-        if (CARDS.poseEvery > 1 && !this.alwaysPose && wantFacing === this.facing && ++this.poseTurn % CARDS.poseEvery) {
+        const every = poseGap(x, y, this.scene.cameras.main.midPoint);      // off the middle of the view, half as often again
+        if (every > 1 && !this.alwaysPose && wantFacing === this.facing && ++this.poseTurn % every) {
             if (view.fin) { view.fin.x += dx; view.fin.y += dy; }
             this.overlay?.setPosition(x, y);
             view.eyes?.shift(dx, dy);

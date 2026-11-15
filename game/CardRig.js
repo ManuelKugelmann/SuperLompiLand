@@ -7,7 +7,7 @@ import RigMouth from './rig/RigMouth.js';
 import { faceOf } from './rig/faces.js';
 import { Breath, BREATH, instanceSeed } from './rig/breath.js';
 import { CHARACTERS } from './characters.js';
-import { CARDS, turnWidth, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
+import { CARDS, poseGap, turnWidth, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
 
 /** Where the part cards come from (scripts/parts/bake.py). */
 export const PARTS = { json: 'parts', url: 'img/parts/', texture: key => `parts_${key}` };
@@ -209,7 +209,8 @@ export default class CardRig {
         }
         // On the slow tiers a rig is posed only every few frames, the rigs taking turns: in between its cards follow its
         // place, and the next pose catches up the frames it skipped (its swimming beat stays in time).
-        if (CARDS.poseEvery > 1 && !this.alwaysPose && !this.turning && ++this.poseTurn % CARDS.poseEvery) {
+        const every = poseGap(x, y, this.scene.cameras.main.midPoint);      // off the middle of the view, half as often again
+        if (every > 1 && !this.alwaysPose && !this.turning && ++this.poseTurn % every) {
             for (const e of set.entries) e.rope.setPosition(x, y);
             const sdx = x - (this.lastX ?? x), sdy = y - (this.lastY ?? y);
             set.eyes?.shift(sdx, sdy); set.mouth?.shift(sdx, sdy);

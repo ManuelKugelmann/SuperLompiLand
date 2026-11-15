@@ -12,11 +12,18 @@
 // Pure (no Phaser): game/CardRig.js uploads the results; tests in tests/cards.test.mjs.
 import { sheenHue } from './sheen.js';
 
+/** Every how many frames a rig at (x, y) is posed, with the view's middle at `mid`: CARDS.poseEvery, twice that far from the middle (slow tiers only). */
+export function poseGap(x, y, mid, cfg = CARDS) {
+    if (cfg.poseEvery <= 1) return 1;
+    return Math.hypot(x - mid.x, y - mid.y) > cfg.farPose ? cfg.poseEvery * 2 : cfg.poseEvery;
+}
+
 export const CARDS = {
     steerBend: 2.4,         // how far the tail lags in a turn: picture widths per radian per frame of turning
     steerMax: 0.07,         // the turn rate (rad per frame) at which the bend is at its most
     steerEase: 0.2,         // how quickly the bend follows the turning (share per frame)
     offView: 200,           // px beyond the view (plus its own size) at which a rig is no longer posed
+    farPose: 600,           // px from the view's middle beyond which a rig on a slow tier is posed half as often again (the eye is on the middle)
     poseEvery: 1,           // a rig is posed anew every so many frames, the rigs taking turns (the quality tier sets it: QUALITY.poseEvery); in between its cards only follow its place. The playable is always posed
     bodyGrid: [12, 9],      // body card grid (columns x rows of cells)
     partGrid: [6, 4],       // fin card grid along its longer side x across
