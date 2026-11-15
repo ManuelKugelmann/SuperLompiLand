@@ -1,5 +1,5 @@
 {
-    "_doc": "Part cards per playable picture (picture px, origin top-left). Read by scripts/parts/bake.py. body: the picture the body card is cut from (default: the key). Each part: role (motion, game/rig/cards.js), poly (the card's outline, generous into the body where it hides behind it), root (two points across where it joins the body; the pivot is their middle), front (drawn over the body; the body under it is filled from its surroundings), under (body area under a front part to fill; a front part takes its whole outline off the body), z (depth in body bulges: + toward the viewer), amp/phase (motion multipliers). parent: the part it hangs on (posed after it, at the point of it where its root lies, and turned with it: a head on its neck). image/at: a part that already exists as its own picture, placed at `at`. core: removed from every part (the body proper). pair: a paired fin painted only on the near side; the game adds its far twin behind the body. Median fins (dorsal, anal, ridges) exist once, on the midline (z 0).",
+    "_doc": "Part cards per playable picture (picture px, origin top-left). Read by scripts/parts/bake.py. body: the picture the body card is cut from (default: the key). Each part: role (motion, game/rig/cards.js), poly (the card's outline, generous into the body where it hides behind it), root (two points across where it joins the body; the pivot is their middle), front (drawn over the body; the body under it is filled from its surroundings), under (body area under a front part to fill; a front part takes its whole outline off the body), z (depth in body bulges: + toward the viewer), amp/phase (motion multipliers). parent: the part it hangs on (posed after it, at the point of it where its root lies, and turned with it: a head on its neck). image/at: a part that already exists as its own picture, placed at `at`. core: removed from every part (the body proper). pair: a paired fin painted only on the near side; the game adds its far twin behind the body. Median fins (dorsal, anal, ridges) exist once, on the midline (z 0). mirror: the art is drawn nose-left; the cards are cut from it flipped to face right (points as painted).",
     "puffer_normal": {
         "body": "puffer_normal_body",
         "parts": [
@@ -100,6 +100,69 @@
             { "name": "tail", "role": "tail", "poly": [[0,10],[70,10],[150,112],[170,130],[170,192],[150,206],[70,236],[0,236]], "root": [[146,128],[146,192]], "z": 0 },
             { "name": "dorsal", "role": "median", "poly": [[168,112],[176,62],[226,8],[290,0],[390,18],[396,50],[340,52],[262,62],[206,100]], "root": [[200,96],[350,50]], "z": 0, "amp": 0.6, "phase": 0.4 },
             { "name": "pectoral", "role": "pectoral", "poly": [[186,262],[230,236],[296,220],[322,226],[320,262],[282,302],[222,308],[186,288]], "root": [[300,226],[318,254]], "front": true, "under": [[220,236],[300,222],[320,230],[318,262],[282,300],[226,304]], "z": 0.8 }
+        ]
+    },
+    "angelfish": {
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,148],[30,148],[38,165],[38,192],[30,206],[0,210]], "root": [[28,162],[28,194]], "z": 0 },
+            { "name": "dorsal", "role": "median", "poly": [[18,165],[22,110],[40,50],[80,10],[150,12],[215,85],[232,118],[205,112],[150,60],[100,58],[60,95],[42,165]], "root": [[60,120],[205,100]], "z": 0, "amp": 0.6, "phase": 0.4 },
+            { "name": "anal", "role": "median", "poly": [[18,190],[42,190],[62,255],[110,290],[170,290],[215,250],[232,240],[222,292],[160,345],[90,345],[40,300],[20,240]], "root": [[60,250],[205,252]], "z": 0, "amp": 0.6, "phase": 1.1 }
+        ]
+    },
+    "rockfish": {
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,40],[50,40],[95,98],[104,108],[104,152],[95,162],[50,205],[0,205]], "root": [[86,108],[86,152]], "z": 0 },
+            { "name": "dorsal", "role": "median", "poly": [[80,100],[84,40],[112,24],[160,28],[172,8],[252,18],[256,56],[200,62],[150,74],[116,100]], "root": [[100,96],[245,56]], "z": 0, "amp": 0.5, "phase": 0.4 },
+            { "name": "pectoral", "role": "pectoral", "poly": [[126,112],[150,88],[178,98],[198,140],[182,172],[150,162],[128,136]], "root": [[182,110],[194,152]], "front": true, "under": [[132,108],[180,96],[196,140],[182,170],[134,140]], "z": 0.8 },
+            { "name": "anal", "role": "median", "poly": [[80,172],[112,166],[146,182],[146,222],[112,240],[84,226]], "root": [[95,180],[136,184]], "z": 0, "amp": 0.6, "phase": 1.1 }
+        ]
+    },
+    "friend_grouper": {
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,52],[30,58],[72,108],[98,118],[98,192],[72,202],[30,312],[0,302]], "root": [[62,118],[62,194]], "z": 0 },
+            { "name": "dorsal", "role": "median", "poly": [[66,142],[78,60],[150,18],[230,0],[300,8],[322,46],[262,56],[160,86],[100,138]], "root": [[95,128],[300,46]], "z": 0, "amp": 0.5, "phase": 0.4 },
+            { "name": "pectoral", "role": "pectoral", "poly": [[78,240],[150,204],[232,198],[268,220],[264,262],[180,302],[98,302]], "root": [[240,204],[264,252]], "front": true, "under": [[96,240],[150,210],[232,204],[262,224],[260,258],[180,296],[104,296]], "z": 0.8 },
+            { "name": "anal", "role": "median", "poly": [[60,280],[110,268],[152,300],[142,372],[100,382],[68,342]], "root": [[85,282],[140,296]], "z": 0, "amp": 0.6, "phase": 1.1 }
+        ]
+    },
+    "enemy_angler": {
+        "mirror": true,
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[400,200],[440,150],[512,138],[512,322],[440,318],[400,272]], "root": [[422,205],[422,262]], "z": 0 },
+            { "name": "dorsal", "role": "median", "poly": [[190,72],[205,0],[300,0],[402,80],[408,188],[380,184],[300,92],[222,78]], "root": [[215,74],[380,176]], "z": 0, "amp": 0.4, "phase": 0.4 },
+            { "name": "lure", "role": "tentacles", "poly": [[0,18],[40,6],[100,8],[142,58],[150,102],[116,102],[108,56],[60,30],[0,62]], "root": [[118,96],[146,94]], "z": 0, "amp": 0.8 },
+            { "name": "pectoral", "role": "pectoral", "poly": [[278,294],[330,286],[380,330],[374,364],[330,352],[288,322]], "root": [[284,296],[300,330]], "front": true, "under": [[282,296],[330,290],[376,332],[370,360],[330,348],[292,320]], "z": 0.8 }
+        ]
+    },
+    "barracuda": {
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,18],[60,18],[150,94],[178,104],[178,136],[150,146],[60,232],[0,232]], "root": [[160,108],[160,132]], "z": 0 },
+            { "name": "dorsal", "role": "median", "poly": [[374,86],[392,14],[432,24],[482,70],[482,92]], "root": [[386,84],[470,82]], "z": 0, "amp": 0.5, "phase": 0.4 },
+            { "name": "anal", "role": "median", "poly": [[274,150],[302,150],[342,166],[332,194],[290,196]], "root": [[284,152],[336,160]], "z": 0, "amp": 0.6, "phase": 1.1 },
+            { "name": "pectoral", "role": "pectoral", "poly": [[486,192],[530,176],[582,154],[598,164],[562,186],[500,198]], "root": [[566,160],[592,168]], "front": true, "under": [[490,190],[530,178],[580,158],[594,166],[560,184],[502,194]], "z": 0.8 }
+        ]
+    },
+    "flying_squid": {
+        "parts": [
+            { "name": "arms", "role": "tentacles", "poly": [[0,0],[240,0],[250,24],[252,72],[240,96],[0,120]], "root": [[236,28],[236,72]], "z": 0, "amp": 0.8 }
+        ]
+    },
+    "nautilus": {
+        "parts": [
+            { "name": "tentacles", "role": "tentacles", "poly": [[0,236],[60,212],[200,206],[300,180],[316,220],[310,268],[250,290],[0,292]], "root": [[60,226],[290,214]], "z": 0, "amp": 0.6 }
+        ]
+    },
+    "sea_lion": {
+        "parts": [
+            { "name": "rear", "role": "flipper", "poly": [[0,0],[110,0],[132,30],[122,72],[60,78],[0,62]], "root": [[104,12],[110,62]], "z": 0 },
+            { "name": "fore", "role": "flipper", "poly": [[284,292],[330,220],[380,168],[442,158],[448,200],[400,242],[330,292]], "root": [[390,170],[442,192]], "front": true, "under": [[300,280],[340,220],[384,174],[440,164],[444,198],[400,238],[338,286]], "z": 0.8 }
+        ]
+    },
+    "sea_otter": {
+        "parts": [
+            { "name": "tail", "role": "tail", "poly": [[0,0],[150,0],[232,8],[254,28],[244,52],[150,42],[0,46]], "root": [[226,18],[232,50]], "z": 0 },
+            { "name": "hind", "role": "flipper", "poly": [[204,112],[220,60],[260,44],[292,54],[282,80],[230,114]], "root": [[256,50],[286,60]], "z": -0.3 },
+            { "name": "front", "role": "flipper", "poly": [[404,158],[420,110],[450,86],[472,94],[462,130],[430,160]], "root": [[440,92],[468,100]], "front": true, "under": [[410,154],[424,112],[452,92],[468,98],[458,128],[432,156]], "z": 0.8 }
         ]
     }
 }

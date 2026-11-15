@@ -120,6 +120,13 @@ for key, s in spec.items():
     if key.startswith('_') or (ONLY and key not in ONLY): continue
     src = load(key); H, W = src.shape[:2]
     body = load(s.get('body', key)).copy()
+    if s.get('mirror'):
+        # Art drawn nose-left: cut from the picture flipped to face right like every card creature (the spec's
+        # points are in the picture as painted and are flipped with it).
+        src, body = src[:, ::-1].copy(), body[:, ::-1].copy()
+        flip = lambda pts: [[W - x, y] for x, y in pts]
+        s = dict(s, parts=[dict(q, **{k: flip(q[k]) for k in ('poly', 'root', 'under') if k in q}) for q in s['parts']])
+        if 'core' in s: s['core'] = flip(s['core'])
     centre = np.array(nd.center_of_mass(body[..., 3]))[::-1]
     core = 1 - poly_mask(s['core'], W, H) if 'core' in s else None
     cards, meta = [], []
@@ -137,6 +144,7 @@ for key, s in spec.items():
             m = refine(src, hint, p.get('band', BAND))
             on_body = 0 if p.get('front') else hint * (1 - beyond(p['root'], centre, W, H))
             part = src.copy(); part[..., 3] *= np.maximum(m, on_body)
+            if not (part[..., 3] > 0.01).any(): sys.exit(f'{key}: part {p.get("name")} is empty (its poly misses the painted picture, or the segmentation took all of it)')
             c, (x0, y0) = crop(part)
             cards.append(c)
             (a, b) = p['root']; pivot = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
@@ -152,11 +160,11 @@ for key, s in spec.items():
                 touched = (m > 0.02).astype(np.float32)
                 # Where the part really lay: synthesized texture, as before; its faint rim only smoothly
                 # filled (synthesis there copied odd patches in, an eye-like blotch on Flitzi).
-                core = np.clip(m * 4, 0, 1)
-                known = (body[..., 3] > 0.95) * (1 - core)
+                lay = np.clip(m * 4, 0, 1)      # (not `core`: that name is the body proper for every later part)
+                known = (body[..., 3] > 0.95) * (1 - lay)
                 body[..., :3] = synth(fill(body[..., :3], known.astype(np.float32), region * m), known, region * m)
-                rim = region * touched * (1 - (core >= 1))
-                body[..., :3] = fill(body[..., :3], ((body[..., 3] > 0.95) * (1 - touched) + region * (core >= 1)).clip(0, 1).astype(np.float32), rim)
+                rim = region * touched * (1 - (lay >= 1))
+                body[..., :3] = fill(body[..., :3], ((body[..., 3] > 0.95) * (1 - touched) + region * (lay >= 1)).clip(0, 1).astype(np.float32), rim)
                 body[..., 3] = np.maximum(body[..., 3] * (1 - rm), region * touched * src[..., 3])
                 # Faint leftovers of the part outside the filled area (its soft edge, half removed) go entirely.
                 body[..., 3] = np.where((rm > 0.02) & (region == 0) & (body[..., 3] < 0.6), 0, body[..., 3])
