@@ -44,7 +44,7 @@ export default class ControlSwitcher {
         });
         // The physics-debug toggle is a developer's tool: only with ?debug in the address.
         this.debug = new URLSearchParams(window.location.search).has('debug')
-            ? pillButton(scene, W - S.margin[0] - 75, y + S.icon, 150, 60, 'Debug', onToggleDebug, { size: 22 }) : null;
+            ? pillButton(scene, W - S.margin[0] - MENU.corner - 75, y + S.icon, 150, 60, 'Debug', onToggleDebug, { size: 22 }) : null;
         this.setActive(activeId);
     }
 
