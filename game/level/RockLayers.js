@@ -17,7 +17,6 @@ import { LAYER_LEAD, layerWindow } from './layerWindow.js';
  *   create():  this.rockLayers = new RockLayers(this)   (after the LevelGenerator: it needs the materials)
  *   update():  this.rockLayers.update(camX, camY)
  */
-const FADE_IN_MS = 600;     // a new chunk fades in over this long (never pops in with hard edges)
 const CULL_MARGIN = 32;     // px round the screen within which a layer chunk is drawn
 const ATLAS_CHUNKS = 25;    // chunks a layer's atlas holds: the wanted window never asks for more (layerWindow.js); kept ones round it give their places up
 const KEY = 'layer:';       // the pool's answers for the layers: 'layer:<layer>:<cx>,<cy>'
@@ -156,12 +155,9 @@ export default class RockLayers {
         // The fog toward the water is baked in by the worker (fogLayer); a slight darkening on top.
         const img = scene.add.image(at[0] * L, at[1] * L, tex, frame).setOrigin(0).setScrollFactor(def.s)
             .setDisplaySize(L + 1, L + 1).setDepth(def.depth).setTint(mix(0xffffff, 0x000000, 1 - def.dark));
-        // A tile fades in only when it arrives on screen while playing. Off screen (the look-ahead's normal case) or while the
-        // first picture is still being built it is simply there: tiles fading in at different times, each with its baked fog,
-        // read as dark straight-edged rectangles (review 2026-11-15, beach and lagoon start view).
-        const cam = scene.cameras.main, x = at[0] * L - cam.scrollX * def.s, y = at[1] * L - cam.scrollY * def.s;
-        const seen = x < cam.width && x + L > 0 && y < cam.height && y + L > 0;
-        if (seen && scene.level?.viewReady) { img.setAlpha(0); scene.tweens.add({ targets: img, alpha: 1, duration: FADE_IN_MS }); }
+        // No fade-in: a tile is simply there. Faded, every tile is a square with baked fog, and next to a finished neighbour it reads as a
+        // dark straight-edged rectangle; tweens advance by the capped frame step, so on a slow phone a 600 ms fade lasted seconds
+        // (review 2026-11-15, beach and lagoon start view). The look-ahead brings almost every tile in off screen anyway.
         l.chunks.set(r.id, { img, at, ...out });
     }
 
