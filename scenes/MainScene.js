@@ -1902,7 +1902,7 @@ export default class MainScene extends Phaser.Scene {
         this.beats?.update(sp, time / 1000, delta);
         this.followTrail.push(sp.x, sp.y);
         // The flock of friends (game/friendFlock.js): who swims with Lompi, and how fast he goes (px/s).
-        this.flockMates = this.school.friends.concat(this.rescues ? this.rescues.flockMates() : []);
+        this.flockMates = this.school.friends;      // only the chapter friends follow; rescued animals swim home
         this.leadVel = { vx: sp.body.velocity.x * 60, vy: sp.body.velocity.y * 60 };
         if (!this.ambientMode) this.school.update(sp, this.fish.facing, time / 1000, delta / 1000);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start

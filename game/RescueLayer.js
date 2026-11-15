@@ -1,9 +1,6 @@
-import { keepOut } from './ai/keepOut.js';
-import { createTrail, chainAt, CHAIN } from './followTrail.js';
-import { flockStep } from './friendFlock.js';
 import { belowHud } from './escort.js';
 import Phaser from 'phaser';
-import { play, musicClock, nowSeconds } from './audio.js';
+import { play } from './audio.js';
 import { RESCUES, rescueSpots, freesRescue, nibble } from './rescues.js';
 import BonusCoins from './level/BonusCoins.js';
 
@@ -49,17 +46,14 @@ export const RESCUE_LOOK = {
     glow: 240,           // px radius of the soft light that shows it from afar
     happyMs: 1500,       // one happy loop where the net was ...
     happyRadius: 90,
-    alongMax: 6,         // ... then it swims along with the fish for good (tester: "they follow, then vanish: strange"); beyond this many the one that has followed longest swims back home (never fades: user 2026-11-15), and says goodbye ...
-    // ... in the chain along the fish's own path (user: "chain of friends"; spacing: followTrail.js CHAIN), after the chapter friends
-    alongClear: 36,      // ... and keeping this many px from rock (ai/keepOut.js)
-    homeEase: 0.03,      // a friend swimming home eases there by this share per step, then circles its old place
+    homeEase: 0.03,      // ... then it swims back home (user 2026-11-15: "only friends follow, others return home"): eases there by this share per step and circles its old place
     nibbleBubbles: 5,    // bubbles (and a nibble sound) per second while a fish nibbles a line through
     big: 1.9             // a big rescue (a turtle in a large ghost net, a landmark) is drawn this much larger
 };
 
 /**
  * The small rescues in the world (rescues.js says where and who): the animal in its bit of net,
- * its happy loop, and its swim alongside the fish. Scenes are built only near the player.
+ * its happy loop, and its swim back home (only the chapter friends follow Lompi). Scenes are built only near the player.
  * `onFree(spot, x, y)` is called once per rescue, `onCoin(x, y)` for every coin of a trail taken.
  */
 /** Painted scenes (loaded by the title screen): the animal in its trap, and free. While missing: a plain shape in a bit of net. */
@@ -71,7 +65,6 @@ export default class RescueLayer {
         this.scene = scene; this.routeY = routeY; this.groundY = groundY; this.onCoin = onCoin; this.done = new Set(done); this.onFree = onFree;
         this.spots = rescueSpots();
         this.actors = new Map();   // spot id -> actor
-        this.trail = createTrail();   // the fish's path, for the chain of followers
     }
 
     build(spot) {
@@ -91,13 +84,6 @@ export default class RescueLayer {
         // A trap on the seabed lies below the view from the route: a trail of coins leads down to it.
         const n = L.trail, trail = ground === null ? null : new BonusCoins(s, Array.from({ length: n }, (_, i) => ({ x: x - 120 + 120 * i / (n - 1), y: ry + 130 + (y - 260 - ry) * i / (n - 1) })), 2, this.onCoin);
         return { spot, x, y, px: x, py: y, img, glow, net, ghost, shadow, trail, state: 'caught', left: 0, seed: x * 0.013, lying: ground !== null, call: 0, held: 0 };
-    }
-
-    /** The rescued animals swimming with Lompi, as flock mates ({ x, y }) for the flock of friends. */
-    flockMates() {
-        const out = [];
-        for (const a of this.actors.values()) if (a.state === 'along' && a.flock) out.push(a.flock);
-        return out;
     }
 
     /** The nearest animal still in its trap within calling distance of the fish, or null (for the edge pointer). */
@@ -133,7 +119,6 @@ export default class RescueLayer {
 
     /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s, `delta` ms. */
     update(fish, radius, t, delta) {
-        if (!this.scene.followTrail) this.trail.push(fish.x, fish.y);      // the scene's shared trail is pushed by the scene
         const L = RESCUE_LOOK, s = this.scene, frames = delta / (1000 / 60);
         for (const spot of this.spots) {
             if (spot.x < fish.x - L.near) continue;
@@ -178,28 +163,12 @@ export default class RescueLayer {
             if (a.state === 'happy') {
                 const k = (1 - a.left / L.happyMs) * Math.PI * 2;
                 a.px = a.x + Math.sin(k) * L.happyRadius; a.py = a.y - (1 - Math.cos(k)) * L.happyRadius * 0.7;
-                if (a.left <= 0) { a.state = 'along'; a.left = Infinity; a.joined = this.joined = (this.joined || 0) + 1; }
+                if (a.left <= 0) { a.state = 'home'; a.left = Infinity; }
             } else {
-                if (a.state === 'along') {
-                    // Its place in the chain along the fish's path: the newest nearest the fish, older ones further back.
-                    const i = this.joined - a.joined;
-                    if (i >= L.alongMax) { a.state = 'home'; continue; }      // one too many: it swims back to where it was found
-                    const at = chainAt(this.scene.followTrail || this.trail, (this.scene.school?.friends.length || 0) + i, this.pt || (this.pt = { x: 0, y: 0 }));
-                    // The chain sways with the music: one wave per bar, travelling down the line (spec 5.0z).
-                    const ph = musicClock.phase(nowSeconds()), bar = ph.beat / musicClock.beatsPerBar;
-                    const sway = Math.sin((bar - i * 0.12) * Math.PI * 2) * CHAIN.sway;
-                    // In the flock of friends (game/friendFlock.js): its place along the path, apart from the others.
-                    a.flock ??= { x: a.px, y: a.py, vx: 0, vy: 0 };
-                    flockStep(a.flock, { x: at.x, y: belowHud(at.y + sway, this.scene.cameras.main.worldView.y) }, this.scene.flockMates || [], this.scene.leadVel || { vx: 0, vy: 0 }, delta / 1000);      // never over the HUD's band
-                    a.px = a.flock.x; a.py = a.flock.y;
-                    // ... and never in rock (the path may cut a corner).
-                    if (this.scene.level?.rock) { const q = keepOut(a.px, a.py, L.alongClear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); a.px = q.x; a.py = q.y; a.flock.x = a.px; a.flock.y = a.py; }
-                } else {
-                    // Home: back to its old place, then it circles there, happy; it is simply left behind as the fish swims on.
-                    const h = 1 - Math.pow(1 - L.homeEase, frames);
-                    a.px += (a.x + Math.cos(t * 0.8 + a.seed) * 70 - a.px) * h; a.py += (a.y + Math.sin(t * 1.1 + a.seed) * 40 - a.py) * h;
-                    if (Math.abs(a.x - fish.x) > RESCUE_LOOK.far) { this.remove(a); continue; }      // far out of sight: let go (never faded in view)
-                }
+                // Home: back to its old place, then it circles there, happy; it is simply left behind as the fish swims on.
+                const h = 1 - Math.pow(1 - L.homeEase, frames);
+                a.px += (a.x + Math.cos(t * 0.8 + a.seed) * 70 - a.px) * h; a.py += (a.y + Math.sin(t * 1.1 + a.seed) * 40 - a.py) * h;
+                if (Math.abs(a.x - fish.x) > RESCUE_LOOK.far) { this.remove(a); continue; }      // far out of sight: let go (never faded in view)
             }
             if (Math.abs(a.px - fromX) > 0.3 && a.img.setFlipX) a.img.setFlipX(a.px < fromX);
             a.img.setPosition(a.px, a.py).setRotation(Math.sin(t * 6 + a.seed) * 0.06);
