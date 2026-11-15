@@ -15,6 +15,9 @@ export const TRAWL_LOOK = {
 
 const KEYS = { net: 'trawl_net', boat: 'trawl_boat', warp: 'trawl_warp' };
 
+/** Painted pictures (loaded by the title screen; the procedural ones below stand in while missing). `line`: the painted boat's waterline, share of its height. */
+export const TRAWL_ART = { net: { key: KEYS.net, file: 'img/trawl_net.webp' }, boat: { key: KEYS.boat, file: 'img/trawl_boat.webp', line: 0.81 } };
+
 /** Procedural pictures (painted ones can come under the same keys). */
 function ensureTextures(scene) {
     const t = scene.textures, [W, H] = TRAWL_LOOK.net;
@@ -73,7 +76,8 @@ export default class TrawlLayer {
         const s = this.scene, L = TRAWL_LOOK;
         ensureTextures(s);
         const net = s.add.image(0, 0, KEYS.net).setOrigin(1 - 110 / L.net[0], 1).setDepth(L.depth);
-        const boat = s.add.image(0, 0, KEYS.boat).setOrigin(0.5, L.boatLine).setDepth(L.boatDepth);
+        const painted = !s.textures.get(KEYS.boat).source[0].isCanvas;      // the loaded picture, not the drawn stand-in
+        const boat = s.add.image(0, 0, KEYS.boat).setOrigin(0.5, painted ? TRAWL_ART.boat.line : L.boatLine).setDepth(L.boatDepth);
         const warp = s.add.rope(0, 0, KEYS.warp, null, [new Phaser.Math.Vector2(), new Phaser.Math.Vector2(), new Phaser.Math.Vector2()], false).setDepth(L.depth - 0.01).setColors(L.warpTint);
         return { net, boat, warp };
     }
