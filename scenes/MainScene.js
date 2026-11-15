@@ -54,7 +54,7 @@ import { SECRETS, countIn } from '../game/level/secrets.js';
 import DumboLayer from '../game/level/DumboLayer.js';
 import DugongLayer from '../game/level/DugongLayer.js';
 import HunterLayer from '../game/level/HunterLayer.js';
-import { powersOf, magnetStep, POWER_WORDS } from '../game/friendPowers.js';
+import { powersOf, magnetStep, POWER_WORDS, coinTaken as coinArrived } from '../game/friendPowers.js';
 import { setPlaying } from '../game/pwa.js';
 import BonusCoins from '../game/level/BonusCoins.js';
 import DolphinLayer from '../game/level/DolphinLayer.js';
@@ -1533,7 +1533,7 @@ export default class MainScene extends Phaser.Scene {
                 // The coin's stored place moves too: the bob sets img.y from c.y every frame.
                 if (s) { if (!c.pullAge) this.tweens.killTweensOf(c.img); c.pullAge = (c.pullAge || 0) + steps; const lift = c.y - c.img.y; c.img.setPosition(s.x, s.y); c.x = s.x; c.y = s.y + lift; }
             }
-            if (!c.img.active || p.distance(c.img) > fr + c.r) continue;
+            if (!c.img.active || !coinArrived(p.distance(c.img), fr, c.r, !!c.pullAge)) continue;
             const { x, y } = c.img;
             this.tweens.killTweensOf(c.img);
             c.img.destroy();

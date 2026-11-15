@@ -65,3 +65,13 @@ export function magnetStep(cx, cy, fx, fy, magnet, age = 0, steps = 1) {
 export function litDepth(bright, light) {
     return light ? bright + (1 - bright) * light.lift : bright;
 }
+
+/**
+ * Is a coin taken? One not flying is taken on touch (`radius` + its `reach`); one the pull caught flies on
+ * until it is really at Lompi, `ARRIVE` x his radius from his middle, so its ting sounds when it arrives,
+ * not when it starts to fly (user 2026-11-15: "coin sound on collect, not on pull").
+ */
+export const ARRIVE = 0.35;
+export function coinTaken(d, radius, reach, pulled, arrive = ARRIVE) {
+    return pulled ? d <= radius * arrive : d <= radius + reach;
+}

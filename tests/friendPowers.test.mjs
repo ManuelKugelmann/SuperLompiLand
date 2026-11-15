@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FRIEND_POWERS, COIN_PULL, POWER_WORDS, powersOf, magnetStep, litDepth } from '../game/friendPowers.js';
+import { FRIEND_POWERS, COIN_PULL, POWER_WORDS, powersOf, magnetStep, litDepth, coinTaken } from '../game/friendPowers.js';
 
 test('powers come from the friends in the school, and the switch turns them off', () => {
     assert.equal(powersOf([]).magnet, COIN_PULL, 'everyone catches coins close by');
@@ -56,4 +56,14 @@ test('Quallina gives back part of the light in the deep, never more than full li
     const lit = litDepth(0.42, FRIEND_POWERS.jellyfish);
     assert.ok(lit > 0.42 && lit < 1);
     assert.equal(litDepth(1, FRIEND_POWERS.jellyfish), 1);
+});
+
+test('a pulled coin counts when it arrives at Lompi, not when it starts to fly', () => {
+    assert.equal(coinTaken(80, 60, 40, false), true, 'touched: taken');
+    assert.equal(coinTaken(80, 60, 40, true), false, 'still flying');
+    assert.equal(coinTaken(10, 60, 40, true), true, 'arrived');
+    // and a pulled coin does arrive: the pull lands it on him
+    let x = 140, age = 0;
+    while (!coinTaken(Math.abs(x), 60, 40, true) && age < 200) { x = magnetStep(x, 0, 0, 0, COIN_PULL, age, 1).x; age++; }
+    assert.ok(age < 200);
 });

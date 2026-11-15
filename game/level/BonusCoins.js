@@ -1,5 +1,5 @@
 import { scaledTexture } from '../fx/scaledTexture.js';
-import { magnetStep } from '../friendPowers.js';
+import { magnetStep, coinTaken } from '../friendPowers.js';
 
 /**
  * A handful of bonus coins that belong to a set piece, not to a chunk (the arc through the sea
@@ -41,7 +41,7 @@ export default class BonusCoins {
             if (!c.visible) continue;
             const m = BonusCoins.magnet && magnetStep(c.cx, c.cy, fish.x, fish.y, BonusCoins.magnet, c.age || 0, steps);      // a friend's power (spec 5.0r)
             if (m) { c.age = (c.age || 0) + steps; c.cx = m.x; c.cy = m.y; c.x = m.x - BONUS_COIN.size / 2; c.y = m.y - BONUS_COIN.size / 2; }
-            if (Math.hypot(c.cx - fish.x, c.cy - fish.y) < radius + BONUS_COIN.reach) { c.visible = false; this.onCoin(c.cx, c.cy); } else left++;
+            if (coinTaken(Math.hypot(c.cx - fish.x, c.cy - fish.y), radius, BONUS_COIN.reach, !!c.age)) { c.visible = false; this.onCoin(c.cx, c.cy); } else left++;
         }
         if (this.backAfter === null) return;
         if (left === 0 && this.emptyAt === null) this.emptyAt = t;
