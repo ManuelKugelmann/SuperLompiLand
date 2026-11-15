@@ -5,6 +5,10 @@
 <!-- devlog:start -->
 ## Dev log
 
+**Friends wait as dark shapes on the title until rescued, then become playable (and swappable in game); the flock swims as boids; music layers grow with the friends, plants and animals nearby** — [`e0a3c8c7`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/e0a3c8c7) · 2026-11-15 12:30
+
+![Friends wait as dark shapes on the title until rescued, then become playable (and swappable in game); the flock swims as boids; music layers grow with the friends, plants and animals nearby](docs/devlog/34-friends-wait-as-dark-shapes-on-the-title-until-r.jpg)
+
 **The flock of friends: all six swim after Lompi along his path, staggered either side so nobody overlaps, swaying with the music; each friend brings a power from its real animal** — [`33f70dc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/33f70dc) · 2026-11-15 11:08
 
 ![The flock of friends: all six swim after Lompi along his path, staggered either side so nobody overlaps, swaying with the music; each friend brings a power from its real animal](docs/devlog/33-the-flock-of-friends-all-six-swim-after-lompi-al.jpg)
@@ -12,10 +16,6 @@
 **New neighbours: angelfish in pairs, a grumpy rockfish, a flying squid near the light, a nautilus in the deep** — [`f08920f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/f08920f) · 2026-11-15 10:00
 
 ![New neighbours: angelfish in pairs, a grumpy rockfish, a flying squid near the light, a nautilus in the deep](docs/devlog/32-new-neighbours-angelfish-in-pairs-a-grumpy-rockf.jpg)
-
-**World events: a longline to thread, a trawl net to rise over, splashes by speed, islands on rock** — [`fec55ef`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/fec55ef) · 2026-11-15 07:25
-
-![World events: a longline to thread, a trawl net to rise over, splashes by speed, islands on rock](docs/devlog/31-world-events-a-longline-to-thread-a-trawl-net-to.jpg)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->

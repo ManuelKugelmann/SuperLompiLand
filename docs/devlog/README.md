@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## Friends wait as dark shapes on the title until rescued, then become playable (and swappable in game); the flock swims as boids; music layers grow with the friends, plants and animals nearby
+
+[`e0a3c8c7`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/e0a3c8c7) · 2026-11-15 12:30
+
+![Friends wait as dark shapes on the title until rescued, then become playable (and swappable in game); the flock swims as boids; music layers grow with the friends, plants and animals nearby](34-friends-wait-as-dark-shapes-on-the-title-until-r.jpg)
+
 ## The flock of friends: all six swim after Lompi along his path, staggered either side so nobody overlaps, swaying with the music; each friend brings a power from its real animal
 
 [`33f70dc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/33f70dc) · 2026-11-15 11:08
