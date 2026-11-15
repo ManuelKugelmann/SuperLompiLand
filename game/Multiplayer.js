@@ -91,6 +91,7 @@ export default class Multiplayer {
             if (!isEmote(e)) { this.strikes.bad(id); return; }
             if (!g || !this.limit.allow(id, performance.now())) return;
             this.showEmote(e, g);
+            if (e === 'wave') g.rig?.wave?.();      // the friend waves its fin and beams (user 2026-11-15)
         });
         this.net.onEvent?.((id, raw) => {
             if (this.strikes.blocked(id)) return;
@@ -357,6 +358,7 @@ export default class Multiplayer {
         if (!this.fish || !this.limit.allow('me', performance.now())) return;
         this.net.sendEmote(e);
         this.showEmote(e, null);
+        if (e === 'wave') this.fish.rig?.wave?.();      // Lompi waves his fin and beams (rig: CardRig.wave)
     }
 
     /** Pop the emote over the fish — or over its edge marker when that friend is off screen. */
