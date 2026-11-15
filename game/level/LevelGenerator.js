@@ -5,6 +5,7 @@ import { makeCritter } from './critters.js';
 import { LINE, createRope, stepRope } from './rope.js';
 import Creature from '../Creature.js';
 import { docksSpot } from './docks.js';
+import { foamRing } from './foamRing.js';
 import { coinTooNear } from './coinClear.js';
 import { SET_PIECES, ghostShip } from './setPieces.js';
 import { MICRO, microAt, microKey } from './microScatter.js';
@@ -1382,6 +1383,16 @@ export default class LevelGenerator {
                 .setDisplaySize(pier.w, pier.deckH).setDepth(p.depth + 0.01).setTint(p.tint));
         }
         const top = pier.deckTop + pier.deckH * 0.8;                   // hidden behind the posts' opaque part
+        if (oy <= 0 && y1 > 0) {
+            // Where the pier stands through the surface: the surface line leaves it out (Backdrop/surface,
+            // addCrossing) and a ring of foam sits around each post instead.
+            const surf = s.surface;
+            chunk.crossings = [surf?.addCrossing?.(pier.x0 - pier.w / 2, pier.x0 + pier.w / 2)].filter(id => id !== undefined);
+            for (const q of pier.piles) {
+                const ring = keep(foamRing(s, q.x, pier.w * p.pileWidth));
+                this.animated.push(ring);
+            }
+        }
         for (const q of pier.piles) {
             yield 'pier'; if (chunk.dead) return;
             const footH = frame('pier_foot').height * k, foot = q.ground + pw * 0.5 - footH;
@@ -1472,6 +1483,7 @@ export default class LevelGenerator {
         for (const o of chunk.objects) { this.scene.tweens.killTweensOf(o); o.destroy(); }
         for (const key of chunk.textures) this.poolCanvas(key);
         for (const [atlas, i] of chunk.places || []) atlas.give(i);
+        for (const id of chunk.crossings || []) this.scene.surface?.removeCrossing?.(id);
         this.chunks.delete(key);
         this.coins = this.coins.filter(c => c.img.active);
         this.hazards = this.hazards.filter(h => h.img.active);
