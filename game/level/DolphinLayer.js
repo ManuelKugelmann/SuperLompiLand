@@ -11,7 +11,8 @@ export const DOLPHIN_LOOK = {
     length: 330,         // px a dolphin is long as drawn
     depth: 1.8,          // just behind the fish
     ringDepth: 4.6,      // in front of the fish (a hoop it swims through)
-    ringAlpha: 0.85
+    ringAlpha: 0.85,
+    ringCoin: 0.3        // a coin sits in each ring, its width this share of the ring's height (playtest: "soap-bubble rings unclear": it shows what swimming through gives)
 };
 
 // Texture keys: a painted 'dolphin' loaded under this key replaces the drawn one.
@@ -85,6 +86,7 @@ export default class DolphinLayer {
             const r = blowRing(ds[v.turn]); v.turn = 1 - v.turn;
             if (Math.abs(r.x - fish.x) < 1100 && Math.abs(r.y - fish.y) < 700) play('whistle');
             r.img = this.scene.add.image(r.x, r.y, RING).setDepth(L.ringDepth).setAlpha(0);
+            r.coin = this.scene.textures.exists('coin') ? this.scene.add.image(r.x, r.y, 'coin').setDepth(L.ringDepth - 0.01).setAlpha(0) : null;
             v.rings.push(r);
         }
         const prev = this.prev || fish;
@@ -92,14 +94,15 @@ export default class DolphinLayer {
             const alive = stepRing(r, dt), rad = ringRadius(r);
             const fade = Math.min(1, r.age / 0.6, (DOLPHIN_RINGS.life - r.age) / 1.2);
             r.img.setPosition(r.x, r.y + Math.sin(t * 3 + r.x * 0.01) * 4).setDisplaySize(rad, rad * 2).setAlpha(L.ringAlpha * Math.max(0, fade));
+            r.coin?.setPosition(r.img.x, r.img.y).setDisplaySize(rad * L.ringCoin * 2, rad * L.ringCoin * 2).setAlpha(Math.max(0, fade));
             if (alive && throughRing(r, prev, fish)) {
                 this.scene.particles.spawn('bubble', r.x, r.y, 14, { radius: rad * 0.8, spread: 90 });
                 play('ringPop');
                 this.onRing(r.x, r.y);
-                r.img.destroy();
+                r.img.destroy(); r.coin?.destroy();
                 return false;
             }
-            if (!alive) r.img.destroy();
+            if (!alive) { r.img.destroy(); r.coin?.destroy(); }
             return alive;
         });
         this.prev = { x: fish.x, y: fish.y };
@@ -108,7 +111,7 @@ export default class DolphinLayer {
 
     clear() {
         for (const d of this.live.dolphins) d.destroy();
-        for (const r of this.live.rings) r.img.destroy();
+        for (const r of this.live.rings) { r.img.destroy(); r.coin?.destroy(); }
         this.live = null; this.prev = null;
     }
 }
