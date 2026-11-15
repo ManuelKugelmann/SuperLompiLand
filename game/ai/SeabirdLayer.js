@@ -20,7 +20,7 @@ export const SEABIRDS = {
     shadowDepth: 40      // px under the surface
 };
 
-export const SEABIRD_ART = ['gannet_glide', 'gannet_dive', 'gannet_float'];
+export const SEABIRD_ART = ['gannet_glide', 'gannet_flap', 'gannet_dive', 'gannet_float'];
 
 /** x of every island coast that faces open sea. */
 export function coasts(biomes = BIOMES) {
@@ -113,8 +113,10 @@ export default class SeabirdLayer {
             const key = art(s, 'gannet_float');
             sp.setTexture(key).setRotation(0).setScale(C.floatW / sp.width).setFlipX(m.vx < 0);
         } else {
-            const key = art(s, 'gannet_glide');
-            // A slow wing rock while circling; wings held still in the hover before the dive.
+            // Side view (both pictures face right): it beats its wings while it climbs on its circle and
+            // glides on the way down; wings held still in the hover before the dive.
+            const climbing = m.state !== 'aim' && Math.cos(m.timer * 0.9 + m.seed) < 0;
+            const key = art(s, climbing && Math.sin(m.timer * 9 + m.seed) > 0 ? 'gannet_flap' : 'gannet_glide');
             const rock = m.state === 'aim' ? 0 : Math.sin(m.timer * 2.2 + m.seed) * 0.12;
             sp.setTexture(key).setRotation(rock).setScale(C.glideW / sp.width).setFlipX(m.vx < 0);
         }
