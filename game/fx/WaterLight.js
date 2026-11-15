@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { causticPattern, sunlightAt, gradeMatrix } from './causticsMath.js';
+import { causticPattern, sunlightAt, gradeMatrix, gainColor } from './causticsMath.js';
 import { shareOf } from '../quality.js';
 import { depthMeters, depthLight } from '../level/depthMeters.js';
 
@@ -85,13 +85,19 @@ export default class WaterLight {
             this.dither = scene.add.tileSprite(0, 0, W, H, 'wl_dither').setOrigin(0).setScrollFactor(0).setDepth(39.5).setAlpha(WATER_LIGHT.dither);
         }
 
-        // Colour grade on the main camera (WebGL post effect; skipped if unavailable).
-        this.grade = null;
-        const cam = scene.cameras.main;
-        if (WATER_LIGHT.grade > 0 && cam.postFX?.addColorMatrix) {
-            this.grade = cam.postFX.addColorMatrix();
-            this.lastLight = -1;
-        }
+        // Colour grade: on the main camera (WebGL post effect), or on the lowest tier one multiply quad (useGrade).
+        this.grade = null; this.gradeQuad = null;
+    }
+
+    /** The grade as the tier asks (quality.js `grade`): the camera's post effect, or one full-screen multiply quad with the same per-channel gain. */
+    useGrade(full) {
+        const scene = this.scene, cam = scene.cameras.main;
+        if (WATER_LIGHT.grade <= 0 || full === this.gradeFull) return;
+        this.gradeFull = full; this.lastLight = -1;
+        if (full && cam.postFX?.addColorMatrix) { this.grade = cam.postFX.addColorMatrix(); this.gradeQuad?.setVisible(false); return; }
+        if (this.grade) { cam.postFX.remove(this.grade); this.grade = null; }
+        this.gradeQuad ??= scene.add.rectangle(0, 0, scene.scale.width, scene.scale.height, 0xffffff).setOrigin(0).setScrollFactor(0).setDepth(39.6).setBlendMode(Phaser.BlendModes.MULTIPLY);
+        this.gradeQuad.setVisible(true);
     }
 
     update(sun = 1) {
@@ -105,6 +111,7 @@ export default class WaterLight {
 
         // The shafts are glow (additive, screen-filling): off on the tiers without glow (quality.js).
         const shafts = shareOf(scene, 'glow') > 0;
+        this.useGrade(shareOf(scene, 'grade') > 0);
         for (const s of this.shafts) {
             s.setVisible(shafts);
             if (!shafts) continue;
@@ -118,7 +125,8 @@ export default class WaterLight {
         }
 
         if (this.caustics.length) {
-            const a = WATER_LIGHT.caustics * sunlightAt(cam.scrollY + H * 0.35, WATER_LIGHT.causticFade) * (1 - above);
+            // Two full-screen additive sheets: off on the tiers without caustics (quality.js).
+            const a = shareOf(scene, 'caustics') > 0 ? WATER_LIGHT.caustics * sunlightAt(cam.scrollY + H * 0.35, WATER_LIGHT.causticFade) * (1 - above) : 0;
             for (const c of this.caustics) {
                 c.setVisible(a > 0.003).setAlpha(a);
                 if (a <= 0.003) continue;
@@ -128,7 +136,7 @@ export default class WaterLight {
             }
         }
 
-        if (this.grade) {
+        if (this.grade || this.gradeQuad?.visible) {
             // Ease the light so camera bobbing never pumps the colours, and update in tiny
             // steps (no visible jumps between quantised levels).
             this.smooth = this.smooth === undefined ? light : this.smooth + (light - this.smooth) * 0.03;
@@ -139,15 +147,16 @@ export default class WaterLight {
             if (Math.abs(q - this.lastLight) > 0.002 || Math.abs(this.bright - this.lastBright) > 0.002) {
                 this.lastLight = q; this.lastBright = this.bright;
                 const m = gradeMatrix(q, WATER_LIGHT.gradeSaturation * WATER_LIGHT.grade, WATER_LIGHT.gradeAbsorb * WATER_LIGHT.grade, WATER_LIGHT.gradeExposure * WATER_LIGHT.grade, 1 - (1 - this.bright) * WATER_LIGHT.grade);
-                // Phaser's ColorMatrix keeps offsets in 0..255.
-                this.grade.set(m.map((v, i) => (i % 5 === 4 ? v * 255 : v)));
+                // Phaser's ColorMatrix keeps offsets in 0..255. The quad multiplies each channel by what its row gives white.
+                if (this.grade) this.grade.set(m.map((v, i) => (i % 5 === 4 ? v * 255 : v)));
+                else this.gradeQuad.setFillStyle(gainColor(m));
             }
         }
     }
 
     destroy() {
         for (const o of [...this.shafts, ...this.caustics]) o.destroy();
-        this.dither?.destroy();
+        this.dither?.destroy(); this.gradeQuad?.destroy();
         if (this.grade) this.scene.cameras.main.postFX?.remove(this.grade);
     }
 }

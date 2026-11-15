@@ -74,3 +74,13 @@ test('a lit face that looks up catches the net; a dark crevice or a face that lo
     assert.ok(causticCatch(0.7, 0.8) < causticCatch(0.7, 0.7), 'brighter below = it faces down');
     assert.equal(causticCatch(0.7, 0.3), 1, 'darker below = it faces up');
 });
+
+test('the grade as one multiply colour: white in sunlit water, darker and bluer in the deep, never brighter than white', async () => {
+    const { gainColor } = await import('../game/fx/causticsMath.js');
+    const ch = c => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+    const top = ch(gainColor(gradeMatrix(1, 0.18, 0.35, 0, 1))), deep = ch(gainColor(gradeMatrix(0, 0.18, 0.35, 0, 0.5)));
+    assert.deepEqual(top, [255, 255, 255]);
+    assert.ok(deep[0] < deep[1] && deep[1] < deep[2], `reds fade first: ${deep}`);
+    assert.ok(deep[2] < 200, 'darker in the deep');
+    for (const v of ch(gainColor(gradeMatrix(1, 0.18, 0.35, 0.5, 1)))) assert.ok(v <= 255);
+});

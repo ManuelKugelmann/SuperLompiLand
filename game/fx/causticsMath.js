@@ -71,6 +71,12 @@ export function gradeMatrix(light, sat = 0.18, absorb = 0.35, exposure = 0, brig
     ];
 }
 
+/** A grade matrix as one multiply colour (0xRRGGBB): what each channel's row makes of white, never above 1 (a multiply only darkens). */
+export function gainColor(m) {
+    const c = row => Math.round(255 * Math.max(0, Math.min(1, m[row * 5] + m[row * 5 + 1] + m[row * 5 + 2] + m[row * 5 + 4])));
+    return (c(0) << 16) | (c(1) << 8) | c(2);
+}
+
 // Caustics on surfaces (spec 5.0j, user: "2.5d wrapped caustic patterns on assets and ground,
 // not flat", "animated caustics, stronger near surface and light shafts"). The pattern is worked
 // out per pixel in a shader (CausticsPipeline.js) from these numbers; the same rules are here as
