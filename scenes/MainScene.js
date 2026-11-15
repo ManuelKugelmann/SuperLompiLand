@@ -289,6 +289,8 @@ export default class MainScene extends Phaser.Scene {
         // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
         // Whoever the player plays is not waiting in a net: Lompi waits there instead (journey.js).
         // Solo, only Lompi and the friends freed so far are playable (an older choice falls back to Lompi).
+        // Friends freed in this game count too (saves from before unlocking existed): they become unlocked here.
+        for (const id of createJourney(this.progression.get?.('journey', []) || []).friends()) unlockCharacter(id);
         const chosen = this.registry.get('character') || loadSelectedId();
         if (!isPlayable(chosen, loadUnlocked(), !!this.registry.get('room'))) this.registry.set('character', getCharacter(null).id);
         this.journey = createJourney(this.progression.get?.('journey', []) || [], chapters(undefined, undefined, this.registry.get('character') || loadSelectedId()));
@@ -300,7 +302,7 @@ export default class MainScene extends Phaser.Scene {
         this.openingAsked = !!this.registry.get('opening');      // 'watch the story' from the title menu: wherever the save is
         this.wantOpening = !this.ambientMode && (this.openingAsked || !openingSeen(window.localStorage));
         // Fields that live across frames start fresh on every (re)start: a restart destroys their objects.
-        this.opening = null; this.rescueArrow = null; this.lostArrow = null;
+        this.opening = null; this.rescueArrow = null; this.lostArrow = null; this.powersMemo = null;
         this.heard = new Set(); this.depthBell = createDepthBell();
         this.registry.set('opening', false);
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y),
@@ -974,7 +976,15 @@ export default class MainScene extends Phaser.Scene {
 
     /** The powers of the friends in the school (spec 5.0r). */
     /** The school's powers; playing together the other players are friends too (user: "multiplayer = friend, too"). */
-    powers() { return powersOf([...(this.school ? this.school.friends.map(f => f.character.id) : []), ...(this.mp?.characters() || [])]); }
+    powers() {
+        // Asked several times a frame (coins, water light, hunter, pearls): worked out again only when who swims along changes.
+        const now = this.time.now;
+        if (this.powersMemo && now - this.powersMemo.at < 250) return this.powersMemo.p;
+        const ids = [...(this.school ? this.school.friends.map(f => f.character.id) : []), ...(this.mp?.characters() || [])];
+        const key = ids.join(',');
+        if (this.powersMemo?.key !== key) this.powersMemo = { key, p: powersOf(ids), at: now }; else this.powersMemo.at = now;
+        return this.powersMemo.p;
+    }
 
     /** A friend has joined: say once what it can do. */
     powerNews(id) {
