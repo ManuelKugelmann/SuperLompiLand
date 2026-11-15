@@ -1,3 +1,4 @@
+import { belowHud } from './escort.js';
 import Phaser from 'phaser';
 import { play } from './audio.js';
 import { RESCUES, rescueSpots, freesRescue } from './rescues.js';
@@ -157,7 +158,7 @@ export default class RescueLayer {
                     const i = this.joined - a.joined;
                     if (i >= L.alongMax) { a.state = 'leave'; a.left = L.leaveMs; continue; }
                     const ox = L.alongOff[0] + L.alongStep[0] * i, oy = L.alongOff[1] + (i % 2 ? L.alongStep[1] : 0);
-                    a.px += (fish.x + ox - a.px) * k; a.py += (fish.y + oy + Math.sin(t * 2.4 + a.seed) * 18 - a.py) * k;
+                    a.px += (fish.x + ox - a.px) * k; a.py += (belowHud(fish.y + oy + Math.sin(t * 2.4 + a.seed) * 18, this.scene.cameras.main.worldView.y) - a.py) * k;      // never over the HUD's band
                 }
                 else { a.py -= 1.1 * frames; a.img.setAlpha(Math.max(0, a.left / L.leaveMs)); }
                 if (a.left <= 0) {

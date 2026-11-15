@@ -36,3 +36,9 @@ test('left far behind (the fish was set somewhere else), a friend comes in again
     assert.ok(fx - p.x > 960 && fx - p.x <= ESCORT.reenter + ESCORT.spacing, 'behind the fish, outside a 1920 px wide view');
     assert.ok(Math.abs(p.y - want.y) < 5, 'at its own height');
 });
+
+test('those who follow keep below the HUD band at the top of the view', async () => {
+    const { belowHud, ESCORT } = await import('../game/escort.js');
+    assert.equal(belowHud(500, 300), 500);
+    assert.equal(belowHud(320, 300), 300 + ESCORT.hudClear);
+});

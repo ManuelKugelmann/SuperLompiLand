@@ -1,5 +1,5 @@
 import { createRig } from './CardRig.js';
-import { ESCORT, schoolPlace, escortStep } from './escort.js';
+import { ESCORT, schoolPlace, escortStep, belowHud } from './escort.js';
 import { GRAND_NEST, friendAt } from './level/grandNest.js';
 
 export const SCHOOL_LOOK = { depth: 4.6 };      // just behind the fish
@@ -37,7 +37,7 @@ export default class FriendSchool {
             if (f.x === null) { f.x = fish.x - dir * ESCORT.far * 2; f.y = fish.y; }      // far behind: the step below sets it just outside the view
             const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place) : schoolPlace(k, fish.x, fish.y, dir, t, this.place);
             const ox = f.x, oy = f.y;
-            escortStep(f, k, to.x, to.y, fish.x, dir, dt);
+            escortStep(f, k, to.x, belowHud(to.y, this.scene.cameras.main.worldView.y), fish.x, dir, dt);      // its place never over the HUD's band
             if (!f.rig) {
                 if (!this.scene.buildSlot()) return;
                 f.rig = createRig(this.scene, f.character, f.x, f.y, SCHOOL_LOOK.depth);

@@ -13,8 +13,14 @@ export const ESCORT = {
     lagS: 0.12,          // ... and s more for each friend further back
     bob: 14,             // px each bobs up and down on its own
     far: 2200,           // px: further from the fish than this (the fish was set somewhere else), a friend comes in again from just outside the view
-    reenter: 1100        // ... this far behind the fish
+    reenter: 1100,       // ... this far behind the fish
+    hudClear: 90         // px under the view's top edge that those who follow keep clear of (the HUD's band: counter, hearts, depth)
 };
+
+/** The lowest y (world) a follower may take: below the HUD's band at the top of the view (`viewTop` = the camera's world y). */
+export function belowHud(y, viewTop, cfg = ESCORT) {
+    return Math.max(y, viewTop + cfg.hudClear);
+}
 
 /**
  * Where friend number `k` of the school (0 = the newest, nearest) wants to be at time `t` (s):
