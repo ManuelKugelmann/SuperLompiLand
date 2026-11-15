@@ -29,9 +29,10 @@ export const ROCK_LAYERS = [
     // drawn over it would read as solid, gamedesigner 2026-11-14).
     // socket: closed share in front of an island at least (its rocky underwater base: no far
     // view right in front of an island, spec 5.0c); it eases off into the open sea.
-    // trenchWall: this layer carries the trench wall behind the descent (TRENCH_WALL).
+    // trenchWall: this layer carries the trench wall behind the descent (TRENCH_WALL); shoalRidge: its
+    // closed stretches rise to ridges under the route in `shoal` biomes (SHOAL_RIDGE).
     // rockSize / sharp / shade: the near layer is baked finer, not softened and shaded crisper (user: the near rock read smeared; the far ones may stay soft).
-    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.38, dark: 0.8, depth: -9.5, socket: 0.85, trenchWall: true,
+    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.38, dark: 0.8, depth: -9.5, socket: 0.85, trenchWall: true, shoalRidge: true,
         rockSize: 376, shade: { grain: 0.34, bump: 0.45, relief: 1.1 } },      // the rock just behind the play plane reads near: baked finer and crisper too (playtest: "rocky near background too blurry"); still softened, or its chunks met in seams
     { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.24, dark: 0.86, depth: -7, clearRoute: true, rockSize: 510, sharp: true,
         shade: { grain: 0.42, bump: 0.55, relief: 1.2 } }      // its own crisper shading: playtest "rocky near background too blurry" (the soft look came from low grain and relief, not resolution)
@@ -93,6 +94,30 @@ export const TRENCH_WALL = {
     ledge: 460, ledgeBend: 380,   // px between ledges, how far they bend up and down along the wall
     specks: 0.0025, speckPatch: 900, speckColours: [0x7fe8ff, 0xb08cff, 0x8affd0], speckGlow: 0.7   // specks gather in patches (speckPatch px): colonies, not a starfield
 };
+
+/**
+ * Shoal ridges (gamedesigner 2026-11-15: "graveyards on shoals"): in a biome with `shoal`, the
+ * closed stretches of a layer with `shoalRidge` rise from the deep seabed to a ridge a little below
+ * the calm route, so rock stands behind the hulls where the swimmer is, not only far down. `below`:
+ * px under the route the ridge top wanders between; `edge`: px over which its top is soft.
+ */
+export const SHOAL_RIDGE = { below: [260, 820], scale: 2600, rough: 130, roughScale: 240, edge: 240, relief: [0.14, 0.05], flank: 4200, flankE: 0.8 };   // flank: px the top sinks toward the stretch's ends (sloped shoulders, not a block), over enclosure 0..flankE
+
+/**
+ * How much a shoal ridge lifts a layer's field at (x, y) toward rock (0..1); `e` = the layer's
+ * enclosure at x. Everything depends on x only except the soft top, so the lift only grows downward:
+ * a ridge never has water under rock (user: "no flying rocks in bg").
+ */
+export function shoalRidgeAt(x, y, route, e, cfg = SHOAL_RIDGE) {
+    if (e <= 0) return 0;
+    const { a, b, t } = biomeBlendAt(x);
+    const share = (a.shoal || 0) * (1 - t) + (b.shoal || 0) * t;
+    if (share <= 0) return 0;
+    const [b0, b1] = cfg.below;
+    const rim = route(x) + b0 + (b1 - b0) * vnoise(x / cfg.scale, 8.3, 81) + (vnoise(x / cfg.roughScale, 2.1, 83) - 0.5) * cfg.rough
+        + (1 - smooth01(e / cfg.flankE)) * cfg.flank;
+    return share * smooth01((y - rim) / cfg.edge);
+}
 
 /**
  * How much the trench wall lifts a layer's field at (x, y) toward rock (0 = not at all, 1 = solid),
@@ -238,6 +263,13 @@ export function layerField(base, layer, { route = null, sup = SUPPORT, clear = R
                 const W = TRENCH_WALL, s = (y + W.ledgeBend * vnoise(x / 1500, 6.1, 73)) / W.ledge;
                 d = Math.max(d, T - 0.06 + 0.18 * tw + W.relief[0] * (vnoise(x / 420, y / 360, 67) - 0.5)
                     + W.relief[1] * (vnoise(x / 130, y / 150, 69) - 0.5) + W.relief[2] * (s - Math.floor(s)));
+            }
+            const sr = layer.shoalRidge && route ? shoalRidgeAt(x, y, route, enclosure(x, layer)) : 0;
+            if (sr > 0) {
+                // Relief only where the ridge is clearly solid (never near its top edge, where it would open
+                // holes under rock), so the ridge stays one rooted piece.
+                const R = SHOAL_RIDGE, rw = smooth01((sr - 0.6) / 0.4);
+                d = Math.max(d, T - 0.06 + sr * 0.18 + sr * rw * (R.relief[0] * (vnoise(x / 460, y / 380, 85) - 0.5) + R.relief[1] * (vnoise(x / 140, y / 150, 87) - 0.5)));
             }
             if (e <= -0.999) return d - surfacePush(x, y);      // open: no walls, so no feet to look for
             // The strongest rock in the stretch above (centre and both sides of the foot): once it

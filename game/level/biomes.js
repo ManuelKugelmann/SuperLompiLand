@@ -16,6 +16,7 @@ import { zoneMix, zoneValue, zoneKind, zonedBiome } from './subzones.js';
 //   open     how much rock is removed (0 = cave-rich, 0.3 = wide open water)
 //   backRock reach (world px) of the rock behind the play plane under overhangs (0 = none: endless open water)
 //   rockWall share of the near/mid rock layers that is closed wall (0 = all open water; rockLayerTable.js)
+//   shoal    closed stretches of the mid layer rise to ridges just under the route (an open-sea biome on shoals)
 //   wallRate / wallLife  chance that a steep rock face gets growth, and what grows there (weighted;
 //            more near an island's drop-off into the sea)
 //   coral    chance that a floor spot gets coral          kelp    chance that it gets a kelp stalk
@@ -119,7 +120,8 @@ export const BIOMES = [
         id: 'wreck', name: { de: 'Schiffsfriedhof', en: 'Ship Graveyard' }, zone: 'sea', floor: 4700,
         rock: [0xd0a67c, 0xa87a55, 0x7c5a44, 0x58423a, 0x3e3132], water: [0x8a5a2a, 0.2], open: 0.26,
         backRock: 0,
-        rockWall: 0,
+        shoal: 1,           // its closed stretches rise to rocky ridges just under the route (rockLayerTable SHOAL_RIDGE)
+        rockWall: 0.3,      // wrecks lie on shoals: rocky ridges behind the hulls on some stretches (gamedesigner, 5.0c); the open blue stays open
         coral: 0, kelp: 0, coins: 3, friendRate: 0.2, hazardRate: 0.55,
         props: { wreck: 5, trawler: 3, rowboat: 1, barrel: 2, crate: 1, boulder: 1, anemone: 1 }, propRate: 2.4,
         landmark: 'wreck',
