@@ -61,8 +61,10 @@ export default class HudScene extends Phaser.Scene {
             this.switcherTimer?.remove();
             this.switcherTimer = this.time.delayedCall(ms, () => this.switcher.setVisible(false));
         };
-        if (main.progression.get?.('controls_shown', false)) this.switcher.setVisible(false);
-        else { main.progression.set?.('controls_shown', true); showSwitcher(HUD.switcherFirstMs); }
+        // On the very first run it waits for the end of the opening story (it was clutter over the story's first picture).
+        this.switcher.setVisible(false);
+        this.showSwitcher = showSwitcher;
+        this.switcherPending = !main.progression.get?.('controls_shown', false);
 
         const hudText = (x, y, size) => this.add.text(x, y, '', softText(parseInt(size, 10)));
         // One line along the top (user: 'HUD in top line'): menu, coins, hearts, depth and place. The
@@ -247,6 +249,11 @@ export default class HudScene extends Phaser.Scene {
             this.tweens.add({ targets: this.depthText, scale: 1.12, duration: 260, yoyo: true, ease: 'Sine.easeOut', onComplete: () => this.depthText.clearTint() });
         }
         if (m.health !== this.shownHealth) { this.shownHealth = m.health; this.hearts.set(m.health); }
+        if (this.switcherPending && !(m.wantOpening && !m.perfTour) && !m.opening?.active) {
+            this.switcherPending = false;
+            m.progression.set?.('controls_shown', true);
+            this.showSwitcher(HUD.switcherFirstMs);
+        }
         if (this.perf) this.updatePerf(m);
         const now = performance.now();
         if (this.fpsText && now - this.fpsAt > 500) { this.fpsAt = now; const q = m.quality, tier = q ? ` · ${q.tier[0].toUpperCase()}${q.auto ? '' : '!'}` : '';
