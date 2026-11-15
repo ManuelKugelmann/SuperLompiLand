@@ -251,7 +251,7 @@ class TerrainPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
 
     /** The material tiles on unit 1 for every quad (other pipelines use that unit too; binding it costs no batch). */
     onBind() {
-        if (this.matTexture) this.bindTexture(this.matTexture, 1);
+        if (this.matTexture) { this.bindTexture(this.matTexture, 1); this.gl.activeTexture(this.gl.TEXTURE0); }      // unit 0 active again: a flush binds the batch's texture there, never on unit 1
     }
 }
 

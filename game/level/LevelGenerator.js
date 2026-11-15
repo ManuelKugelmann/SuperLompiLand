@@ -294,7 +294,8 @@ export default class LevelGenerator {
                 for (const t of e.data.islands || []) this.field.setIslandTile(t.key, t.state, t.near);
                 this.pending.delete(e.data.key); this.ready.push(e.data);
             };
-            this.worker.onerror = () => { this.worker = null; this.pending.clear(); };   // fall back to the main thread
+            // A worker failed: all of them stop (review: the others ran on across restarts), and the main thread takes over, finding floating rock itself.
+            this.worker.onerror = () => { this.worker?.terminate?.(); this.worker = null; this.pending.clear(); this.field.islandMode('own'); };
             if (mats) this.worker.postMessage({ materials: mats });
         } catch { this.worker = null; }
         if (!this.worker) this.field.islandMode('own');

@@ -6,7 +6,7 @@
 
 export const PARTICLES = {
     capacity: 900,     // simulated particles at most (one budget constant, spec 14)
-    maxDt: 0.1,        // larger frame gaps are split so nothing tunnels through rock
+    maxDt: 0.05,       // larger frame gaps are split so nothing tunnels through rock (a 980 px/s splash drop moves 49 px a step: under a 96 px rock cell)
     flowEvery: 3,      // each particle asks the water how it moves every this many steps (it changes slowly; staggered: the particles take turns)
     agedDt: 0.1        // the step a set born in the past is brought up to now with (spawnAged): coarser, it is done in one frame
 };

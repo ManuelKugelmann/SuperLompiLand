@@ -77,12 +77,14 @@ export default class RockLayers {
             }
             l.want = [x0, x1, y0, y1, lx + W / 2, ly + H / 2];
         });
-        // Show at most one finished chunk per frame; ones nobody waits for any more are dropped.
-        while (this.ready.length) {
-            const r = this.ready.shift(), l = this.layers[r.layer];
-            if (l.chunks.get(r.key) !== 'pending') continue;
+        // Show at most one finished chunk per frame; ones nobody waits for any more are dropped. One whose layer has no room
+        // yet waits in the queue, and the next chunk gets its turn (review: a full layer at the head starved the other layer).
+        for (let k = 0; k < this.ready.length; k++) {
+            const r = this.ready[k], l = this.layers[r.layer];
+            if (l.chunks.get(r.key) !== 'pending') { this.ready.splice(k--, 1); continue; }
             const shown = this.show(l, r);
-            if (!shown) { this.ready.unshift(r); break; }      // no room yet: it waits for a place
+            if (!shown) continue;
+            this.ready.splice(k, 1);
             l.chunks.set(r.key, shown);
             break;
         }
