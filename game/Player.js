@@ -91,6 +91,7 @@ export default class Player {
         // in fixed 60 Hz steps); the rig is drawn every frame at a position
         // interpolated between the last two steps, so motion is smooth at any refresh rate.
         this.rig = createRig(scene, character, x, y);
+        this.rig.alwaysPose = true;      // the playable moves every frame on every tier
         this.sprite = scene.matter.add.sprite(x, y, this.rig.view.texture.key).setVisible(false);
         this.aura = scene.add.circle(x, y, 80, 0xfff3b0, 0.12).setStrokeStyle(5, 0xfff3b0, 0.8).setDepth(4.9).setVisible(false);
         this.prev = new Phaser.Math.Vector2(x, y);

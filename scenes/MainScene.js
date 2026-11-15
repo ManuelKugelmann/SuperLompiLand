@@ -66,6 +66,7 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
 import { PRESETS } from '../game/fx/particles.js';
 import { VIEW_CULL, cullToView } from '../game/viewCull.js';
+import { CARDS } from '../game/rig/cards.js';
 import { updateTerrain } from '../game/fx/TerrainPipeline.js';
 import { due, everyOf } from '../game/throttle.js';
 import { setRenderScale } from '../game/renderScale.js';
@@ -580,6 +581,7 @@ export default class MainScene extends Phaser.Scene {
         this.level.setTerrainLite(q.liteTerrain);
         this.level.leadMax = q.lead;
         this.level.kelpBack = q.kelpBack; this.level.plantSegments = q.plantSegments; this.level.animEvery = q.animEvery;
+        CARDS.poseEvery = q.poseEvery;
         this.particles.share = q.particles;
         this.swarms.share = q.shoals;
         SWARMS.simEvery = q.simEvery; SWARMS.midEvery = q.midEvery; SWARMS.perView = q.shoalsAround;

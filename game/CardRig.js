@@ -72,6 +72,9 @@ export default class CardRig {
         this.zoom = 1;
         this.shown = true;
         this.turning = null;
+        this.poseTurn = Math.floor(Math.random() * 64);      // its turn among the rigs (CARDS.poseEvery)
+        this.owed = 0;            // frames not yet posed
+        this.alwaysPose = false;  // the playable: posed every frame whatever the tier
         this.depth = depth;
         this.views = {};
         this.sets = {};
@@ -189,6 +192,17 @@ export default class CardRig {
             set.eyes?.hide();
             return;
         }
+        // On the slow tiers a rig is posed only every few frames, the rigs taking turns: in between its cards follow its
+        // place, and the next pose catches up the frames it skipped (its swimming beat stays in time).
+        if (CARDS.poseEvery > 1 && !this.alwaysPose && !this.turning && ++this.poseTurn % CARDS.poseEvery) {
+            for (const e of set.entries) e.rope.setPosition(x, y);
+            set.eyes?.shift(x - (this.lastX ?? x), y - (this.lastY ?? y));
+            this.lastX = x; this.lastY = y;
+            this.owed += frames;
+            return;
+        }
+        this.lastX = x; this.lastY = y;
+        frames += this.owed; this.owed = 0;
         const speed = Math.hypot(vx, vy);
         const want = facing ?? (Math.abs(vx) > 0.8 ? (vx < 0 ? -1 : 1) : this.facing);
         // Turn-around: the nose swings toward the viewer, through edge-on, onto the other side.

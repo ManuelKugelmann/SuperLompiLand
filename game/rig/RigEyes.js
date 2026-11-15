@@ -102,6 +102,9 @@ export default class RigEyes {
 
     setDepth(d) { this.depth = d; this.parts?.forEach((p, i) => p.setDepth(d + i * 0.00001)); return this; }
 
+    /** The whole eye moved by (dx, dy) px as it is: a rig that is not posed this frame (CARDS.poseEvery) carries its eyes along. */
+    shift(dx, dy) { if (this.parts) for (const p of this.parts) { p.x += dx; p.y += dy; } }
+
     /** Not shown: the pictures go (the gaze and blinking keep their state). */
     hide() {
         if (!this.parts) return;

@@ -17,6 +17,7 @@ export const CARDS = {
     steerMax: 0.07,         // the turn rate (rad per frame) at which the bend is at its most
     steerEase: 0.2,         // how quickly the bend follows the turning (share per frame)
     offView: 200,           // px beyond the view (plus its own size) at which a rig is no longer posed
+    poseEvery: 1,           // a rig is posed anew every so many frames, the rigs taking turns (the quality tier sets it: QUALITY.poseEvery); in between its cards only follow its place. The playable is always posed
     bodyGrid: [12, 9],      // body card grid (columns x rows of cells)
     partGrid: [6, 4],       // fin card grid along its longer side x across
     bulge: 0.17,            // how far the body's middle stands toward the viewer, in picture widths

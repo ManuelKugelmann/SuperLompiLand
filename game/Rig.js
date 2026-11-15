@@ -74,6 +74,9 @@ function softFor(scene, key) {
  */
 export default class Rig {
     constructor(scene, character, x, y, depth = 5) {
+        this.poseTurn = Math.floor(Math.random() * 64);      // its turn among the rigs (CARDS.poseEvery)
+        this.owed = 0;            // frames not yet posed
+        this.alwaysPose = false;  // the playable: posed every frame whatever the tier
         ensureFallbackTextures(scene);
         this.char = character;
         this.facing = 1;        // 1 = right, -1 = left
@@ -162,6 +165,19 @@ export default class Rig {
     draw({ x, y, vx = 0, vy = 0, frames = 1, effort = 0, squash = 0, turn = 0.2, facing, flowX = 0, flowY = 0, lean = 0, beat }) {
         const view = this.view, grid = view.grid, halo = grid.halo;
         view.setPosition(x, y);
+        // On the slow tiers a rig is bent anew only every few frames, the rigs taking turns (CARDS.poseEvery): in between
+        // it moves as it is, fin, overlay and eyes along, and the next pose catches up the frames it skipped.
+        const dx = x - (this.lastX ?? x), dy = y - (this.lastY ?? y);
+        this.lastX = x; this.lastY = y;
+        const wantFacing = facing ?? (Math.abs(vx) > 0.8 ? (vx < 0 ? -1 : 1) : this.facing);
+        if (CARDS.poseEvery > 1 && !this.alwaysPose && wantFacing === this.facing && ++this.poseTurn % CARDS.poseEvery) {
+            if (view.fin) { view.fin.x += dx; view.fin.y += dy; }
+            this.overlay?.setPosition(x, y);
+            view.eyes?.shift(dx, dy);
+            this.owed += frames;
+            return;
+        }
+        frames += this.owed; this.owed = 0;
 
         // Orientation depends on speed: slow = level, just hovering; faster = the
         // nose follows the movement. The art faces right; heading left it is
