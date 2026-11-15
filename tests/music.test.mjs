@@ -188,3 +188,11 @@ test('layers: in key with the chord, on their own steps, louder with more round 
     assert.equal(none.friends, 0);
     assert.ok(some.friends > 0 && some.friends < 1 && some.glow === 1);
 });
+
+test('earshot: a coral reef near the floor sounds of plants, shoals count as animals', async () => {
+    const { earshot, layerLevels } = await import('../game/music/score.js');
+    const none = { plants: 0, animals: 0, glow: 0 };
+    assert.ok(Math.abs(layerLevels(earshot(none, 0.7, 1, 0)).plants - 0.7) < 1e-9);
+    assert.equal(layerLevels(earshot(none, 0.7, 0, 0)).plants, 0, 'open water above the reef: none');
+    assert.ok(layerLevels(earshot(none, 0, 0, 2)).animals > 0.5);
+});

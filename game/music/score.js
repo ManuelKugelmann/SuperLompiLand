@@ -88,3 +88,16 @@ export function layerLevels(near, full = LAYER_FULL) {
     for (const k of Object.keys(LAYERS)) out[k] = Math.max(0, Math.min(1, (near[k] || 0) / full[k]));
     return out;
 }
+
+/**
+ * What the layers hear round Lompi, from what the world can count: `life` = { plants, animals, glow } in
+ * earshot (swaying plants, creatures), `richness` = the place's corals and kelp (biome coral + kelp, 0..1+),
+ * `nearFloor` = 0..1 how close the seabed is (corals are not counted one by one), `shoals` = fish shoals in earshot.
+ */
+export function earshot(life, richness, nearFloor, shoals, full = LAYER_FULL) {
+    return {
+        plants: life.plants + Math.min(1, richness) * nearFloor * full.plants,
+        animals: life.animals + shoals,
+        glow: life.glow
+    };
+}

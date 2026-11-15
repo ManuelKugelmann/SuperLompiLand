@@ -24,7 +24,7 @@ import { getCharacter, loadSelectedId, saveSelectedId, isPlayable, loadUnlocked,
 import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock, updateMusic, updateWeatherSound, setMusicLayers } from '../game/audio.js';
-import { layerLevels } from '../game/music/score.js';
+import { layerLevels, earshot } from '../game/music/score.js';
 import { createStreak, chainNote, chainChord } from '../game/music/melody.js';
 import { CHAIN, createChain, createSpin, coinWorth } from '../game/chain.js';
 import BoosterLayer from '../game/level/BoosterLayer.js';
@@ -152,7 +152,7 @@ const FISH_LIGHT = { size: 760, alpha: 0.85, depth: 0.9 };      // depth: under 
 const COIN_BOB_PX = 12;
 
 /** The music's proximity layers listen this far round Lompi, this often (game/music/score.js LAYERS). */
-const MUSIC_NEAR = { r: 900, everyMs: 500 };
+const MUSIC_NEAR = { r: 900, everyMs: 500, floor: 900 };      // floor: px above the seabed where the corals' and kelp's layer fades out
 
 const WORLD = {
     gravity: 0.12,         // gentle sink
@@ -1902,8 +1902,10 @@ export default class MainScene extends Phaser.Scene {
             // Music layers by what is round Lompi (score.js LAYERS): the flock, plants, animals, glowing ones. Counted twice a second.
             if (!this.ambientMode && time - (this.lifeAt || -Infinity) > MUSIC_NEAR.everyMs) {
                 this.lifeAt = time;
-                const life = this.level.lifeNear(sp.x, sp.y, MUSIC_NEAR.r);
-                setMusicLayers(layerLevels({ ...life, friends: this.school.friends.length + (this.mp?.characters().length || 0) }));
+                const life = this.level.lifeNear(sp.x, sp.y, MUSIC_NEAR.r), b = BIOMES[biomeIndexAt(sp.x)];
+                const floor = this.seabedBelow(sp.x, sp.y), nearFloor = floor === null ? 0 : Math.max(0, 1 - (floor - sp.y) / MUSIC_NEAR.floor);
+                const near = earshot(life, (b.coral || 0) + (b.kelp || 0), nearFloor, this.swarms.near(sp.x, sp.y, MUSIC_NEAR.r).length);
+                setMusicLayers(layerLevels({ ...near, friends: this.school.friends.length + (this.mp?.characters().length || 0) }));
             }
             // The storm rumbles overhead (loudest near the surface); strong moving water rushes past the fish.
             const p = this.soundProbe || (this.soundProbe = { x: 0, y: 0 }), waves = this.waves ?? this.wavePhase();
