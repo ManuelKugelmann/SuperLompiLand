@@ -211,3 +211,12 @@ test('a fright spreads through a group, the same way the first one fled', () => 
     stepSwimmer(lone, 1 / 60, { ...open, mates: [lone] });
     assert.notEqual(lone.state, 'flee');
 });
+
+test('a group of six never balls up: each keeps its own size from the others, and only its nearest mate pulls', () => {
+    const open = { isOpen: () => true, player: null, alarm: null };
+    const fish = Array.from({ length: 6 }, (_, i) => createSwimmer({ x: i * 120, y: (i % 2) * 90 }, { range: 3000, gap: 250 }, i + 1)), env = { ...open, mates: fish };
+    for (let s = 0; s < 1800; s++) { env.t = s / 60; for (const f of fish) stepSwimmer(f, 1 / 60, env); }
+    let close = 0;
+    for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) if (Math.hypot(fish[i].x - fish[j].x, fish[i].y - fish[j].y) < 250 * 0.6) close++;
+    assert.ok(close <= 2, `${close} pairs overlapping`);
+});

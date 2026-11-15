@@ -71,21 +71,27 @@ export function nearestRock(isOpen, x, y, reach) {
     return best && { x: best.x, y: best.y };
 }
 
-/** The heading a roaming swimmer wants with its mates about: its own `want` turned with them, toward them, away from one too close. */
+/**
+ * The heading a roaming swimmer wants with its mates about: its own `want` turned with them, toward its nearest mate, away
+ * from any too close. Only the nearest mate pulls (artifact pass: six angelfish all drawn to their middle hung as a stack of
+ * discs): pairs and loose strings, never a ball. Each keeps its own `gap` (its size) from the others, at least cfg.gap.
+ */
 export function flockWant(a, mates, want, cfg = SWIMMER.flock) {
-    let n = 0, cx = 0, cy = 0, hx = 0, hy = 0, sx = 0, sy = 0;
+    const gap = Math.max(cfg.gap, a.gap || 0);
+    let n = 0, hx = 0, hy = 0, sx = 0, sy = 0, near = null, nd = Infinity;
     for (const m of mates) {
         if (m === a) continue;
         const dx = m.x - a.x, dy = m.y - a.y, d = Math.hypot(dx, dy);
         if (d > cfg.range) continue;
-        n++; cx += dx; cy += dy; hx += Math.cos(m.heading); hy += Math.sin(m.heading);
-        if (d < cfg.gap && d > 1e-6) { const k = (cfg.gap - d) / cfg.gap; sx -= dx / d * k; sy -= dy / d * k; }
+        n++; hx += Math.cos(m.heading); hy += Math.sin(m.heading);
+        if (d < nd) { nd = d; near = m; }
+        if (d < gap && d > 1e-6) { const k = (gap - d) / gap; sx -= dx / d * k; sy -= dy / d * k; }
     }
     if (!n) return want;
     let vx = Math.cos(want), vy = Math.sin(want);
-    const hl = Math.hypot(hx, hy), cd = Math.hypot(cx, cy) / n;
+    const hl = Math.hypot(hx, hy);
     if (hl > 1e-6) { vx += cfg.align * hx / hl; vy += cfg.align * hy / hl; }
-    if (cd > cfg.gap) { const k = cfg.cohesion * Math.min(3, cd / cfg.gap); vx += k * cx / n / cd; vy += k * cy / n / cd; }      // the further off, the harder it pulls
+    if (nd > gap * 1.3) { const k = cfg.cohesion * Math.min(3, nd / gap); vx += k * (near.x - a.x) / nd; vy += k * (near.y - a.y) / nd; }      // the further off, the harder it pulls
     vx += cfg.part * sx; vy += cfg.part * sy;
     return Math.atan2(vy, vx);
 }

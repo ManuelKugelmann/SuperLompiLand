@@ -37,7 +37,7 @@ export default class Creature {
             const c = createCrawler(x, y, env.density, env.threshold, row.crawl, seed);
             if (c.onRock) { this.crawler = c; this.body.lift = Math.hypot(x - c.x, y - c.y); }
         }
-        if (row.ai) this.brain = createSwimmer({ x, y }, row.ai, seed);
+        if (row.ai) this.brain = createSwimmer({ x, y }, { gap: row.size * 1.15, ...row.ai }, seed);      // in a group it keeps at least its own size from the others
         if (row.grumpy) this.grumpy = createGrumpy(x, y, row.grumpy, seed);
         this.step(0, 0, null, null);
     }
