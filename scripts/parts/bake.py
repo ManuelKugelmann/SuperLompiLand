@@ -148,8 +148,13 @@ for key, s in spec.items():
                 # (the soft mask left a half-clear seam through it).
                 region = poly_mask(p['under'], W, H) * (src[..., 3] > 0.5)
                 touched = (m > 0.02).astype(np.float32)
-                known = (body[..., 3] > 0.95) * (1 - touched)
-                body[..., :3] = synth(fill(body[..., :3], known.astype(np.float32), region * touched), known, region * touched)
+                # Where the part really lay: synthesized texture, as before; its faint rim only smoothly
+                # filled (synthesis there copied odd patches in, an eye-like blotch on Flitzi).
+                core = np.clip(m * 4, 0, 1)
+                known = (body[..., 3] > 0.95) * (1 - core)
+                body[..., :3] = synth(fill(body[..., :3], known.astype(np.float32), region * m), known, region * m)
+                rim = region * touched * (1 - (core >= 1))
+                body[..., :3] = fill(body[..., :3], ((body[..., 3] > 0.95) * (1 - touched) + region * (core >= 1)).clip(0, 1).astype(np.float32), rim)
                 body[..., 3] = np.maximum(body[..., 3] * (1 - rm), region * touched * src[..., 3])
                 # Faint leftovers of the part outside the filled area (its soft edge, half removed) go entirely.
                 body[..., 3] = np.where((rm > 0.02) & (region == 0) & (body[..., 3] < 0.6), 0, body[..., 3])
