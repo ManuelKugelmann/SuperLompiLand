@@ -116,7 +116,11 @@ export class Gaze {
  * shows its eyeball turned by `yaw` (0 = facing the viewer; the far eye round the head is turned a lot; faces.js). The iris sits on the ball: looking sideways by `gx`
  * (-1..1 toward the nose) turns it by gx x `angle`, so it moves less and narrows the further it turns away.
  */
-export const EYEBALL = { angle: 0.7, minSquash: 0.22 };
+export const EYEBALL = {
+    angle: 0.7,       // rad the iris turns on its ball at full gaze (sets how far it moves)
+    squashTurn: 0.5,  // ... but only this share of that turn narrows it (a far eye looking ahead stayed a sliver)
+    minSquash: 0.55   // never narrower than this: the painted far eyes are about 0.5-0.6 (user: "far eye pupils distorted")
+};
 
 /** Each eye's yaw (rad): given per eye in faces.js (`yaw`, the far eye round the head); front eyes face the viewer. */
 export const eyeYaws = at => at.map(a => a.yaw || 0);
@@ -124,5 +128,5 @@ export const eyeYaws = at => at.map(a => a.yaw || 0);
 /** The iris on its ball: { dx: shift across in ball radii, squash: its width 0..1 }. */
 export function onBall(gx, yaw, cfg = EYEBALL) {
     const a = yaw + gx * cfg.angle;
-    return { dx: Math.sin(a) - Math.sin(yaw), squash: Math.max(cfg.minSquash, Math.cos(a)) };
+    return { dx: Math.sin(a) - Math.sin(yaw), squash: Math.max(cfg.minSquash, Math.cos(yaw + gx * cfg.angle * cfg.squashTurn)) };
 }
