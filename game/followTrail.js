@@ -7,6 +7,16 @@ export const TRAIL = {
     keep: 160         // points kept (160 x 40 = 6 400 px of path: enough for a long chain)
 };
 
+/** The chain behind the fish: chapter friends first (FriendSchool), then rescued animals (RescueLayer). */
+export const CHAIN = {
+    start: 230,      // px back along the path where the first friend swims
+    gap: 170,        // px between two friends (about a body length: they never overlap)
+    sway: 22         // px they sway across the path, one wave per bar of the music (spec 5.0z)
+};
+
+/** Where friend number `slot` (0 = first) swims: the point that far back along the trail. */
+export const chainAt = (trail, slot, out, cfg = CHAIN) => trail.at(cfg.start + cfg.gap * slot, out);
+
 /** A trail of the head's path. push(x, y) every frame; at(d) = the point d px back along the path. */
 export function createTrail(cfg = TRAIL) {
     const xs = new Float64Array(cfg.keep), ys = new Float64Array(cfg.keep);

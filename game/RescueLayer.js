@@ -1,5 +1,5 @@
 import { keepOut } from './ai/keepOut.js';
-import { createTrail } from './followTrail.js';
+import { createTrail, chainAt, CHAIN } from './followTrail.js';
 import { belowHud } from './escort.js';
 import Phaser from 'phaser';
 import { play, musicClock, nowSeconds } from './audio.js';
@@ -49,9 +49,7 @@ export const RESCUE_LOOK = {
     happyMs: 1500,       // one happy loop where the net was ...
     happyRadius: 90,
     alongMax: 6,         // ... then it swims along with the fish for good (tester: "they follow, then vanish: strange"); beyond this many the one that has followed longest swims back home (never fades: user 2026-11-15), and says goodbye ...
-    chainStart: 230,     // ... in a chain along the fish's own path (user: "chain of friends"): the first this many px back along it ...
-    chainGap: 170,       // ... each further one this much further back (about one body length: they never overlap) ...
-    chainSway: 22,       // ... swaying this many px across the path, each a little out of step
+    // ... in the chain along the fish's own path (user: "chain of friends"; spacing: followTrail.js CHAIN), after the chapter friends
     alongEase: 0.09,     // ... easing there by this share per step (keeps up with a sprinting fish) ...
     alongClear: 36,      // ... and keeping this many px from rock (ai/keepOut.js)
     homeEase: 0.03,      // a friend swimming home eases there by this share per step, then circles its old place
@@ -128,7 +126,7 @@ export default class RescueLayer {
 
     /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s, `delta` ms. */
     update(fish, radius, t, delta) {
-        this.trail.push(fish.x, fish.y);
+        if (!this.scene.followTrail) this.trail.push(fish.x, fish.y);      // the scene's shared trail is pushed by the scene
         const L = RESCUE_LOOK, s = this.scene, frames = delta / (1000 / 60);
         for (const spot of this.spots) {
             if (spot.x < fish.x - L.near) continue;
@@ -180,10 +178,10 @@ export default class RescueLayer {
                     // Its place in the chain along the fish's path: the newest nearest the fish, older ones further back.
                     const i = this.joined - a.joined;
                     if (i >= L.alongMax) { a.state = 'home'; continue; }      // one too many: it swims back to where it was found
-                    const at = this.trail.at(L.chainStart + L.chainGap * i, this.pt || (this.pt = { x: 0, y: 0 }));
+                    const at = chainAt(this.scene.followTrail || this.trail, (this.scene.school?.friends.length || 0) + i, this.pt || (this.pt = { x: 0, y: 0 }));
                     // The chain sways with the music: one wave per bar, travelling down the line (spec 5.0z).
                     const ph = musicClock.phase(nowSeconds()), bar = ph.beat / musicClock.beatsPerBar;
-                    const sway = Math.sin((bar - i * 0.12) * Math.PI * 2) * L.chainSway;
+                    const sway = Math.sin((bar - i * 0.12) * Math.PI * 2) * CHAIN.sway;
                     a.px += (at.x - a.px) * k; a.py += (belowHud(at.y + sway, this.scene.cameras.main.worldView.y) - a.py) * k;      // never over the HUD's band
                     // ... and never in rock (the path may cut a corner).
                     if (this.scene.level?.rock) { const q = keepOut(a.px, a.py, L.alongClear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); a.px = q.x; a.py = q.y; }

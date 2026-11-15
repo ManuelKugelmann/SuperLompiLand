@@ -73,6 +73,7 @@ import { updateTerrain } from '../game/fx/TerrainPipeline.js';
 import { due, everyOf } from '../game/throttle.js';
 import { setRenderScale } from '../game/renderScale.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
+import { createTrail } from '../game/followTrail.js';
 import FriendSchool from '../game/FriendSchool.js';
 import NurseryLayer from '../game/level/NurseryLayer.js';
 import SiphonophoreLayer from '../game/level/SiphonophoreLayer.js';
@@ -282,6 +283,7 @@ export default class MainScene extends Phaser.Scene {
         this.journey = createJourney(this.progression.get?.('journey', []) || [], chapters(undefined, undefined, this.registry.get('character') || loadSelectedId()));
         // The freed friends swim along as a little school for the rest of the journey (tester: "rescued friends should follow
         // indefinitely"): those freed before this start are there from the first frame, the newest nearest.
+        this.followTrail = createTrail();      // Lompi's path: the chain of friends swims along it (game/followTrail.js)
         this.school = new FriendSchool(this);
         for (const ch of this.journey.list) if (ch.friend && this.journey.has(ch.friend.id)) this.school.add(ch.friend);
         this.openingAsked = !!this.registry.get('opening');      // 'watch the story' from the title menu: wherever the save is
@@ -1879,6 +1881,7 @@ export default class MainScene extends Phaser.Scene {
         this.front.update(sp, time / 1000, delta);
         this.arch.update(sp, this.fish.radius, time / 1000, this.fish.inAir);
         this.beats?.update(sp, time / 1000, delta);
+        this.followTrail.push(sp.x, sp.y);
         if (!this.ambientMode) this.school.update(sp, this.fish.facing, time / 1000, delta / 1000);
         if (!this.creaturesWarm && this.buildSlot()) this.creaturesWarm = !this.level.prewarm();      // one creature kind per frame, right after the start
         else if (this.creaturesWarm && !this.stormWarm && this.buildSlot()) this.stormWarm = !prewarmStorm(this);      // then the storm's pictures, one per frame

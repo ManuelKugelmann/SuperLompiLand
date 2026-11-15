@@ -1,4 +1,5 @@
 import { keepOut } from './ai/keepOut.js';
+import { chainAt } from './followTrail.js';
 import { createRig } from './CardRig.js';
 import { ESCORT, schoolPlace, escortStep, belowHud } from './escort.js';
 import { GRAND_NEST, friendAt } from './level/grandNest.js';
@@ -36,7 +37,10 @@ export default class FriendSchool {
         if (this.nest) this.gathered = Math.min(1, this.gathered + dt / GRAND_NEST.gatherS);
         this.friends.forEach((f, k) => {
             if (f.x === null) { f.x = fish.x - dir * ESCORT.far * 2; f.y = fish.y; }      // far behind: the step below sets it just outside the view
-            const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place) : schoolPlace(k, fish.x, fish.y, dir, t, this.place);
+            // In the chain along Lompi's path (user: "chain of friends"), the newest nearest; at the grand nest they gather round him.
+            const trail = this.scene.followTrail;
+            const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place)
+                : trail ? chainAt(trail, k, this.pt || (this.pt = { x: 0, y: 0 })) : schoolPlace(k, fish.x, fish.y, dir, t, this.place);
             const ox = f.x, oy = f.y;
             escortStep(f, k, to.x, belowHud(to.y, this.scene.cameras.main.worldView.y), fish.x, dir, dt);      // its place never over the HUD's band
             // Never in rock (it follows the fish's path, which may cut a corner): pushed out along the terrain's slope.
