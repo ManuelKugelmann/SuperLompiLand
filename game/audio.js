@@ -410,6 +410,8 @@ const SOUNDS = {
     respawn() { tone({ f: 440, to: 220, type: 'sine', dur: 0.4, vol: 0.2 }); },
     flap() { noise({ dur: 0.09, vol: 0.1, from: 700, to: 1400, q: 1.2 }); },
     tap() { tone({ f: 880, type: 'sine', dur: 0.06, vol: 0.12 }); },
+    /** A trapped animal calls for help (RescueLayer): a soft falling two-note "here!". */
+    call() { [[987.77, 0], [783.99, 0.16]].forEach(([f, at]) => tone({ f, type: 'sine', at, dur: 0.32, vol: 0.05, rise: 0.03 })); },
     /**
      * A big animal is near, heard before it is seen (game/level/heralds.js): a soft low swell of two notes,
      * like the music noticing something big. Synthesized barks and chirps were tried and read as a snare

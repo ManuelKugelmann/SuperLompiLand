@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { play } from './audio.js';
 import { RESCUES, rescueSpots, freesRescue } from './rescues.js';
 import BonusCoins from './level/BonusCoins.js';
 
@@ -81,6 +82,13 @@ export default class RescueLayer {
         return { spot, x, y, px: x, py: y, img, glow, net, shadow, trail, state: 'caught', left: 0, seed: x * 0.013, lying: ground !== null, call: 0 };
     }
 
+    /** The nearest animal still in its trap within calling distance of the fish, or null (for the edge pointer). */
+    calling(fish) {
+        let best = null, d = RESCUE_LOOK.callNear;
+        for (const a of this.actors.values()) if (a.state === 'caught' && Math.abs(a.x - fish.x) < d) { d = Math.abs(a.x - fish.x); best = a; }
+        return best;
+    }
+
     remove(a) {
         a.img.destroy(); a.glow.destroy(); a.net?.destroy(); a.shadow?.destroy(); a.trail?.destroy();
         this.actors.delete(a.spot.id);
@@ -121,6 +129,9 @@ export default class RescueLayer {
                 // A gentle call when the fish is about (playtest: the animals to rescue should be easier to notice): every so often
                 // it waves (a quick wide rocking that dies down) and a few small bubbles rise from its trap. One lying on the sand calls anyway.
                 const heard = Math.abs(a.x - fish.x) < L.callNear;
+                // Heard for the first time on this approach: a soft "here!" (spec 5.0t 4, rescue calls).
+                if (heard && !a.heard) play('call');
+                a.heard = heard;
                 if ((heard || a.lying) && (a.call -= delta / 1000) <= 0) {
                     a.call = L.callEvery; a.wave = heard ? 1 : 0;
                     s.particles?.mark('bubble', a.x, a.y - L.size * 0.3, heard ? 4 : 2, { radius: 10, spread: 30, vy: -260 });

@@ -805,6 +805,34 @@ export default class MainScene extends Phaser.Scene {
     }
 
     /**
+     * Rescue calls (spec 5.0t 4; tester: 'the animals to rescue should be easier to notice'): while a trapped animal
+     * calls but is out of the picture, a small arrow of light at the edge points to it.
+     */
+    /** The soft chevron of light the edge cues use (pointing right), made once. */
+    arrowTexture() {
+        if (!this.textures.exists('lost_arrow')) {
+            // A soft chevron of light, pointing right.
+            const S = 128, tex = this.textures.createCanvas('lost_arrow', S, S), c = tex.getContext();
+            c.lineCap = 'round'; c.lineJoin = 'round';
+            for (const [w, a] of [[34, 0.12], [22, 0.25], [11, 0.9]]) {
+                c.strokeStyle = `rgba(255,243,176,${a})`; c.lineWidth = w;
+                c.beginPath(); c.moveTo(44, 26); c.lineTo(86, 64); c.lineTo(44, 102); c.stroke();
+            }
+            tex.refresh();
+        }
+    }
+
+    updateRescueCue() {
+        const a = this.rescues?.calling(this.fish.sprite);
+        this.arrowTexture();
+        const at = a ? edgeMarker(this.cameras.main.worldView, { x: a.x, y: a.y }) : null;
+        if (!at) { this.rescueArrow?.setVisible(false); return; }
+        if (!this.rescueArrow) this.rescueArrow = this.add.image(0, 0, 'lost_arrow').setScrollFactor(0).setDepth(50).setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff6ff);
+        const beat = 1 + 0.12 * Math.sin(this.time.now / 200);
+        this.rescueArrow.setVisible(true).setPosition(at.x, at.y).setRotation(at.angle).setAlpha(0.8).setScale(0.9 * beat);
+    }
+
+    /**
      * The lost cue (game/lostCue.js): after a while of standing still or swimming west, a soft
      * glowing arrow at the edge of the picture points to the next friend in a net or the next
      * nest; it fades once the fish heads that way.
@@ -819,16 +847,7 @@ export default class MainScene extends Phaser.Scene {
         }
         const gx = this.goalX, alpha = this.lostCue.step(dt, v.x, Math.hypot(v.x, v.y), gx === null ? null : gx - f.x);
         if (alpha <= 0) { this.lostArrow?.setVisible(false); return; }
-        if (!this.textures.exists('lost_arrow')) {
-            // A soft chevron of light, pointing right.
-            const S = 128, tex = this.textures.createCanvas('lost_arrow', S, S), c = tex.getContext();
-            c.lineCap = 'round'; c.lineJoin = 'round';
-            for (const [w, a] of [[34, 0.12], [22, 0.25], [11, 0.9]]) {
-                c.strokeStyle = `rgba(255,243,176,${a})`; c.lineWidth = w;
-                c.beginPath(); c.moveTo(44, 26); c.lineTo(86, 64); c.lineTo(44, 102); c.stroke();
-            }
-            tex.refresh();
-        }
+        this.arrowTexture();
         if (!this.lostArrow) this.lostArrow = this.add.image(0, 0, 'lost_arrow').setScrollFactor(0).setDepth(50).setBlendMode(Phaser.BlendModes.ADD);
         const at = edgeMarker(this.cameras.main.worldView, { x: gx, y: this.level.field.routeY(gx) });
         if (!at) { this.lostArrow.setVisible(false); return; }
@@ -1711,7 +1730,7 @@ export default class MainScene extends Phaser.Scene {
         this.bobCoins();
         this.discover(delta);
         if (!this.ambientMode) this.updateGuide(delta / 1000);
-        if (!this.ambientMode && !this.perfTour) this.updateLostCue(delta / 1000);
+        if (!this.ambientMode && !this.perfTour) { this.updateLostCue(delta / 1000); this.updateRescueCue(); }
         if (!this.revealed && !this.ambientMode && !this.perfTour && this.fish.sprite.x > ventSpot().x1) { this.revealed = true; play('reveal'); }
 
         // Bubble trail when moving fast.
