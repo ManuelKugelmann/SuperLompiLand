@@ -44,7 +44,7 @@ export function createDepthBell(cfg = DEPTH_MARKS) {
  * joined by straight pieces. Shallow water is as painted; by 50 m the picture is clearly darker, by 100 m a
  * dark blue, past 200 m nearly night where creature light matters. One table, read by the camera grade.
  */
-export const DEPTH_LIGHT = [[0, 1], [10, 1], [20, 0.9], [50, 0.62], [100, 0.5], [200, 0.43], [500, 0.39], [1000, 0.37]];      // the floor keeps Lompi and the coins readable (the grade darkens everything)
+export const DEPTH_LIGHT = [[0, 1], [15, 1], [30, 0.9], [60, 0.76], [120, 0.6], [250, 0.5], [600, 0.44], [1000, 0.42]];      // gentler since 2026-11-15 (user: 'depth darkening too quick'); the floor keeps Lompi and the coins readable
 
 /** Brightness for a depth in metres (0..1, never brighter deeper). */
 export function depthLight(m, table = DEPTH_LIGHT) {
