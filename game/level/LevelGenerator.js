@@ -1280,15 +1280,17 @@ export default class LevelGenerator {
         }
         chunk.objects.push(s.add.image(f.x, f.y - 26, 'vent_plant').setOrigin(0.5, 64 / 112).setDepth(1));
         // The bubbles: purely visual, looping up the column.
-        // One picture per bubble, so fewer on the slower tiers (quality.js particles share).
-        const columnBubbles = Math.max(2, Math.round(height / 110 * shareOf(s, 'particles')));
-        for (let i = 0; i < columnBubbles; i++) {
+        // One picture per bubble, so fewer on the slower tiers (quality.js particles share). Every bubble still draws its
+        // random numbers, shown or not: the chunk's random stream must not depend on the tier, or coins and props would
+        // stand elsewhere on another phone (or after the tier steps down and the chunk is built again).
+        const all = Math.round(height / 110), shown = Math.max(2, Math.round(all * shareOf(s, 'particles')));
+        for (let i = 0; i < all; i++) {
+            const size = rng.between(22, 52), drift = rng.between(-60, 60), slow = rng.realInRange(2.6, 3.4);
+            if (i >= shown) continue;
             const b = s.textures.exists('bubble') ? s.add.image(f.x, f.y, 'bubble') : s.add.circle(f.x, f.y, 16, 0xffffff, 0.4);
-            const size = rng.between(22, 52);
             b.setDisplaySize(size, size).setDepth(6).setAlpha(0.75);
-            const drift = rng.between(-60, 60);
             s.tweens.add({
-                targets: b, y: f.y - height, x: f.x + drift, alpha: 0, duration: height * rng.realInRange(2.6, 3.4),
+                targets: b, y: f.y - height, x: f.x + drift, alpha: 0, duration: height * slow,
                 delay: i * 330, repeat: -1, ease: 'Sine.easeIn'
             });
             chunk.objects.push(b);
