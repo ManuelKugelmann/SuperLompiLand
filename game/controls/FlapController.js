@@ -3,8 +3,7 @@ import ControllerBase from './ControllerBase.js';
 import SteerAssist from './SteerAssist.js';
 import { play } from '../audio.js';
 
-const KICK = 10.5; // velocity added per tap at full deflection
-const LONG_PRESS_MS = 380;
+import { FLAP, strokeSpeed } from './flap.js';
 
 /**
  * Tap-rhythm swimming. Every tap is one fin stroke:
@@ -37,7 +36,7 @@ export default class FlapController extends ControllerBase {
         // A stroke against a step goes up along it (the shared wall slide), as strong as the tap asked for.
         const len = Math.min(1, dir.length());
         if (len > 0) { const d = this.assist.aim(dir.normalize()); dir.set(d.x, d.y); }
-        this.fish.launch(dir.scale(len * KICK));
+        this.fish.launch(dir.scale(strokeSpeed(this.fish.body.velocity, dir, len)));      // never past FLAP.maxSpeed
         play('flap');
     }
 
@@ -45,7 +44,7 @@ export default class FlapController extends ControllerBase {
         // Long press = puff (rapid taps are swimming here, so no double tap).
         if (!this.held) return;
         if (!this.held.isDown) { this.held = null; return; }
-        if (this.scene.time.now - this.heldSince > LONG_PRESS_MS) {
+        if (this.scene.time.now - this.heldSince > FLAP.longPressMs) {
             this.fish.special();
             this.held = null;
         }

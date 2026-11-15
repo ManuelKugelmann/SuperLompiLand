@@ -14,12 +14,21 @@ export const FLIGHT = {
     lift: 0.6,         // share of the weight carried in fast level flight (a character's `glide.lift` may be higher)
     turn: 0.055,       // radians per step the heading can turn at full speed (old model: 0.009); a loop takes ~2 s
     turnDrag: 0.08,    // share of speed lost per radian turned (a full loop costs about 40 %)
-    brakeDrag: 0.04    // air drag while a pose is held (the puffed ball is an air brake; normal air: 0.0015)
+    brakeDrag: 0.04,   // air drag while a pose is held (the puffed ball is an air brake; normal air: 0.0015)
+    // How high a flight goes is limited softly (playtest: "limit flight height softly"): from `from` px above the water a
+    // growing pull down is added, `pull` times gravity at `from + span` px, more beyond: no ceiling to bump into.
+    ceiling: { from: 260, span: 420, pull: 2 }
 };
 
 if (typeof window !== 'undefined') {
     const model = new URLSearchParams(window.location.search).get('flight');
     if (model === 'bird' || model === 'ballistic') FLIGHT.model = model;
+}
+
+/** Extra pull down (times gravity) at `height` px above the water: none low down, growing with the square of the height above `from`. */
+export function heightPull(height, cfg = FLIGHT.ceiling) {
+    const k = (height - cfg.from) / cfg.span;
+    return k > 0 ? cfg.pull * k * k : 0;
 }
 
 /** How well the wings work at this speed, 0 (stalled) .. 1. */

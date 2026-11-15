@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { CHARACTERS, MOTION, glideLift, skim } from './characters.js';
-import { FLIGHT, fly } from './flight.js';
+import { FLIGHT, fly, heightPull } from './flight.js';
 import { SPECIALS, canUse, chainStep } from './specials.js';
 import { createRig } from './CardRig.js';
 import { play } from './audio.js';
@@ -355,6 +355,9 @@ export default class Player {
                 const lift = glideLift(this.char, bv.x);
                 this.sprite.applyForce({ x: 0, y: (this.move.airGravity * (1 - lift) - PLAYER.sinkForce * lift) * this.body.mass });
             }
+            // High up the air pulls back down, more the higher (FLIGHT.ceiling): soft, never a wall.
+            const pull = heightPull(waterY - this.sprite.y);
+            if (pull > 0) this.sprite.applyForce({ x: 0, y: this.move.airGravity * pull * this.body.mass });
             const hop = skim(this.char, { vx: bv.x, vy: bv.y, height: waterY - this.sprite.y, skips: this.skips });
             if (hop) {
                 this.skips++;
