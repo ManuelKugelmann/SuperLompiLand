@@ -17,7 +17,9 @@ export const SKY = {
     // into the water over `deep` px. Drawn just over the sea sheet, behind everything that plays.
     // It stands as far off as the island (on the horizon): hazy, water-tinted, soft-edged, `deep` x the
     // piece's size tall, gone in the blue below.
-    socket: { deep: 700, depth: DEPTH.socket, tint: 0x6fb0bb, alpha: 0.34, top: 0.62, fit: 0.78 }      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
+    socket: { deep: 700, depth: DEPTH.socket, tint: 0x6fb0bb, alpha: 0.34, top: 0.62, fit: 0.78,      // top: share of the texture's width its top takes (it widens below); fit: share of the coast picture's width it starts under (the painted land, not the picture's margins)
+        far: 0.6, farDepth: DEPTH.socket - 0.04,     // the islands on the far horizon stand on rock too (playtest: "islands only in the background, each with a rocky base"): fainter, behind the near ones
+        kinds: ['palms', 'canopy', 'light', 'stacks', 'port', 'volcano'] }      // the far shapes that are land (a ship is not)
 };
 
 /** The rock socket under an island (drawn once, procedural): a dark rock mass with a jagged outline and ledges, fading downward. */
@@ -193,17 +195,24 @@ export default class SkyLayer {
         this.flock = { x: W * 0.3, y: -330, dir: 1 };
     }
 
-    /** The rock under each near coast piece in view (SKY.socket): shown while the camera is not deeper than its fade. */
+    /** The rock under every island in view (SKY.socket): the near coast pieces, the far land shapes and the volcano; shown while the camera is not deeper than its fade. */
     updateSockets(cam, W, camY) {
         const K = SKY.socket, deepEnough = camY > SKY.baseY + K.deep;
         let used = 0;
-        if (!deepEnough) for (const d of this.items) {
-            if (!d.near) continue;                             // near coast pieces only (the far shapes stand on the horizon)
-            const sx = screenX(d.item, cam, W);
-            if (!onScreen(sx, d.half, W)) continue;
-            const o = this.sockets[used] || (this.sockets[used] = this.scene.add.image(0, 0, 'coast_socket').setOrigin(0.5, 0).setScrollFactor(0, 1).setDepth(K.depth).setTint(K.tint).setAlpha(K.alpha));
+        const put = (sx, half, size, near, flip) => {
+            const o = this.sockets[used] || (this.sockets[used] = this.scene.add.image(0, 0, 'coast_socket').setOrigin(0.5, 0).setScrollFactor(0, 1).setTint(K.tint));
             used++;
-            o.setVisible(true).setPosition(sx, SKY.baseY - 6).setDisplaySize(d.half * 2 * K.fit / K.top, K.deep * d.item.size).setFlipX(d.flip);
+            o.setVisible(true).setPosition(sx, SKY.baseY - 6).setDisplaySize(half * 2 * K.fit / K.top, K.deep * size).setFlipX(flip)
+                .setDepth(near ? K.depth : K.farDepth).setAlpha(K.alpha * (near ? 1 : K.far));
+        };
+        if (!deepEnough) {
+            for (const d of this.items) {
+                if (!d.near && !K.kinds.includes(d.item.kind)) continue;
+                const sx = screenX(d.item, cam, W);
+                if (onScreen(sx, d.half, W)) put(sx, d.half, d.item.size, d.near, d.flip);
+            }
+            const v = volcanoAt(cam, W), half = this.volcano.width * v.size / 2;
+            if (onScreen(v.x, half, W)) put(v.x, half, v.size, false, false);
         }
         for (let i = used; i < this.sockets.length; i++) this.sockets[i].setVisible(false);
     }
