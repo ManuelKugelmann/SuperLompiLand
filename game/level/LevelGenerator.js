@@ -156,7 +156,8 @@ const HAZARDS = {
  * = half buried, the rock in front hides the keel; `back` = hazed toward the water: what is
  * passable must read as behind the play plane), at most how many per chunk, `tilt` = how far
  * (radians) a lost thing may lie turned either way (each lies its own way: leanAt), and
- * `sway` for plants (rooted, swaying with the water and pushed aside by the fish).
+ * `sway` for plants (rooted, swaying with the water and pushed aside by the fish), `block` = [share of its width,
+ * share of its visible height] of a solid box over its hull: the fish cannot swim through it (boats; not hazed then).
  */
 /** How a lost thing at x lies turned (radians, within +-max): its own way for each place, the same every time (playtest: waste must not all lie the same way). */
 function leanAt(x, max) {
@@ -170,8 +171,8 @@ export const PROPS = {
     crate: { keys: ['crate_1'], width: [SIZES.crate * 0.85, SIZES.crate], sink: 0.22, reach: 0.15, flat: 0.35, depth: -3, back: true, max: 1, tilt: 0.3 },
     // Sizes of ships and cargo come from the one scale table (game/scale.js, spec 5.0j).
     // Hulls share one slot per chunk, and only every third chunk column has one, so they never overlap.
-    wreck: { keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: SIZES.sailingWreck, sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
-    trawler: { keys: ['trawler_1', 'cutter_1'], width: SIZES.fishingBoat, sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
+    wreck: { block: [0.8, 0.5], keys: ['wreck_1', 'wreck_2', 'wreck_3'], width: SIZES.sailingWreck, sink: 0.3, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xb6c6cc },
+    trawler: { block: [0.8, 0.5], keys: ['trawler_1', 'cutter_1'], width: SIZES.fishingBoat, sink: 0.22, reach: 0.5, flat: 0.3, depth: -3, max: 1, slot: 'hull', every: 3, tint: 0xc4d0d4 },
     // Pier (generated art): stands at the surface, not on a floor spot (pierAt / drawPier).
     // `piles` = pile positions across the deck (under its own posts), `pileWidth` = post width (share of the deck),
     // `pileWood` = share of the pile art that is wood (band, seamless wood strip and foot are cut from one
@@ -179,7 +180,7 @@ export const PROPS = {
     // height where its own posts end in the piles (a mussel band sits over each joint).
     pier: { keys: ['pier_deck', 'pier_pile_mid', 'pier_band', 'pier_foot'], width: [1300, 1600], surface: true, every: 4, chance: 0.5, max: 1,
         piles: [0.083, 0.383, 0.769, 0.928], pileWidth: 0.1, pileWood: 0.7, above: 0.2, joint: 0.93, depth: -3, tint: 0xc4d0d4 },
-    rowboat: { keys: ['rowboat_1'], width: SIZES.rowboat, sink: 0.3, reach: 0.2, flat: 0.35, depth: -3, back: true, max: 1, every: 2 },
+    rowboat: { block: [0.85, 0.55], keys: ['rowboat_1'], width: SIZES.rowboat, sink: 0.3, reach: 0.2, flat: 0.35, depth: -3, max: 1, every: 2 },
     // Generated art (FLUX.2 klein, Replicate): plants between the kelp stalks.
     seagrass: { keys: ['seagrass_1'], width: [220, 340], sink: 0.12, reach: 0.2, flat: 0.6, depth: -1, max: 2, sway: 0.6 },
     seafan: { keys: ['seafan_1'], width: [200, 330], sink: 0.08, reach: 0.2, flat: 0.6, depth: -1, max: 1, sway: 0.25 },
@@ -216,6 +217,7 @@ export default class LevelGenerator {
         this.state = state;
         this.chunks = new Map(); // "cx,cy" -> { objects[], bodies[] }
         this.coins = [];
+        this.blockers = new Set();      // solid boats and decks there now (addBlocker)
         this.hazards = [];
         this.friends = [];
         this.animated = [];
@@ -844,6 +846,11 @@ export default class LevelGenerator {
                 if (p.tint) img.setTint(p.tint);
                 // Passable things read as behind the play plane: hazed toward the biome's water.
                 else if (p.back) img.setTint(mix(0xffffff, waterTone(biome, 170), PROP_BACK_HAZE));
+                // A boat's hull is solid: a box over its visible part, standing on its spot and tilted with it.
+                if (p.block) {
+                    const bw = w * p.block[0], bh = h * (1 - p.sink) * p.block[1], ux = Math.sin(angle), uy = -Math.cos(angle);
+                    this.addBlocker(chunk, spot.x + ux * bh / 2, spot.y + uy * bh / 2, bw, bh, angle);
+                }
                 // Its foot sits in the sand, not on a picture edge: a soft skirt in front of the base.
                 if (w <= PROP_SKIRT.maxWidth) {
                     const sw = w * PROP_SKIRT.width, sh = sw * PROP_SKIRT.height;
@@ -1072,9 +1079,21 @@ export default class LevelGenerator {
         else if (walls && Math.abs(nx) > 0.7 && len > 40) walls.push({ x: mx, y: my, angle: Math.atan2(-nx, ny) });   // grows out along the face's normal
     }
 
+    /** A solid box in the play plane (a boat's hull, a pier's deck): the fish bumps into it. It goes with its chunk. */
+    addBlocker(chunk, x, y, w, h, angle) {
+        const b = this.scene.matter.add.rectangle(x, y, w, h, { isStatic: true, angle, friction: 0.05 });
+        b.blocker = true;
+        chunk.bodies.push(b);
+        this.blockers.add(b);
+        // A coin of a chunk built before it that lies inside cannot be reached: it is not shown (its number stays its own).
+        for (const c of this.coins) if (c.img.active && Phaser.Physics.Matter.Matter.Vertices.contains(b.vertices, { x: c.x, y: c.y })) c.img.setVisible(false).setActive(false);
+    }
+
     addCoin(chunk, x, y, chunkKey, index) {
         if (y < LEVEL.coinTop || !this.reachable(x, y)) return;      // its number stays taken, so the others keep theirs
         if (treatCoinNear(x, y, LEVEL.coinGap, this.treats, this.field.routeY)) return;      // a coin figure on the route has a coin there (two on one spot read as a glitch)
+        // None inside a solid boat or deck (addBlocker): it could not be reached. (Its number stays taken, like every skipped coin.)
+        for (const b of this.blockers) if (Phaser.Physics.Matter.Matter.Vertices.contains(b.vertices, { x, y })) return;
         // The story's net scenes stand free: no coins in front of a friend who waits for help.
         for (const c of this.storySpots) if ((c.x - x) ** 2 + (c.y - y) ** 2 < JOURNEY.clear ** 2) return;
         // Coins never lead into harm: none within reach of a hazard or along its chain (coinClear.js).
@@ -1467,6 +1486,7 @@ export default class LevelGenerator {
         if (Math.max(0, pier.deckTop) >= oy && Math.max(0, pier.deckTop) < y1) {      // the deck pokes above the surface
             keep(s.add.image(pier.x0, pier.deckTop, 'pier_deck').setOrigin(0.5, 0)
                 .setDisplaySize(pier.w, pier.deckH).setDepth(p.depth + 0.01).setTint(p.tint));
+            this.addBlocker(chunk, pier.x0, pier.deckTop + pier.deckH * 0.45, pier.w, pier.deckH * 0.6, 0);      // the deck is solid; the posts are not
         }
         const top = pier.deckTop + pier.deckH * 0.8;                   // hidden behind the posts' opaque part
         if (oy <= 0 && y1 > 0) {
@@ -1567,7 +1587,7 @@ export default class LevelGenerator {
     drop(key) {
         const chunk = this.chunks.get(key);
         chunk.dead = true;      // a build still in progress stops at its next step
-        for (const b of chunk.bodies) this.scene.matter.world.remove(b);
+        for (const b of chunk.bodies) { this.scene.matter.world.remove(b); this.blockers.delete(b); }
         for (const o of chunk.objects) { this.scene.tweens.killTweensOf(o); o.destroy(); }
         for (const key of chunk.textures) this.poolCanvas(key);
         for (const [atlas, i] of chunk.places || []) atlas.give(i);

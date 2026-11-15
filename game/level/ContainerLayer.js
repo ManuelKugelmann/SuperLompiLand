@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import { CONTAINERS, containerSpan, containerField, containerCoins, roofY, landsOnRoof, roofBounce } from './containers.js';
 import BonusCoins from './BonusCoins.js';
 
@@ -6,10 +7,12 @@ export const CONTAINER_LOOK = {
     depth: 2.4,          // behind the fish: it swims in front of a container's far wall, through the open one's ends
     coinDepth: 2.6,
     paints: [['#a8452f', '#7c2f20'], ['#2f6f9a', '#214d6c'], ['#3d8a6e', '#2a614d']],   // rust red, sea blue, green: [side, shade]
-    seen: 900            // px from a container at which the field counts as seen (reef book)
+    seen: 900,           // px from a container at which the field counts as seen (reef book)
+    solid: 0.72          // share of its height (from the bottom) that is solid; above it the roof bounces a leap (CONTAINERS.roof)
 };
 
 const key = i => `container_${i}`;
+const Body = Phaser.Physics.Matter.Matter.Body;
 
 /** The painted containers (loaded by the title screen; container_2's doors hang open); drawn procedurally while missing. */
 export const CONTAINER_ART = Object.fromEntries([0, 1, 2].map(i => [key(i), `img/container_${i}.webp`]));
@@ -59,7 +62,9 @@ export default class ContainerLayer {
         const shadows = this.boxes.map(b => b.stacked ? null : s.add.image(b.x, b.y + h * 0.75, 'bd_glow').setDisplaySize(len * 1.1, h * 1.3).setTint(0x041018).setAlpha(CONTAINERS.shadow).setDepth(L.depth - 0.1));
         const left = this.coinSpots.map((p, k) => ({ ...p, k })).filter(p => !this.taken.has(p.k));
         const coins = new BonusCoins(s, left, L.coinDepth, (x, y) => { const p = left.find(q => q.x === x && q.y === y); if (p) this.taken.add(p.k); this.onCoin(x, y); });
-        return { imgs, shadows, coins };
+        // Solid below the roof (the roof itself is a bounce pad: CONTAINERS.roof): the fish swims under a container, not through it.
+        const bodies = this.boxes.map(b => s.matter.add.rectangle(b.x, b.y, len * 0.94, h * L.solid, { isStatic: true, angle: b.tilt, friction: 0.05 }));
+        return { imgs, shadows, coins, bodies };
     }
 
     /** Per frame. `fish` = the fish's body sprite (x, y, body.velocity, setVelocity), `radius` its radius, `t` s, `inAir` = it is above the water. */
@@ -67,6 +72,7 @@ export default class ContainerLayer {
         const L = CONTAINER_LOOK, sp = this.span;
         if (this.live && (fish.x < sp.x0 - L.far || fish.x > sp.x1 + L.far)) {
             for (const o of [...this.live.imgs, ...this.live.shadows]) o?.destroy();
+            for (const b of this.live.bodies) this.scene.matter.world.remove(b);
             this.live.coins.destroy(); this.live = null;
         }
         if (!this.live) {
@@ -80,6 +86,10 @@ export default class ContainerLayer {
             const mid = this.surfaceY(b.x), slope = Math.atan2(this.surfaceY(b.x + half) - this.surfaceY(b.x - half), half * 2);
             img.setY(mid + b.y).setRotation(b.tilt + slope * 0.6 + Math.sin(t * 0.5 + i * 2.3) * CONTAINERS.rock);
             this.live.shadows[i]?.setY(mid + b.y + CONTAINERS.size[1] * 0.75);
+            // Its solid part rides with it, a little under the roof line.
+            const body = this.live.bodies[i], down = CONTAINERS.size[1] * (1 - L.solid) / 2, a = img.rotation;
+            Body.setPosition(body, { x: b.x - Math.sin(a) * down, y: mid + b.y + Math.cos(a) * down });
+            Body.setAngle(body, a);
             if (!this.seen && Math.hypot(fish.x - b.x, fish.y - (mid + b.y)) < L.seen) { this.seen = true; this.onSeen(); }
             // A leap that comes down on its roof bounces off, like off a pad: when the fish's lower edge reaches the drawn roof line.
             const v = fish.body.velocity, roof = roofY(b, mid, fish.x, img.rotation);
