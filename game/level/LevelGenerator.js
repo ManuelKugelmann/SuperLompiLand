@@ -14,6 +14,7 @@ import { foamRing } from './foamRing.js';
 import { coinTooNear } from './coinClear.js';
 import { coinNearHook } from './longline.js';
 import { dwellerBand } from './dwellers.js';
+import { art } from '../art.js';
 import { SET_PIECES, ghostShip } from './setPieces.js';
 import { MICRO, microAt, microKey } from './microScatter.js';
 import { makeMicroTextures, MICRO_ORIGIN_Y } from './MicroArt.js';
@@ -679,7 +680,7 @@ export default class LevelGenerator {
         this.chunks.set(chunk.key, chunk);
         // Every picture of the world's surfaces (rock, sand, growth, props, piles) catches the caustics (fx/CausticsPipeline.js).
         const keep = o => { chunk.objects.push(o); if (this.caustics && this.causticsOn && o.type === 'Image') o.setPipeline(CAUSTICS); return o; };
-        const has = key => s.textures.exists(key);
+        const pic = key => art(s, key, biome?.id), has = key => s.textures.exists(key) || pic(key)[1] !== undefined;      // its own texture, or a frame in a shared atlas (art.js)
         const blend = biomeBlendAt(mid);
         const biome = zonedBiomeAt(blend.t < 0.5 ? blend.a : blend.b, mid);      // inside a sub-zone: its own mix of growth and props
 
@@ -793,7 +794,7 @@ export default class LevelGenerator {
                 if (!fresh.length) continue;
                 const key = fresh[Math.floor(at * fresh.length)];
                 this.coralSpacing.add(key, f.x, f.y);
-                const coral = keep(s.add.image(f.x, f.y, key).setOrigin(0.5, BIG_CORALS.includes(key) ? 0.97 : 0.92).setRotation(f.angle * (size.cls === 'large' ? 0.4 : 1)).setDepth(front ? 7 : size.cls === 'large' ? -1.5 : -1)).setFlipX(flip);
+                const coral = keep(s.add.image(f.x, f.y, ...pic(key)).setOrigin(0.5, BIG_CORALS.includes(key) ? 0.97 : 0.92).setRotation(f.angle * (size.cls === 'large' ? 0.4 : 1)).setDepth(front ? 7 : size.cls === 'large' ? -1.5 : -1)).setFlipX(flip);
                 coral.setScale(size.px / Math.max(coral.width, coral.height));
                 corals++;
             } else if (roll < biome.coral + biome.kelp && stalks < 6) {
@@ -831,9 +832,9 @@ export default class LevelGenerator {
                 if (grown >= WALL_LIFE.max || wrng.frac() > rate) continue;
                 const kind = pickWeighted(wrng, kinds, () => true);
                 if (!kind) break;
-                const key = wrng.pick(WALL_LIFE.keys[kind].filter(has)), tex = s.textures.get(key).getSourceImage();
-                const width = wrng.realInRange(WALL_LIFE.width[kind][0], WALL_LIFE.width[kind][1]);
-                keep(s.add.image(w.x, w.y, key).setOrigin(0.5, 0.9).setScale(width / tex.width).setRotation(w.angle).setDepth(-1)).setFlipX(wrng.frac() < 0.5);
+                const key = wrng.pick(WALL_LIFE.keys[kind].filter(has));
+                const width = wrng.realInRange(WALL_LIFE.width[kind][0], WALL_LIFE.width[kind][1]), grow = s.add.image(w.x, w.y, ...pic(key));
+                keep(grow.setOrigin(0.5, 0.9).setScale(width / grow.width).setRotation(w.angle).setDepth(-1)).setFlipX(wrng.frac() < 0.5);
                 grown++;
             }
         }
@@ -859,8 +860,8 @@ export default class LevelGenerator {
                 if (!group) break;
                 const p = PROPS[group];
                 const key = rng.pick(p.keys.filter(has));
-                const tex = s.textures.get(key).getSourceImage();
-                const w = rng.realInRange(p.width[0], p.width[1]), h = w * tex.height / tex.width;
+                const tex = s.textures.getFrame(...pic(key));      // its picture's size (its own texture, or its frame in an atlas)
+                const w = rng.realInRange(p.width[0], p.width[1]), h = w * tex.realHeight / tex.realWidth;      // real: the untrimmed size an image shows
                 // Never floating: rock must lie under both ends, below the buried part.
                 const rockUnder = (x, y) => { for (let d = 0; d <= h * p.reach; d += 20) if (this.density(x, y + d) > T) return true; return false; };
                 const below = f => f.y + h * p.sink * 0.8;
@@ -875,7 +876,7 @@ export default class LevelGenerator {
                 if (p.sway) {
                     // Rooted mesh: the middle sits half the visible height above the ground.
                     const lift = h * (0.5 - p.sink);
-                    const plant = makeCritter(s, key, spot.x + Math.sin(angle) * lift, spot.y - Math.cos(angle) * lift, w, 'sway',
+                    const plant = makeCritter(s, pic(key), spot.x + Math.sin(angle) * lift, spot.y - Math.cos(angle) * lift, w, 'sway',
                         { root: 'bottom', amp: p.sway, speed: rng.realInRange(0.5, 0.8), scaleY: h / tex.height });
                     plant.setRotation(angle).setDepth(p.depth);
                     plant.isPlant = true;
@@ -892,8 +893,8 @@ export default class LevelGenerator {
                 // The median of five samples across its middle: one groove under an edge does not sink the whole prop.
                 const under = [-0.3, -0.15, 0, 0.15, 0.3].map(k => floorAt(spot.x + k * w)).sort((a, b) => a - b);
                 const footY = Math.max(spot.y, under[2]);
-                const img = keep(s.add.image(spot.x, footY, key).setOrigin(0.5, 1 - p.sink));
-                img.setScale(w / tex.width).setRotation(angle).setDepth(p.depth);
+                const img = keep(s.add.image(spot.x, footY, ...pic(key)).setOrigin(0.5, 1 - p.sink));
+                img.setScale(w / tex.realWidth).setRotation(angle).setDepth(p.depth);
                 if (rng.frac() < 0.5) img.setFlipX(true);
                 if (p.tint) img.setTint(p.tint);
                 // Passable things read as behind the play plane: hazed toward the biome's water.
@@ -923,7 +924,7 @@ export default class LevelGenerator {
                 if (f.prop || reefCrest(f.x) > 0 && f.y < 400) continue;      // not under a prop; the crest's top belongs to the corals
                 const m = microAt(biome.id, f.angle, next, microCfg);
                 if (!m || this.nests.some(n => Math.abs(n.x - f.x) < LEVEL.nestClear && Math.abs(n.y - f.y) < LEVEL.nestClear)) continue;
-                const img = keep(s.add.image(f.x, f.y + 4, microKey(m.kind, m.variant)).setOrigin(0.5, MICRO_ORIGIN_Y)
+                const img = keep(s.add.image(f.x, f.y + 4, ...pic(microKey(m.kind, m.variant))).setOrigin(0.5, MICRO_ORIGIN_Y)
                     .setRotation(f.angle).setDepth(0.9).setFlipX(m.flip));
                 img.setScale(m.width / img.width);
                 placed++;
@@ -1072,8 +1073,9 @@ export default class LevelGenerator {
             const every = key && FRIENDS[key].every, rare = every && !(cx % every === 0 && cy === Math.floor(cx / every) % 2);
             if (p && !onRoute && !rare) {
                 this.addFriend(chunk, key, p.x, p.y, rng);
-                // Kinds that live in pairs come two by two: the mate beside it, if there is room (no rng: the chunk's draws stay as they were).
-                const mate = FRIENDS[key].pair && this.pairs !== false && [[150, -40], [-150, 40], [0, 150]].map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy })).find(q => this.isOpen(q.x, q.y, 0.1) && this.reachable(q.x, q.y));
+                // Kinds that live in pairs come two by two: the mate beside it, a little more than its own size away (never overlapping), if
+                // there is room (no rng: the chunk's draws stay as they were).
+                const mate = FRIENDS[key].pair && this.pairs !== false && [[1.3, -0.25], [-1.3, 0.25], [0, 1.3]].map(([dx, dy]) => ({ x: p.x + dx * FRIENDS[key].size, y: p.y + dy * FRIENDS[key].size })).find(q => this.isOpen(q.x, q.y, 0.1) && this.reachable(q.x, q.y));
                 if (mate) this.addFriend(chunk, key, mate.x, mate.y, rng);
             }
         }
@@ -1149,7 +1151,7 @@ export default class LevelGenerator {
         if (coinNearHook(x, y)) return;      // ... nor near a longline's hooks (longline.js)
         const s = this.scene;
         const img = s.textures.exists('coin')
-            ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)
+            ? s.add.image(x, y, ...art(s, 'coin')).setDisplaySize(72, 72)
             : s.add.circle(x, y, 32, 0xffd23f).setStrokeStyle(5, 0xfff3b0);
         img.setDepth(2);   // bobs on the music's beat: MainScene.bobCoins()
         chunk.objects.push(img);
@@ -1402,7 +1404,7 @@ export default class LevelGenerator {
         for (let i = 0; i < all; i++) {
             const size = rng.between(22, 52), drift = rng.between(-60, 60), slow = rng.realInRange(2.6, 3.4);
             if (i >= shown) continue;
-            const b = s.textures.exists('bubble') ? s.add.image(f.x, f.y, 'bubble') : s.add.circle(f.x, f.y, 16, 0xffffff, 0.4);
+            const b = s.textures.exists('bubble') ? s.add.image(f.x, f.y, ...art(s, 'bubble')) : s.add.circle(f.x, f.y, 16, 0xffffff, 0.4);
             b.setDisplaySize(size, size).setDepth(6).setAlpha(0.75);
             // Each bubble leaves on an eighth note and loops a whole number of eighths (spec 5.0z): the column breathes with the music.
             const loop = gridLoop(musicClock, nowSeconds(), height * slow / 1000, i);      // one eighth apart (was 330 ms)
@@ -1589,9 +1591,9 @@ export default class LevelGenerator {
         const key = rng.pick(KELP_STALKS.filter(k => s.textures.exists(k))) || 'kelp';
         // `skip`: not made on this quality tier, but its random draws are, so everything after it stays where it is.
         if (skip) { rng.realInRange(0.5, 0.9); rng.frac(); return; }
-        const frame = s.textures.getFrame(key);
+        const frame = s.textures.getFrame(...art(s, key));
         const up = { x: Math.sin(f.angle), y: -Math.cos(f.angle) };
-        const stalk = makeCritter(s, key, f.x + up.x * h * 0.48, f.y + up.y * h * 0.48, h * frame.width / frame.height, 'sway',
+        const stalk = makeCritter(s, art(s, key), f.x + up.x * h * 0.48, f.y + up.y * h * 0.48, h * frame.width / frame.height, 'sway',
             { root: 'bottom', speed: rng.realInRange(0.5, 0.9), scaleY: h / frame.height, segments: this.plantSegments });
         stalk.setDepth(depth);
         if (depth >= 7) { stalk.setAlpha(LEVEL.frontAlpha); stalk.fgFixed = true; }      // in front of the fish: a little see-through for good, never fading in and out

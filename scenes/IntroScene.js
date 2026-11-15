@@ -24,6 +24,7 @@ import { fitToWindow, misfit } from '../game/orientation.js';
 import { SPECIES, schoolArt } from '../game/ai/SwarmLayer.js';
 import { PAD_ART } from '../game/level/BoosterLayer.js';
 import { SURF_ART } from '../game/fx/SurfLayer.js';
+import { ART, atlasFiles } from '../game/art.js';
 import { SPLASH_ART } from '../game/fx/SplashLayer.js';
 import { LONGLINE_ART } from '../game/level/LonglineLayer.js';
 import { TRAWL_ART } from '../game/level/TrawlLayer.js';
@@ -119,12 +120,26 @@ const IMAGES = {
     manta: 'manta.png'             // the manta (part cards in img/parts); also glides through the title's sea
 };
 
+/** The quality tier a game starts on: ?quality= in the address, else the one the last game ended on (medium on a phone at first). */
+function startingTier(scene) {
+    const asked = new URLSearchParams(window.location.search).get('quality');
+    return QUALITY.tiers.includes(asked) ? asked : startTier(new ProgressionManager().get?.('quality', null), scene.sys.game.device.input.touch);
+}
+
 export default class IntroScene extends Phaser.Scene {
     constructor() {
         super({ key: SCENE_KEYS.INTRO });
     }
 
     preload() {
+        // Shared atlases (game/art.js): only those the list names are loaded (no requests for files not made yet); every picture
+        // still has its own file and its procedural stand-in.
+        // A slow phone's tier takes the half-size twins.
+        this.load.json('atlas_index', `${ART.dir}index.json`);
+        this.load.once('filecomplete-json-atlas_index', (key, type, data) => {
+            const files = atlasFiles(QUALITY[startingTier(this)].halfArt === 1);
+            for (const name of data?.atlases || []) { const f = files.find(a => a.key === name); if (f && !this.textures.exists(f.key)) this.load.multiatlas(f.key, f.json, f.path); }
+        });
         const W = this.scale.width, H = this.scale.height;
         this.cameras.main.setBackgroundColor(0x0a3f6e);
         const bar = this.add.rectangle(W / 2 - 300, H / 2, 4, 18, 0xffc266).setOrigin(0, 0.5);
@@ -177,8 +192,7 @@ export default class IntroScene extends Phaser.Scene {
     create() {
         fitToWindow(this.game);     // the picture fills the screen, whatever its shape
         // The title is drawn at the resolution of the quality tier the last game ended on (medium on a phone at first): its cost is all in the graphics chip.
-        const asked = new URLSearchParams(window.location.search).get('quality');
-        setRenderScale(this.game, QUALITY[QUALITY.tiers.includes(asked) ? asked : startTier(new ProgressionManager().get?.('quality', null), this.sys.game.device.input.touch)].resolution);
+        setRenderScale(this.game, QUALITY[startingTier(this)].resolution);
         setPlaying(false);          // on the title an update that waited during play may be applied
         const W = this.scale.width, H = this.scale.height;
         const lang = this.registry.get('currentLanguage') || 'de';
