@@ -115,6 +115,8 @@ void main () {
     // The density and its slope, smooth across texels (central differences, blended): a slope that jumps from texel to texel would show as lines.
     float d00 = dens(i0), d10 = dens(i0 + vec2(1.0, 0.0)), d01 = dens(i0 + vec2(0.0, 1.0)), d11 = dens(i0 + vec2(1.0, 1.0));
     float d = mix(mix(d00, d10, fr.x), mix(d01, d11, fr.x), fr.y);
+#ifndef BACK
+    // (The slope only shapes the rock; the back needs the density alone: 8 texture reads a pixel less over the whole screen.)
 #ifdef LITE
     float gx = mix(d10 - d00, d11 - d01, fr.y) / STEP, gy = mix(d01 - d00, d11 - d10, fr.x) / STEP;
 #else
@@ -127,6 +129,7 @@ void main () {
 #endif
     float gl = max(1e-5, length(vec2(gx, gy)));
     float dist = (d - TH) / gl;
+#endif
 #ifdef BACK
     {
         // The back: shade gathering in the water next to rock, and back rock under overhangs.
