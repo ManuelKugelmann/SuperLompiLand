@@ -5,7 +5,7 @@
 //   sway   the strip curls gently from its fixed end; `root: 'bottom'` = fixed at the base (plants)
 //   still  no deformation (scrap, drums)
 
-const SEGMENTS = 10;
+const SEGMENTS = 10;      // points of a swaying strip (opts.segments: fewer on the lowest quality tiers)
 
 /**
  * @returns a game object with x/y/scale/rotation plus `animate(t, bend)` (t in seconds, bend =
@@ -13,7 +13,7 @@ const SEGMENTS = 10;
  */
 export function makeCritter(scene, key, x, y, width, anim = 'still', opts = {}) {
     const sways = anim === 'sway';
-    const obj = sways ? scene.add.rope(x, y, key, null, SEGMENTS, false) : scene.add.image(x, y, key);
+    const obj = sways ? scene.add.rope(x, y, key, null, opts.segments ?? SEGMENTS, false) : scene.add.image(x, y, key);
     const base = width / obj.frame.width;
     const baseY = opts.scaleY ?? base;   // plants set their own height
     const phase = (Math.abs(x) * 0.013 + Math.abs(y) * 0.007) % 6.28; // desync neighbours

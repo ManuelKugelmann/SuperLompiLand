@@ -36,8 +36,11 @@ import {
 
 /** Dev measurement only: `?noshade` leaves out the chunks' shaded pictures (worker shading and uploads), to see what they cost. */
 const NO_SHADE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noshade');
-/** The landscape from tiles (tileTerrain.js, fx/TerrainPipeline.js): `?tiles` while its look is judged against the painted one. */
-const TILES = typeof location !== 'undefined' && new URLSearchParams(location.search).has('tiles');
+/**
+ * The landscape from tiles (tileTerrain.js, fx/TerrainPipeline.js). `?painted` draws the old per-chunk painted pictures
+ * instead, only until the device test has compared the two on a weak phone; then that path goes.
+ */
+const TILES = !(typeof location !== 'undefined' && new URLSearchParams(location.search).has('painted'));
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
@@ -720,7 +723,9 @@ export default class LevelGenerator {
                 if (biome.kelp > 0.5 && rng.frac() < 0.6) {
                     // ... on its own ground (playtest: "kelp holdfasts float"): the seabed is looked up where it stands, level there.
                     const bx = f.x + rng.between(-160, 160), bh = rng.between(700, 1100), under = this.groundBelow(bx, f.y - 260, 520);
-                    if (under) this.addKelp(chunk, { x: bx, y: under.y, angle: 0, len: f.len }, bh, -5, rng, KELP_BACK_TINT);
+                    // Fewer on the slow tiers (kelpBack), chosen by place, not by a draw: every random draw stays the same on every tier.
+                    const keepBack = (this.kelpBack ?? 1) >= 1 || ((Math.sin(bx * 12.9898) * 43758.5453) % 1 + 1) % 1 < this.kelpBack;
+                    if (under) this.addKelp(chunk, { x: bx, y: under.y, angle: 0, len: f.len }, bh, -5, rng, KELP_BACK_TINT, !keepBack);
                 }
                 stalks++;
                 yield 'floor kelp'; if (chunk.dead) return;
@@ -1463,16 +1468,18 @@ export default class LevelGenerator {
      * A swaying kelp stalk rooted at floor spot `f`, `h` px tall: painted art
      * (kelp_stalk_*) when loaded, else the procedural strip.
      */
-    addKelp(chunk, f, h, depth, rng, tint = null) {
+    addKelp(chunk, f, h, depth, rng, tint = null, skip = false) {
         const s = this.scene;
         // Kelp never reaches out of the water, and none grows in the shallows or on the reef crest.
         if (f.y < LEVEL.kelpMinDepth || reefCrest(f.x) > 0) return;
         h = Math.min(h, f.y * 0.85);
         const key = rng.pick(KELP_STALKS.filter(k => s.textures.exists(k))) || 'kelp';
+        // `skip`: not made on this quality tier, but its random draws are, so everything after it stays where it is.
+        if (skip) { rng.realInRange(0.5, 0.9); rng.frac(); return; }
         const frame = s.textures.getFrame(key);
         const up = { x: Math.sin(f.angle), y: -Math.cos(f.angle) };
         const stalk = makeCritter(s, key, f.x + up.x * h * 0.48, f.y + up.y * h * 0.48, h * frame.width / frame.height, 'sway',
-            { root: 'bottom', speed: rng.realInRange(0.5, 0.9), scaleY: h / frame.height });
+            { root: 'bottom', speed: rng.realInRange(0.5, 0.9), scaleY: h / frame.height, segments: this.plantSegments });
         stalk.setDepth(depth);
         if (depth >= 7) { stalk.setAlpha(LEVEL.frontAlpha); stalk.fgFixed = true; }      // in front of the fish: a little see-through for good, never fading in and out
         if (rng.frac() < 0.5) stalk.setFlipX?.(true);
