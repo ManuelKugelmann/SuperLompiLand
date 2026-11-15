@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## The flock of friends: all six swim after Lompi along his path, staggered either side so nobody overlaps, swaying with the music; each friend brings a power from its real animal
+
+[`33f70dc`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/33f70dc) · 2026-11-15 11:08
+
+![The flock of friends: all six swim after Lompi along his path, staggered either side so nobody overlaps, swaying with the music; each friend brings a power from its real animal](33-the-flock-of-friends-all-six-swim-after-lompi-al.jpg)
+
 ## New neighbours: angelfish in pairs, a grumpy rockfish, a flying squid near the light, a nautilus in the deep
 
 [`f08920f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/f08920f) · 2026-11-15 10:00
