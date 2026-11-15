@@ -4,7 +4,7 @@
 // first play() that follows user input.
 
 import { createClock } from './music/clock.js';
-import { SCORE, chordMix, arpAt } from './music/score.js';
+import { SCORE, chordMix, arpAt, LAYERS, layerAt } from './music/score.js';
 import { creakSamples } from './music/creak.js';
 import { splashSize } from './fx/splash.js';
 
@@ -544,9 +544,12 @@ export const MUSIC = {
     fadeInS: 2.5,
     stormVol: 0.14,       // the storm's low rumble at full strength (spec 5.0c)
     rushVol: 0.2,         // the rush of strong moving water: surge, breakers, downwelling
-    rushHz: 900           // centre of the rush's band
+    rushHz: 900,          // centre of the rush's band
+    layerVol: 0.035,      // each proximity layer at full (game/music/score.js LAYERS)
+    layerFade: 1.5,       // s for a layer to come in or go
+    wave: 0.7             // the sea hum swells by this share once a bar near the surface, like a wave coming in (gone in the deep)
 };
-let bus = null, busFilter = null, amb = null, ambFilter = null, nextBeat = -1, beatIdx = 0, rumble = null, rush = null;
+let bus = null, busFilter = null, amb = null, ambFilter = null, nextBeat = -1, beatIdx = 0, rumble = null, rush = null, layerGain = null, layerWant = {};
 
 function musicNodes() {
     if (bus) return;
@@ -587,6 +590,27 @@ function musicNodes() {
     };
     rumble = voice('lowpass', 160, 0.7, 1.7);
     rush = voice('bandpass', MUSIC.rushHz, 0.6, 3.9);
+    // One gain per proximity layer, so a layer fades in and out smoothly however its notes fall.
+    layerGain = {};
+    for (const k of Object.keys(LAYERS)) { const g = ctx.createGain(); g.gain.value = 0; g.connect(bus); layerGain[k] = g; }
+}
+
+/** How loud each proximity layer should be, 0..1 (score.js layerLevels); the scheduler fades to it. */
+export function setMusicLayers(levels) { layerWant = levels || {}; }
+
+/** One note of a layer: bass (soft round low), wood (short knock), pluck (bright short), glass (high, ringing). */
+function layerNote(hz, t, voice, out) {
+    const V = { bass: [['triangle', 1, 1], 0.9], wood: [['sine', 1, 1], 0.22, ['sine', 3, 0.25]], pluck: [['triangle', 1, 1], 0.45, ['sine', 2, 0.3]], glass: [['sine', 1, 1], 1.3, ['sine', 3.01, 0.2]] }[voice];
+    const dur = V[1];
+    for (const [type, m, a] of [V[0], ...(V[2] ? [V[2]] : [])]) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = type; o.frequency.value = hz * m;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(a, t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g).connect(out);
+        o.start(t); o.stop(t + dur + 0.05);
+    }
 }
 
 /** Weather sound, 0..1 each: the storm overhead and how hard the water around the fish moves. */
@@ -649,8 +673,21 @@ export function updateMusic(blend, depth01) {
             for (const n of chordMix(blend.a.id, blend.b.id, blend.t, bar)) pad(n.hz, nextBeat, beatS * musicClock.beatsPerBar * SCORE.barsPerChord, n.gain);
         }
         for (const half of [0, 1]) {
-            const hz = arpAt(biomeId, bar, inBar * 2 + half, depth01);
-            if (hz) bellNote(hz, nextBeat + half * beatS / 2);
+            const step = inBar * 2 + half, at = nextBeat + half * beatS / 2;
+            const hz = arpAt(biomeId, bar, step, depth01);
+            if (hz) bellNote(hz, at);
+            // The proximity layers (only those that are in: no silent notes are made).
+            for (const k in layerGain) {
+                if ((layerWant[k] || 0) < 0.02 && layerGain[k].gain.value < 0.001) continue;
+                const lh = layerAt(k, biomeId, bar, step);
+                if (lh) layerNote(lh, at, LAYERS[k].voice, layerGain[k]);
+            }
+        }
+        // The sea hum swells once a bar like a wave coming in, near the surface (the waves beat with the music).
+        if (inBar === 0) {
+            const base = MUSIC.ambVol * (1 + 0.3 * Math.max(0, Math.min(1, depth01))), up = base * (1 + MUSIC.wave * (1 - Math.max(0, Math.min(1, depth01 * 3))));
+            amb.gain.setTargetAtTime(up, nextBeat, beatS * 0.6);
+            amb.gain.setTargetAtTime(base, nextBeat + beatS * 1.5, beatS);
         }
         nextBeat += beatS;
         beatIdx++;
@@ -658,7 +695,7 @@ export function updateMusic(blend, depth01) {
     const d = Math.max(0, Math.min(1, depth01));
     busFilter.frequency.setTargetAtTime(MUSIC.cutoffTop * Math.pow(MUSIC.cutoffDeep / MUSIC.cutoffTop, d), ctx.currentTime, 0.6);
     ambFilter.frequency.setTargetAtTime(520 - 200 * d, ctx.currentTime, 0.6);
-    amb.gain.setTargetAtTime(MUSIC.ambVol * (1 + 0.3 * d), ctx.currentTime, 0.6);
+    for (const k in layerGain) layerGain[k].gain.setTargetAtTime(MUSIC.layerVol * (layerWant[k] || 0), ctx.currentTime, MUSIC.layerFade / 3);
 }
 
 /** Play a named sound; unknown names and blocked audio are ignored silently. */

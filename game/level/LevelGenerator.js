@@ -428,6 +428,17 @@ export default class LevelGenerator {
         this.alarm.x = x; this.alarm.y = y; this.alarmLeft = 0.25;
     }
 
+    /** What lives within `r` px of (x, y), for the music's proximity layers: { plants, animals, glow } counts. */
+    lifeNear(x, y, r) {
+        const out = { plants: 0, animals: 0, glow: 0 }, r2 = r * r;
+        for (const p of this.animated) if (p.isPlant && p.active && (p.x - x) ** 2 + (p.y - y) ** 2 < r2) out.plants++;
+        for (const c of this.creatures) {
+            if (!c.active || (c.x - x) ** 2 + (c.y - y) ** 2 >= r2) continue;
+            if (FRIENDS[c.key]?.glow || c.key.includes('jelly')) out.glow++; else out.animals++;
+        }
+        return out;
+    }
+
     isOpen(x, y, slack = 0.07) {
         return y > 60 && this.density(x, y) < LEVEL.threshold - slack;
     }

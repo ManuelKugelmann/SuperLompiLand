@@ -58,3 +58,33 @@ export function arpAt(biomeId, bar, step, depth01 = 0) {
     const shape = [0, 2, 4, 7, 4, 2, 4, 9];                  // up and back down, a wave
     return degreeHz(id, SCORE.arpOctave * scaleLen(id) + root + shape[step % 8]);
 }
+
+/**
+ * Layers over the score (user 2026-11-15: "animal, plant, biome themes on proximity. Multi layered
+ * music"): each fades in by what is round Lompi and plays on its own eighth-note steps, from the bar's
+ * chord, so all layers stay in key with the pads. The biome theme is the pads and the arpeggio above.
+ *   steps   which of the bar's 8 eighths it plays on       octave  relative to the coin melody
+ *   shape   scale degrees over the chord root, one per step  voice   how audio.js sounds it
+ */
+export const LAYERS = {
+    friends: { steps: [0, 3, 4], octave: -3, shape: [0, 4, 2], voice: 'bass' },          // the flock: a soft bass that grows with every friend
+    plants: { steps: [2, 6], octave: 0, shape: [4, 2], voice: 'wood' },                  // kelp, sea grass, corals close by: a wooden pluck on the off-beats
+    animals: { steps: [1, 5, 7], octave: 0, shape: [2, 4, 7], voice: 'pluck' },          // creatures close by: a little answering tune
+    glow: { steps: [1, 3, 5, 7], octave: 1, shape: [7, 9, 4, 11], voice: 'glass' }       // jellies and glowing animals: a glassy shimmer
+};
+
+/** A layer's note at this bar and eighth (0..7), or null when it rests there. */
+export function layerAt(name, biomeId, bar, step) {
+    const L = LAYERS[name], i = L ? L.steps.indexOf(step) : -1;
+    if (i < 0) return null;
+    const id = biomeOf(biomeId), { root } = chordAt(id, bar);
+    return degreeHz(id, L.octave * scaleLen(id) + root + L.shape[i]);
+}
+
+/** How loud each layer is (0..1) from what is round Lompi: friends in the flock, plants, animals and glowing ones in earshot. */
+export const LAYER_FULL = { friends: 3, plants: 6, animals: 3, glow: 2 };
+export function layerLevels(near, full = LAYER_FULL) {
+    const out = {};
+    for (const k of Object.keys(LAYERS)) out[k] = Math.max(0, Math.min(1, (near[k] || 0) / full[k]));
+    return out;
+}

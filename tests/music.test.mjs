@@ -172,3 +172,19 @@ test('gridLoop: a loop starts on an eighth and lasts a whole number of eighths',
     assert.ok(Math.abs(period - 3.0) < 1e-9, `period ${period}`);
     assert.ok(gridLoop(c, 0, 0.01).period >= 0.25);
 });
+
+test('layers: in key with the chord, on their own steps, louder with more round Lompi', async () => {
+    const { LAYERS, layerAt, layerLevels, chordAt } = await import('../game/music/score.js');
+    for (const name of Object.keys(LAYERS)) {
+        let notes = 0;
+        for (let step = 0; step < 8; step++) {
+            const hz = layerAt(name, 'reef', 0, step);
+            if (LAYERS[name].steps.includes(step)) { assert.ok(hz > 20 && hz < 5000, `${name} ${step}: ${hz}`); notes++; } else assert.equal(hz, null);
+        }
+        assert.ok(notes > 0);
+    }
+    assert.ok(chordAt('reef', 0));
+    const none = layerLevels({}), some = layerLevels({ friends: 1, glow: 5 });
+    assert.equal(none.friends, 0);
+    assert.ok(some.friends > 0 && some.friends < 1 && some.glow === 1);
+});
