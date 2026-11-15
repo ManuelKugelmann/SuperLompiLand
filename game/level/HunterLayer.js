@@ -70,7 +70,9 @@ export default class HunterLayer {
         const h = this.h, was = h.phase;
         // Rock between them hides Lompi; looked up every few frames (throttle.js 'check').
         if (h.phase === 'chase' && due(frame, everyOf('check', tier), 3)) this.sees = !sightBlocked(this.world.solid, h.x, h.y, fish.x, fish.y);
-        stepHunter(h, fish, this.sees, dt, HUNTER, this.world);
+        // With the Feuerfisch in the school the barracuda gives up sooner (its spines, friendPowers.js).
+        const spines = this.scene.powers?.().spines;
+        stepHunter(h, fish, this.sees, dt, spines ? (this.spiny ??= { ...HUNTER, chaseS: HUNTER.chaseS * spines.chase }) : HUNTER, this.world);
         if (h.phase !== 'warn' && h.phase !== 'chase') this.hideCover();
         if (h.phase === 'done') { this.rig?.destroy(); this.rig = null; this.h = null; return; }
         if (h.phase === 'warn') return;

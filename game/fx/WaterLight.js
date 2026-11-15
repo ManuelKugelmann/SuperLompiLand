@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { causticPattern, sunlightAt, gradeMatrix, gainColor } from './causticsMath.js';
 import { shareOf } from '../quality.js';
 import { depthMeters, depthLight } from '../level/depthMeters.js';
+import { litDepth } from '../friendPowers.js';
 
 /**
  * Sunlight under water — one system for light shafts, caustics and the colour grade
@@ -142,7 +143,7 @@ export default class WaterLight {
             const ease = 1 - Math.pow(0.97, Math.min(10, scene.game.loop.delta / (1000 / 60)));      // 3 % per 60th of a second, at any frame rate
             this.smooth = this.smooth === undefined ? light : this.smooth + (light - this.smooth) * ease;
             // Darker the deeper the middle of the view is (spec 5.0w), eased the same way.
-            const b = depthLight(depthMeters(Math.max(0, cam.scrollY + H / 2)));
+            const b = litDepth(depthLight(depthMeters(Math.max(0, cam.scrollY + H / 2))), scene.powers?.().light);      // Quallina's light (friendPowers.js)
             this.bright = this.bright === undefined ? b : this.bright + (b - this.bright) * ease;
             const q = this.smooth;
             if (Math.abs(q - this.lastLight) > 0.002 || Math.abs(this.bright - this.lastBright) > 0.002) {

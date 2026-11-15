@@ -56,7 +56,7 @@ export default class SecretLayer {
 
     /** Per frame. `fish` = { x, y }, `t` s. */
     update(fish, t) {
-        const L = SECRET_LOOK;
+        const L = SECRET_LOOK, sense = this.scene.powers?.().sense?.reach || 1;      // Sharky feels them from further away (friendPowers.js)
         for (const s of this.spots) {
             const dx = Math.abs(fish.x - s.x);
             if (s.live && dx > L.far) { s.live.clam.destroy(); s.live.pearl.destroy(); s.live = null; }
@@ -71,7 +71,7 @@ export default class SecretLayer {
                 s.live = { clam, pearl };
             }
             // Close by, the clam opens a little and the pearl shines (a hint to dive down).
-            const d = Math.hypot(fish.x - s.place.x, fish.y - s.place.y), near = Math.max(0, 1 - d / L.open);
+            const d = Math.hypot(fish.x - s.place.x, fish.y - s.place.y), near = Math.max(0, 1 - d / (L.open * sense));
             s.live.pearl.setAlpha(0.35 + 0.65 * near * (0.8 + 0.2 * Math.sin(t * 4))).setScale(0.55 + 0.25 * near);
             if (s.place.bottle) s.live.clam.setPosition(s.place.x, s.place.y + 8 + Math.sin(t * 1.3) * 10).setRotation(Math.sin(t * 0.9) * 0.15);
             else s.live.clam.setScale(s.live.clam.scaleX, (L.size / s.live.clam.width) * (1 + 0.12 * near));

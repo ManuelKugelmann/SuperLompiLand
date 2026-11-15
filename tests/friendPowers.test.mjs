@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FRIEND_POWERS, COIN_PULL, powersOf, magnetStep } from '../game/friendPowers.js';
+import { FRIEND_POWERS, COIN_PULL, POWER_WORDS, powersOf, magnetStep, litDepth } from '../game/friendPowers.js';
 
 test('powers come from the friends in the school, and the switch turns them off', () => {
     assert.equal(powersOf([]).magnet, COIN_PULL, 'everyone catches coins close by');
@@ -42,4 +42,18 @@ test('the pull is by time: one call of four 60ths of a second moves as far as fo
     for (let i = 0; i < 4; i++) { x = magnetStep(x, 0, 0, 0, m, age, 1).x; age += 1; }
     const once = magnetStep(-100, 0, 0, 0, m, 1, 4).x;
     assert.ok(Math.abs(once - x) < 12, `slow phone ${once.toFixed(1)} vs fast ${x.toFixed(1)}`);
+});
+
+test('every friend with a power says it, and the new powers come from the right friends', () => {
+    for (const [id, p] of Object.entries(FRIEND_POWERS)) if (id !== 'enabled' && p.kind !== 'glide') assert.ok(POWER_WORDS[id], id);
+    const all = powersOf(['jellyfish', 'firefish', 'shark']);
+    assert.ok(all.light && all.spines && all.sense);
+    assert.equal(powersOf([]).light, null);
+});
+
+test('Quallina gives back part of the light in the deep, never more than full light', () => {
+    assert.equal(litDepth(0.42, null), 0.42);
+    const lit = litDepth(0.42, FRIEND_POWERS.jellyfish);
+    assert.ok(lit > 0.42 && lit < 1);
+    assert.equal(litDepth(1, FRIEND_POWERS.jellyfish), 1);
 });
