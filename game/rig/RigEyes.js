@@ -15,7 +15,8 @@ const EYES_REST = EYES.restLid;
 export const RIG_EYES = {
     tex: 128,           // px of the shared eye textures
     cover: 1.25,        // the white and the lid reach this far past the hole (the picture hides the rest)
-    iris: 0.66,         // iris radius, share of the smaller half size of the hole
+    iris: 0.8,          // iris radius, share of the smaller half size of the hole (painted eyes: the iris nearly fills
+                        // the eye; 0.66 left a ring of white that read goggly). A face may set its own (faces.js irisSize)
     pupil: 0.52,        // pupil radius, share of the iris (Gaze scales it with light and fright)
     travel: 0.36,       // how far the iris moves at full gaze, share of the half size
     lids: 8,            // frames of the lid, open .. closed (and of the smiling lower lid)
@@ -48,6 +49,18 @@ function ensureTextures(scene, E = RIG_EYES) {
             c.strokeStyle = `rgba(255,255,255,${0.12 + (k % 3) * 0.06})`; c.lineWidth = 2;
             c.beginPath(); c.moveTo(h + Math.cos(a) * h * 0.55, h + Math.sin(a) * h * 0.55); c.lineTo(h + Math.cos(a) * h * 0.9, h + Math.sin(a) * h * 0.9); c.stroke();
         }
+        t.refresh();
+    }
+    if (!scene.textures.exists('rig_eye_shine')) {
+        // The catchlights, as painted on the heroes: a big soft one high on the light side and a small one low on the other.
+        const t = scene.textures.createCanvas('rig_eye_shine', S, S), c = t.getContext();
+        const blob = (x, y, rx, ry, a) => {
+            const g = c.createRadialGradient(x, y, 0, x, y, Math.max(rx, ry));
+            g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(0.6, `rgba(255,255,255,${a * 0.85})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+            c.fillStyle = g; c.beginPath(); c.ellipse(x, y, rx, ry, -0.5, 0, Math.PI * 2); c.fill();
+        };
+        blob(S * 0.34, S * 0.3, S * 0.17, S * 0.13, 1);
+        blob(S * 0.66, S * 0.68, S * 0.07, S * 0.07, 0.8);
         t.refresh();
     }
     if (!scene.textures.exists('rig_eye_lid')) {
@@ -105,7 +118,7 @@ export default class RigEyes {
             e.white = s.add.image(0, 0, 'rig_eye_white');
             e.iris = s.add.image(0, 0, 'rig_eye_iris').setTint(spec.iris);
             e.pupil = s.add.image(0, 0, 'rig_eye_white').setTint(0x05080c);
-            e.shine = s.add.image(0, 0, 'rig_eye_white');
+            e.shine = s.add.image(0, 0, 'rig_eye_shine');
             e.lid = s.add.image(0, 0, 'rig_eye_lid', 0).setTint(spec.lid);
             e.smile = s.add.image(0, 0, 'rig_eye_smile', 0).setTint(spec.lid).setVisible(false);
         }
@@ -154,11 +167,12 @@ export default class RigEyes {
             const shut = q.lids ? 1 : (1 - Math.max(0, (lid - EYES_REST) / (1 - EYES_REST))) * (1 - happy * E.smile * 0.6);
             const ox = ball.dx / Math.sin(EYES.reach * 0.7) * E.travel * r * kx * view.facing, oy = -g.y * E.travel * ry;
             const ix = P.x + ox * cr - oy * sr, iy = P.y + ox * sr + oy * cr;
-            const ir = r * E.iris, pr = ir * E.pupil * g.pupil * (this.spec.pupil ?? 1);
+            const ir = r * (this.spec.irisSize ?? E.iris), pr = ir * E.pupil * g.pupil * (this.spec.pupil ?? 1);
             e.white.setPosition(P.x, P.y).setRotation(view.rotation).setScale(rx * 2 * E.cover / W, ry * 2 * E.cover / W);
             e.iris.setPosition(ix, iy).setRotation(view.rotation).setScale(ir * 2 * kx * ball.squash / W, ir * 2 * ky * shut / W);
             e.pupil.setPosition(ix, iy).setRotation(view.rotation).setScale(pr * 2 * kx * ball.squash / W, pr * 2 * ky * shut / W);
-            e.shine.setPosition(ix - ir * 0.35 * view.facing * kx * ball.squash, iy - ir * 0.4 * ky).setScale(ir * 0.55 * kx * ball.squash / W, ir * 0.55 * ky * shut / W);
+            // The catchlights sit over the iris and stay where the light is (not turned with the eye), mirrored with the facing.
+            e.shine.setPosition(ix, iy).setFlipX(view.facing < 0).setScale(ir * 2 * kx * ball.squash / W, ir * 2 * ky * shut / W);
             e.lid.setVisible(!!q.lids);
             if (q.lids) e.lid.setFrame(Math.round(lid * (E.lids - 1))).setPosition(P.x, P.y).setRotation(view.rotation).setScale(rx * 2 * E.cover / W, ry * 2 * E.cover / W);
             const smiling = !!q.lids && happy > 0.02;
