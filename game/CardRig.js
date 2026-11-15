@@ -228,7 +228,8 @@ export default class CardRig {
         this.spinePh += step * this.spine.rate;
         const ph = this.phase, sq = Phaser.Math.Clamp(squash, -0.35, 0.35), sc = view.baseScale * this.zoom;
         // Breathing: always, slow at rest and quicker after effort; the body swells a little with each breath.
-        const br = this.breath.update(frames / 60, raw), swell = BREATH.swell * (br.gill - 0.3);
+        // (A paddler's shell is rigid: it does not swell; user: "turtle shell should be rigid".)
+        const br = this.breath.update(frames / 60, raw), swell = this.char.anim === 'paddle' ? 0 : BREATH.swell * (br.gill - 0.3);
         let sx = sc * (1 + sq - swell * 0.4), sy = sc * (1 - sq + swell), rotation = Phaser.Math.Angle.Wrap(this.angle - level) + lean;
         // Steering shows in the body (user: 'creatures should bend tail fin or body when steering'): while the
         // nose turns, the tail lags behind and the body curves into the turn; it straightens when the turn ends.
@@ -250,9 +251,9 @@ export default class CardRig {
             const k = 0.02 + 0.03 * drive;
             bend = (u, v, o) => { o.x = Math.sin(ph * 0.7 - v * 2.2) * k * W * v; o.y = 0; };
         } else if (style === 'paddle') {
-            const stroke = Math.sin(ph * 0.55);
-            rotation += stroke * 0.04 * (0.1 + drive);
-            sy *= 1 - stroke * 0.025 * (0.1 + drive);
+            // Turtle: the shell is rigid (user: "shell rigid, not part of the flipper anim"); the whole body
+            // only rocks a little with each stroke, the flipper cards do the rowing.
+            rotation += Math.sin(ph * 0.55) * 0.03 * (0.1 + drive);
             bend = (u, v, o) => { o.x = 0; o.y = 0; };
         } else {
             // The spine wave (CARDS.spine): the body bends sideways as a real 3D curve, each cross-section

@@ -216,7 +216,7 @@ export default class Rig {
         const ph = this.phase, amp = view.wiggle * (RIG.idle + drive * (1 - RIG.idle)), w = view.frame.width;
         const style = this.char.anim || 'swim';
         // Breathing: always; the body swells a little with each breath.
-        const br = this.breath.update(frames / 60, raw), swell = BREATH.swell * (br.gill - 0.3);
+        const br = this.breath.update(frames / 60, raw), swell = style === 'paddle' ? 0 : BREATH.swell * (br.gill - 0.3);      // a paddler's shell is rigid
         scaleX *= 1 - swell * 0.4; scaleY *= 1 + swell;
         let bend;
         if (style === 'pulse') {
@@ -231,11 +231,10 @@ export default class Rig {
             const trail = Phaser.Math.Clamp(-vx * 0.01, -0.3, 0.3) * flip, k = 0.05 * (0.15 + drive * 1.35);
             bend = (u, v, out) => { out.x = (Math.sin(ph * 0.7 - v * 2.2) * k + trail * v) * w * v; out.y = 0; };
         } else if (style === 'paddle') {
-            // Turtle: a stiff shell that rocks with each flipper stroke and stretches forward a little.
-            const stroke = Math.sin(ph * 0.55);
-            rotation += stroke * 0.07 * (0.08 + drive * 1.2) * flip;
-            scaleX *= 1 + stroke * 0.03 * drive; scaleY *= 1 - stroke * 0.045 * (0.4 + drive);
-            bend = (u, v, out) => { const t = left ? u : 1 - u; out.x = 0; out.y = Math.sin(ph * 0.55 - t * 1.5) * amp * 0.5 * t * t * t; };
+            // Turtle: the shell is rigid (user: "shell rigid, not part of the flipper anim"): the whole picture
+            // only rocks a little with each stroke; nothing of it stretches or bends.
+            rotation += Math.sin(ph * 0.55) * 0.05 * (0.08 + drive * 1.2) * flip;
+            bend = still;
         } else if (style === 'sit') {
             // Sitters (starfish, snail, slug): they rock a little and breathe; the thin parts do the rest.
             rotation += Math.sin(ph * 0.45) * 0.018;
