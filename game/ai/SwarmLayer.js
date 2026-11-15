@@ -11,12 +11,16 @@ import { CARDS, makeSpine, spineTable, spineAt } from '../rig/cards.js';
 
 /** Species: look, size (px), how many, how fast, flock overrides (boids.js SWARM), where they live (biome ids). */
 export const SPECIES = {
-    anthias:    { count: 110, size: 26, body: 0xff8a5c, belly: 0xffc6ad, accent: 0xb36cff, speed: 85, flock: { separationR: 38, neighbourR: 95, weights: { cohesion: 0.35 } }, biomes: ['reef', 'beach'] },
+    anthias:    { count: 70, size: 26, body: 0xff8a5c, belly: 0xffc6ad, accent: 0xb36cff, speed: 85, flock: { separationR: 38, neighbourR: 95, weights: { cohesion: 0.35 } }, biomes: ['reef', 'beach'] },
     tang:       { count: 14, size: 40, body: 0xffd23f, belly: 0xfff0a0, accent: 0xffffff, speed: 55, tall: true, flock: { neighbourR: 140, separationR: 60, weights: { cohesion: 0.4 } }, biomes: ['reef', 'kelp', 'mangrove'] },
-    fry:        { count: 70, size: 14, body: 0xbfe3f0, belly: 0xffffff, accent: 0x9bd0e6, speed: 70, stripe: true, flock: { separationR: 16, neighbourR: 50 }, biomes: ['mangrove', 'beach'] },
-    juvenile:   { count: 45, size: 18, body: 0xffd84a, belly: 0xfff3b0, accent: 0x2f5d8a, speed: 60, flock: { separationR: 22, neighbourR: 70, weights: { cohesion: 0.4 } }, biomes: ['beach'] },   // young yellow reef fish growing up in the lagoon
-    silverside: { count: 150, size: 20, body: 0x8fb0c4, belly: 0xeaf4fa, accent: 0xdff2ff, speed: 105, stripe: true, biomes: ['blue', 'kelp', 'harbour', 'wreck'] },
-    lantern:    { count: 60, size: 18, body: 0x1d2b4a, belly: 0x2c4166, accent: 0x7fe9ff, speed: 75, glow: true, biomes: ['trench'] }
+    fry:        { count: 45, size: 14, body: 0xbfe3f0, belly: 0xffffff, accent: 0x9bd0e6, speed: 70, stripe: true, flock: { separationR: 16, neighbourR: 50 }, biomes: ['mangrove', 'beach'] },
+    juvenile:   { count: 30, size: 18, body: 0xffd84a, belly: 0xfff3b0, accent: 0x2f5d8a, speed: 60, flock: { separationR: 22, neighbourR: 70, weights: { cohesion: 0.4 } }, biomes: ['beach'] },   // young yellow reef fish growing up in the lagoon
+    silverside: { count: 110, size: 20, body: 0x8fb0c4, belly: 0xeaf4fa, accent: 0xdff2ff, speed: 105, stripe: true, biomes: ['blue', 'kelp', 'harbour', 'wreck'] },
+    lantern:    { count: 60, size: 18, body: 0x1d2b4a, belly: 0x2c4166, accent: 0x7fe9ff, speed: 75, glow: true, biomes: ['trench'] },
+    // Bigger fish in a small, loose shoal (playtest: "add shoals of larger fish").
+    jack:       { count: 10, size: 46, body: 0x8aa3b5, belly: 0xdfe8ee, accent: 0xffd84a, speed: 125, flock: { separationR: 70, neighbourR: 190, weights: { cohesion: 0.5 } }, biomes: ['blue', 'reef', 'shore'] },
+    // The one big sardine swarm of the open sea (a home shoal: MainScene), never a roaming one (no biomes).
+    sardine:    { count: 240, size: 18, body: 0x6f8fa6, belly: 0xf2f7fa, accent: 0xcfe6f5, speed: 115, stripe: true, flock: { separationR: 18, neighbourR: 60, weights: { cohesion: 0.55 } }, biomes: [] }
 };
 /** How many swarms around the camera, spawn and drop distances (px). */
 export const SWARMS = { perView: 2,

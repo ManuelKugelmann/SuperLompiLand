@@ -118,6 +118,9 @@ const STEP_MS = 1000 / 60;
 /** World tunables. */
 /** Leaking oil drums (spec 7.1): how often they puff and how much. */
 // `crack`: where the oil leaves the drum, in shares of its displayed size from its centre.
+/** The open sea's one big sardine swarm: share of the open blue's width where it lives, px below the calm route. */
+const SARDINES = { at: 0.42, below: 380 };
+
 const OIL = { pulseMs: 450, perPulse: 2, margin: 600, denseCount: 6, graceS: 1.2, pauseS: 2.5, crack: [0.19, -0.34] };
 // A drum that comes near gets its plume as it would be after leaking all along (playtest: "start some spillage before
 // simulated"): once, and again only after it has been away for longer than oil lives (else the plume would double).
@@ -249,7 +252,8 @@ export default class MainScene extends Phaser.Scene {
             flowAt: this.particles.env.flowAt,
             biomeAt: x => BIOMES[biomeIndexAt(x)].id,
             waterAt: x => { const bl = biomeBlendAt(x); return mixColor(bl.a.water[0], bl.b.water[0], bl.t); },
-            homes: [{ ...ghostShip(), id: 'silverside' }]   // a shoal shelters in the ghost ship's hull (spec 5.0e)
+            homes: [{ ...ghostShip(), id: 'silverside' },   // a shoal shelters in the ghost ship's hull (spec 5.0e)
+                (() => { const b = BIOMES.find(bm => bm.id === 'blue'), x = b.from + b.width * SARDINES.at; return { x, y: this.level.field.routeY(x) + SARDINES.below, id: 'sardine' }; })()]   // the open sea's big sardine swarm
         });
         this.swarmPlayer = { x: 0, y: 0, vx: 0, vy: 0 };
         // Gannets over the island coasts dive after shoals and after a fish near the surface (spec 5.0d).
