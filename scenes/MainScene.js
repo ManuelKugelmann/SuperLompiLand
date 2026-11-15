@@ -271,7 +271,8 @@ export default class MainScene extends Phaser.Scene {
         // indefinitely"): those freed before this start are there from the first frame, the newest nearest.
         this.school = new FriendSchool(this);
         for (const ch of this.journey.list) if (ch.friend && this.journey.has(ch.friend.id)) this.school.add(ch.friend);
-        this.wantOpening = !this.ambientMode && (this.registry.get('opening') || !openingSeen(window.localStorage));
+        this.openingAsked = !!this.registry.get('opening');      // 'watch the story' from the title menu: wherever the save is
+        this.wantOpening = !this.ambientMode && (this.openingAsked || !openingSeen(window.localStorage));
         this.registry.set('opening', false);
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y),
             (ch, x, y) => { this.school.add(ch.friend, x, y); this.powerNews(ch.friend.id); });
@@ -1896,7 +1897,13 @@ export default class MainScene extends Phaser.Scene {
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
         // The opening story starts on the first frame the HUD is up (its captions are HUD banners).
-        if (this.wantOpening && !this.perfTour && this.scene.isActive(HUD_KEY)) { this.wantOpening = false; this.opening = new OpeningLayer(this); }
+        if (this.wantOpening && !this.perfTour && this.scene.isActive(HUD_KEY)) {
+            this.wantOpening = false;
+            // On its own the story plays only at the very start (the lagoon, before the first nest): a save that lost its
+            // 'seen' mark, or a test that starts elsewhere, simply goes on playing.
+            const atStart = this.nestIndex === 0 && !new URLSearchParams(window.location.search).has('at');
+            if (this.openingAsked || atStart) this.opening = new OpeningLayer(this);
+        }
         this.opening?.update(delta);
         // Depth is felt (spec 5.0w): past a depth mark a lower bell rings and the HUD's depth line glows.
         this.depthBell ??= createDepthBell();
