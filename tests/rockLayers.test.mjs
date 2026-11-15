@@ -164,8 +164,8 @@ test('the trench wall stands behind the descent below its rim, has windows, and 
 });
 
 test('layer chunks meet without a seam: baked with their neighbours\' rock, edge columns continue', async () => {
-    const { layerPicture, LAYER_SHADE } = await import('../game/level/rockLayerTable.js');
-    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L), S = LAYER_SHADE.rockSize;
+    const { layerPicture, layerSize } = await import('../game/level/rockLayerTable.js');
+    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L), S = layerSize(L);
     // A chunk of the lagoon's back rock (x about 37 000) and its right and lower neighbours: without the margin its borders stepped by 25.
     const cx = 23, cy = 0, a = layerPicture(f, 1337 + L.seed, L, cx, cy), r = layerPicture(f, 1337 + L.seed, L, cx + 1, cy), d = layerPicture(f, 1337 + L.seed, L, cx, cy + 1);
     const px = (img, x, y) => [0, 1, 2, 3].map(c => img[(y * S + x) * 4 + c]);
@@ -193,8 +193,8 @@ test('no rock floats in a layer: small pieces that touch no edge are dropped, ro
     assert.equal(img[(80 * S + 50) * 4 + 3], 255, 'the ground stays');
     assert.ok(LOOSE_ROCK.minArea > 72);
     // Over a stretch of trench and lagoon, every remaining piece in the layer pictures reaches an edge or is big.
-    const { layerPicture, LAYER_SHADE } = await import('../game/level/rockLayerTable.js');
-    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L, { route: x => createField(1337).routeY(x) }), P = LAYER_SHADE.rockSize;
+    const { layerPicture, layerSize } = await import('../game/level/rockLayerTable.js');
+    const L = ROCK_LAYERS[0], f = layerField(createField(1337 + L.seed), L, { route: x => createField(1337).routeY(x) }), P = layerSize(L);
     for (const [cx, cy] of [[23, 0], [538, 1], [538, 2]]) {
         const pic = layerPicture(f, 1337 + L.seed, L, cx, cy), copy = pic.slice();
         dropLooseRock(copy, P, { ...LOOSE_ROCK, minArea: LOOSE_ROCK.minArea });

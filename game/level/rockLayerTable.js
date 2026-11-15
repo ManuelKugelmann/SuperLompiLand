@@ -30,9 +30,11 @@ export const ROCK_LAYERS = [
     // socket: closed share in front of an island at least (its rocky underwater base: no far
     // view right in front of an island, spec 5.0c); it eases off into the open sea.
     // trenchWall: this layer carries the trench wall behind the descent (TRENCH_WALL).
-    // rockSize / sharp: the near layer is baked finer and not softened (user: the near rock read smeared; the far ones may stay soft).
-    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.38, dark: 0.8, depth: -9.5, socket: 0.85, trenchWall: true },
-    { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.24, dark: 0.86, depth: -7, clearRoute: true, rockSize: 376, sharp: true }
+    // rockSize / sharp / shade: the near layer is baked finer, not softened and shaded crisper (user: the near rock read smeared; the far ones may stay soft).
+    { id: 'mid', s: 0.6, seed: 101, share: 1, swing: 0.32, scale: 1100, fog: 0.38, dark: 0.8, depth: -9.5, socket: 0.85, trenchWall: true,
+        rockSize: 376, shade: { grain: 0.34, bump: 0.45, relief: 1.1 } },      // the rock just behind the play plane reads near: baked finer and crisper too (playtest: "rocky near background too blurry"); still softened, or its chunks met in seams
+    { id: 'near', s: 0.82, seed: 202, share: 0.55, open: -0.08, swing: 0.36, scale: 1300, fog: 0.24, dark: 0.86, depth: -7, clearRoute: true, rockSize: 510, sharp: true,
+        shade: { grain: 0.42, bump: 0.55, relief: 1.2 } }      // its own crisper shading: playtest "rocky near background too blurry" (the soft look came from low grain and relief, not resolution)
 ];
 
 /** Layer chunk size (layer px) and its shading: coarse (soft), no sand, low contrast, unlit rims. */
@@ -469,7 +471,7 @@ export const layerSize = layer => layer.rockSize || LAYER_SHADE.rockSize;
 export function layerPicture(field, seed, layer, cx, cy, M = LAYER_MARGIN) {
     const S = layerSize(layer), B = S + 2 * M, { ox, oy, span } = layerChunkRect(layer, cx, cy), step = span / S;
     const bx = ox - M * step, by = oy - M * step, bspan = span * B / S;
-    const { rock } = shadeChunk(field, seed, bx, by, bspan, { ...LAYER_SHADE, rockSize: B, grainAt: [cx * S - M, cy * S - M] });
+    const { rock } = shadeChunk(field, seed, bx, by, bspan, { ...LAYER_SHADE, ...layer.shade, rockSize: B, grainAt: [cx * S - M, cy * S - M] });
     fogLayer(rock, B, bx, by, bspan, layer);
     dropLooseRock(rock, B);
     const out = new Uint8ClampedArray(S * S * 4);
