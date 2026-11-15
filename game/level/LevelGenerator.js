@@ -864,7 +864,9 @@ export default class LevelGenerator {
                 // Settle onto the floor under its middle: where the foot point is on a slope and the floor dips
                 // under the prop, it sinks into the dip instead of hanging over water (user: bases integrate).
                 const floorAt = x => { for (let y = spot.y - 40; y < spot.y + h * LEVEL.propSettle; y += 8) if (this.density(x, y) > T) return y; return spot.y + h * LEVEL.propSettle; };
-                const footY = Math.max(spot.y, ...[-0.3, -0.15, 0, 0.15, 0.3].map(k => floorAt(spot.x + k * w)));
+                // The median of five samples across its middle: one groove under an edge does not sink the whole prop.
+                const under = [-0.3, -0.15, 0, 0.15, 0.3].map(k => floorAt(spot.x + k * w)).sort((a, b) => a - b);
+                const footY = Math.max(spot.y, under[2]);
                 const img = keep(s.add.image(spot.x, footY, key).setOrigin(0.5, 1 - p.sink));
                 img.setScale(w / tex.width).setRotation(angle).setDepth(p.depth);
                 if (rng.frac() < 0.5) img.setFlipX(true);
@@ -874,7 +876,7 @@ export default class LevelGenerator {
                 // A boat's hull is solid: a box over its visible part, standing on its spot and tilted with it.
                 if (p.block) {
                     const bw = w * p.block[0], bh = h * (1 - p.sink) * p.block[1], ux = Math.sin(angle), uy = -Math.cos(angle);
-                    this.addBlocker(chunk, spot.x + ux * bh / 2, spot.y + uy * bh / 2, bw, bh, angle);
+                    this.addBlocker(chunk, spot.x + ux * bh / 2, footY + uy * bh / 2, bw, bh, angle);      // where the settled hull really is
                 }
                 // Its foot sits in the sand, not on a picture edge: a soft skirt in front of the base.
                 if (w <= PROP_SKIRT.maxWidth) {

@@ -12,6 +12,10 @@ export const BREATH = {
     swell: 0.014                  // how much a rig's body swells with each breath (CardRig, Rig)
 };
 
+/** A different seed for every rig made (Gaze, Breath): animals of one kind do not blink or breathe in unison. */
+let seeds = 0;
+export const instanceSeed = () => (seeds = (seeds * 1103515245 + 12345 + 7919) >>> 0) || 1;
+
 export class Breath {
     constructor(seed = 1, cfg = BREATH) {
         this.cfg = cfg;

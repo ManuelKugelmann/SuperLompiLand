@@ -3,8 +3,9 @@ import { CHARACTERS } from './characters.js';
 import { softnessMap, SoftHalo } from './rig/soft.js';
 import { CARDS, makeSpine, spineTable, spineAt } from './rig/cards.js';
 import RigEyes from './rig/RigEyes.js';
+import { holedTexture } from './rig/eyeHoles.js';
 import { faceOf } from './rig/faces.js';
-import { Breath, BREATH } from './rig/breath.js';
+import { Breath, BREATH, instanceSeed } from './rig/breath.js';
 
 /** Tunables of the body animation shared by every playable (local, remote, title screen). */
 export const RIG = {
@@ -90,7 +91,17 @@ export default class Rig {
         this.shown = true;
         this.views = {};
         this.scene = scene;
-        this.breath = new Breath((character.id || character.states.normal?.key || '').length * 7 + 5);     // breathing (rig/breath.js), as the card rigs
+        this.breath = new Breath(instanceSeed());     // breathing (rig/breath.js), as the card rigs
+        // Per-rig scratch for placing points on the bent picture (eyes, mouth): no closures or objects per frame.
+        this.pt = {};
+        this.place = (a, o) => {
+            const P = this.pt, w = P.w, h = P.h;
+            P.bend(a.x / w, a.y / h, P.out);
+            const lx = (a.x - w / 2 + P.out.x) * P.scaleX, ly = (a.y - h / 2 + P.out.y) * P.scaleY;
+            o.x = P.x + lx * P.cos - ly * P.sin; o.y = P.y + lx * P.sin + ly * P.cos; o.sx = Math.abs(P.scaleX); o.sy = Math.abs(P.scaleY);
+        };
+        this.eyeView = { rotation: 0, facing: 1, alpha: 1 };
+        this.ahead = { x: 0, y: 0 };
         for (const [name, st] of Object.entries(character.states)) {
             const key = scene.textures.exists(st.key) ? st.key : DEFAULT_STATES.normal.key;
             // With the layered art (body without side fin + the fin on its own)
@@ -98,15 +109,17 @@ export default class Rig {
             const pivot = scene.cache.json.get('fins')?.[key];
             const layered = !!pivot && scene.textures.exists(`${key}_body`) && scene.textures.exists(`${key}_fin`);
             // A Rope is used as a free-form triangle strip: its vertices are set by hand in draw().
-            const view = scene.add.rope(x, y, layered ? `${key}_body` : key, null, STRIP.length / 2, true)
+            // A hero's eyes are cut out of its picture; the living eyeballs are drawn behind it (rig/eyeHoles.js).
+            const face = key === st.key && !layered ? faceOf(st) : null;
+            const view = scene.add.rope(x, y, layered ? `${key}_body` : holedTexture(scene, key, face?.eyes), null, STRIP.length / 2, true)
                 .setDepth(depth).setVisible(false);
             view.dirty = false;
             view.baseScale = st.width / view.frame.width;
             view.wiggle = st.wiggle;
             view.grid = makeGrid(view, softFor(scene, key));
             // Living eyes and the mouth (rig/faces.js): only with the painted picture they were measured on.
-            view.face = key === st.key ? faceOf(st) : null;
-            if (view.face?.eyes) view.eyes = new RigEyes(scene, view.face.eyes, key.length + 3).setDepth(depth + 0.05);
+            view.face = face;
+            if (face?.eyes) view.eyes = new RigEyes(scene, face.eyes, instanceSeed()).setDepth(depth - 0.005);
             if (layered) {
                 const fin = scene.add.image(x, y, `${key}_fin`).setDepth(depth + 0.1).setVisible(false);
                 fin.setOrigin((pivot.pivotX - pivot.finX) / fin.width, (pivot.pivotY - pivot.finY) / fin.height);
@@ -145,7 +158,7 @@ export default class Rig {
     setAlpha(a) { this.view.setAlpha(a); return this; }
 
     setDepth(d) {
-        for (const v of Object.values(this.views)) { v.setDepth(d); v.fin?.setDepth(d + 0.1); v.eyes?.setDepth(d + 0.05); }
+        for (const v of Object.values(this.views)) { v.setDepth(d); v.fin?.setDepth(d + 0.1); v.eyes?.setDepth(d - 0.005); }
         return this;
     }
 
@@ -332,18 +345,19 @@ export default class Rig {
         // Eyes and mouth ride the bent picture where they are painted.
         const face = view.face;
         if (face) {
-            const w = view.frame.width, h = view.frame.height;
-            const place = (a, o) => {
-                bend(a.x / w, a.y / h, out);
-                const lx = (a.x - w / 2 + out.x) * scaleX, ly = (a.y - h / 2 + out.y) * scaleY;
-                o.x = x + lx * cos - ly * sin; o.y = y + lx * sin + ly * cos; o.s = Math.abs(scaleY);
-            };
+            const P = this.pt;
+            P.w = view.frame.width; P.h = view.frame.height; P.bend = bend; P.out = out; P.scaleX = scaleX; P.scaleY = scaleY;
+            P.x = x; P.y = y; P.cos = cos; P.sin = sin;
             if (view.eyes) {
                 if (!this.shown) view.eyes.hide();
-                // Mirrored upside down when heading left (see above): seen upright, that is a left-facing eye.
-                else view.eyes.update(place, { rotation: flip < 0 ? rotation - Math.PI : rotation, facing: flip, alpha: view.alpha, edge: 1 }, this.look || { x: x + flip * 400 + vx * 30, y: y + vy * 30 }, frames / 60, { scared: this.scared || 0 });
+                else {
+                    // Mirrored upside down when heading left (see above): seen upright, that is a left-facing eye.
+                    const V = this.eyeView; V.rotation = flip < 0 ? rotation - Math.PI : rotation; V.facing = flip; V.alpha = view.alpha;
+                    const ahead = this.ahead; ahead.x = x + flip * 400 + vx * 30; ahead.y = y + vy * 30;
+                    view.eyes.update(this.place, V, this.look || ahead, frames / 60, { scared: this.scared || 0 });
+                }
             }
-            if (br.blub && face.mouth && this.shown && y > 0) { place(face.mouth, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); }
+            if (br.blub && face.mouth && this.shown && y > 0) { this.place(face.mouth, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); }
         }
 
         const over = this.overlay;
@@ -379,7 +393,7 @@ export default class Rig {
     }
 }
 
-const TMP = { x: 0, y: 0 }, SPINE = { z: 0, a: 0, dx: 0 }, MOUTH = { x: 0, y: 0, s: 1 };
+const TMP = { x: 0, y: 0 }, SPINE = { z: 0, a: 0, dx: 0 }, MOUTH = { x: 0, y: 0, sx: 1, sy: 1 };
 const still = (u, v, out) => { out.x = 0; out.y = 0; };
 
 /** Everything about one picture's grid that never changes: places, texture coordinates, soft weights, rays. */

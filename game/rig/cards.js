@@ -336,7 +336,7 @@ const LIGHT = (() => { const [x, y, z] = CARDS.light, L = Math.hypot(x, y, z); r
  */
 export function project(card, posed, v, verts, bright, alpha, hue = null) {
     const cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cr = Math.cos(v.rotation), sr = Math.sin(v.rotation);
-    const wide = Math.max(cy, CARDS.turnMin[0] * smooth(0, CARDS.turnMin[1], Math.abs(cy)));      // never paper-thin, except right at the mirror
+    const wide = turnWidth(v.yaw);      // never paper-thin, except right at the mirror
     const kx = v.sx * v.facing, ky = v.sy;
     const strip = card.strip;
     for (let s = 0; s < strip.length; s++) {
@@ -360,6 +360,12 @@ export function project(card, posed, v, verts, bright, alpha, hue = null) {
         if (hue) hue[s] = sheenHue(nx1, posed.ny[i], X, posed.y[i], 0);   // rainbow sheen (game/rig/sheen.js)
         alpha[s] = v.fade ? smooth(CARDS.edgeFade[0], CARDS.edgeFade[1], Math.abs(nz1)) : 1;
     }
+}
+
+/** How wide a card reads at yaw (share of its width): its cosine, but never paper-thin except right at the mirror (CARDS.turnMin). */
+export function turnWidth(yaw) {
+    const cy = Math.cos(yaw);
+    return Math.max(cy, CARDS.turnMin[0] * smooth(0, CARDS.turnMin[1], Math.abs(cy)));
 }
 
 function smooth(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }

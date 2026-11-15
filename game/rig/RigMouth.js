@@ -30,6 +30,9 @@ export default class RigMouth {
 
     hide() { this.img?.destroy(); this.img = null; }
 
+    /** The rig moved without being posed (slow tiers): the mouth moves with it. */
+    shift(dx, dy) { if (this.img) { this.img.x += dx; this.img.y += dy; } }
+
     /** Per frame: `at` = { x, y, s } where the mouth is and the picture's scale; `h` = picture height px; `dt` s. */
     update(at, h, rotation, alpha, dt) {
         if (this.t < 0) { this.hide(); return; }
@@ -40,7 +43,7 @@ export default class RigMouth {
             this.img = this.scene.add.image(0, 0, RIG_MOUTH.key).setTint(RIG_MOUTH.tint).setDepth(this.depth);
             this.img.noCaustics = true;
         }
-        const open = Math.sin(Math.PI * this.t), d = h * RIG_MOUTH.size * at.s / 64;
+        const open = Math.sin(Math.PI * this.t), d = h * RIG_MOUTH.size * at.sy / 64;
         this.img.setPosition(at.x, at.y).setRotation(rotation).setScale(d * (0.7 + 0.3 * open), d * open).setAlpha(alpha);
     }
 

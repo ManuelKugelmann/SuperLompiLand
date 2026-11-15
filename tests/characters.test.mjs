@@ -89,14 +89,30 @@ test('shape difference: the same ratio is 0, an address bar is a little, a resha
 });
 
 test('face spots lie inside their pictures', async () => {
-    const { readFileSync } = await import('node:fs');
+    const { readFileSync, existsSync } = await import('node:fs');
     const { FACES } = await import('../game/rig/faces.js');
-    const rig = JSON.parse(readFileSync(new URL('../public/img/parts/rig.json', import.meta.url)));
+    // Every FACES picture's size, read from its file (PNG or WebP header): none is skipped.
+    const sizeOf = key => {
+        for (const ext of ['png', 'webp']) {
+            const url = new URL(`../public/img/${key}.${ext}`, import.meta.url);
+            if (!existsSync(url)) continue;
+            const b = readFileSync(url);
+            if (ext === 'png') return [b.readUInt32BE(16), b.readUInt32BE(20)];
+            const kind = b.toString('ascii', 12, 16);
+            if (kind === 'VP8X') return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
+            if (kind === 'VP8L') { const v = b.readUInt32LE(21); return [1 + (v & 0x3fff), 1 + ((v >> 14) & 0x3fff)]; }
+            return [b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff];
+        }
+        return null;
+    };
     for (const [key, f] of Object.entries(FACES)) {
-        const size = rig[key]?.size;
-        if (!size) continue;           // a picture without part cards: checked by eye in the viewer
+        const size = sizeOf(key);
+        assert.ok(size, `${key}: no picture`);
         const [W, H] = size;
-        for (const e of f.eyes?.at || []) assert.ok(e.x - e.rx >= 0 && e.x + e.rx <= W && e.y - e.ry >= 0 && e.y + e.ry <= H, key);
+        for (const e of f.eyes?.at || []) {
+            assert.ok(e.x - e.rx >= 0 && e.x + e.rx <= W && e.y - e.ry >= 0 && e.y + e.ry <= H, key);
+            for (const [x, y] of e.hole || []) assert.ok(x >= 0 && x <= W && y >= 0 && y <= H, `${key} hole`);
+        }
         if (f.mouth) assert.ok(f.mouth.x >= 0 && f.mouth.x <= W && f.mouth.y >= 0 && f.mouth.y <= H, key);
     }
 });

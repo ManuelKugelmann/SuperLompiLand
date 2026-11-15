@@ -2,11 +2,12 @@ import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import RigEyes from './rig/RigEyes.js';
+import { holedTexture } from './rig/eyeHoles.js';
 import RigMouth from './rig/RigMouth.js';
 import { faceOf } from './rig/faces.js';
-import { Breath, BREATH } from './rig/breath.js';
+import { Breath, BREATH, instanceSeed } from './rig/breath.js';
 import { CHARACTERS } from './characters.js';
-import { CARDS, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
+import { CARDS, turnWidth, makeCard, posedBuffers, poseBody, posePart, carryPoint, project, turnPose, makeSpine, spineTable, spineAt, yawPart } from './rig/cards.js';
 
 /** Where the part cards come from (scripts/parts/bake.py). */
 export const PARTS = { json: 'parts', url: 'img/parts/', texture: key => `parts_${key}` };
@@ -55,7 +56,17 @@ export default class CardRig {
     constructor(scene, character, x, y, depth = 5) {
         this.clock = scene.time;     // the sheen drifts with game time
         this.scene = scene;
-        this.breath = new Breath((character.id || '').length * 7 + 3);
+        this.breath = new Breath(instanceSeed());
+        // Per-rig scratch for placing points on the posed body (eyes, mouth): no closures or objects per frame.
+        this.pt = {};
+        this.pointAt = (k, out) => {
+            const P = this.pt, ox = k.dx * P.sx * P.flip * P.wide, oy = k.dy * P.sy;
+            out.x = P.x + P.verts[k.s * 2] + ox * P.cr - oy * P.sr; out.y = P.y + P.verts[k.s * 2 + 1] + ox * P.sr + oy * P.cr;
+            out.sx = P.sx * P.wide; out.sy = P.sy;
+        };
+        this.placeEye = (a, out) => this.pointAt(this.pt.set.eyeAt[this.pt.set.eyes.spec.at.indexOf(a)], out);
+        this.eyeView = { rotation: 0, facing: 1, alpha: 1 };
+        this.ahead = { x: 0, y: 0 };
         this.cam = scene.cameras.main;
         // The rainbow sheen is the playables' mark (spec 10.0 lookdev): sharks, mantas, whales and other animals keep their own colours.
         this.sheen = CHARACTERS.some(c => c.id === character.id) ? 1 : 0;
@@ -86,7 +97,10 @@ export default class CardRig {
     }
 
     buildSet(scene, st, x, y) {
-        const R = partsFor(scene, st.key), texKey = PARTS.texture(st.key), tex = scene.textures.get(texKey);
+        const R = partsFor(scene, st.key);
+        // A hero's eyes are cut out of its body card; the living eyeballs are drawn behind it (rig/eyeHoles.js).
+        const [fx, fy] = R.body.frame, [bx, by] = R.body.rect;
+        const texKey = holedTexture(scene, PARTS.texture(st.key), faceOf(st)?.eyes, (x, y) => [fx + x - bx, fy + y - by]), tex = scene.textures.get(texKey);
         const [W, H] = R.size, bulgePx = CARDS.bulge * W;
         const frame = (name, f) => tex.has(name) ? tex.get(name) : tex.add(name, 0, f[0], f[1], f[2], f[3]);
         const entries = [];
@@ -138,7 +152,7 @@ export default class CardRig {
         const face = faceOf(st);
         if (face?.eyes) {
             // Living eyes (rig/RigEyes.js).
-            set.eyes = new RigEyes(scene, face.eyes, (this.char.id || st.key).length + Object.keys(this.sets).length);
+            set.eyes = new RigEyes(scene, face.eyes, instanceSeed());
             set.eyeAt = face.eyes.at.map(anchor);
         }
         if (face?.mouth) { set.mouthAt = anchor(face.mouth); set.mouth = new RigMouth(scene); }
@@ -151,7 +165,7 @@ export default class CardRig {
         this.state = this.sets[name] ? name : 'normal';
         this.view = this.views[this.state];
         if (old !== this.view) { this.view.x = old.x; this.view.y = old.y; this.view.alpha = old.alpha; }
-        for (const [k, set] of Object.entries(this.sets)) { for (const e of set.entries) e.rope.setVisible(this.shown && k === this.state && e.drawn); if (k !== this.state) set.eyes?.hide(); }
+        for (const [k, set] of Object.entries(this.sets)) { for (const e of set.entries) e.rope.setVisible(this.shown && k === this.state && e.drawn); if (k !== this.state) { set.eyes?.hide(); set.mouth?.hide(); } }
         return this;
     }
 
@@ -174,7 +188,7 @@ export default class CardRig {
         this.depth = d;
         for (const set of Object.values(this.sets)) {
             set.entries.forEach((e, i) => e.rope.setDepth(d + i * 0.001));
-            set.eyes?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 + 0.0005);      // on the body, under the fins in front
+            set.eyes?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 - 0.0005);      // just behind the body, whose cut-out eyes frame them
             set.mouth?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 + 0.0004);
         }
         return this;
@@ -189,14 +203,16 @@ export default class CardRig {
         const wv = this.cam.worldView, reach = Math.max(W, H) * view.baseScale * this.zoom + CARDS.offView;
         if (!this.turning && (x < wv.x - reach || x > wv.right + reach || y < wv.y - reach || y > wv.bottom + reach)) {
             for (const e of set.entries) e.rope.setPosition(x, y);
-            set.eyes?.hide();
+            set.eyes?.hide(); set.mouth?.hide();
+            this.lastRot = undefined;      // no steering lag carried over from before it left the view
             return;
         }
         // On the slow tiers a rig is posed only every few frames, the rigs taking turns: in between its cards follow its
         // place, and the next pose catches up the frames it skipped (its swimming beat stays in time).
         if (CARDS.poseEvery > 1 && !this.alwaysPose && !this.turning && ++this.poseTurn % CARDS.poseEvery) {
             for (const e of set.entries) e.rope.setPosition(x, y);
-            set.eyes?.shift(x - (this.lastX ?? x), y - (this.lastY ?? y));
+            const sdx = x - (this.lastX ?? x), sdy = y - (this.lastY ?? y);
+            set.eyes?.shift(sdx, sdy); set.mouth?.shift(sdx, sdy);
             this.lastX = x; this.lastY = y;
             this.owed += frames;
             return;
@@ -212,7 +228,10 @@ export default class CardRig {
             this.turning.t = Math.min(1, this.turning.t + frames * (1000 / 60) / CARDS.turnMs);
             const tp = turnPose(this.turning.t, this.turning.from);
             yaw = tp.yaw;
-            if (tp.facing !== this.facing) { this.facing = tp.facing; this.angle = Phaser.Math.Angle.Wrap(Math.PI - this.angle); }
+            if (tp.facing !== this.facing) {
+                this.facing = tp.facing; this.angle = Phaser.Math.Angle.Wrap(Math.PI - this.angle);
+                if (this.lastRot !== undefined) this.lastRot = -this.lastRot;      // the picture mirrors, its rotation too: no false steering flick
+            }
             if (this.turning.t >= 1) this.turning = null;
         }
         const flip = this.facing;
@@ -314,19 +333,18 @@ export default class CardRig {
             r.setVisible(this.shown);
         }
         // Points on the body (projected just now): each rides its body vertex, offset by its distance from it.
-        const verts = set.bodyEntry.rope.vertices, cr = Math.cos(rotation), sr = Math.sin(rotation);
-        const pointAt = (k, out) => {
-            const ox = k.dx * sx * flip, oy = k.dy * sy;
-            out.x = x + verts[k.s * 2] + ox * cr - oy * sr; out.y = y + verts[k.s * 2 + 1] + ox * sr + oy * cr; out.s = sc;
-        };
-        if (br.blub && set.mouthAt && this.shown && spread < 0.5) { pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); set.mouth.blub(); }
-        if (set.mouth) { pointAt(set.mouthAt, MOUTH); set.mouth.update(MOUTH, H, rotation, this.shown ? view.alpha : 0, frames / 60); }
+        // (the offset squashed, swollen and narrowed in a turn, as project() does the body).
+        const P = this.pt;
+        P.verts = set.bodyEntry.rope.vertices; P.cr = Math.cos(rotation); P.sr = Math.sin(rotation);
+        P.x = x; P.y = y; P.sx = sx; P.sy = sy; P.flip = flip; P.wide = turnWidth(yaw); P.set = set;
+        if (br.blub && set.mouthAt && this.shown && spread < 0.5) { this.pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); set.mouth.blub(); }
+        if (set.mouth) { this.pointAt(set.mouthAt, MOUTH); set.mouth.update(MOUTH, H, rotation, this.shown ? view.alpha : 0, frames / 60); }
         if (set.eyes) {
             if (!this.shown) set.eyes.hide();
             else {
-                const place = (a, out) => pointAt(set.eyeAt[set.eyes.spec.at.indexOf(a)], out);
-                const look = this.look || { x: x + flip * 400 + vx * 30, y: y + vy * 30 };
-                set.eyes.update(place, { rotation, facing: flip, alpha: view.alpha, edge: Math.abs(Math.cos(yaw)) }, look, frames / 60, { scared: this.scared || 0 });
+                const ahead = this.ahead; ahead.x = x + flip * 400 + vx * 30; ahead.y = y + vy * 30;
+                const V = this.eyeView; V.rotation = rotation; V.facing = flip; V.alpha = view.alpha;
+                set.eyes.update(this.placeEye, V, this.look || ahead, frames / 60, { scared: this.scared || 0 });
             }
         }
     }
@@ -342,7 +360,7 @@ export default class CardRig {
     }
 }
 
-const CARRY = { x: 0, y: 0, a: 0 }, MOUTH = { x: 0, y: 0, s: 1 };
+const CARRY = { x: 0, y: 0, a: 0 }, MOUTH = { x: 0, y: 0, sx: 1, sy: 1 };
 
 /** How many parents a part hangs below (the body and free parts: 0), so parents are posed first. */
 function depthOf(e) {
