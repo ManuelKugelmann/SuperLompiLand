@@ -1,0 +1,247 @@
+import Phaser from 'phaser';
+import { SHADE, SAND_SKIN } from '../level/shade.js';
+import { FIELD } from '../level/density.js';
+import { MAT, MATERIALS } from '../level/materials.js';
+import { TILE_TERRAIN, texelStep } from '../level/tileTerrain.js';
+
+// The landscape shaded on the graphics card (level/tileTerrain.js). A chunk is drawn as two plain
+// quads (its back at depth -6, its rock at -2) whose texture is the shared atlas of density tiles;
+// this shader reads the chunk's tile round each pixel and works out what level/shade.js paints per
+// pixel in the worker: the outline, the rounding of the rock toward its rim, the light, the palette
+// from rim to core, the sand skin on upward faces, the back rock and the shade next to rock. The
+// stone's grain comes from the shared material tiles (level/materials.js), repeated over the world.
+
+export const TERRAIN = 'TileTerrain';
+const f = v => Number(v).toFixed(6);
+const S = SHADE, T = TILE_TERRAIN;
+
+const VERT = `
+#define SHADER_NAME TILE_TERRAIN_VS
+precision highp float;
+uniform mat4 uProjectionMatrix;
+attribute vec2 inPosition;
+attribute vec2 inTexCoord;
+attribute float inTexId;
+attribute float inTintEffect;
+attribute vec4 inTint;
+varying vec2 outPos;
+void main () {
+    gl_Position = uProjectionMatrix * vec4(inPosition, 1.0, 1.0);
+    outPos = inPosition;
+}`;
+
+const FRAG = `
+#define SHADER_NAME TILE_TERRAIN_FS
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform sampler2D uMainSampler;   // the density tiles
+uniform sampler2D uMat;           // the material tiles, 4 x 2 places of ${MAT.size} px
+uniform float uMatOn;
+uniform vec2 uAtlas;              // the density atlas, px
+uniform vec2 uScroll;             // the view's top left in the world
+uniform vec4 uChunk;              // ox, oy, span, mode (0 rock, 1 back)
+uniform vec2 uPlace;              // the chunk's place in the density atlas (its top left texel)
+uniform vec3 uPalL[5];
+uniform vec3 uPalR[5];
+uniform vec4 uSandL;              // colour, reach
+uniform vec4 uSandR;
+uniform vec2 uSandCover;          // left, right
+uniform vec3 uFogL;
+uniform vec3 uFogR;
+uniform vec4 uMats;               // main and second material, left and right
+varying vec2 outPos;
+
+const float TH = ${f(FIELD.threshold)};
+const float STEP = ${f(texelStep(960))};
+const float BORDER = ${f(T.border)};
+const float RANGE = ${f(T.range)};
+
+float dens(vec2 i) {
+    vec4 c = texture2D(uMainSampler, (uPlace + i + 0.5) / uAtlas);
+    return TH + ((c.r * 255.0 * 256.0 + c.g * 255.0) / 65535.0 - 0.5) * 2.0 * RANGE;
+}
+vec2 back(vec2 i) { return texture2D(uMainSampler, (uPlace + i + 0.5) / uAtlas).ba; }      // back rock cover, distance to rock (0..1 of occlusionReach)
+
+vec3 pal(float k, float side) {
+    // the palette from rim (0) to core (4), blended across the chunk
+    vec3 a = uPalL[0], b = uPalL[1];
+    vec3 ra = uPalR[0], rb = uPalR[1];
+    float t = k;
+    if (k >= 3.0) { a = uPalL[3]; b = uPalL[4]; ra = uPalR[3]; rb = uPalR[4]; t = k - 3.0; }
+    else if (k >= 2.0) { a = uPalL[2]; b = uPalL[3]; ra = uPalR[2]; rb = uPalR[3]; t = k - 2.0; }
+    else if (k >= 1.0) { a = uPalL[1]; b = uPalL[2]; ra = uPalR[1]; rb = uPalR[2]; t = k - 1.0; }
+    return mix(mix(a, b, t), mix(ra, rb, t), side);
+}
+
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+    vec2 i = floor(p), q = fract(p); q = q * q * (3.0 - 2.0 * q);
+    return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), q.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), q.x), q.y);
+}
+
+// One material at world point w: colour relative to its mean (rgb), height (a).
+// (A material texel is a rock-picture pixel: the stone has the grain size it has in the painted pictures.)
+vec4 mat(float m, vec2 w) {
+    vec2 cell = vec2(mod(m, 4.0), floor(m / 4.0)) * ${f(MAT.size)};
+    vec2 p = cell + 1.0 + fract(w * ${f(S.rockSize / 960)} / ${f(MAT.size)}) * ${f(MAT.size - 2)};
+    return texture2D(uMat, p / vec2(${f(MAT.size * 4)}, ${f(MAT.size * 2)}));
+}
+
+void main () {
+    vec2 world = outPos + uScroll;
+    // Each chunk draws exactly its own square: where two quads meet, no pixel is drawn twice (a see-through back would show a line).
+    if (world.x < uChunk.x || world.y < uChunk.y || world.x >= uChunk.x + uChunk.z || world.y >= uChunk.y + uChunk.z) discard;
+    vec2 t = (world - uChunk.xy) / STEP + BORDER;
+    vec2 i0 = floor(t), fr = t - i0;
+    float side = clamp((world.x - uChunk.x) / uChunk.z, 0.0, 1.0);
+    float deepK = clamp(world.y / ${f(FIELD.maxDepth)}, 0.0, 1.0);
+    vec3 deepTint = vec3(${S.deepTint.map(v => f(v / 255)).join(', ')});
+
+    // The density and its slope, smooth across texels (central differences, blended): a slope that jumps from texel to texel would show as lines.
+    float d00 = dens(i0), d10 = dens(i0 + vec2(1.0, 0.0)), d01 = dens(i0 + vec2(0.0, 1.0)), d11 = dens(i0 + vec2(1.0, 1.0));
+    float d = mix(mix(d00, d10, fr.x), mix(d01, d11, fr.x), fr.y);
+    float gx00 = d10 - dens(i0 + vec2(-1.0, 0.0)), gx10 = dens(i0 + vec2(2.0, 0.0)) - d00;
+    float gx01 = d11 - dens(i0 + vec2(-1.0, 1.0)), gx11 = dens(i0 + vec2(2.0, 1.0)) - d01;
+    float gy00 = d01 - dens(i0 + vec2(0.0, -1.0)), gy01 = dens(i0 + vec2(0.0, 2.0)) - d00;
+    float gy10 = d11 - dens(i0 + vec2(1.0, -1.0)), gy11 = dens(i0 + vec2(1.0, 2.0)) - d10;
+    float gx = mix(mix(gx00, gx10, fr.x), mix(gx01, gx11, fr.x), fr.y) / (2.0 * STEP);
+    float gy = mix(mix(gy00, gy10, fr.x), mix(gy01, gy11, fr.x), fr.y) / (2.0 * STEP);
+    float gl = max(1e-5, length(vec2(gx, gy)));
+    float dist = (d - TH) / gl;
+    if (uChunk.w > 0.5) {
+        // The back: shade gathering in the water next to rock, and back rock under overhangs.
+        vec2 bk = mix(mix(back(i0), back(i0 + vec2(1.0, 0.0)), fr.x), mix(back(i0 + vec2(0.0, 1.0)), back(i0 + vec2(1.0, 1.0)), fr.x), fr.y);
+        float cov = bk.x;
+        float occ = d >= TH ? 1.0 : 1.0 - smoothstep(0.0, 1.0, bk.y);
+        float occA = ${f(S.occlusion)} * occ * occ;
+        float rockA = ${f(S.backRockAlpha)} * cov;
+        float a = occA + rockA * (1.0 - occA);
+        if (a <= 0.004) discard;
+        float tone = 0.8 + 0.4 * (uMatOn > 0.5 ? mat(mix(uMats.x, uMats.z, step(0.5, side)), world).a : 0.5);
+        vec3 far = pal(2.0, side) * tone * (1.0 - ${f(1 - S.backRockDark)} * rockA / ${f(S.backRockAlpha)});
+        far = mix(far, deepTint, ${f(S.deepMix)} * deepK);
+        far = mix(far, mix(uFogL, uFogR, side), ${f(S.backRockFog)});
+        vec3 col = (vec3(${[4, 22, 42].map(v => f(v / 255)).join(', ')}) * occA + far * rockA * (1.0 - occA)) / a;
+        gl_FragColor = vec4(col * a, a);
+        return;
+    }
+
+    // The rock.
+    if (d < TH - 0.02) discard;
+    float alpha = clamp(dist / 1.4 + 0.5, 0.0, 1.0);
+    if (alpha <= 0.0) discard;
+    float inside = max(dist, 0.0);
+
+    float outY = -gy / gl;
+    float edge = inside >= ${f(S.bevel)} ? 0.0 : 1.0 - inside / ${f(S.bevel)};
+    float tilt = edge * sqrt(edge) * ${f(S.relief)};
+    vec3 stone = vec3(1.0);
+    vec2 bumpN = vec2(0.0);
+    if (uMatOn > 0.5) {
+        float m2 = smoothstep(${f(1 - MAT.share - 0.08)}, ${f(1 - MAT.share + 0.08)}, vnoise(world / ${f(MAT.maskScale)}));
+        vec2 ms = side < 0.5 ? uMats.xy : uMats.zw;
+        vec4 a = mat(ms.x, world), b = mat(ms.y, world.yx + vec2(151.0, 333.0));
+        vec4 c = mix(a, b, m2);
+        stone = c.rgb * ${f(255 / 128 * MAT.colour)};      // as shade.js: the stone's colour relative to its mean, times MAT.colour
+        float hx = mix(mat(ms.x, world + vec2(1.5, 0.0)).a, mat(ms.y, world.yx + vec2(151.0, 334.5)).a, m2) - c.a;
+        float hy = mix(mat(ms.x, world + vec2(0.0, 1.5)).a, mat(ms.y, world.yx + vec2(152.5, 333.0)).a, m2) - c.a;
+        bumpN = vec2(hx, hy) * 2.0 * ${f(MAT.relief * 8)};
+        float big = mat(ms.x, world / 6.0 + vec2(97.0, 211.0)).a;
+        stone += ${f(MAT.macro * 2)} * (big - 0.5);
+    }
+    float nx = -gx / gl * tilt - bumpN.x, ny = outY * tilt - bumpN.y;
+    float nl = 1.0 / sqrt(nx * nx + ny * ny + 1.0);
+    nx *= nl; ny *= nl;
+    vec3 L = normalize(vec3(${S.light.map(f).join(', ')}));
+    float keyK = ${f(S.keyStrength)} * (1.0 - ${f(S.deepLight)} * deepK);
+    float lambert = max(0.0, nx * L.x + ny * L.y + nl * L.z) * keyK;
+    float up = 0.5 - 0.5 * ny;
+
+    float r = min(1.0, inside / ${f(S.coreDist)});
+    float depthIn = sqrt(r * sqrt(r)) * ${f(S.coreShade * 3.9999)};
+    vec3 col = pal(depthIn, side);
+
+    vec4 sand = mix(uSandL, uSandR, side);
+    float faceUp = outY > -0.25 ? 0.0 : smoothstep(0.25, 0.65, -outY) * smoothstep(${f(SAND_SKIN.flat[0])}, ${f(SAND_SKIN.flat[1])}, gl);
+    float sandy = 0.0, under = 1.0;
+    if (sand.w > 0.0 && faceUp > 0.0) {
+        float deep = max(0.0, d - TH) / max(gl, ${f(SAND_SKIN.minSlope)}), fk = deep / sand.w;
+        if (fk < 1.0) sandy = faceUp * mix(uSandCover.x, uSandCover.y, side) * (1.0 - smoothstep(0.3, 1.0, fk));
+        else if (deep < sand.w + ${f(SAND_SKIN.under[0])}) under = 1.0 - ${f(SAND_SKIN.under[1])} * faceUp * sin(3.14159265 * (deep - sand.w) / ${f(SAND_SKIN.under[0])});
+    }
+    if (sandy > 0.0) {
+        float rip = 1.0 + ${f(SAND_SKIN.ripple[0])} * sin(world.x * ${f(Math.PI * 2 / SAND_SKIN.ripple[1])} + world.y * ${f(Math.PI * 2 / SAND_SKIN.ripple[1] * 0.35)});
+        col = mix(col, sand.rgb * rip, sandy);
+    }
+    col *= under;
+    col = mix(col, deepTint, ${f(S.deepMix)} * deepK);
+    vec3 bounce = vec3(${S.bounce.map(f).join(', ')}), sky = vec3(${S.sky.map(f).join(', ')}) - bounce, key = vec3(${S.key.map(f).join(', ')});
+    vec3 light = bounce + sky * up + key * lambert;
+    if (sandy > 0.0) {
+        float lm = (light.r + light.g + light.b) / 3.0, k = sandy * ${f(SAND_SKIN.warm)};
+        light = mix(light, vec3(lm * 1.06, lm, lm * 0.92), k) * (1.0 + sandy * ${f(SAND_SKIN.lift)});
+    }
+    col = col * stone * light;
+    gl_FragColor = vec4(col * alpha, alpha);
+}`;
+
+class TerrainPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
+    constructor(game) {
+        super({ game, name: TERRAIN, vertShader: VERT, fragShader: FRAG });
+        this.view = { x: 0, y: 0 };
+        this.matTexture = null;
+        this.current = null;
+    }
+
+    onPreRender() {
+        this.set2f('uScroll', this.view.x, this.view.y);
+        this.set1f('uMatOn', this.matTexture ? 1 : 0);
+        this.current = null;
+    }
+
+    /** Each chunk's quad brings its own numbers (`gameObject.terrain`, see chunkTerrain): what was batched for the last one is drawn first. */
+    onBind(gameObject) {
+        const k = gameObject?.terrain;
+        if (!k || k === this.current) return;
+        this.flush();
+        this.current = k;
+        if (this.matTexture) { this.bindTexture(this.matTexture, 1); this.set1i('uMat', 1); }
+        this.set2f('uAtlas', k.atlas[0], k.atlas[1]);
+        this.set4f('uChunk', k.ox, k.oy, k.span, k.mode);
+        this.set2f('uPlace', k.place[0], k.place[1]);
+        this.set3fv('uPalL', k.palL); this.set3fv('uPalR', k.palR);
+        this.set4f('uSandL', ...k.sandL); this.set4f('uSandR', ...k.sandR);
+        this.set2f('uSandCover', k.sandCover[0], k.sandCover[1]);
+        this.set3f('uFogL', ...k.fogL); this.set3f('uFogR', ...k.fogR);
+        this.set4f('uMats', ...k.mats);
+    }
+}
+
+/** Make the pipeline known (WebGL only); `materials` = the prepared material tiles (or null: plain stone). True when it can be used. */
+export function installTerrain(game, materials) {
+    const r = game.renderer, pipes = r?.pipelines, gl = r?.gl;
+    if (!pipes || !gl) return false;
+    let p = pipes.get(TERRAIN);
+    if (!p) { p = new TerrainPipeline(game); pipes.add(TERRAIN, p); }
+    if (materials && !p.matTexture) {
+        const N = MAT.size;
+        p.matTexture = r.createTexture2D(0, gl.LINEAR, gl.LINEAR, gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE, gl.RGBA, null, N * 4, N * 2, false, false, false);
+        gl.activeTexture(gl.TEXTURE0);
+        const before = gl.getParameter(gl.TEXTURE_BINDING_2D);
+        gl.bindTexture(gl.TEXTURE_2D, p.matTexture.webGLTexture);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);      // A is the stone's height, not a cover
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        MATERIALS.forEach((m, i) => gl.texSubImage2D(gl.TEXTURE_2D, 0, (i % 4) * N, Math.floor(i / 4) * N, N, N, gl.RGBA, gl.UNSIGNED_BYTE, materials[i]));
+        gl.bindTexture(gl.TEXTURE_2D, before);
+    }
+    return true;
+}
+
+/** Per frame: the view's top left in the world. */
+export function updateTerrain(game, scrollX, scrollY) {
+    const p = game.renderer?.pipelines?.get(TERRAIN);
+    if (p) { p.view.x = scrollX; p.view.y = scrollY; }
+}

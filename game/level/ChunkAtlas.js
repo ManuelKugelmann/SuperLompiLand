@@ -9,15 +9,17 @@ import { createSlots, gridFor } from './atlasSlots.js';
  */
 export default class ChunkAtlas {
     /** `key` = texture key; `cell` = px a picture is wide and tall; `count` = pictures it must hold. */
-    static make(scene, key, cell, count) {
+    static make(scene, key, cell, count, premultiply = true) {
         const r = scene.renderer, gl = r.gl;
         if (!gl || typeof r.createTexture2D !== 'function') return null;
         const side = gridFor(count);
         if (side * cell > gl.getParameter(gl.MAX_TEXTURE_SIZE)) return null;
-        return new ChunkAtlas(scene, key, cell, side);
+        return new ChunkAtlas(scene, key, cell, side, premultiply);
     }
 
-    constructor(scene, key, cell, side) {
+    /** `premultiply` false: the four channels are data, not a picture (tileTerrain.js), and go up as they are. */
+    constructor(scene, key, cell, side, premultiply = true) {
+        this.premultiply = premultiply;
         const r = scene.renderer, gl = r.gl;
         this.gl = gl; this.key = key; this.cell = cell; this.side = side;      // side: places across (and down)
         this.slots = createSlots(side, side, cell);
@@ -45,7 +47,7 @@ export default class ChunkAtlas {
         gl.activeTexture(gl.TEXTURE0);
         const before = gl.getParameter(gl.TEXTURE_BINDING_2D);
         gl.bindTexture(gl.TEXTURE_2D, this.wrapper.webGLTexture);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, this.premultiply);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.texSubImage2D(gl.TEXTURE_2D, 0, p.x, p.y + y0, c, rows, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(data.buffer, data.byteOffset + y0 * c * 4, rows * c * 4));
         gl.bindTexture(gl.TEXTURE_2D, before);

@@ -66,6 +66,7 @@ import { LOST, createLostCue, nextGoal } from '../game/lostCue.js';
 import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js';
 import { PRESETS } from '../game/fx/particles.js';
 import { VIEW_CULL, cullToView } from '../game/viewCull.js';
+import { updateTerrain } from '../game/fx/TerrainPipeline.js';
 import { due, everyOf } from '../game/throttle.js';
 import { setRenderScale } from '../game/renderScale.js';
 import { SWARMS } from '../game/ai/SwarmLayer.js';
@@ -1822,6 +1823,7 @@ export default class MainScene extends Phaser.Scene {
         const sun = sunAt(SKY_START + this.time.now / 1000, stormShare(this.fish.sprite.x));      // the sky's share of light: day 1, night little, less under the storm
         this.waterLight.update(sun);
         // The net of light on rock, sand and props: in world space, as strong as the sun, in the water's hue.
+        updateTerrain(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY);
         updateCaustics(this.game, this.cameras.main.scrollX, this.cameras.main.scrollY, time / 1000, sun * QUALITY[this.quality.tier].caustics, biomeBlendAt(view.x).a.water[0]);
         // Nothing outside the picture is drawn (viewCull.js): after every layer has set its things where they are for this frame.
         // ... and on everything else of the world under water (creatures, fish, props), as things come and go.

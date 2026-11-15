@@ -10,6 +10,7 @@
 import { createField, chunkGrids } from './density.js';
 import { shadeChunk } from './shade.js';
 import { setMaterials } from './materials.js';
+import { densityTile } from './tileTerrain.js';
 import { ROCK_LAYERS, layerField, layerPicture } from './rockLayerTable.js';
 
 let field = null, fieldSeed = null;
@@ -46,6 +47,11 @@ self.onmessage = e => {
     const islands = field.islandTilesFor(ox, oy, span).filter(t => !sentTiles.has(t.key));
     for (const t of islands) sentTiles.add(t.key);
     const coarse = chunkGrids(field, seed, ox, oy, span, n).fine;
+    if (e.data.tiles) {      // the landscape from tiles (?tiles): only the chunk's shape, the graphics card shades it (tileTerrain.js)
+        const tile = densityTile(field, ox, oy, span);
+        self.postMessage({ key, coarse, tile, rock: null, back: null, islands }, [coarse.buffer, tile.buffer]);
+        return;
+    }
     if (e.data.noShade) { self.postMessage({ key, coarse, rock: null, back: null, islands }, [coarse.buffer]); return; }      // measuring only (?noshade): what the world costs without its pictures
     const { rock, back } = shadeChunk(field, seed, ox, oy, span, undefined, take);
     self.postMessage({ key, coarse, rock, back, islands }, [coarse.buffer, rock.buffer, back.buffer]);

@@ -21,6 +21,8 @@ import { getCharacter, loadSelectedId } from '../characters.js';
 import { coralSize } from './coralSizes.js';
 import { SHADE, shadeChunk } from './shade.js';
 import ChunkAtlas from './ChunkAtlas.js';
+import { TILE_TERRAIN, densityTile, chunkLook } from './tileTerrain.js';
+import { TERRAIN, installTerrain } from '../fx/TerrainPipeline.js';
 import { treatCoinNear } from './RhythmLayer.js';
 import { spotsOf } from './worldMap.js';
 import { FLOW, createFlow, inStreamPath } from './flow.js';
@@ -33,6 +35,8 @@ import {
 
 /** Dev measurement only: `?noshade` leaves out the chunks' shaded pictures (worker shading and uploads), to see what they cost. */
 const NO_SHADE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noshade');
+/** The landscape from tiles (tileTerrain.js, fx/TerrainPipeline.js): `?tiles` while its look is judged against the painted one. */
+const TILES = typeof location !== 'undefined' && new URLSearchParams(location.search).has('tiles');
 
 export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
@@ -279,6 +283,18 @@ export default class LevelGenerator {
         ensureGrandArch(scene);
         if (scene.textures.exists('grand_garden')) ensureGardenGlow(scene);
         this.atlases = LEVEL.atlas ? this.chunkAtlases() : null;
+        // Tiles: one small density tile per chunk in a shared atlas, shaded by the graphics card (null: the painted pictures).
+        this.tileAtlas = TILES && installTerrain(scene.game, mats) ? this.tileAtlasFor() : null;
+    }
+
+    /** The atlas of density tiles (tileTerrain.js), made once per game like the picture atlases. */
+    tileAtlasFor() {
+        const reg = this.scene.registry, t = this.scene.textures;
+        let a = reg.get('tileAtlas');
+        if (a && t.exists(a.key)) { a.reset(); return a; }
+        a = ChunkAtlas.make(this.scene, 'chunk_atlas_tiles', TILE_TERRAIN.size, LEVEL.atlasChunks, false);
+        reg.set('tileAtlas', a);
+        return a;
     }
 
     /** The two atlases of chunk pictures ({ back, rock }), made once per game (they live in its registry), or null where they cannot be had. */
@@ -298,7 +314,7 @@ export default class LevelGenerator {
         if (!this.caustics || on === this.causticsOn) return;
         this.causticsOn = on;
         // (A chunk's list also holds what was taken away since it was built, a collected coin for one: those have no scene any more.)
-        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.type === 'Image' && o.scene) { if (on) o.setPipeline(CAUSTICS); else o.resetPipeline(); }
+        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.type === 'Image' && o.scene && !o.terrain) { if (on) o.setPipeline(CAUSTICS); else o.resetPipeline(); }
     }
 
     /** A worker result that is used up (its chunk is built, or nobody needs it any more): its picture arrays go back to the worker to be written into again. */
@@ -422,7 +438,7 @@ export default class LevelGenerator {
                     if (!this.early.has(key) && solid < LEVEL.earlyPerFrame) { this.solidNow(cx, cy, key); solid++; }
                     if (this.pending.has(key) || this.ready.some(r => r.key === key)) continue;
                     this.pending.add(key);
-                    this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells, noShade: NO_SHADE });
+                    this.worker.postMessage({ seed: LEVEL.seed, key, ox: cx * CH, oy: cy * CH, span: CH, n: LEVEL.cells, noShade: NO_SHADE, tiles: !!this.tileAtlas });
                 }
             }
         }
@@ -582,7 +598,8 @@ export default class LevelGenerator {
         // The terrain pictures are shaded per pixel (shade.js, normally in the
         // worker) and shown as two plain images per chunk: nothing about the
         // terrain is redrawn while playing.
-        const pics = baked || { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, ...shadeChunk(this.field, LEVEL.seed, ox, oy, CH) };
+        const pics = baked || (this.tileAtlas ? { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, tile: densityTile(this.field, ox, oy, CH), rock: null }
+            : { coarse: chunkGrids(this.field, LEVEL.seed, ox, oy, CH, N).fine, ...shadeChunk(this.field, LEVEL.seed, ox, oy, CH) });
         // Each picture in two steps (painting it, then handing it to the graphics card): together they are the build's biggest cost.
         // A picture is one texture (each is a draw call of its own under the caustics shader), painted in
         // `strips` equal strips from top to bottom, a build step each, and then handed to the graphics card.
@@ -600,7 +617,19 @@ export default class LevelGenerator {
         if (!baked) { yield 'shade'; if (chunk.dead) return; }
         // With the atlases: each picture goes straight to its place in the shared texture, the rock in strips.
         const A = this.atlases, place = !pics.rock ? null : A && A.back.slots.free && A.rock.slots.free ? [A.back.take(), A.rock.take()] : null;
-        if (!pics.rock) {
+        const tileAt = pics.tile && this.tileAtlas?.slots.free ? this.tileAtlas.take() : null;
+        if (pics.tile && tileAt !== null) {
+            // Tiles: the chunk's shape goes up (16 KB), and two plain quads show it, shaded by the graphics card: its back and its rock.
+            const A2 = this.tileAtlas, p = A2.slots.at(tileAt), look = chunkLook(ox, CH);
+            chunk.places = [[A2, tileAt]];
+            A2.upload(tileAt, pics.tile, 0, TILE_TERRAIN.size);
+            for (const [mode, depth] of [[1, -6], [0, -2]]) {
+                const img = s.add.image(ox, oy, A2.key, String(tileAt)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth).setPipeline(TERRAIN);
+                img.terrain = { ...look, mode, ox, oy, span: CH, place: [p.x, p.y], atlas: [A2.slots.size.w, A2.slots.size.h] };
+                chunk.objects.push(img);
+            }
+            yield 'tile'; if (chunk.dead) return;
+        } else if (!pics.rock) {
             // (?noshade: no pictures at all; only for measuring what they cost)
         } else if (place) {
             chunk.places = [[A.back, place[0]], [A.rock, place[1]]];      // given back when the chunk is dropped
