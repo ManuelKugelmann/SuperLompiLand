@@ -602,7 +602,12 @@ export default class LevelGenerator {
         this.alarmLeft -= dt;
         const ground = this.crawlEnv;
         ground.player = env.player; ground.players = all;
+        // Swimmers of a kind form loose groups (ai/swimmer.js flockWant): each sees the others of its kind.
+        const kinds = this.kinds || (this.kinds = new Map());
+        for (const list of kinds.values()) list.length = 0;
+        for (const c of this.creatures) if (c.active && c.brain) { let l = kinds.get(c.key); if (!l) kinds.set(c.key, l = []); l.push(c.brain); }
         for (const c of this.creatures) {
+            env.mates = c.brain ? kinds.get(c.key) : null;
             if (c.active && c.step(t, dt, env, ground, inView(c)) === 'hit') this.scene.events.emit('grumpy-hit', { x: c.x, y: c.y });
         }
         for (const l of this.lights) {

@@ -182,3 +182,32 @@ test('playing together, a creature reacts to whoever is nearest', () => {
     stepSwimmer(b, 1 / 60, { isOpen: open, t: 0, player: me, players: [me, { x: -250, y: 0, vx: 16, vy: 0 }], alarm: null });
     assert.equal(b.state, 'flee');
 });
+
+test('swimmers of a kind form a loose group: they come together, keep their gap and turn alike', async () => {
+    const { flockWant, SWIMMER: S } = await import('../game/ai/swimmer.js');
+    const open = { isOpen: () => true, player: null, alarm: null };
+    const a = createSwimmer({ x: 0, y: 0 }, { range: 3000 }, 1), b = createSwimmer({ x: 600, y: 0 }, { range: 3000 }, 2);
+    const mates = [a, b], env = { ...open, mates };
+    const d0 = Math.hypot(a.x - b.x, a.y - b.y);
+    let near = 0;
+    for (let i = 0; i < 1800; i++) { env.t = i / 60; stepSwimmer(a, 1 / 60, env); stepSwimmer(b, 1 / 60, env); if (Math.hypot(a.x - b.x, a.y - b.y) < S.flock.range * 0.6) near++; }
+    assert.ok(near > 1200, `together most of the time (${near} of 1800 steps), from ${Math.round(d0)} px apart`);
+    // Too close: the wanted heading points away from the mate.
+    const c = { x: 0, y: 0, heading: 0 }, d = { x: 0, y: 40, heading: 0 };
+    assert.ok(Math.sin(flockWant(c, [c, d], 0)) < -0.3, 'turns away from a mate too close beside it');
+    // Far apart and heading alike: it turns toward the mate.
+    const e = { x: 0, y: 0, heading: 0 }, f = { x: 0, y: 500, heading: Math.PI / 2 };
+    assert.ok(Math.sin(flockWant(e, [e, f], 0)) > 0.3, 'drifts toward and turns with the mate');
+});
+
+test('a fright spreads through a group, the same way the first one fled', () => {
+    const open = { isOpen: () => true, player: null, alarm: null, t: 0 };
+    const a = createSwimmer({ x: 0, y: 0 }, {}, 1), b = createSwimmer({ x: 200, y: 0 }, {}, 2);
+    a.state = 'flee'; a.left = SWIMMER.fleeS; a.heading = Math.PI / 2;
+    stepSwimmer(b, 1 / 60, { ...open, mates: [a, b] });
+    assert.equal(b.state, 'flee');
+    assert.equal(b.fleeWay, Math.PI / 2);
+    const lone = createSwimmer({ x: 200, y: 0 }, {}, 3);
+    stepSwimmer(lone, 1 / 60, { ...open, mates: [lone] });
+    assert.notEqual(lone.state, 'flee');
+});

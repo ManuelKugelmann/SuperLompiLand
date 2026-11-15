@@ -8,6 +8,9 @@
 //   flee     the player rushed at it (or burst a special nearby): dart away, then come back
 //   breathe  (trait `breathe`, the turtle) every so often: up to the surface, a breath, back down
 // A creature with the trait `anchor` (the seahorse) rests holding on to the nearest rock.
+// Swimmers of a kind that meet form a loose group (spec 6.2 "pairs and small groups ... with the
+// same boids at a looser setting"): roaming, each keeps its gap, turns with the others and drifts
+// toward them; when one takes fright the others flee the same way.
 //
 // Pure, no Phaser (tests/swimmer.test.mjs). Speeds in px per step (60 per second), times in s.
 
@@ -31,7 +34,11 @@ export const SWIMMER = {
     breathGiveUpS: 30,        // ... and gives up after this long if it cannot get there
     surfaceY: 46,             // how deep under the waterline it takes its breath
     anchorReach: 220,         // an anchoring creature looks this far for rock to hold
-    anchorRest: 2.5           // ... and then rests this many times longer
+    anchorRest: 2.5,          // ... and then rests this many times longer
+    // Loose groups (boids at a slow setting): mates within `range` count; each keeps `gap` px from the others,
+    // turns with them (`align`), drifts toward them (`cohesion`) and away from one too close (`part`);
+    // a mate's fright spreads while the mate still has `panic` of its flight ahead.
+    flock: { range: 700, gap: 170, align: 0.5, cohesion: 0.6, part: 1.4, panic: 0.6 }
 };
 
 /** Traits default to a calm reef swimmer; species override what differs. */
@@ -64,11 +71,45 @@ export function nearestRock(isOpen, x, y, reach) {
     return best && { x: best.x, y: best.y };
 }
 
+/** The heading a roaming swimmer wants with its mates about: its own `want` turned with them, toward them, away from one too close. */
+export function flockWant(a, mates, want, cfg = SWIMMER.flock) {
+    let n = 0, cx = 0, cy = 0, hx = 0, hy = 0, sx = 0, sy = 0;
+    for (const m of mates) {
+        if (m === a) continue;
+        const dx = m.x - a.x, dy = m.y - a.y, d = Math.hypot(dx, dy);
+        if (d > cfg.range) continue;
+        n++; cx += dx; cy += dy; hx += Math.cos(m.heading); hy += Math.sin(m.heading);
+        if (d < cfg.gap && d > 1e-6) { const k = (cfg.gap - d) / cfg.gap; sx -= dx / d * k; sy -= dy / d * k; }
+    }
+    if (!n) return want;
+    let vx = Math.cos(want), vy = Math.sin(want);
+    const hl = Math.hypot(hx, hy), cd = Math.hypot(cx, cy) / n;
+    if (hl > 1e-6) { vx += cfg.align * hx / hl; vy += cfg.align * hy / hl; }
+    if (cd > cfg.gap) { const k = cfg.cohesion * Math.min(3, cd / cfg.gap); vx += k * cx / n / cd; vy += k * cy / n / cd; }      // the further off, the harder it pulls
+    vx += cfg.part * sx; vy += cfg.part * sy;
+    return Math.atan2(vy, vx);
+}
+
+/** Whether a resting swimmer's group is roaming away from it (a mate in view, more than twice the gap off). */
+function strayed(a, mates, cfg) {
+    if (!mates) return false;
+    for (const m of mates) if (m !== a && m.state === 'wander' && Math.hypot(m.x - a.x, m.y - a.y) > cfg.flock.gap * 2 && Math.hypot(m.x - a.x, m.y - a.y) < cfg.flock.range) return true;
+    return false;
+}
+
+/** A mate near enough whose fright is fresh (it spreads), or null. */
+export function panickedMate(a, mates, cfg = SWIMMER) {
+    if (!mates) return null;
+    for (const m of mates) if (m !== a && m.state === 'flee' && m.left > cfg.fleeS * cfg.flock.panic && Math.hypot(m.x - a.x, m.y - a.y) < cfg.flock.range) return m;
+    return null;
+}
+
 /**
  * One step.
  *   dt      seconds
  *   env     { isOpen(x, y), t (s), player: { x, y, vx, vy } | null, alarm: { x, y } | null,
- *             players: [...] optional: everyone in the room; the nearest one counts }
+ *             players: [...] optional: everyone in the room; the nearest one counts,
+ *             mates: [...] optional: the swimmers of its kind about (a loose group, `flockWant`) }
  * Returns the agent (x, y, heading, v, state updated).
  */
 export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
@@ -87,8 +128,9 @@ export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
     // What now? Frights first, then the player, then its own routine.
     const scare = cfg.scare * a.shy;
     const alarmed = env.alarm && Math.hypot(env.alarm.x - a.x, env.alarm.y - a.y) < scare;
-    if (a.state !== 'flee' && (alarmed || (dist < scare && pSpeed > cfg.rush && closing))) {
-        a.state = 'flee'; a.left = cfg.fleeS;
+    const mate = a.state !== 'flee' && !alarmed && !(dist < scare && pSpeed > cfg.rush && closing) ? panickedMate(a, env.mates, cfg) : null;
+    if (a.state !== 'flee' && (alarmed || (dist < scare && pSpeed > cfg.rush && closing) || mate)) {
+        a.state = 'flee'; a.left = cfg.fleeS; a.fleeWay = mate ? mate.heading : null;      // a fright caught from a mate: the same way it went
     } else if (a.state === 'flee') {
         if (a.left <= 0) { a.state = 'wander'; a.left = between(a, cfg.roamS); a.cooldown = cfg.greetCooldownS * 0.5; }
     } else if (a.state === 'breathe') {
@@ -105,6 +147,8 @@ export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
         a.state = 'notice';
     } else if (a.state === 'notice') {
         a.state = 'wander'; a.left = between(a, cfg.roamS);
+    } else if (a.state === 'rest' && !a.hold && strayed(a, env.mates, cfg)) {
+        a.state = 'wander'; a.left = between(a, cfg.roamS);      // its group swims off: it goes along
     } else if (a.left <= 0) {
         a.state = a.state === 'rest' ? 'wander' : 'rest';
         a.left = between(a, a.state === 'rest' ? cfg.restS : cfg.roamS);
@@ -119,6 +163,7 @@ export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
     let want = a.heading, speed = 0, turn = a.turn;
     if (a.state === 'wander') {
         want = leash(a.x, a.y, a.home, a.range, wanderHeading(env.t, a.seed));
+        if (env.mates) want = flockWant(a, env.mates, want, cfg.flock);
         speed = a.speed;
     } else if (a.state === 'rest' && a.hold) {
         // Swim to the rock and hold on there.
@@ -135,7 +180,7 @@ export function stepSwimmer(a, dt, env, cfg = SWIMMER) {
         speed = a.speed * 1.5; turn = a.turn * 2.4;
     } else if (a.state === 'flee') {
         const from = env.alarm && alarmed ? Math.atan2(a.y - env.alarm.y, a.x - env.alarm.x) : toPlayer + Math.PI;
-        want = p || env.alarm ? from : a.heading;
+        want = a.fleeWay ?? (p || env.alarm ? from : a.heading);
         speed = a.speed * cfg.fleeSpeed; turn = a.turn * 3;
     }
     // Going up for air it looks only a little way ahead: the waterline itself is not a wall to steer round.
