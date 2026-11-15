@@ -45,6 +45,7 @@ ${lite ? '#define LITE' : ''}
 ${back ? '#define BACK' : ''}
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
+precision highp sampler2D;      // the tiles hold data (16-bit density, material numbers): a lowp fetch could land a step off on a phone GPU
 #else
 precision mediump float;
 #endif
@@ -68,7 +69,7 @@ vec2 origin;                      // this chunk's place in the atlas (its top le
 
 float dens(vec2 i) {
     vec4 c = texture2D(uMainSampler, (origin + i + 0.5) / uAtlas);
-    return TH + ((c.r * 255.0 * 256.0 + c.g * 255.0) / 65535.0 - 0.5) * 2.0 * RANGE;
+    return TH + ((floor(c.r * 255.0 + 0.5) * 256.0 + floor(c.g * 255.0 + 0.5)) / 65535.0 - 0.5) * 2.0 * RANGE;      // bytes rounded: 4/255*255 may read 3.9999
 }
 vec2 back(vec2 i) { return texture2D(uMainSampler, (origin + i + 0.5) / uAtlas).ba; }      // back rock cover, distance to rock (0..1 of occlusionReach)
 
@@ -107,7 +108,7 @@ void main () {
     vec2 i0 = floor(t), fr = t - i0;
     float side = (t.x - BORDER) / (CELL - 1.0 - 2.0 * BORDER);
     vec4 l14 = look(14.0), l15 = look(15.0);
-    vec4 mats = vec4(l14.ba, l15.rg) * 255.0;      // main and second material, left and right
+    vec4 mats = floor(vec4(l14.ba, l15.rg) * 255.0 + 0.5);      // main and second material, left and right (rounded: whole numbers, never a step low)
     float deepK = clamp(world.y / ${f(FIELD.maxDepth)}, 0.0, 1.0);
     vec3 deepTint = vec3(${S.deepTint.map(v => f(v / 255)).join(', ')});
 

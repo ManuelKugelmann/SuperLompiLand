@@ -69,6 +69,9 @@ export const LEVEL = {
     atlas: true,          // chunk pictures share two atlas textures (one draw call for all of a kind, no canvas); false = a canvas texture per picture, as before
     atlasChunks: 36,      // chunks an atlas holds (a full one falls back to canvases) ...
     atlasSpare: 6,        // ... of which this many stay free for the ring kept round the wanted set
+    tileAtlasChunks: 64,  // the tile terrain's atlas: its cells are tiny (64 px), so it holds the wanted set and the whole kept ring round it (review: a full atlas left a chunk with collision but no picture)
+    tileSpare: 26,        // ... of which this many stay free for that ring (8 x 7 kept round a 6 x 5 view on a 20:9 phone)
+    leadDeadZone: 120,    // px per s: slower than this the view counts as still (no lead), so swimming up and down does not rebuild the rows beside the view
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
     nestClear: 320,       // px to either side of a nest kept free of props and ground cover: the painted nest's own rim of grass and shells shows, its hollow stays open
@@ -115,7 +118,8 @@ const FRIENDS = {
     // The extended cast (gamedesigner 2026-11-15; pictures 3669043, head to the right). Angelfish pair up by themselves
     // (loose groups, ai/swimmer.js flockWant); the rockfish guards a patch near the floor; the flying squid keeps
     // near the surface (`surface`: it lives no deeper than this); the nautilus drifts slowly in the deep (`floor`); `pair`: they come two by two.
-    angelfish: { size: 200, pair: true, swim: 380, bob: 12, anim: 'swim', soft: 0.35, wiggle: 14, ai: { speed: 0.8, range: 380, turn: 0.035, shy: 1 } },
+    angelfish: { size: 200, pair: true, sheen: 0.25, swim: 380,      // `sheen`: share of the rainbow sheen (an added light reads far stronger on a dark picture)
+        bob: 12, anim: 'swim', soft: 0.35, wiggle: 14, ai: { speed: 0.8, range: 380, turn: 0.035, shy: 1 } },
     rockfish: { size: 220, swim: 400, bob: 8, anim: 'swim', soft: 0.3, wiggle: 12, floor: 300, grumpy: { territory: 160 } },      // `floor`: it lives at most this many px over the seabed (dwellers.js)
     flying_squid: { size: 180, swim: 400, bob: 20, anim: 'swim', soft: 0.6, wiggle: 10, surface: 520, ai: { speed: 1.1, range: 600, turn: 0.04, shy: 1.3 } },
     nautilus: { size: 160, bob: 30, anim: 'pulse', soft: 0.3, wiggle: 4, upright: true, floor: 400, ai: { speed: 0.35, range: 240, turn: 0.02, shy: 0.8 } },
@@ -317,7 +321,7 @@ export default class LevelGenerator {
         const reg = this.scene.registry, t = this.scene.textures;
         let a = reg.get('tileAtlas');
         if (a && t.exists(a.key)) { a.reset(); setTerrainAtlas(this.scene.game, a.slots.size.w, a.slots.size.h); return a; }
-        a = ChunkAtlas.make(this.scene, 'chunk_atlas_tiles', TILE_TERRAIN.size, LEVEL.atlasChunks, false)?.addInsetFrames('c', TILE_TERRAIN.border);
+        a = ChunkAtlas.make(this.scene, 'chunk_atlas_tiles', TILE_TERRAIN.size, LEVEL.tileAtlasChunks, false)?.addInsetFrames('c', TILE_TERRAIN.border);
         reg.set('tileAtlas', a);
         if (a) setTerrainAtlas(this.scene.game, a.slots.size.w, a.slots.size.h);
         return a;
@@ -427,7 +431,7 @@ export default class LevelGenerator {
             vel.x += ((camX - vel.at.x) / dt - vel.x) * k; vel.y += ((camY - vel.at.y) / dt - vel.y) * k;
         }
         vel.at = { x: camX, y: camY };
-        const lead = v => Math.min(this.leadMax ?? LEVEL.leadMax, Math.ceil(Math.abs(v) * LEVEL.leadS / CH));
+        const lead = v => Math.abs(v) < LEVEL.leadDeadZone ? 0 : Math.min(this.leadMax ?? LEVEL.leadMax, Math.ceil(Math.abs(v) * LEVEL.leadS / CH));
         let ax = lead(vel.x), ay = lead(vel.y);
         // Ahead the view gets its margin and its lead; behind it, while it leads, no margin (it is moving away from there). The
         // whole set must fit the chunk atlases (else chunks fall back to a canvas each, a long step on a phone): the lead gives way first.
@@ -438,7 +442,8 @@ export default class LevelGenerator {
             return [x0, x1, y0, y1];
         };
         let [x0, x1, y0, y1] = span();
-        while ((x1 - x0 + 1) * (y1 - y0 + 1) > LEVEL.atlasChunks - LEVEL.atlasSpare && (ax || ay)) {
+        const fits = this.tileAtlas ? LEVEL.tileAtlasChunks - LEVEL.tileSpare : LEVEL.atlasChunks - LEVEL.atlasSpare;
+        while ((x1 - x0 + 1) * (y1 - y0 + 1) > fits && (ax || ay)) {
             if (ax >= ay) ax--; else ay--;
             [x0, x1, y0, y1] = span();
         }
@@ -630,7 +635,7 @@ export default class LevelGenerator {
             if (l.hue === undefined) { l.setPosition(l.follow.x, l.follow.y); continue; }
             if (!l.visible) continue;      // a sheen switched off (quality) or out of view: nothing to colour
             // Rainbow sheen: colours run across the body and shimmer a little.
-            l.setAlpha(LEVEL.friendSheen * (0.75 + 0.25 * Math.sin(t * 2 + l.hue * 20)));
+            l.setAlpha(LEVEL.friendSheen * l.strength * (0.75 + 0.25 * Math.sin(t * 2 + l.hue * 20)));
             const n = l.colors.length, base = l.hue + t * LEVEL.sheenSpeed;
             for (let i = 0; i < n; i++) l.colors[i] = RAINBOW[Math.floor(((base + (i / n) * LEVEL.sheenSpread) % 1) * RAINBOW.length)];
         }
@@ -681,6 +686,9 @@ export default class LevelGenerator {
             keep(s.add.image(ox, oy, tex.key).setOrigin(0).setScale(CH / size).setDepth(depth)).causticGround = true;      // the net on its top skin only (CausticsPipeline)
         };
         if (!baked) { yield 'shade'; if (chunk.dead) return; }
+        // A chunk is never finished without its picture (review: a full tile atlas left collision with nothing drawn, an
+        // invisible wall): it waits, a step at a time, until the chunks dropped round the view give a place back.
+        while (pics.tile && this.tileAtlas && !this.tileAtlas.slots.free) { yield 'wait for a tile place'; if (chunk.dead) return; }
         // With the atlases: each picture goes straight to its place in the shared texture, the rock in strips.
         const A = this.atlases, place = !pics.rock ? null : A && A.back.slots.free && A.rock.slots.free ? [A.back.take(), A.rock.take()] : null;
         const tileAt = pics.tile && this.tileAtlas?.slots.free ? this.tileAtlas.take() : null;
@@ -1306,6 +1314,7 @@ export default class LevelGenerator {
             if (Phaser.TintModes) sheen.setTintMode?.(Phaser.TintModes.FILL); else sheen.tintFill = true;
             sheen.follow = img;
             sheen.hue = rng.frac();
+            sheen.strength = f.sheen ?? 1;
             this.lights.push(sheen);
         }
         chunk.objects.push(img);

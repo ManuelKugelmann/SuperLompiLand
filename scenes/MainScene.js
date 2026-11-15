@@ -1873,8 +1873,11 @@ export default class MainScene extends Phaser.Scene {
         this.quality.fps = this.autotune.fps;
         // The frame's real length (the engine's own delta is held under 200 ms: a phone slower than that would look faster than it is).
         const frameMs = this.game.loop.rawDelta || delta;
-        if (this.quality.auto) { const tier = this.autotune.step(frameMs); if (tier) this.applyQuality(tier, true); }
-        else this.autotune.step(frameMs);
+        // Judged only once the first view is built: the frames before it (the build in a rush, shaders compiling) say nothing about the phone.
+        if (this.level.started) {
+            if (this.quality.auto) { const tier = this.autotune.step(frameMs); if (tier) this.applyQuality(tier, true); }
+            else this.autotune.step(frameMs);
+        }
         if (!this.surf) {
             const z = surfZones();
             if (sp.x < z.surge[1] + WORLD.weatherRange || (sp.x > z.reef[0] - WORLD.weatherRange && sp.x < z.reef[1] + WORLD.weatherRange)) this.surf = new SurfLayer(this, this.surface);

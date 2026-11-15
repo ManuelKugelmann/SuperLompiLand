@@ -26,7 +26,7 @@ export const QUALITY = {
     high: { caustics: 1, particles: 1, shoals: 1, shoalsAround: 2, simEvery: 2, midEvery: 3, glow: 1, far: 1, sheen: 1, resolution: 1, eyes: Infinity, lids: 1, liteTerrain: false, micro: 1, lead: 3, kelpBack: 1, plantSegments: 10, animEvery: 1, poseEvery: 1, grade: 1 },
     tune: {
         windowS: 2,       // the frame rate is the average over this many seconds
-        lowFps: 30,       // under this for `lowS` seconds: a tier down
+        lowFps: 26,       // under this for `lowS` seconds: a tier down (not 30: a phone held at 30 Hz by battery saving averages 29.9 and is not slow)
         lowS: 2,
         highFps: 50,      // over this in the start's probe: a tier up (the only way up)
         settleS: 2,       // after a change nothing is judged for this long (the change itself costs frames)
