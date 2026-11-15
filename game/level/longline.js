@@ -19,7 +19,7 @@ export const LONGLINE = {
     branch: [380, 720],  // px a branch line hangs below the main line
     sway: 38,            // px a hook swings to each side ...
     swayS: 5.2,          // ... once in this many seconds
-    hookR: 40,           // px: a fish this much nearer than its own radius touches a hook
+    hookR: 44,           // px: a fish this much nearer than its own radius touches a hook
     maxHits: 2,          // stings that cost something on one visit (each half a heart: one heart at most)
     stingWait: 1.2,      // s after a sting before a hook can sting again
     cue: 2400,           // px before the line at which the shoals scatter and it is announced

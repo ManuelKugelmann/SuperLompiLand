@@ -8,10 +8,13 @@ export const LONGLINE_LOOK = {
     lineAlpha: 0.85,
     lineStep: 90,        // px between two points of the main line
     float: [64, 46],     // px of a float picture
-    hook: [40, 70]       // px of a hook picture (its eye at the top): big enough to read as a danger on a phone
+    hook: [54, 96]       // px of a hook picture (its eye at the top): big enough to read as a danger on a phone
 };
 
 const KEYS = { line: 'longline_line', hook: 'longline_hook', float: 'longline_float' };
+
+/** Painted pictures (loaded by the title screen); the procedural ones below stand in while they are missing. */
+export const LONGLINE_ART = [{ key: KEYS.hook, file: 'img/longline_hook.webp' }, { key: KEYS.float, file: 'img/longline_float.webp' }];
 
 /** Procedural pictures (the painted ones, when there, are loaded under the same keys). */
 function ensureTextures(scene) {
