@@ -7,7 +7,7 @@ import { chapters } from '../game/journey.js';
 import { weatherZones } from '../game/level/weather.js';
 import { seaArch } from '../game/level/seaArch.js';
 
-const spots = rescueSpots(), f = createField(1337);
+const all = rescueSpots(), spots = all.filter(s => !s.event), f = createField(1337);      // the small rescues (an event's rescue keeps the event's own rules)
 
 test('a small rescue waits every so often along the whole journey, in every biome', () => {
     assert.ok(spots.length >= Math.floor(WORLD_END / RESCUES.every) - 2, `${spots.length} spots`);
@@ -16,7 +16,7 @@ test('a small rescue waits every so often along the whole journey, in every biom
         assert.ok(gap > RESCUES.every * 0.4 && gap < RESCUES.every * 1.7, `gap ${Math.round(gap)} at ${Math.round(spots[i].x)}`);
     }
     for (const b of BIOMES) assert.ok(spots.some(s => s.biome === b.id), `one in ${b.id}`);
-    assert.equal(new Set(spots.map(s => s.id)).size, spots.length, 'ids are unique');
+    assert.equal(new Set(all.map(s => s.id)).size, all.length, 'ids are unique');
     for (const t of RESCUES.traps) assert.ok(spots.filter(s => s.trap === t.trap && s.kind === t.kind).length >= 5, `${t.trap} comes again and again`);
     for (let i = 1; i < spots.length; i++) assert.notEqual(spots[i].trap, spots[i - 1].trap, 'never the same trap twice in a row');
     for (const s of spots) if (s.ground) assert.equal(BIOMES.find(b => b.id === s.biome).zone, 'island', 'ground traps lie along the islands only');

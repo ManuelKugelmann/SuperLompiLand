@@ -196,6 +196,9 @@ export const ENTRIES = [
         name: { de: 'Tiefsee', en: 'Deep sea' },
         fact: { de: 'Die tiefste Stelle des Meeres liegt fast 11 Kilometer unter der Oberfläche.', en: 'The deepest point of the ocean is almost 11 kilometres down.' } },
     // Things people left behind (keys as in the level's hazard table)
+    { id: 'longline', kind: 'leftover', image: 'longline_hook',
+        name: { de: 'Langleine', en: 'Longline' },
+        fact: { de: 'Eine Langleine ist eine Angelschnur, viele Kilometer lang, mit tausenden Haken. Oft beißen dabei auch Schildkröten und junge Haie an, die niemand fangen wollte.', en: 'A longline is a fishing line many kilometres long with thousands of hooks. Turtles and young sharks that nobody wanted to catch often bite too.' } },
     { id: 'hazard_net', kind: 'leftover', image: 'hazard_net',
         name: { de: 'Geisternetz', en: 'Ghost net' },
         fact: { de: 'Verlorene Fischernetze fangen noch jahrelang Tiere. Darum heißen sie Geisternetze.', en: 'Lost fishing nets keep catching animals for years. That is why they are called ghost nets.' } },

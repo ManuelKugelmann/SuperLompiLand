@@ -98,6 +98,7 @@ import { updateCaustics, catchCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
 import SplashLayer from '../game/fx/SplashLayer.js';
+import LonglineLayer from '../game/level/LonglineLayer.js';
 import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
 import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
 import WhaleSharkLayer from '../game/level/WhaleSharkLayer.js';
@@ -356,6 +357,15 @@ export default class MainScene extends Phaser.Scene {
             caught: (x, y) => { if (!this.relaxed) this.hurt(x, y, 1); },
             escaped: () => { play('nest'); this.announce('', this.lang === 'de' ? 'Puh! Entwischt!' : 'Phew! Got away!'); },
             seen: kind => this.bookEntry(kind)
+        });
+        // World event (spec 5.0t 3): a longline off the kelp coast; thread its hooks, nibble the hooked turtle free (a rescue).
+        this.longline = this.ambientMode ? null : new LonglineLayer(this, x => this.surface.heightAt(x, this.time.now / 1000), {
+            cue: (x, y) => {
+                play('whistle'); this.swarms.startle(x, y);
+                this.announce(this.lang === 'de' ? 'Eine Langleine!' : 'A longline!', this.lang === 'de' ? 'Weich den Haken aus und befreie die Schildkröte!' : 'Dodge the hooks and free the turtle!');
+                this.bookEntry('longline');
+            },
+            sting: (x, y, costs) => { if (costs) this.softHit(x, y); else this.fish.hit(new Phaser.Math.Vector2(x, y)); }
         });
         this.dugong = new DugongLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), kind => this.bookEntry(kind));
         // Three pearls hidden in clams in every area (spec 5.0r): a small reason to dive down and look.
@@ -1879,7 +1889,7 @@ export default class MainScene extends Phaser.Scene {
         this.nudis.update(sp, time / 1000);
         this.dumbo.update(sp, time / 1000, delta / 1000);
         this.dugong.update(sp, time / 1000, delta / 1000);
-        if (!this.perfTour) this.hunter?.update(sp, delta / 1000);
+        if (!this.perfTour) { this.hunter?.update(sp, delta / 1000); this.longline?.update(sp, this.fish.radius, this.time.now / 1000, this.relaxed); }
         this.secrets?.update(sp, time / 1000);
         this.dolphins.update(sp, time / 1000, delta);
         { const fv = this.fish.sprite.body.velocity; this.octopus.update(sp, Math.hypot(fv.x, fv.y), time / 1000, delta); }

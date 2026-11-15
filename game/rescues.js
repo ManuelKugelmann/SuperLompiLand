@@ -9,6 +9,7 @@ import { FIELD, nestSpots, setPieceStretches } from './level/density.js';
 import { weatherZones } from './level/weather.js';
 import { SET_PIECES, ghostShip } from './level/setPieces.js';
 import { JOURNEY, chapters } from './journey.js';
+import { longlineRescues } from './level/longline.js';
 
 export const RESCUES = {
     every: 25000,        // px between two of them along the route
@@ -23,7 +24,7 @@ export const RESCUES = {
     groundReach: 1300,   // px below the route within which a ground trap finds its seabed (else it hangs on the route)
     // Big rescues (spec 5.0t, landmark gaps): where the way between two landmarks is longest, the nearest small rescue
     // moves to the middle and becomes a big one: the same animal, caught in a large ghost net, a landmark of its own.
-    big: [160700, 196200, 439200, 465800, 613000],
+    big: [160700, 196200, 465800, 613000],      // (the gap 426 600 - 451 800 has the longline instead: level/longline.js)
     bigReach: 13000      // px a small rescue may move to become a big one
 };
 
@@ -62,9 +63,19 @@ export function rescueSpots(cfg = RESCUES) {
         for (let d = 0; d <= 6000 && x === null; d += 500) x = free(bx + d) ? bx + d : free(bx - d) ? bx - d : null;
         if (best && x !== null) Object.assign(best, { x, big: true, biome: BIOMES[biomeIndexAt(x)].id });
     }
+    // World events carry rescues of their own (spec 5.0t): the turtle on the longline.
+    if (cfg === RESCUES) out.push(...longlineRescues().map(r => ({ ...r, biome: BIOMES[biomeIndexAt(r.x)].id })));
     out.sort((a, b) => a.x - b.x);
     if (cfg === RESCUES) SPOTS = out;
     return out;
+}
+
+/**
+ * Seconds a fish has stayed next to an animal it must nibble free (a spot with `hold`): it grows while the fish is near
+ * and falls back twice as fast when it swims off (so a pass-by never frees it, a short wobble away loses little).
+ */
+export function nibble(held, near, dt) {
+    return near ? held + dt : Math.max(0, held - 2 * dt);
 }
 
 /** Does a fish at (fx, fy), or a special set off there, free the animal at (x, y)? */

@@ -188,6 +188,9 @@ export const MORE_FACTS = {
         f('Junge Schützenfische müssen das Treffen erst üben.', 'Young archerfish have to practise hitting first.')],
     container_field: [
         f('Was hilft: Ladung gut sichern und Stürmen ausweichen.', 'What helps: securing cargo well and steering round storms.')],
+    longline: [
+        f('Was hilft: Runde Haken, an denen Schildkröten kaum hängen bleiben, und Leinen, die nachts tiefer hängen.', 'What helps: round hooks that turtles hardly get caught on, and lines that hang deeper at night.'),
+        f('Was hilft: Meeresschutzgebiete, in denen gar nicht gefischt wird.', 'What helps: marine reserves where no fishing is allowed at all.')],
     hazard_net: [
         f('Was hilft: Taucher bergen Geisternetze, und daraus werden neue Dinge gemacht.', 'What helps: divers bring ghost nets up, and new things are made from them.')],
     hazard_buoy: [
