@@ -1,4 +1,5 @@
 import { keepOut } from './ai/keepOut.js';
+import { createTrail } from './followTrail.js';
 import { belowHud } from './escort.js';
 import Phaser from 'phaser';
 import { play } from './audio.js';
@@ -47,12 +48,13 @@ export const RESCUE_LOOK = {
     glow: 240,           // px radius of the soft light that shows it from afar
     happyMs: 1500,       // one happy loop where the net was ...
     happyRadius: 90,
-    alongMax: 6,         // ... then it swims along with the fish for good (tester: "they follow, then vanish: strange"); only when more than this many follow, the one that has followed longest says goodbye ...
-    alongOff: [-150, -110],   // ... the first at this place beside the fish (px behind, px above) ...
-    alongStep: [-78, 46],     // ... each further one this much further behind, in turn above and below the line ...
+    alongMax: 6,         // ... then it swims along with the fish for good (tester: "they follow, then vanish: strange"); beyond this many the one that has followed longest swims back home (never fades: user 2026-11-15), and says goodbye ...
+    chainStart: 230,     // ... in a chain along the fish's own path (user: "chain of friends"): the first this many px back along it ...
+    chainGap: 170,       // ... each further one this much further back (about one body length: they never overlap) ...
+    chainSway: 22,       // ... swaying this many px across the path, each a little out of step
     alongEase: 0.09,     // ... easing there by this share per step (keeps up with a sprinting fish) ...
     alongClear: 36,      // ... and keeping this many px from rock (ai/keepOut.js)
-    leaveMs: 1800,       // and fades as it swims off
+    homeEase: 0.03,      // a friend swimming home eases there by this share per step, then circles its old place
     nibbleBubbles: 5,    // bubbles (and a nibble sound) per second while a fish nibbles a line through
     big: 1.9             // a big rescue (a turtle in a large ghost net, a landmark) is drawn this much larger
 };
@@ -71,6 +73,7 @@ export default class RescueLayer {
         this.scene = scene; this.routeY = routeY; this.groundY = groundY; this.onCoin = onCoin; this.done = new Set(done); this.onFree = onFree;
         this.spots = rescueSpots();
         this.actors = new Map();   // spot id -> actor
+        this.trail = createTrail();   // the fish's path, for the chain of followers
     }
 
     build(spot) {
@@ -125,6 +128,7 @@ export default class RescueLayer {
 
     /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s, `delta` ms. */
     update(fish, radius, t, delta) {
+        this.trail.push(fish.x, fish.y);
         const L = RESCUE_LOOK, s = this.scene, frames = delta / (1000 / 60);
         for (const spot of this.spots) {
             if (spot.x < fish.x - L.near) continue;
@@ -171,26 +175,26 @@ export default class RescueLayer {
                 a.px = a.x + Math.sin(k) * L.happyRadius; a.py = a.y - (1 - Math.cos(k)) * L.happyRadius * 0.7;
                 if (a.left <= 0) { a.state = 'along'; a.left = Infinity; a.joined = this.joined = (this.joined || 0) + 1; }
             } else {
-                // Beside the fish, a little behind and above; when its time is up it stays behind and fades.
                 const k = 1 - Math.pow(1 - L.alongEase, frames);
                 if (a.state === 'along') {
-                    // Its place in the line: the newest nearest the fish, older ones further back.
+                    // Its place in the chain along the fish's path: the newest nearest the fish, older ones further back.
                     const i = this.joined - a.joined;
-                    if (i >= L.alongMax) { a.state = 'leave'; a.left = L.leaveMs; continue; }
-                    const ox = L.alongOff[0] + L.alongStep[0] * i, oy = L.alongOff[1] + (i % 2 ? L.alongStep[1] : 0);
-                    a.px += (fish.x + ox - a.px) * k; a.py += (belowHud(fish.y + oy + Math.sin(t * 2.4 + a.seed) * 18, this.scene.cameras.main.worldView.y) - a.py) * k;      // never over the HUD's band
-                    // ... and never in rock (it follows the fish's path, which may cut a corner).
+                    if (i >= L.alongMax) { a.state = 'home'; continue; }      // one too many: it swims back to where it was found
+                    const at = this.trail.at(L.chainStart + L.chainGap * i, this.pt || (this.pt = { x: 0, y: 0 }));
+                    const sway = Math.sin(t * 2.4 + a.seed + i * 0.9) * L.chainSway;
+                    a.px += (at.x - a.px) * k; a.py += (belowHud(at.y + sway, this.scene.cameras.main.worldView.y) - a.py) * k;      // never over the HUD's band
+                    // ... and never in rock (the path may cut a corner).
                     if (this.scene.level?.rock) { const q = keepOut(a.px, a.py, L.alongClear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); a.px = q.x; a.py = q.y; }
-                }
-                else { a.py -= 1.1 * frames; a.img.setAlpha(Math.max(0, a.left / L.leaveMs)); }
-                if (a.left <= 0) {
-                    if (a.state === 'leave') { this.remove(a); continue; }
-                    a.state = 'leave'; a.left = L.leaveMs;
+                } else {
+                    // Home: back to its old place, then it circles there, happy; it is simply left behind as the fish swims on.
+                    const h = 1 - Math.pow(1 - L.homeEase, frames);
+                    a.px += (a.x + Math.cos(t * 0.8 + a.seed) * 70 - a.px) * h; a.py += (a.y + Math.sin(t * 1.1 + a.seed) * 40 - a.py) * h;
+                    if (Math.abs(a.x - fish.x) > RESCUE_LOOK.far) { this.remove(a); continue; }      // far out of sight: let go (never faded in view)
                 }
             }
             if (Math.abs(a.px - fromX) > 0.3 && a.img.setFlipX) a.img.setFlipX(a.px < fromX);
             a.img.setPosition(a.px, a.py).setRotation(Math.sin(t * 6 + a.seed) * 0.06);
-            a.glow.setPosition(a.px, a.py).setAlpha(RESCUE_HALO.alpha * 0.35 * (a.state === 'leave' ? Math.max(0, a.left / L.leaveMs) : 1));
+            a.glow.setPosition(a.px, a.py).setAlpha(RESCUE_HALO.alpha * 0.35);
         }
     }
 
