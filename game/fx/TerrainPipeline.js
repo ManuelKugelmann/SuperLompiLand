@@ -195,7 +195,9 @@ void main () {
     }
 #ifndef LITE
     if (sandy > 0.0) {
-        float rip = 1.0 + ${f(SAND_SKIN.ripple[0])} * sin(world.x * ${f(Math.PI * 2 / SAND_SKIN.ripple[1])} + world.y * ${f(Math.PI * 2 / SAND_SKIN.ripple[1] * 0.35)});
+        // Rippled sand from the shared 'sand' material (crests run with the tile's y: turned to lie across the slope), else plain ripples.
+        vec3 rip = uMatOn > 0.5 ? mat(${f(MATERIALS.indexOf('sand'))}, world.yx * vec2(1.0, 0.6)).rgb * ${f(255 / 128)}
+            : vec3(1.0 + ${f(SAND_SKIN.ripple[0])} * sin(world.x * ${f(Math.PI * 2 / SAND_SKIN.ripple[1])} + world.y * ${f(Math.PI * 2 / SAND_SKIN.ripple[1] * 0.35)}));
         col = mix(col, sand.rgb * rip, sandy);
     }
 #else
