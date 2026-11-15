@@ -82,7 +82,8 @@ export const LEVEL = {
     friendSheen: 0.4,     // strength of the rainbow sheen on friends
     sheenSpeed: 0.1,      // how fast its colours travel (turns of the colour wheel per second)
     sheenSpread: 1.3,     // how much of the colour wheel lies across one friend
-    wakeRadius: 300,      // how close the fish must swim to bend a plant
+    wakeRadius: 300,      // how close the fish must swim to bend a plant ...
+    wakeBend: 0.45,       // ... and how far it bends at most (share of a full bend; playtest: "less exaggerated"; tuned on a device)
     coinGap: 92,          // minimum distance between two coins
     coinStep: 110,        // distance between the coins of a trail
     trailChance: 0.13,    // chance of a coin trail in a chunk, per point of the biome's `coins` value
@@ -536,7 +537,7 @@ export default class LevelGenerator {
                 const surge = (o.surf ? -surgeWave(o.x, waves) * o.surf : 0) * LEVEL.surgeLean + (this.lean ? this.lean(o.x) * LEVEL.surgeLean : 0);
                 // Swimming past pushes plants aside; they swing back when it is calm.
                 const dx = o.x - fish.x, d = Math.hypot(dx, o.y - fish.y);
-                const push = d < LEVEL.wakeRadius ? Math.sign(dx || 1) * (1 - d / LEVEL.wakeRadius) * Math.min(1, speed / 9) : 0;
+                const push = d < LEVEL.wakeRadius ? Math.sign(dx || 1) * (1 - d / LEVEL.wakeRadius) * Math.min(1, speed / 9) * LEVEL.wakeBend : 0;
                 const since = Math.min(8, Math.max(0, (t - (o.bendT ?? t)) * 60));      // 60ths of a second since this plant was last bent (it may wait its turn)
                 o.bendT = t;
                 o.bend += (push + surge - o.bend) * (1 - Math.pow(0.9, since));
