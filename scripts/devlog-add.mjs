@@ -57,7 +57,8 @@ writeFileSync(LOG, firstEntry < 0 ? `${log.trimEnd()}\n\n${entry}` : `${log.slic
 }
 
 // --- main README: "Dev log" section with the newest screenshots ------------
-const entries = [...readFileSync(LOG, 'utf8').matchAll(/^## (.+)\n\n\[`([0-9a-f]+)`\]\((\S+)\) · ([^\n]+)\n\n((?:!\[[^\]]*\]\([^)]+\)\n\n?)+)/gm)]
+const entries = [...readFileSync(LOG, 'utf8').replace(/\r\n/g, '\n').matchAll(      // either line ending (a Windows checkout has CRLF)
+    /^## (.+)\n\n\[`([0-9a-f]+)`\]\((\S+)\) · ([^\n]+)\n\n((?:!\[[^\]]*\]\([^)]+\)\n\n?)+)/gm)]
     .map(m => ({ title: m[1], sha: m[2], url: m[3], date: m[4], image: /\]\(([^)]+)\)/.exec(m[5])[1] }))
     .slice(0, SHOWN);
 const section = [
