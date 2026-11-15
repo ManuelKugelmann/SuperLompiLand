@@ -33,7 +33,8 @@ const VOLUME = 0.5;
  * mobile games sit around -23 to -16): a gentle compressor holds the peaks, make-up gain lifts the whole
  * mix. Target: music about -28 LUFS, nothing over -1 dBTP.
  */
-const MASTER = { threshold: -20, knee: 8, ratio: 4, attack: 0.004, release: 0.25, makeup: 3.2 };
+const MASTER = { threshold: -20, knee: 8, ratio: 4, attack: 0.004, release: 0.25, makeup: 3.2,
+    limit: { threshold: -4, ratio: 20, attack: 0.001, release: 0.12 } };      // the last stage: peaks held under about -1 dBFS
 // Fallback when play('coin') is called without a streak note: C major pentatonic.
 const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
 
@@ -93,7 +94,10 @@ function ready() {
         const comp = ctx.createDynamicsCompressor(), makeup = ctx.createGain();
         comp.threshold.value = MASTER.threshold; comp.knee.value = MASTER.knee; comp.ratio.value = MASTER.ratio;
         comp.attack.value = MASTER.attack; comp.release.value = MASTER.release; makeup.gain.value = MASTER.makeup;
-        master.connect(comp).connect(makeup).connect(ctx.destination);
+        // Last, a limiter: the compressor's attack lets sharp onsets through, and the make-up gain lifted them over 0 dBFS (earshot 2026-11-15: the eruption and a full splash clipped).
+        const lim = ctx.createDynamicsCompressor(), L = MASTER.limit;
+        lim.threshold.value = L.threshold; lim.knee.value = 0; lim.ratio.value = L.ratio; lim.attack.value = L.attack; lim.release.value = L.release;
+        master.connect(comp).connect(makeup).connect(lim).connect(ctx.destination);
         noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -455,8 +459,35 @@ const SOUNDS = {
         am.connect(lp).connect(out).connect(master);
         lfo.start(t); lfo.stop(t + E.dur + 0.05);
     },
-    rumble() { tone({ f: 55, to: 38, type: 'sawtooth', dur: 1.6, vol: 0.3 }); noise({ dur: 1.6, vol: 0.25, from: 180, to: 70, q: 0.4 }); },
-    boom() { noise({ dur: 1.2, vol: 0.5, from: 900, to: 60, q: 0.3 }); tone({ f: 90, to: 30, type: 'sine', dur: 0.9, vol: 0.4 }); }
+    // The volcano grumbling deep in the earth (the opening's "Was grollt da?"). earshot 2026-11-15: the old buzzing sawtooth
+    // read as 'an error buzz'. Now low noise that swells and rolls, with an uneven tremble, and a little body above 150 Hz for phone speakers.
+    rumble() {
+        const t = ctx.currentTime, dur = 2.2, g = ctx.createGain(), lp = ctx.createBiquadFilter(), trem = ctx.createOscillator(), tremG = ctx.createGain();
+        lp.type = 'lowpass'; lp.frequency.setValueAtTime(220, t); lp.frequency.linearRampToValueAtTime(420, t + 0.9); lp.frequency.linearRampToValueAtTime(160, t + dur); lp.Q.value = 0.9;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.24, t + 0.7); g.gain.linearRampToValueAtTime(0.17, t + 1.4); g.gain.linearRampToValueAtTime(0, t + dur);
+        trem.frequency.value = 5.3; tremG.gain.value = 0.08; trem.connect(tremG).connect(g.gain);
+        for (const [rate, off] of [[1, 0], [0.5, 0.37]]) {      // two takes of the noise, one an octave down: a deeper, rolling body
+            const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true; src.playbackRate.value = rate;
+            src.connect(lp); src.start(t, off); src.stop(t + dur + 0.05);
+        }
+        lp.connect(g).connect(master);
+        trem.start(t); trem.stop(t + dur + 0.05);
+        tone({ f: 48, to: 36, type: 'sine', dur, vol: 0.08, rise: 0.6 });
+    },
+    // The volcano erupting (the opening). earshot 2026-11-15: the old band-passed burst read as 'a snare hit'. Now a deep
+    // thump, then a long rolling roar that darkens as it dies, and a little crackle of falling rock.
+    boom() {
+        const t = ctx.currentTime, dur = 3, g = ctx.createGain(), lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.Q.value = 0.6; lp.frequency.setValueAtTime(1400, t); lp.frequency.exponentialRampToValueAtTime(120, t + dur);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.15, t + 0.03); g.gain.exponentialRampToValueAtTime(0.06, t + 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        for (const [rate, off] of [[1, 0.1], [0.5, 0.6], [0.25, 0.3]]) {
+            const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true; src.playbackRate.value = rate;
+            src.connect(lp); src.start(t, off); src.stop(t + dur + 0.05);
+        }
+        lp.connect(g).connect(master);
+        tone({ f: 70, to: 32, type: 'sine', dur: 1.1, vol: 0.16, rise: 0.01 });
+        for (let i = 0; i < 9; i++) noise({ at: 0.5 + Math.random() * 1.8, dur: 0.05 + Math.random() * 0.06, vol: 0.025 + Math.random() * 0.025, from: 2500, to: 900, q: 1.5 });
+    }
 };
 
 /**
