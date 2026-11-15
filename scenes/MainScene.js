@@ -67,6 +67,7 @@ import { QUALITY, startTier, createAutotune, shareOf } from '../game/quality.js'
 import { PRESETS } from '../game/fx/particles.js';
 import { VIEW_CULL, cullToView } from '../game/viewCull.js';
 import { CARDS } from '../game/rig/cards.js';
+import StreamLayer from '../game/level/StreamLayer.js';
 import { updateTerrain } from '../game/fx/TerrainPipeline.js';
 import { due, everyOf } from '../game/throttle.js';
 import { setRenderScale } from '../game/renderScale.js';
@@ -240,6 +241,7 @@ export default class MainScene extends Phaser.Scene {
         this.density = (x, y) => this.level.density(x, y);
         // Currents and swell: one field for player and particles. Streams lose their pull at the calm route.
         this.flow = createFlow(LEVEL.seed, FLOW, x => this.level.field.routeY(x));
+        this.streams = new StreamLayer(this, this.flow);      // the big currents, shown as bands of streaks running with the water
         this.flowAt = { x: 0, y: 0 };
         this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
         this.swarms = new SwarmLayer(this, {   // shoals of small fish around the view (spec 6.2)
@@ -1868,6 +1870,7 @@ export default class MainScene extends Phaser.Scene {
         this.rescues?.update(sp, this.fish.radius, time / 1000, delta);
         this.blooms.update(sp, time / 1000, delta);
         this.siphons.update(sp, time / 1000);
+        this.streams.update(time / 1000);
         this.surgeChannel.update(sp, time / 1000, delta);
         this.gannets.update(sp, this.fish.facing, time / 1000);
         this.seal.update(sp, time / 1000, delta / 1000);

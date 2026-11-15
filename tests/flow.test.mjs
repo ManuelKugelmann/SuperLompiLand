@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOW, createFlow, streamInSlot, streamY, carry, inStreamPath } from '../game/level/flow.js';
+import { FLOW, createFlow, streamInSlot, streamY, streamDir, carry, inStreamPath } from '../game/level/flow.js';
 import { createField, FIELD } from '../game/level/density.js';
 import { WORLD_WEST, WORLD_END } from '../game/level/biomes.js';
 
@@ -11,7 +11,8 @@ test('the world has streams, inside its borders, the same for the same seed', ()
     assert.ok(all.length >= 5, `${all.length} streams`);
     for (const s of all) {
         assert.ok(s.x0 > WORLD_WEST && s.x1 < WORLD_END);
-        assert.deepEqual(s, streamInSlot(s.index, SEED));
+        const { dir, ...plain } = s;
+        assert.deepEqual(plain, streamInSlot(s.index, SEED));
     }
     assert.notDeepEqual(createFlow(7).streamsIn(WORLD_WEST, WORLD_END).map(s => s.x0 | 0), all.map(s => s.x0 | 0));
 });
@@ -95,22 +96,25 @@ test('streams lose their pull at the calm route and keep it away from it', () =>
 });
 
 
-test('streams lead east steadily: nearly straight, the water always going east, and nothing turns round at their ends', () => {
+test('streams are big straight slanting lanes leading east, in open water at both ends, still past their ends', () => {
     const all = flow.streamsIn(WORLD_WEST, WORLD_END), calm = { ...FLOW, swell: 0 }, f = createFlow(SEED, calm);
     assert.ok(all.length > 20);
     assert.equal(flow.eddiesIn, undefined, 'no eddies');
-    for (const s of all.slice(0, 40)) {
-        let lo = Infinity, hi = -Infinity;
-        for (let x = s.x0; x <= s.x1; x += 50) {
-            const y = streamY(s, x), v = f.at(x, y, 0, { x: 0, y: 0 });
-            lo = Math.min(lo, y); hi = Math.max(hi, y);
-            assert.ok(v.x >= 0, 'never back west');
-            assert.ok(Math.abs(v.y) <= Math.abs(v.x) * 0.12 + 1e-9, `nearly level at ${Math.round(x)}: ${v.x.toFixed(1)}, ${v.y.toFixed(1)}`);
+    let slanted = 0;
+    for (const s of all) {
+        assert.ok(s.x1 - s.x0 >= FLOW.streamLength[0] - 1e-6, 'long');
+        const d = streamDir(s), slope = d.y / d.x;
+        assert.ok(Math.abs(slope) <= FLOW.streamSlope[1] + 1e-9, 'never steep');
+        if (Math.abs(slope) >= FLOW.streamSlope[0] * 0.5) slanted++;
+        for (const y of [s.y0, s.y1]) assert.ok(y >= FLOW.streamBand[0] - 1e-6, 'under the surface band');
+        for (let x = s.x0 + 300; x <= s.x1 - 300; x += 400) {
+            const v = f.at(x, streamY(s, x), 0, { x: 0, y: 0 });
+            assert.ok(v.x > 0, 'always east');
+            assert.ok(Math.abs(v.y / v.x - slope) < 1e-6, 'straight: the same direction all along');
         }
-        assert.ok(hi - lo <= FLOW.streamWave * 2 + 1e-6, 'a slight sway only');
-        // Just past its end the water is still (apart from the swell, switched off here).
         assert.deepEqual(f.at(s.x1 + 300, streamY(s, s.x1), 0, { x: 0, y: 0 }), { x: 0, y: 0 });
     }
+    assert.ok(slanted / all.length > 0.6, `most of them clearly slanting (${slanted} of ${all.length})`);
 });
 
 test('no hazard in a stream\'s way: its lane and the stretch beyond its end count as its path', () => {
@@ -122,4 +126,11 @@ test('no hazard in a stream\'s way: its lane and the stretch beyond its end coun
     assert.equal(inStreamPath(s.x1 + FLOW.clear.ahead + 10, streamY(s, s.x1), [s]), false);
     assert.equal(inStreamPath(s.x0 - 400, y, [s]), false);
     assert.equal(inStreamPath(mid, y, []), false);
+});
+
+test('a stream shows where it pulls: none of its pull is left on the calm route', () => {
+    const f = createFlow(SEED, FLOW, () => 1000);
+    assert.equal(f.pullAt(5000, 1000), 0);
+    assert.equal(f.pullAt(5000, 1000 + FLOW.calm[1] + 10), 1);
+    assert.equal(createFlow(SEED).pullAt(5000, 1000), 1, 'no route: everywhere');
 });

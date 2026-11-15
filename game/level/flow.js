@@ -2,10 +2,11 @@
 // the player, particles, later plants, swarms and props.
 //
 //   swell    a slow to-and-fro near the surface that fades with depth
-//   streams  currents that run through open water like lanes: enter one and it
-//            carries you along. They are placed by the seed and lead east,
-//            steadily and nearly straight (playtest: "currents should be less
-//            random": no whirls at their ends, no wide swings).
+//   streams  big sea currents that run through open water like lanes: enter one
+//            and it carries you along. They are placed by the seed, lead east and
+//            run straight and slanting, up or down (playtest: "the whirl current is
+//            strange. Better make it large, diagonal sea currents"), long enough to
+//            be read from afar.
 //
 // Pure and deterministic (no Phaser; tests/flow.test.mjs). Velocities are in
 // world px per physics step, like the player's.
@@ -15,20 +16,21 @@ import { floorY, WORLD_WEST, WORLD_END } from './biomes.js';
 export const FLOW = {
     swell: 0.9,            // strongest to-and-fro at the surface (px per step)
     swellDepth: 700,       // depth by which it has faded away
-    streamEvery: 4200,     // one stream slot per this much world width ...
-    streamChance: 0.7,     // ... which holds a stream this often
-    streamLength: [1500, 2600],
+    streamEvery: 7200,     // one stream slot per this much world width ...
+    streamChance: 0.65,    // ... which holds a stream this often
+    streamLength: [3600, 6400],
+    streamSlope: [0.1, 0.32],   // px down (or up) per px east: a clear slant, never steep
+    streamBand: [320, 0.55],    // a stream keeps between this depth and this share of the seabed's depth (open water)
     streamWidth: 150,      // distance from the middle at which the pull has dropped to about a third
     streamSpeed: 19,       // speed of the water in the middle of a stream: above the swimmers' own top speed (Lompi ~17); was 11
-    streamWave: 45,        // how far a stream's path swings up and down (a slight sway: it reads as a lane going east)
     carry: 0.045,          // how quickly the water takes a body up to its own speed (per step)
     calm: [200, 420],      // px from the calm route's middle: no stream pull inside the first, full pull beyond the second
     clear: { side: 420, ahead: 1300 }   // px to either side of a stream's middle line, and beyond its end, where no hazard may be (it would be carried into)
 };
 
 /**
- * The stream in slot `i`, or null. A stream follows a gentle wave between the
- * surface and the seabed and fades in and out at its ends.
+ * The stream in slot `i`, or null: a straight lane from (x0, y0) to (x1, y1), slanting up or down,
+ * that fades in and out at its ends. Both ends lie in open water (FLOW.streamBand).
  */
 export function streamInSlot(i, seed, cfg = FLOW) {
     if (hash(i, 11, seed) > cfg.streamChance) return null;
@@ -36,14 +38,26 @@ export function streamInSlot(i, seed, cfg = FLOW) {
     const length = a + (b - a) * hash(i, 12, seed);
     const x0 = i * cfg.streamEvery + hash(i, 13, seed) * (cfg.streamEvery - length);
     if (x0 < WORLD_WEST + 2500 || x0 + length > WORLD_END - 600) return null;
-    const mid = x0 + length / 2;
-    const y0 = 320 + (floorY(mid) * 0.5 - 320) * (0.25 + 0.6 * hash(i, 14, seed));
-    return { index: i, x0, x1: x0 + length, y0, phase: hash(i, 15, seed) * 6.28, wave: cfg.streamWave * (0.5 + 0.5 * hash(i, 16, seed)) };
+    const x1 = x0 + length, [top, share] = cfg.streamBand;
+    const low = x => Math.max(top, floorY(x) * share);            // the deepest a stream may run at x
+    // How far it can slant: as far as its band allows at both ends; up or down by the seed.
+    const room = Math.min(low(x0), low(x1)) - top;
+    const want = cfg.streamSlope[0] + (cfg.streamSlope[1] - cfg.streamSlope[0]) * hash(i, 14, seed);
+    const drop = Math.min(want * length, room) * (hash(i, 16, seed) < 0.5 ? 1 : -1);
+    const start = top + (room - Math.abs(drop)) * hash(i, 15, seed);
+    const y0 = drop >= 0 ? start : start + Math.abs(drop);
+    return { index: i, x0, x1, y0, y1: y0 + drop };
 }
 
 /** Height of a stream's middle line at world x. */
 export function streamY(s, x) {
-    return s.y0 + Math.sin((x - s.x0) / 520 + s.phase) * s.wave;
+    return s.y0 + (s.y1 - s.y0) * (x - s.x0) / (s.x1 - s.x0);
+}
+
+/** A stream's direction: the unit vector along its lane, east. */
+export function streamDir(s) {
+    const dx = s.x1 - s.x0, dy = s.y1 - s.y0, len = Math.hypot(dx, dy);
+    return { x: dx / len, y: dy / len };
 }
 
 /**
@@ -91,14 +105,14 @@ export function createFlow(seed, cfg = FLOW, calmY = null) {
             if (Math.abs(d) > 2.6) continue;
             const ends = Math.min(1, (x - s.x0) / 260, (s.x1 - x) / 260);          // fades in and out
             const speed = cfg.streamSpeed * Math.exp(-d * d) * ends * ends * (3 - 2 * ends) * pull(x, y);
-            const slope = Math.cos((x - s.x0) / 520 + s.phase) * s.wave / 520;     // the lane's direction
-            const len = Math.hypot(1, slope);
-            out.x += speed / len; out.y += speed * slope / len;
+            const dir = s.dir || (s.dir = streamDir(s));      // along the lane
+            out.x += speed * dir.x; out.y += speed * dir.y;
         }
         return out;
     };
 
-    return { at, streamsIn };
+    /** How much of a stream's pull is left at (x, y): 0 inside the calm route, 1 away from it (for showing the streams where they pull). */
+    return { at, streamsIn, pullAt: pull };
 }
 
 /**
