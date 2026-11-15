@@ -30,3 +30,13 @@ test('a depth mark rings once going down, again only after coming back up well a
     // a jump from 12 to 120 m passes 50 and 100: the deepest one rings.
     assert.deepEqual(rings, [10, 20, 10, 100]);
 });
+
+test('the water darkens with depth: as painted near the surface, clearly darker at 50 m, never brighter deeper', async () => {
+    const { depthLight } = await import('../game/level/depthMeters.js');
+    assert.equal(depthLight(5), 1);
+    assert.ok(depthLight(17) > 0.9 && depthLight(17) < 1);
+    assert.ok(depthLight(50) < 0.7, '50 m clearly darker');
+    assert.ok(depthLight(17) - depthLight(50) > 0.25, '17 m and 50 m look different');
+    let last = 1;
+    for (let m = 0; m <= 3000; m += 5) { const b = depthLight(m); assert.ok(b <= last + 1e-12 && b > 0.1, String(m)); last = b; }
+});

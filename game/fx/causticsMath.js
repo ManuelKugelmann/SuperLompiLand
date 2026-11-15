@@ -55,9 +55,9 @@ export function sunlightAt(y, fadeTo = 2600) {
  * deeper the red channel is absorbed first and everything leans blue-green.
  * `light` = sunlightAt(depth), `sat` = extra saturation at full light.
  */
-export function gradeMatrix(light, sat = 0.18, absorb = 0.35, exposure = 0) {
+export function gradeMatrix(light, sat = 0.18, absorb = 0.35, exposure = 0, bright = 1) {
     const s = 1 + sat * light;                       // saturation factor
-    const e = 1 + exposure * light;                  // brighter in sunlit water (auto-exposure by depth)
+    const e = (1 + exposure * light) * bright;       // brighter in sunlit water, darker in the deep (depthLight)
     const lr = 0.2126, lg = 0.7152, lb = 0.0722;     // luminance weights
     const sr = (1 - s) * lr, sg = (1 - s) * lg, sb = (1 - s) * lb;
     const dark = 1 - light;

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { causticPattern, sunlightAt, gradeMatrix } from './causticsMath.js';
 import { shareOf } from '../quality.js';
+import { depthMeters, depthLight } from '../level/depthMeters.js';
 
 /**
  * Sunlight under water — one system for light shafts, caustics and the colour grade
@@ -22,9 +23,9 @@ export const WATER_LIGHT = {
     causticFade: 1500,    // caustics fade faster than the shafts: a shallow-water effect
     grade: 1,             // depth colour grade on the camera (0 = off)
     gradeSaturation: 0.2, // extra saturation in full sunlight
-    gradeAbsorb: 0.32,    // how much red is lost at full depth
+    gradeAbsorb: 0.5,     // how much red (and some green) is lost in the deep: warm colours fade first
     gradeExposure: 0.22,  // brightness lift in full sunlight (style guide: shallow water is bright)
-    fadeTo: 2600,         // depth (px below the surface) where the sunlight has faded away
+    fadeTo: 2400,         // depth (px below the surface, about 35 m) where the sunlight and its shafts have faded away
     dither: 0.035         // strength of the fine noise that breaks up colour banding in smooth water (0 = off)
 };
 
@@ -131,10 +132,13 @@ export default class WaterLight {
             // Ease the light so camera bobbing never pumps the colours, and update in tiny
             // steps (no visible jumps between quantised levels).
             this.smooth = this.smooth === undefined ? light : this.smooth + (light - this.smooth) * 0.03;
+            // Darker the deeper the middle of the view is (spec 5.0w), eased the same way.
+            const b = depthLight(depthMeters(Math.max(0, cam.scrollY + H / 2)));
+            this.bright = this.bright === undefined ? b : this.bright + (b - this.bright) * 0.03;
             const q = this.smooth;
-            if (Math.abs(q - this.lastLight) > 0.002) {
-                this.lastLight = q;
-                const m = gradeMatrix(q, WATER_LIGHT.gradeSaturation * WATER_LIGHT.grade, WATER_LIGHT.gradeAbsorb * WATER_LIGHT.grade, WATER_LIGHT.gradeExposure * WATER_LIGHT.grade);
+            if (Math.abs(q - this.lastLight) > 0.002 || Math.abs(this.bright - this.lastBright) > 0.002) {
+                this.lastLight = q; this.lastBright = this.bright;
+                const m = gradeMatrix(q, WATER_LIGHT.gradeSaturation * WATER_LIGHT.grade, WATER_LIGHT.gradeAbsorb * WATER_LIGHT.grade, WATER_LIGHT.gradeExposure * WATER_LIGHT.grade, 1 - (1 - this.bright) * WATER_LIGHT.grade);
                 // Phaser's ColorMatrix keeps offsets in 0..255.
                 this.grade.set(m.map((v, i) => (i % 5 === 4 ? v * 255 : v)));
             }

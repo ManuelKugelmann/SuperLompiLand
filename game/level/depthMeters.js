@@ -38,3 +38,20 @@ export function createDepthBell(cfg = DEPTH_MARKS) {
         }
     };
 }
+
+/**
+ * How bright the water is at a depth (spec 5.0w, user: "depth scale not felt"): [metres, brightness] points,
+ * joined by straight pieces. Shallow water is as painted; by 50 m the picture is clearly darker, by 100 m a
+ * dark blue, past 200 m nearly night where creature light matters. One table, read by the camera grade.
+ */
+export const DEPTH_LIGHT = [[0, 1], [10, 1], [20, 0.9], [50, 0.62], [100, 0.5], [200, 0.43], [500, 0.39], [1000, 0.37]];      // the floor keeps Lompi and the coins readable (the grade darkens everything)
+
+/** Brightness for a depth in metres (0..1, never brighter deeper). */
+export function depthLight(m, table = DEPTH_LIGHT) {
+    if (m <= table[0][0]) return table[0][1];
+    for (let i = 1; i < table.length; i++) {
+        const [m0, b0] = table[i - 1], [m1, b1] = table[i];
+        if (m <= m1) return b0 + (b1 - b0) * (m - m0) / (m1 - m0);
+    }
+    return table.at(-1)[1];
+}
