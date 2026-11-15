@@ -71,6 +71,7 @@ export const LEVEL = {
     atlasSpare: 6,        // ... of which this many stay free for the ring kept round the wanted set
     tileAtlasChunks: 64,  // the tile terrain's atlas: its cells are tiny (64 px), so it holds the wanted set and the whole kept ring round it (review: a full atlas left a chunk with collision but no picture)
     tileSpare: 26,        // ... of which this many stay free for that ring (8 x 7 kept round a 6 x 5 view on a 20:9 phone)
+    maxSteps: 12,         // 60ths of a second that plants, chains and lines catch up in one frame at most (review: capped at 3-4 they swung at a third of their speed at 6 fps)
     leadDeadZone: 120,    // px per s: slower than this the view counts as still (no lead), so swimming up and down does not rebuild the rows beside the view
     canvasPool: 24,       // chunks' worth of canvas textures kept from dropped chunks for the next ones (a jump drops and needs a whole view at once)
     canvasWarm: 8,        // chunks' worth of them made right after the first view is built (still behind the start's fade): the reserve play draws on
@@ -548,7 +549,7 @@ export default class LevelGenerator {
     /** Per frame: bend / pulse every creature and plant. `t` in seconds; `others` = the other players in the room; `waves` = time in waves (surf.js). */
     animate(t, fish, speed = 0, others = null, waves = 0) {
         // Everything here moves by the clock (playtest: "speeds time-based, not frame-based"): `steps` = 60ths of a second since the last frame.
-        const steps = Math.min(4, Math.max(0, (t - (this.animT ?? t)) * 60));
+        const steps = Math.min(LEVEL.maxSteps, Math.max(0, (t - (this.animT ?? t)) * 60));
         this.animT = t;
         // Only what can be on screen is bent and drawn: chunks are loaded well beyond the view.
         const vw = this.scene.scale.width * LEVEL.liveView, vh = this.scene.scale.height * LEVEL.liveView;
@@ -568,7 +569,7 @@ export default class LevelGenerator {
                 // Swimming past pushes plants aside; they swing back when it is calm.
                 const dx = o.x - fish.x, d = Math.hypot(dx, o.y - fish.y);
                 const push = d < LEVEL.wakeRadius ? Math.sign(dx || 1) * (1 - d / LEVEL.wakeRadius) * Math.min(1, speed / 9) * LEVEL.wakeBend : 0;
-                const since = Math.min(8, Math.max(0, (t - (o.bendT ?? t)) * 60));      // 60ths of a second since this plant was last bent (it may wait its turn)
+                const since = Math.min(LEVEL.maxSteps * 3, Math.max(0, (t - (o.bendT ?? t)) * 60));      // 60ths of a second since this plant was last bent (it may wait its turn)
                 o.bendT = t;
                 o.bend += (push + surge - o.bend) * (1 - Math.pow(0.9, since));
             }
@@ -582,9 +583,9 @@ export default class LevelGenerator {
             this.chainBody.vx = moved && steps > 0 ? jx / steps : 0; this.chainBody.vy = moved && steps > 0 ? jy / steps : 0;      // px per 60th of a second
             this.chainBody.x = fish.x; this.chainBody.y = fish.y;
         }
-        // Ropes step in 60ths of a second, as many as have passed (at most 3 a frame): the same swing at any frame rate.
+        // Ropes step in 60ths of a second, as many as have passed: the same swing at any frame rate, down to the slowest phones.
         this.ropeDue = (this.ropeDue || 0) + steps;
-        const ropeSteps = Math.min(3, Math.floor(this.ropeDue));
+        const ropeSteps = Math.min(LEVEL.maxSteps, Math.floor(this.ropeDue));
         this.ropeDue -= Math.floor(this.ropeDue);
         const body = this.chainBody.active ? this.chainBody : null;
         for (const c of this.chains) {
