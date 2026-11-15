@@ -42,7 +42,19 @@ const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
  * Recorded sounds (CC0, _ref/cc0/<name>/SOURCE): fetched and decoded once when audio starts; until
  * then, or if a file is missing, the synthesized version plays instead. Paths are relative (base per branch).
  */
-const SAMPLE_FILES = { splash_a: 'sfx/splash_a.mp3', splash_b: 'sfx/splash_b.mp3' };
+// Real recordings (CC0; sources in public/sfx/CREDITS.txt); each sound falls back to its code-made version while a file is missing.
+const SAMPLE_FILES = {
+    splash_a: 'sfx/splash_a.mp3', splash_b: 'sfx/splash_b.mp3',
+    coin_glass: 'sfx/coin_glass.mp3',      // a tapped wine bottle (earshot: "a glass ting" z +4.1), rings at about 2104 Hz
+    nest_chord: 'sfx/nest_chord.mp3',      // a glockenspiel chord ("a small bell" / "a success chime")
+    boom_thunder: 'sfx/boom_thunder.mp3'   // distant thunder for the eruption ("a distant thunder boom")
+};
+/** Gains and pitch of the recordings, set from earshot measurements (LUFS of the file -> the code-made sound's level). */
+const REAL = {
+    coin: { gain: 0.093, hz: 2104, octaves: 2 },   // measured through the master: -23.6 LUFS like the old coin; two octaves above the melody note
+    nest: { gain: 0.65 },                          // about -20 LUFS through the master (rare, may stand out a little)
+    boom: { gain: 0.39 }                           // about -18 LUFS through the master
+};
 /** The recorded splash's gain from a gentle plop to a full dive (under the master's make-up: the top stays under -1 dBFS). */
 const SPLASH_SAMPLE = { gain: [0.12, 0.34] };
 const samples = {};
@@ -55,13 +67,13 @@ function loadSamples() {
 }
 
 /** Play a recorded sound: gain, playback rate (pitch). False when it is not loaded. */
-function playSample(name, gain = 1, rate = 1) {
+function playSample(name, gain = 1, rate = 1, at = 0) {
     const buf = samples[name];
     if (!buf) return false;
     const src = ctx.createBufferSource(), g = ctx.createGain();
     src.buffer = buf; src.playbackRate.value = rate; g.gain.value = gain;
     src.connect(g).connect(master);
-    src.start();
+    src.start(ctx.currentTime + at);
     return true;
 }
 
@@ -273,8 +285,11 @@ const SOUNDS = {
         const bright = Math.min(0.08, 0.02 * (note.multiplier - 1));
         // Tester: the coin was too loud next to everything else; coins come in long trails, so it sits
         // about 4.5 dB lower than it was (COIN_VOL), still the brightest small sound.
-        tone({ f: note.hz, type: 'triangle', at, dur: 0.18, vol: COIN_VOL * (0.2 + bright) });
-        tone({ f: note.hz * 2, type: 'sine', at: at + 0.02, dur: 0.12, vol: COIN_VOL * (0.07 + bright) });
+        const R = REAL.coin, rate = note.hz * 2 ** R.octaves / R.hz;
+        if (!playSample('coin_glass', R.gain * (1 + bright * 4), rate, at)) {
+            tone({ f: note.hz, type: 'triangle', at, dur: 0.18, vol: COIN_VOL * (0.2 + bright) });
+            tone({ f: note.hz * 2, type: 'sine', at: at + 0.02, dur: 0.12, vol: COIN_VOL * (0.07 + bright) });
+        }
         if (note.multiplier > 1) tone({ f: note.harmonyHz, type: 'sine', at, dur: 0.16, vol: COIN_VOL * (0.06 + bright) });
         if (note.flourish) {
             const step = 60 / musicClock.bpm / 4;
@@ -407,7 +422,7 @@ const SOUNDS = {
         lastVoice = pick;
         voices[pick]();
     },
-    nest() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.11, dur: 0.3, vol: 0.22 })); },
+    nest() { if (playSample('nest_chord', REAL.nest.gain)) return; [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone({ f, type: 'triangle', at: i * 0.11, dur: 0.3, vol: 0.22 })); },
     // The finale's reveal (spec 5.0m beat 3): past the last chimney the nest comes into view; one warm swell, a few bells rising.
     reveal() {
         const t = ctx.currentTime;
@@ -477,6 +492,7 @@ const SOUNDS = {
     // The volcano erupting (the opening). earshot 2026-11-15: the old band-passed burst read as 'a snare hit'. Now a deep
     // thump, then a long rolling roar that darkens as it dies, and a little crackle of falling rock.
     boom() {
+        if (playSample('boom_thunder', REAL.boom.gain)) return;
         const t = ctx.currentTime, dur = 3, g = ctx.createGain(), lp = ctx.createBiquadFilter();
         lp.type = 'lowpass'; lp.Q.value = 0.6; lp.frequency.setValueAtTime(1400, t); lp.frequency.exponentialRampToValueAtTime(120, t + dur);
         g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.15, t + 0.03); g.gain.exponentialRampToValueAtTime(0.06, t + 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
