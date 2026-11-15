@@ -286,6 +286,9 @@ export default class MainScene extends Phaser.Scene {
         for (const ch of this.journey.list) if (ch.friend && this.journey.has(ch.friend.id)) this.school.add(ch.friend);
         this.openingAsked = !!this.registry.get('opening');      // 'watch the story' from the title menu: wherever the save is
         this.wantOpening = !this.ambientMode && (this.openingAsked || !openingSeen(window.localStorage));
+        // Fields that live across frames start fresh on every (re)start: a restart destroys their objects.
+        this.opening = null; this.rescueArrow = null; this.lostArrow = null;
+        this.heard = new Set(); this.depthBell = createDepthBell();
         this.registry.set('opening', false);
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y),
             (ch, x, y) => { this.school.add(ch.friend, x, y); this.powerNews(ch.friend.id); });
@@ -1496,7 +1499,7 @@ export default class MainScene extends Phaser.Scene {
     }
 
     collect() {
-        const p = this.fish.pos, fr = this.fish.radius, mag = this.powers().magnet, steps = Math.min(4, this.game.loop.delta / (1000 / 60));      // by time, not by frame
+        const p = this.fish.pos, fr = this.fish.radius, mag = this.powers().magnet, steps = Math.min(15, this.game.loop.delta / (1000 / 60));      // by time, not by frame, down to 4 fps (a coin never overshoots)
         BonusCoins.magnet = mag;      // the set pieces' and the route's coins feel it too
         for (const c of this.level.coins) {
             if (mag && c.img.active) {      // coins in reach fly to Lompi (everyone's pull, Hüpfi's from further away)
@@ -1929,11 +1932,9 @@ export default class MainScene extends Phaser.Scene {
         }
         this.opening?.update(delta);
         // Depth is felt (spec 5.0w): past a depth mark a lower bell rings and the HUD's depth line glows.
-        this.depthBell ??= createDepthBell();
         const mark = this.depthBell.step(this.depthMeters());
         if (mark >= 0 && !this.ambientMode && !this.perfTour) { play('deeper', mark); this.depthMarkAt = time; }
         // Big animals are heard before they are seen (research 5.0x #14).
-        this.heard ??= new Set();
         const herald = this.ambientMode || this.perfTour ? null : heraldDue(this.fish.sprite.x, this.heard);
         if (herald) { this.heard.add(herald.id); play('herald', herald.call); }
         const t2 = performance.now();

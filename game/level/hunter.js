@@ -7,13 +7,14 @@ import { BIOMES } from './biomes.js';
 
 export const HUNTER = {
     enabled: true,
-    spots: { reef: [0.55], blue: [0.4, 0.8], kelp: [0.6], wreck: [0.5] },   // where in each area (share of its width)
+    spots: { reef: [0.55], kelp: [0.6] },   // where in each area (share of its width); only where rock cover exists (open blue and wreck have none)
     trigger: 500,        // px before a spot from which it may start ...
     window: 4000,        // ... until this far past it: it starts only where cover is near (see findCover), else not at all
     cover: [200, 1100],  // px ahead of Lompi in which a hiding place behind rock is looked for ...
     coverDepth: [-500, 900],   // ... from this far above to this far below him
     coverStep: 120,      // px between the places tried (coarse: the search runs on slow phones too)
     room: 70,            // px of open water a hiding place needs around it
+    searchEvery: 400,    // px of progress between two cover searches (each is a few thousand density reads)
     warnS: 2,            // s between the warning and the hunter setting off
     chaseS: 7,           // s it chases at most
     from: [-1500, -520], // where it sets off, from the fish (px): behind and above, outside the picture
@@ -52,7 +53,7 @@ export function findCover(solid, fx, fy, cfg = HUNTER) {
     for (let dx = cfg.cover[0]; dx <= cfg.cover[1]; dx += cfg.coverStep) {
         for (let dy = cfg.coverDepth[0]; dy <= cfg.coverDepth[1]; dy += cfg.coverStep) {
             const x = fx + dx, y = fy + dy;
-            if (open(x, y) && sightBlocked(solid, x + cfg.from[0], y + cfg.from[1], x, y)) return { x, y };
+            if (open(x, y) && sightBlocked(solid, x + cfg.from[0], y + cfg.from[1], x, y, 140)) return { x, y };      // a coarse look is enough for cover
         }
     }
     return null;

@@ -13,7 +13,7 @@ const run = (fishAt, sees = () => true, maxS = 30) => {
 
 test('hunters pass at fixed places inside their areas, each met once', () => {
     const spots = hunterSpots();
-    assert.ok(spots.length >= 4);
+    assert.ok(spots.length >= 2, 'only where rock cover exists (reef, kelp)');
     for (const s of spots) { const b = BIOMES.find(q => q.id === s.biome); assert.ok(s.x > b.from && s.x < b.from + b.width, s.id); }
     const s = spots[0], done = new Set();
     assert.equal(spotNear(s.x + HUNTER.trigger - 10, done).id, s.id);

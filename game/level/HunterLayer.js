@@ -57,6 +57,8 @@ export default class HunterLayer {
             const s = spotNear(fish.x, this.done, HUNTER, this.spots);
             if (!s) { for (const q of this.spots) if (fish.x > q.x + HUNTER.window) this.done.add(q.id); return; }
             // Only where there is somewhere to hide: the place lights up softly so a child sees where to go.
+            if (Math.abs(fish.x - (this.searchedAt ?? -Infinity)) < HUNTER.searchEvery) return;
+            this.searchedAt = fish.x;
             const cover = findCover(this.world.solid, fish.x, fish.y);
             if (!cover) return;
             this.done.add(s.id);
