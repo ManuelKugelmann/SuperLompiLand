@@ -22,7 +22,7 @@ import { coralSize } from './coralSizes.js';
 import { SHADE, shadeChunk } from './shade.js';
 import ChunkAtlas from './ChunkAtlas.js';
 import { TILE_TERRAIN, densityTile, chunkLook } from './tileTerrain.js';
-import { TERRAIN, installTerrain } from '../fx/TerrainPipeline.js';
+import { TERRAIN, TERRAIN_LITE, installTerrain } from '../fx/TerrainPipeline.js';
 import { treatCoinNear } from './RhythmLayer.js';
 import { spotsOf } from './worldMap.js';
 import { FLOW, createFlow, inStreamPath } from './flow.js';
@@ -307,6 +307,13 @@ export default class LevelGenerator {
         a = back && rock ? { back, rock } : null;
         reg.set('chunkAtlases', a);
         return a;
+    }
+
+    /** The terrain's lighter shader on or off (the lowest quality tiers: a weak graphics chip), for the chunks there now and those to come. */
+    setTerrainLite(on) {
+        if (!this.tileAtlas || on === this.terrainLite) return;
+        this.terrainLite = on;
+        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.terrain && o.scene) o.setPipeline(on ? TERRAIN_LITE : TERRAIN);
     }
 
     /** The net of light on or off for every picture of the world, those there now and those to come (the lowest quality tier draws without its shader). */
@@ -624,7 +631,7 @@ export default class LevelGenerator {
             chunk.places = [[A2, tileAt]];
             A2.upload(tileAt, pics.tile, 0, TILE_TERRAIN.size);
             for (const [mode, depth] of [[1, -6], [0, -2]]) {
-                const img = s.add.image(ox, oy, A2.key, String(tileAt)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth).setPipeline(TERRAIN);
+                const img = s.add.image(ox, oy, A2.key, String(tileAt)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth).setPipeline(this.terrainLite ? TERRAIN_LITE : TERRAIN);
                 img.terrain = { ...look, mode, ox, oy, span: CH, place: [p.x, p.y], atlas: [A2.slots.size.w, A2.slots.size.h] };
                 chunk.objects.push(img);
             }

@@ -3,6 +3,8 @@ import { SHADE, SAND_SKIN } from '../level/shade.js';
 import { FIELD } from '../level/density.js';
 import { MAT, MATERIALS } from '../level/materials.js';
 import { TILE_TERRAIN, texelStep } from '../level/tileTerrain.js';
+import { SURFACE_CAUSTICS as C } from './causticsMath.js';
+import { WEB_GLSL, causticsView } from './CausticsPipeline.js';
 
 // The landscape shaded on the graphics card (level/tileTerrain.js). A chunk is drawn as two plain
 // quads (its back at depth -6, its rock at -2) whose texture is the shared atlas of density tiles;
@@ -12,7 +14,9 @@ import { TILE_TERRAIN, texelStep } from '../level/tileTerrain.js';
 // stone's grain comes from the shared material tiles (level/materials.js), repeated over the world.
 
 export const TERRAIN = 'TileTerrain';
-const f = v => Number(v).toFixed(6);
+/** The same, lighter for the lowest tiers (a weak graphics chip): one stone, no ripples, no net of light, the slope from four reads. */
+export const TERRAIN_LITE = 'TileTerrainLite';
+const f = v => Number(v).toFixed(6), TAU = (Math.PI * 2).toFixed(6);
 const S = SHADE, T = TILE_TERRAIN;
 
 const VERT = `
@@ -30,8 +34,9 @@ void main () {
     outPos = inPosition;
 }`;
 
-const FRAG = `
+const frag = lite => `
 #define SHADER_NAME TILE_TERRAIN_FS
+${lite ? '#define LITE' : ''}
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
 #else
@@ -52,6 +57,9 @@ uniform vec2 uSandCover;          // left, right
 uniform vec3 uFogL;
 uniform vec3 uFogR;
 uniform vec4 uMats;               // main and second material, left and right
+uniform float uTime;              // the net of light (CausticsPipeline's numbers this frame)
+uniform float uStrength;
+uniform vec3 uTint;
 varying vec2 outPos;
 
 const float TH = ${f(FIELD.threshold)};
@@ -75,6 +83,8 @@ vec3 pal(float k, float side) {
     else if (k >= 1.0) { a = uPalL[1]; b = uPalL[2]; ra = uPalR[1]; rb = uPalR[2]; t = k - 1.0; }
     return mix(mix(a, b, t), mix(ra, rb, t), side);
 }
+
+${WEB_GLSL}
 
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -103,12 +113,16 @@ void main () {
     // The density and its slope, smooth across texels (central differences, blended): a slope that jumps from texel to texel would show as lines.
     float d00 = dens(i0), d10 = dens(i0 + vec2(1.0, 0.0)), d01 = dens(i0 + vec2(0.0, 1.0)), d11 = dens(i0 + vec2(1.0, 1.0));
     float d = mix(mix(d00, d10, fr.x), mix(d01, d11, fr.x), fr.y);
+#ifdef LITE
+    float gx = mix(d10 - d00, d11 - d01, fr.y) / STEP, gy = mix(d01 - d00, d11 - d10, fr.x) / STEP;
+#else
     float gx00 = d10 - dens(i0 + vec2(-1.0, 0.0)), gx10 = dens(i0 + vec2(2.0, 0.0)) - d00;
     float gx01 = d11 - dens(i0 + vec2(-1.0, 1.0)), gx11 = dens(i0 + vec2(2.0, 1.0)) - d01;
     float gy00 = d01 - dens(i0 + vec2(0.0, -1.0)), gy01 = dens(i0 + vec2(0.0, 2.0)) - d00;
     float gy10 = d11 - dens(i0 + vec2(1.0, -1.0)), gy11 = dens(i0 + vec2(1.0, 2.0)) - d10;
     float gx = mix(mix(gx00, gx10, fr.x), mix(gx01, gx11, fr.x), fr.y) / (2.0 * STEP);
     float gy = mix(mix(gy00, gy10, fr.x), mix(gy01, gy11, fr.x), fr.y) / (2.0 * STEP);
+#endif
     float gl = max(1e-5, length(vec2(gx, gy)));
     float dist = (d - TH) / gl;
     if (uChunk.w > 0.5) {
@@ -140,6 +154,9 @@ void main () {
     float tilt = edge * sqrt(edge) * ${f(S.relief)};
     vec3 stone = vec3(1.0);
     vec2 bumpN = vec2(0.0);
+#ifdef LITE
+    if (uMatOn > 0.5) stone = mat(side < 0.5 ? uMats.x : uMats.z, world).rgb * ${f(255 / 128 * MAT.colour)};
+#else
     if (uMatOn > 0.5) {
         float m2 = smoothstep(${f(1 - MAT.share - 0.08)}, ${f(1 - MAT.share + 0.08)}, vnoise(world / ${f(MAT.maskScale)}));
         vec2 ms = side < 0.5 ? uMats.xy : uMats.zw;
@@ -152,6 +169,7 @@ void main () {
         float big = mat(ms.x, world / 6.0 + vec2(97.0, 211.0)).a;
         stone += ${f(MAT.macro * 2)} * (big - 0.5);
     }
+#endif
     float nx = -gx / gl * tilt - bumpN.x, ny = outY * tilt - bumpN.y;
     float nl = 1.0 / sqrt(nx * nx + ny * ny + 1.0);
     nx *= nl; ny *= nl;
@@ -172,10 +190,14 @@ void main () {
         if (fk < 1.0) sandy = faceUp * mix(uSandCover.x, uSandCover.y, side) * (1.0 - smoothstep(0.3, 1.0, fk));
         else if (deep < sand.w + ${f(SAND_SKIN.under[0])}) under = 1.0 - ${f(SAND_SKIN.under[1])} * faceUp * sin(3.14159265 * (deep - sand.w) / ${f(SAND_SKIN.under[0])});
     }
+#ifndef LITE
     if (sandy > 0.0) {
         float rip = 1.0 + ${f(SAND_SKIN.ripple[0])} * sin(world.x * ${f(Math.PI * 2 / SAND_SKIN.ripple[1])} + world.y * ${f(Math.PI * 2 / SAND_SKIN.ripple[1] * 0.35)});
         col = mix(col, sand.rgb * rip, sandy);
     }
+#else
+    col = mix(col, sand.rgb, sandy);
+#endif
     col *= under;
     col = mix(col, deepTint, ${f(S.deepMix)} * deepK);
     vec3 bounce = vec3(${S.bounce.map(f).join(', ')}), sky = vec3(${S.sky.map(f).join(', ')}) - bounce, key = vec3(${S.key.map(f).join(', ')});
@@ -185,12 +207,27 @@ void main () {
         light = mix(light, vec3(lm * 1.06, lm, lm * 0.92), k) * (1.0 + sandy * ${f(SAND_SKIN.lift)});
     }
     col = col * stone * light;
+#ifndef LITE
+    // The net of light (as CausticsPipeline draws it on everything else): on faces that look up, in the top skin of the rock,
+    // bent along the rock's own slope, fading with depth.
+    float cd = clamp((${f(C.gone)} - world.y) / ${f(C.gone - C.full)}, 0.0, 1.0);
+    cd *= cd * step(0.0, world.y);
+    if (uStrength > 0.0 && cd > 0.0) {
+        vec2 p = vec2(mod(world.x, ${f(C.period)}), world.y) + vec2(nx, ny) * ${f(C.wrap)};
+        float wa = web(p * ${f(C.cells[0] / C.period)}, ${f(C.cells[0])}, uTime * ${f(C.drift[0])});
+        float wb = web(p * ${f(C.cells[1] / C.period)} + 7.3, ${f(C.cells[1])}, uTime * ${f(C.drift[1])});
+        float net = min(1.0, wa + 0.55 * wb);
+        float shaft = ${f(C.shaft.floor)} + ${f(1 - C.shaft.floor)} * smoothstep(-0.3, 0.7, sin((p.x + world.y * ${f(C.shaft.slant)}) * ${TAU} * ${f(C.shaft.bands)} / ${f(C.period)} + uTime * ${f(C.shaft.speed)}));
+        float catching = smoothstep(0.0, 0.5, -outY) * (1.0 - smoothstep(${f(C.skin[0] * S.rockSize * 1.5)}, ${f(C.skin[1] * S.rockSize * 1.5)}, inside));
+        col += uTint * (net * shaft * cd * catching * uStrength);
+    }
+#endif
     gl_FragColor = vec4(col * alpha, alpha);
 }`;
 
 class TerrainPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
-    constructor(game) {
-        super({ game, name: TERRAIN, vertShader: VERT, fragShader: FRAG });
+    constructor(game, lite = false) {
+        super({ game, name: lite ? TERRAIN_LITE : TERRAIN, vertShader: VERT, fragShader: frag(lite) });
         this.view = { x: 0, y: 0 };
         this.matTexture = null;
         this.current = null;
@@ -199,6 +236,8 @@ class TerrainPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
     onPreRender() {
         this.set2f('uScroll', this.view.x, this.view.y);
         this.set1f('uMatOn', this.matTexture ? 1 : 0);
+        const c = causticsView(this.game);
+        this.set1f('uTime', c ? c.t : 0); this.set1f('uStrength', c ? c.strength : 0); this.set3f('uTint', c ? c.r : 1, c ? c.g : 1, c ? c.b : 1);
         this.current = null;
     }
 
@@ -224,6 +263,7 @@ class TerrainPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
 export function installTerrain(game, materials) {
     const r = game.renderer, pipes = r?.pipelines, gl = r?.gl;
     if (!pipes || !gl) return false;
+    if (!pipes.has(TERRAIN_LITE)) pipes.add(TERRAIN_LITE, new TerrainPipeline(game, true));
     let p = pipes.get(TERRAIN);
     if (!p) { p = new TerrainPipeline(game); pipes.add(TERRAIN, p); }
     if (materials && !p.matTexture) {
@@ -236,12 +276,15 @@ export function installTerrain(game, materials) {
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         MATERIALS.forEach((m, i) => gl.texSubImage2D(gl.TEXTURE_2D, 0, (i % 4) * N, Math.floor(i / 4) * N, N, N, gl.RGBA, gl.UNSIGNED_BYTE, materials[i]));
         gl.bindTexture(gl.TEXTURE_2D, before);
+        pipes.get(TERRAIN_LITE).matTexture = p.matTexture;
     }
     return true;
 }
 
 /** Per frame: the view's top left in the world. */
 export function updateTerrain(game, scrollX, scrollY) {
-    const p = game.renderer?.pipelines?.get(TERRAIN);
-    if (p) { p.view.x = scrollX; p.view.y = scrollY; }
+    for (const name of [TERRAIN, TERRAIN_LITE]) {
+        const p = game.renderer?.pipelines?.get(name);
+        if (p) { p.view.x = scrollX; p.view.y = scrollY; }
+    }
 }

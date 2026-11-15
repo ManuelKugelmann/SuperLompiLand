@@ -32,6 +32,27 @@ void main () {
     outPos = inPosition;
 }`;
 
+/** The web of light as GLSL (hash2, web): also used by the terrain shader (TerrainPipeline.js). */
+export const WEB_GLSL = `
+// One layer of the web: the edges of Voronoi cells whose centres wander, the classic look of
+// light focused by waves (an organic web, not a grid). p is in cells; n = cells per period, so
+// the web tiles at the wrap (the warp uses whole waves per period for the same reason).
+vec2 hash2(vec2 c) { c = vec2(dot(c, vec2(127.1, 311.7)), dot(c, vec2(269.5, 183.3))); return fract(sin(c) * 43758.5453); }
+float web(vec2 p, float n, float t) {
+    p += 0.3 * vec2(sin(p.y * 0.9 + t * 0.6), sin(p.x * ${TAU} * 3.0 / n + t * 0.5));
+    vec2 g = floor(p), q = fract(p);
+    float d1 = 8.0, d2 = 8.0;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 o = vec2(float(x), float(y)), c = g + o;
+        vec2 h = hash2(vec2(mod(c.x, n), c.y));
+        vec2 r = o + 0.5 + 0.4 * sin(t + ${TAU} * h) - q;
+        float d = dot(r, r);
+        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+    }
+    return 1.0 - smoothstep(0.0, ${f(C.line)}, sqrt(d2) - sqrt(d1));
+}
+`;
+
 // Phaser's single-texture fragment shader, plus the net of light: worked out in world space
 // (so it lies on the ground, not on the screen), pushed along the picture's own relief (so it
 // bends over bumps: "wrapped", not flat), only on faces that are lit and look up, stronger near
@@ -65,24 +86,7 @@ vec4 near(vec2 off) {
     return texture2D(uMainSampler, clamp(outTexCoord + off / uSide, lo + 0.0003, lo + 1.0 / uSide - 0.0003));
 }
 
-// One layer of the web: the edges of Voronoi cells whose centres wander, the classic look of
-// light focused by waves (an organic web, not a grid). p is in cells; n = cells per period, so
-// the web tiles at the wrap (the warp uses whole waves per period for the same reason).
-vec2 hash2(vec2 c) { c = vec2(dot(c, vec2(127.1, 311.7)), dot(c, vec2(269.5, 183.3))); return fract(sin(c) * 43758.5453); }
-float web(vec2 p, float n, float t) {
-    p += 0.3 * vec2(sin(p.y * 0.9 + t * 0.6), sin(p.x * ${TAU} * 3.0 / n + t * 0.5));
-    vec2 g = floor(p), q = fract(p);
-    float d1 = 8.0, d2 = 8.0;
-    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-        vec2 o = vec2(float(x), float(y)), c = g + o;
-        vec2 h = hash2(vec2(mod(c.x, n), c.y));
-        vec2 r = o + 0.5 + 0.4 * sin(t + ${TAU} * h) - q;
-        float d = dot(r, r);
-        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
-    }
-    return 1.0 - smoothstep(0.0, ${f(C.line)}, sqrt(d2) - sqrt(d1));
-}
-
+${WEB_GLSL}
 void main () {
     vec4 texture = texture2D(uMainSampler, outTexCoord);
     vec4 texel = vec4(outTint.bgr * outTint.a, outTint.a);
@@ -182,6 +186,11 @@ export function catchCaustics(scene, on) {
         o.setPipeline(o.type === 'Rope' ? CAUSTICS_ROPE : CAUSTICS);
         o.caustic = true;
     }
+}
+
+/** The net's numbers this frame ({ x, y, t, strength, r, g, b }), or null where there is no caustics pipeline. */
+export function causticsView(game) {
+    return game.renderer?.pipelines?.get(CAUSTICS)?.view || null;
 }
 
 /**
