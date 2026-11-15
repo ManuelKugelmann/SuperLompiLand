@@ -191,6 +191,9 @@ export const MORE_FACTS = {
     longline: [
         f('Was hilft: Runde Haken, an denen Schildkröten kaum hängen bleiben, und Leinen, die nachts tiefer hängen.', 'What helps: round hooks that turtles hardly get caught on, and lines that hang deeper at night.'),
         f('Was hilft: Meeresschutzgebiete, in denen gar nicht gefischt wird.', 'What helps: marine reserves where no fishing is allowed at all.')],
+    trawl: [
+        f('Was hilft: Netze mit großen Maschen und Fluchtluken, durch die kleine Fische und Schildkröten wieder hinauskommen.', 'What helps: nets with big meshes and escape hatches that let small fish and turtles out again.'),
+        f('Was hilft: Schutzgebiete, in denen keine Netze über den Boden gezogen werden dürfen.', 'What helps: protected areas where no nets may be dragged over the seabed.')],
     hazard_net: [
         f('Was hilft: Taucher bergen Geisternetze, und daraus werden neue Dinge gemacht.', 'What helps: divers bring ghost nets up, and new things are made from them.')],
     hazard_buoy: [

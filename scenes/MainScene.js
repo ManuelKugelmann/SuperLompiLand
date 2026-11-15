@@ -99,6 +99,7 @@ import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
 import SplashLayer from '../game/fx/SplashLayer.js';
 import LonglineLayer from '../game/level/LonglineLayer.js';
+import TrawlLayer from '../game/level/TrawlLayer.js';
 import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
 import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
 import WhaleSharkLayer from '../game/level/WhaleSharkLayer.js';
@@ -366,6 +367,20 @@ export default class MainScene extends Phaser.Scene {
                 this.bookEntry('longline');
             },
             sting: (x, y, costs) => { if (costs) this.softHit(x, y); else this.fish.hit(new Phaser.Math.Vector2(x, y)); }
+        });
+        // World event (spec 5.0t 2): a trawl net along the kelp floor; rise over its headrope or outswim it.
+        this.trawl = this.ambientMode ? null : new TrawlLayer(this, {
+            floor: x => this.seabedBelow(x, this.level.field.routeY(x)) ?? floorY(x), route: x => this.level.field.routeY(x), surface: x => this.surface.heightAt(x, this.time.now / 1000)
+        }, {
+            warn: (x, y) => {
+                play('rumble'); this.swarms.startle(x, y);
+                this.announce(this.lang === 'de' ? 'Ein Schleppnetz!' : 'A trawl net!', this.lang === 'de' ? 'Schwimm schnell nach oben, über das Netz!' : 'Swim up quickly, over the net!');
+                this.bookEntry('trawl');
+            },
+            tow: () => {},
+            caught: (x, y) => { if (!this.relaxed) this.hurt(x, y, 1); this.announce('', this.lang === 'de' ? 'Gefangen! Gleich bist du wieder frei.' : 'Caught! You will be free in a moment.'); },
+            released: () => { play('nest'); this.announce('', this.lang === 'de' ? 'Frei! Puh!' : 'Free! Phew!'); },
+            rumble: () => play('rumble')
         });
         this.dugong = new DugongLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), kind => this.bookEntry(kind));
         // Three pearls hidden in clams in every area (spec 5.0r): a small reason to dive down and look.
@@ -1889,7 +1904,7 @@ export default class MainScene extends Phaser.Scene {
         this.nudis.update(sp, time / 1000);
         this.dumbo.update(sp, time / 1000, delta / 1000);
         this.dugong.update(sp, time / 1000, delta / 1000);
-        if (!this.perfTour) { this.hunter?.update(sp, delta / 1000); this.longline?.update(sp, this.fish.radius, this.time.now / 1000, this.relaxed); }
+        if (!this.perfTour) { this.hunter?.update(sp, delta / 1000); this.longline?.update(sp, this.fish.radius, this.time.now / 1000, this.relaxed); this.trawl?.update(this.fish, delta / 1000); }
         this.secrets?.update(sp, time / 1000);
         this.dolphins.update(sp, time / 1000, delta);
         { const fv = this.fish.sprite.body.velocity; this.octopus.update(sp, Math.hypot(fv.x, fv.y), time / 1000, delta); }
