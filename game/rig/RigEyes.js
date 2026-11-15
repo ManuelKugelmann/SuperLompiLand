@@ -1,4 +1,4 @@
-import { Gaze, EYES } from './eyes.js';
+import { Gaze, EYES, eyeYaws, onBall } from './eyes.js';
 import { QUALITY } from '../quality.js';
 
 const EYES_REST = EYES.restLid;
@@ -94,7 +94,8 @@ export default class RigEyes {
         // One gaze for both eyes (user 2026-11-15: "both eyes need to look, the backside one too; sync blink"):
         // they look the same way and blink together, as real eyes do.
         this.gaze = new Gaze(seed * 13);
-        this.eyes = spec.at.map(at => ({ at }));
+        const yaws = eyeYaws(spec.at);      // each eye's ball is turned this far (the far one round the head a lot)
+        this.eyes = spec.at.map((at, i) => ({ at, yaw: yaws[i] }));
         this.parts = null;       // made while shown, given back when not (out of view the eyes cost nothing)
     }
 
@@ -146,16 +147,18 @@ export default class RigEyes {
         const g = this.gaze.update(dt, { x: tx, y: ty }, opts);
         for (const e of this.eyes) {
             place(e.at, P);
-            const kx = P.sx, ky = P.sy, rx = e.at.rx * kx, ry = e.at.ry * ky, r = Math.min(e.at.rx, e.at.ry);
+            // The ball's own size: a turned eye's outline is narrow, its ball is not (iris as big as the front eye's).
+            const kx = P.sx, ky = P.sy, rx = e.at.rx * kx, ry = e.at.ry * ky, r = Math.min(e.at.rx / Math.max(0.3, Math.cos(e.yaw)), e.at.ry);
+            const ball = onBall(g.x, e.yaw);
             const happy = opts?.happy || 0, lid = Math.max(g.lid, happy * E.squint);
             const shut = q.lids ? 1 : (1 - Math.max(0, (lid - EYES_REST) / (1 - EYES_REST))) * (1 - happy * E.smile * 0.6);
-            const ox = g.x * E.travel * rx * view.facing, oy = -g.y * E.travel * ry;
+            const ox = ball.dx / Math.sin(EYES.reach * 0.7) * E.travel * r * kx * view.facing, oy = -g.y * E.travel * ry;
             const ix = P.x + ox * cr - oy * sr, iy = P.y + ox * sr + oy * cr;
             const ir = r * E.iris, pr = ir * E.pupil * g.pupil * (this.spec.pupil ?? 1);
             e.white.setPosition(P.x, P.y).setRotation(view.rotation).setScale(rx * 2 * E.cover / W, ry * 2 * E.cover / W);
-            e.iris.setPosition(ix, iy).setRotation(view.rotation).setScale(ir * 2 * kx / W, ir * 2 * ky * shut / W);
-            e.pupil.setPosition(ix, iy).setRotation(view.rotation).setScale(pr * 2 * kx / W, pr * 2 * ky * shut / W);
-            e.shine.setPosition(ix - ir * 0.35 * view.facing * kx, iy - ir * 0.4 * ky).setScale(ir * 0.55 * kx / W, ir * 0.55 * ky * shut / W);
+            e.iris.setPosition(ix, iy).setRotation(view.rotation).setScale(ir * 2 * kx * ball.squash / W, ir * 2 * ky * shut / W);
+            e.pupil.setPosition(ix, iy).setRotation(view.rotation).setScale(pr * 2 * kx * ball.squash / W, pr * 2 * ky * shut / W);
+            e.shine.setPosition(ix - ir * 0.35 * view.facing * kx * ball.squash, iy - ir * 0.4 * ky).setScale(ir * 0.55 * kx * ball.squash / W, ir * 0.55 * ky * shut / W);
             e.lid.setVisible(!!q.lids);
             if (q.lids) e.lid.setFrame(Math.round(lid * (E.lids - 1))).setPosition(P.x, P.y).setRotation(view.rotation).setScale(rx * 2 * E.cover / W, ry * 2 * E.cover / W);
             const smiling = !!q.lids && happy > 0.02;

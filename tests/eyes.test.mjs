@@ -77,3 +77,13 @@ test('two eyes looking at one near point converge', () => {
     const left = run(new Gaze(1), 1, { x: 1 - 0, y: 0 }), right = run(new Gaze(2), 1, { x: -1, y: 0 });
     assert.ok(left.x > 0.5 && right.x < -0.5, 'each eye turns inward');
 });
+
+test('eyeballs: the far eye is turned, its iris narrower and moving less', async () => {
+    const { eyeYaws, onBall } = await import('../game/rig/eyes.js');
+    const [near, far] = eyeYaws([{ rx: 45, ry: 44 }, { rx: 16, ry: 26 }]);
+    assert.ok(near < 0.05 && far > 0.8, `${near} ${far}`);
+    assert.ok(onBall(0, far).squash < onBall(0, near).squash);
+    assert.ok(Math.abs(onBall(0.8, far).dx) < Math.abs(onBall(0.8, near).dx), 'toward the nose the far iris barely moves');
+    assert.equal(onBall(0, near).dx, 0);
+    assert.deepEqual(eyeYaws([{ rx: 30, ry: 30 }]), [0]);
+});

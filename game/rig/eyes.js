@@ -110,3 +110,23 @@ export class Gaze {
         return this;
     }
 }
+
+/**
+ * Eyes are balls, not flat discs (user 2026-11-15: "eyes look a bit lopsided, more 3d aware"). Each painted eye
+ * shows its eyeball turned by `yaw` (0 = facing the viewer; the far eye round the head is turned a lot), found from
+ * how much narrower its outline is than the front eye's. The iris sits on the ball: looking sideways by `gx`
+ * (-1..1 toward the nose) turns it by gx x `angle`, so it moves less and narrows the further it turns away.
+ */
+export const EYEBALL = { angle: 0.7, minSquash: 0.22 };
+
+/** Each eye's yaw (rad) from the outlines' widths over heights: the roundest eye faces the viewer. */
+export function eyeYaws(at) {
+    const ratio = at.map(a => a.rx / a.ry), front = Math.max(...ratio);
+    return ratio.map(r => Math.acos(Math.max(0, Math.min(1, r / front))));
+}
+
+/** The iris on its ball: { dx: shift across in ball radii, squash: its width 0..1 }. */
+export function onBall(gx, yaw, cfg = EYEBALL) {
+    const a = yaw + gx * cfg.angle;
+    return { dx: Math.sin(a) - Math.sin(yaw), squash: Math.max(cfg.minSquash, Math.cos(a)) };
+}
