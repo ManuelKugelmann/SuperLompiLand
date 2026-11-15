@@ -2,7 +2,7 @@ import { keepOut } from './ai/keepOut.js';
 import { createTrail } from './followTrail.js';
 import { belowHud } from './escort.js';
 import Phaser from 'phaser';
-import { play } from './audio.js';
+import { play, musicClock, nowSeconds } from './audio.js';
 import { RESCUES, rescueSpots, freesRescue, nibble } from './rescues.js';
 import BonusCoins from './level/BonusCoins.js';
 
@@ -181,7 +181,9 @@ export default class RescueLayer {
                     const i = this.joined - a.joined;
                     if (i >= L.alongMax) { a.state = 'home'; continue; }      // one too many: it swims back to where it was found
                     const at = this.trail.at(L.chainStart + L.chainGap * i, this.pt || (this.pt = { x: 0, y: 0 }));
-                    const sway = Math.sin(t * 2.4 + a.seed + i * 0.9) * L.chainSway;
+                    // The chain sways with the music: one wave per bar, travelling down the line (spec 5.0z).
+                    const ph = musicClock.phase(nowSeconds()), bar = ph.beat / musicClock.beatsPerBar;
+                    const sway = Math.sin((bar - i * 0.12) * Math.PI * 2) * L.chainSway;
                     a.px += (at.x - a.px) * k; a.py += (belowHud(at.y + sway, this.scene.cameras.main.worldView.y) - a.py) * k;      // never over the HUD's band
                     // ... and never in rock (the path may cut a corner).
                     if (this.scene.level?.rock) { const q = keepOut(a.px, a.py, L.alongClear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); a.px = q.x; a.py = q.y; }
