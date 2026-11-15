@@ -26,7 +26,8 @@ missing, why it matters, and the concrete next step, never only "not done yet".
 
 - **Never work outside the project directory** (`C:\Projects\SuperLompiLand` and its subfolders, worktrees
   included). Do not read, write or run anything outside it: temp files, screenshots, test clones, logs and
-  build outputs go under `_ref/` (gitignored), never into user, temp or job folders.
+  build outputs go under `_ref/` (gitignored), never into user, temp or job folders. Running tools that
+  are on the PATH (node, npm, git, python, ...) is fine; their inputs and outputs stay in the project.
 
 - **`@gks/sdk` is fine in code, never front-facing:** not in README, repo description,
   page titles, in-game text, manifest or commit subjects. Do not modify the SDK from this
