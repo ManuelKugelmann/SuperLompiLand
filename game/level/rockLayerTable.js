@@ -57,7 +57,9 @@ export const LAYER_SHADE = {
  * threshold is not carried (`minCarry`: a minimum piece size); carried rock saturates
  * `lift` above the threshold within `band`, so it is a flat foot, not a ripple.
  */
-export const SUPPORT = { reach: 1800, gap: 60, spread: 120, wobble: 260, grid: 110, carryGrid: [280, 480], minCarry: 0.03, band: 0.06, lift: 0.1 };
+// reach: far enough to find the seabed under any island and its drop-off (user 2026-11-15: no flying rocks in the background;
+// at 1800 virtual px a piece high on a drop-off, with the seabed 4000+ px below, kept no foot and hung in the water).
+export const SUPPORT = { reach: 6500, gap: 60, spread: 120, wobble: 260, grid: 110, carryGrid: [280, 480], minCarry: 0.03, band: 0.06, lift: 0.1 };
 
 /**
  * Near the surface: no layer rock above `below` virtual px, fading back in over `fade` px. The
