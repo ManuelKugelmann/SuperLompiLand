@@ -195,6 +195,9 @@ export default class MainScene extends Phaser.Scene {
         // (relayout) and carry on; until then the picture covers the screen (a sliver cropped).
         this.resume = data?.resume || null;
         this.resumed = !!this.resume;     // carrying on after a reshape: no fresh biome banner
+        // A new game from the title starts fresh in the lagoon (user 2026-11-15: "single player: start at lagoon always,
+        // only load progress on demand"); the saved nests come back only through the title's Saves list.
+        this.fresh = !!data?.fresh;
         const refit = () => {
             if (this.refitting || !misfit(this.game, WORLD.refitAt)) return;
             this.refitting = this.time.delayedCall(600, () => {
@@ -244,6 +247,7 @@ export default class MainScene extends Phaser.Scene {
         // What has been collected stays collected (per chunk bitfields, see worldState.js).
         // Playing together, the room has its own memory, separate from the solo journey.
         this.world = new WorldState(window.localStorage, Multiplayer.worldKey(this.registry) || 'sll_world', `${LEVEL.seed}.${LEVEL.version}`);
+        if (this.fresh) this.resetRun();
         this.level = new LevelGenerator(this, this.world);
         this.rockLayers = new RockLayers(this);   // near and mid-range rock behind the play plane (needs the level's materials)
         this.density = (x, y) => this.level.density(x, y);
@@ -406,7 +410,7 @@ export default class MainScene extends Phaser.Scene {
         this.lostCue = createLostCue(); this.goalAge = LOST.goalS;      // no map: one soft arrow toward the next friend or nest when the child seems lost (spec 5.0l)
         this.guide = createGuide({ isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK), routeY: x => this.level.field.routeY(x) });   // shows the way when stuck (spec 1.4)
 
-        // Start at the last nest reached (kept across sessions), else the start pool.
+        // Start at the last nest reached in this game (a save loaded from the title, or a restart while playing), else the lagoon.
         this.nestIndex = Phaser.Math.Clamp(this.progression.get?.('nest', 0) || 0, 0, this.level.nests.length - 2);
         this.banked = this.progression.get?.('banked', 0) || 0;
         this.character = getCharacter(this.registry.get('character') || loadSelectedId());
@@ -1051,24 +1055,37 @@ export default class MainScene extends Phaser.Scene {
     /** Out of health: no fail screen — back to the last nest with what was saved there. */
     respawn() {
         const de = this.lang === 'de';
-        const p = this.startPoint();
         play('respawn');
+        this.moveTo(this.startPoint(), () => {
+            this.health = this.maxHealth;
+            this.coins = this.banked;
+            this.streak.reset();
+            this.respawning = false;
+            this.announce(de ? 'Nochmal!' : 'Try again!', de ? 'Zurück am letzten Nest' : 'Back at the last nest');
+        });
+    }
+
+    /** Playing together: just come into the room, Lompi swims in next to the friend (net/meet.js). */
+    meetFriend(spot) {
+        if (this.respawning || this.opening) return;
+        const de = this.lang === 'de';
+        this.moveTo(this.safeSpot(spot.x, spot.y), () => this.announce(de ? 'Da ist dein Freund!' : 'There is your friend!', ''));
+    }
+
+    /** Fade out, put the fish at `p` with the camera on it, then fade in once the place is built. */
+    moveTo(p, then) {
         this.cameras.main.fadeOut(260, 10, 40, 70);
         this.time.delayedCall(280, () => {
             this.fish.endPose();
             this.fish.place(p.x, p.y);
             this.fish.sprite.setVelocity(0, 0);
             this.fish.guard = 2500;
-            this.health = this.maxHealth;
-            this.coins = this.banked;
-            this.streak.reset();
             this.camX = p.x - this.scale.width / 2;
             this.camY = p.y - this.scale.height / 2;
-            this.respawning = false;
-            this.swarms.arrive(p.x, p.y);      // back at the nest the water is not empty: a shoal swims into the picture
+            this.swarms.arrive(p.x, p.y);      // the water there is not empty: a shoal swims into the picture
             // The place is built off the main thread now (no freeze): the fade lifts once it is there.
             this.fadeInAt = this.time.now + RESPAWN_HOLD_MS;
-            this.announce(de ? 'Nochmal!' : 'Try again!', de ? 'Zurück am letzten Nest' : 'Back at the last nest');
+            then();
         });
     }
 
@@ -1085,12 +1102,17 @@ export default class MainScene extends Phaser.Scene {
 
     /** Menu: forget the saved nest and coins and begin at the home reef again. */
     startOver() {
+        this.resetRun();
+        this.scene.restart();
+    }
+
+    /** A new game: no nest reached, no coins banked, no friends found, nothing collected (the Saves list keeps the old ones). */
+    resetRun() {
         this.progression.set?.('nest', 0);
         this.progression.set?.('banked', 0);
         this.progression.set?.('journey', []);
         this.progression.set?.('pearls', []);
-        this.world.reset();
-        this.scene.restart();
+        if (!Multiplayer.worldKey(this.registry)) this.world.reset();      // a room's shared memory belongs to everyone in it
     }
 
     finish() {

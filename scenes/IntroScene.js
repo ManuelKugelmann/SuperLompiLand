@@ -445,7 +445,7 @@ export default class IntroScene extends Phaser.Scene {
             if (ch && CHARACTERS.some(c => c.id === ch)) this.registry.set('character', ch);
             this.registry.set('ambient', false);
             this.registry.set('room', word);
-            this.time.delayedCall(300, () => this.scene.start(SCENE_KEYS.MAIN));
+            this.time.delayedCall(300, () => this.scene.start(SCENE_KEYS.MAIN, { fresh: true }));
             return;
         }
         try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* old browser */ }
@@ -539,7 +539,7 @@ export default class IntroScene extends Phaser.Scene {
             try { window.localStorage.setItem('sll_family', word); } catch { /* storage blocked */ }
             this.registry.set('ambient', false);
             this.registry.set('room', word);
-            this.scene.start(SCENE_KEYS.MAIN);
+            this.scene.start(SCENE_KEYS.MAIN, { fresh: true });
         }, invited ? 56 : 40);
         if (invited) this.tweens.add({ targets: go, scale: 1.08, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
         pill(W - 70, 60, '✕', '#ffd0d0', close);
@@ -563,7 +563,7 @@ export default class IntroScene extends Phaser.Scene {
         this.registry.set('room', null); // plain start = solo
         this.registry.set('ambient', false);
         // First time: tell the story of the eruption before the journey begins.
-        this.scene.start(SCENE_KEYS.MAIN);      // the opening story plays inside the level (game/OpeningLayer.js)
+        this.scene.start(SCENE_KEYS.MAIN, { fresh: true });      // the opening story plays inside the level (game/OpeningLayer.js)
     }
 
     update(time, delta) {

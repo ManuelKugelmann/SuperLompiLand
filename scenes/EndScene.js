@@ -58,7 +58,7 @@ export default class EndScene extends Phaser.Scene {
             fontFamily: 'Arial', fontSize: '48px', color: '#06343a', fontStyle: 'bold',
             backgroundColor: '#ffc266', padding: { x: 40, y: 20 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        again.on('pointerdown', () => this.scene.start(SCENE_KEYS.MAIN));
+        again.on('pointerdown', () => this.scene.start(SCENE_KEYS.MAIN, { fresh: true }));
     }
 
     update(time, delta) {

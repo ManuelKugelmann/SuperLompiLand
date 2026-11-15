@@ -4,6 +4,7 @@ import { EMOTES, EMOTE_ICON, isEmote, colorsFor, RateLimit } from '../net/social
 import { cleanState, cleanEvent, Strikes, bitsOf, syncBatches, WORLD_KINDS } from '../net/validate.js';
 import { roomStorageKey } from '../net/keys.js';
 import { normalizeSecret } from '../net/secret.js';
+import { meetSpot } from '../net/meet.js';
 import { HUD_KEY } from '../scenes/HudScene.js';
 import { pillButton, textStyle } from './ui/kit.js';
 
@@ -46,6 +47,8 @@ export default class Multiplayer {
         this.net = openNet(secret);
         this.word = this.net.secret;
         this.ghosts = new Map(); // userId -> RemoteFish
+        this.joinedAt = performance.now();      // a newcomer swims in next to the first friend it meets (net/meet.js)
+        this.met = false;
         this.sendAt = 0;
         this.seq = 0;
         this.lang = scene.registry.get('currentLanguage') || 'de';
@@ -77,6 +80,11 @@ export default class Multiplayer {
                 // First snapshot from someone new: the channel is open both ways now, so send
                 // them what this room has collected so far (they OR-merge it).
                 this.sendSync();
+                if (!this.met && scene.fish) {
+                    this.met = true;
+                    const at = meetSpot((performance.now() - this.joinedAt) / 1000, scene.fish.sprite, snap);
+                    if (at) scene.meetFriend?.(at);
+                }
             }
             g.push(snap, performance.now());
         });
