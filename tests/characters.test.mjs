@@ -116,3 +116,11 @@ test('face spots lie inside their pictures', async () => {
         if (f.mouth) assert.ok(f.mouth.x >= 0 && f.mouth.x <= W && f.mouth.y >= 0 && f.mouth.y <= H, key);
     }
 });
+
+test('friends are playable only once rescued, or playing together; Lompi always', async () => {
+    const { isPlayable, CHARACTERS } = await import('../game/characters.js');
+    assert.equal(isPlayable(CHARACTERS[0].id, []), true);
+    assert.equal(isPlayable('seahorse', []), false);
+    assert.equal(isPlayable('seahorse', ['seahorse']), true);
+    assert.equal(isPlayable('shark', [], true), true);
+});

@@ -20,7 +20,7 @@ import { glowShare } from '../game/level/deepGlow.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
 import { makeController, CONTROL_SCHEMES, BOT_SCHEME } from '../game/controls/index.js';
-import { getCharacter, loadSelectedId, saveSelectedId } from '../game/characters.js';
+import { getCharacter, loadSelectedId, saveSelectedId, isPlayable, loadUnlocked, unlockCharacter } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock, updateMusic, updateWeatherSound, setMusicLayers } from '../game/audio.js';
@@ -288,6 +288,9 @@ export default class MainScene extends Phaser.Scene {
         this.reefBook = createBook(this.progression.get?.('reefbook', []) || []);   // discovery journal (spec 5.2d)
         // The story path: a friend to free in every chapter, right on the calm route (spec ch.9).
         // Whoever the player plays is not waiting in a net: Lompi waits there instead (journey.js).
+        // Solo, only Lompi and the friends freed so far are playable (an older choice falls back to Lompi).
+        const chosen = this.registry.get('character') || loadSelectedId();
+        if (!isPlayable(chosen, loadUnlocked(), !!this.registry.get('room'))) this.registry.set('character', getCharacter(null).id);
         this.journey = createJourney(this.progression.get?.('journey', []) || [], chapters(undefined, undefined, this.registry.get('character') || loadSelectedId()));
         // The freed friends swim along as a little school for the rest of the journey (tester: "rescued friends should follow
         // indefinitely"): those freed before this start are there from the first frame, the newest nearest.
@@ -670,6 +673,7 @@ export default class MainScene extends Phaser.Scene {
     /** A friend is out of its net (StoryBeats): thanks, coins, a heart, and the journey remembers. */
     freeFriend(ch, x, y) {
         const de = this.lang === 'de', name = ch.friend.name;
+        unlockCharacter(ch.friend.id);      // playable from now on, in every game (title and SWAP FRIEND)
         this.progression.set?.('journey', this.journey.toJSON());
         this.coins += JOURNEY.coins;
         this.health = Math.min(this.maxHealth, this.health + 1);

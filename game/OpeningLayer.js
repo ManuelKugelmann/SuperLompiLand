@@ -3,6 +3,7 @@ import { OPENING, captionOf } from './story/opening.js';
 import { createTimeline } from './timeline.js';
 import { createRig } from './CardRig.js';
 import { play } from './audio.js';
+import { MENU } from './ui/GameMenu.js';
 
 /**
  * The opening story in the real level (game/story/opening.js says when and what): Lompi and a few
@@ -48,7 +49,8 @@ export default class OpeningLayer {
             .setAlpha(0).setScrollFactor(0).setDepth(79).setBlendMode('ADD');
         this.murk = scene.add.rectangle(0, 0, W, H, 0x1a1414, 1).setAlpha(0).setOrigin(0).setScrollFactor(0).setDepth(78);
         scene.controller.ui.setVisible(false);      // the steering lesson waits for the end of the story
-        this.skip = scene.add.text(W - 32, H - 28, de ? 'Überspringen  ›' : 'Skip  ›', {
+        this.skip = scene.add.text(W - 32 - MENU.corner, H - 28 - MENU.corner, de ?      // in from the phone's rounded corner
+            'Überspringen  ›' : 'Skip  ›', {
             fontFamily: 'Arial', fontSize: '40px', fontStyle: 'bold', color: '#ffffff', backgroundColor: '#0a3f6ecc', padding: { x: 24, y: 12 }
         }).setOrigin(1, 1).setScrollFactor(0).setDepth(81).setInteractive({ useHandCursor: true });
         this.skip.on('pointerdown', (p, x, y, ev) => { ev?.stopPropagation(); this.finish(); });
