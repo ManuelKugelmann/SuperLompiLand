@@ -81,3 +81,14 @@ export function createClock({ bpm = CLOCK.bpm, beatsPerBar = CLOCK.beatsPerBar, 
 function clampBpm(bpm) {
     return Math.min(CLOCK.maxBpm, Math.max(CLOCK.minBpm, Number(bpm) || CLOCK.bpm));
 }
+
+/**
+ * A looping animation on the music's grid (spec 5.0z: vent bubbles leave on eighths): about `wantS` long,
+ * rounded to a whole number of grid steps (division = steps per beat, 2 = eighths), starting on the grid
+ * line `step` steps after the next one. Returns { delay, period } in seconds. The loop keeps the tempo it
+ * was made with; a tempo change only slowly drifts it off the grid, which nobody sees in a bubble.
+ */
+export function gridLoop(clock, time, wantS, step = 0, division = 2) {
+    const grid = 60 / clock.bpm / division;
+    return { delay: clock.untilGrid(time, division) + step * grid, period: Math.max(1, Math.round(wantS / grid)) * grid };
+}

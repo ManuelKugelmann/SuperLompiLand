@@ -10,12 +10,25 @@ export const TRAIL = {
 /** The chain behind the fish: chapter friends first (FriendSchool), then rescued animals (RescueLayer). */
 export const CHAIN = {
     start: 230,      // px back along the path where the first friend swims
-    gap: 170,        // px between two friends (about a body length: they never overlap)
+    gap: 170,        // px along the path between two friends ...
+    side: 110,       // px ... every other one this far to the side of the path: neighbours sit diagonally, about 280 px
+                     // apart, more than a body is wide (~250 px; techartist review: they overlapped), and the chain stays short
     sway: 22         // px they sway across the path, one wave per bar of the music (spec 5.0z)
 };
 
-/** Where friend number `slot` (0 = first) swims: the point that far back along the trail. */
-export const chainAt = (trail, slot, out, cfg = CHAIN) => trail.at(cfg.start + cfg.gap * slot, out);
+const back = { x: 0, y: 0 };
+
+/** Where friend number `slot` (0 = first) swims: that far back along the trail, every other one off to alternate sides. */
+export function chainAt(trail, slot, out, cfg = CHAIN) {
+    const d = cfg.start + cfg.gap * slot;
+    trail.at(d, out);
+    trail.at(d + 40, back);
+    const dx = out.x - back.x, dy = out.y - back.y, len = Math.hypot(dx, dy);
+    if (len < 1e-6) return out;
+    const side = (slot % 2 ? 1 : -1) * cfg.side;
+    out.x += (-dy / len) * side; out.y += (dx / len) * side;
+    return out;
+}
 
 /** A trail of the head's path. push(x, y) every frame; at(d) = the point d px back along the path. */
 export function createTrail(cfg = TRAIL) {

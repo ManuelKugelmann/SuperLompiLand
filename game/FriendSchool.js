@@ -7,7 +7,7 @@ import { createRig } from './CardRig.js';
 import { ESCORT, schoolPlace, escortStep, belowHud } from './escort.js';
 import { GRAND_NEST, friendAt } from './level/grandNest.js';
 
-export const SCHOOL_LOOK = { depth: 4.6, clear: 40 };      // just behind the fish; clear = px each keeps from rock
+export const SCHOOL_LOOK = { depth: 4.6, clear: 40, underSurface: 60 };      // just behind the fish; clear = px each keeps from rock; underSurface = px a side place stays under the waves
 
 /**
  * The freed friends as a little school behind the fish (escort.js): each on its own rig, the
@@ -45,6 +45,9 @@ export default class FriendSchool {
             const to = this.nest ? friendAt(k, n, t, this.nest, fish, this.gathered, this.place)
                 : trail ? chainAt(trail, k, this.pt || (this.pt = { x: 0, y: 0 })) : schoolPlace(k, fish.x, fish.y, dir, t, this.place);
             const ox = f.x, oy = f.y;
+            // A place off to the side of the path stays under the waves while Lompi is under them (only his own leaps take friends out).
+            const sea = !this.nest && trail ? this.scene.surface?.heightAt?.(to.x, t) : undefined;
+            if (sea !== undefined && fish.y > sea && to.y < sea + SCHOOL_LOOK.underSurface) to.y = sea + SCHOOL_LOOK.underSurface;
             const ty = belowHud(to.y, this.scene.cameras.main.worldView.y);      // its place never over the HUD's band
             if (!this.nest && trail) {
                 // A flock along Lompi's path (user: "boid / flock of friends"): springy, apart from the others, his way.

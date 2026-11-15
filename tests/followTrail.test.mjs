@@ -28,3 +28,15 @@ test('standing still keeps the chain where it is, and the memory is bounded', ()
     for (let i = 0; i < 100; i++) tr.push(2000, 0);
     assert.ok(Math.abs(tr.at(200).x - 1800) < 41);
 });
+
+test('neighbours in the chain are further apart than a friend is wide', async () => {
+    const { createTrail, chainAt } = await import('../game/followTrail.js');
+    const t = createTrail();
+    for (let x = 0; x <= 4000; x += 10) t.push(x, 500);
+    const at = k => chainAt(t, k, { x: 0, y: 0 });
+    for (let k = 0; k < 5; k++) {
+        const a = at(k), b = at(k + 1), c = at(k + 2);
+        assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 250, `slots ${k},${k + 1}`);
+        assert.ok(Math.hypot(a.x - c.x, a.y - c.y) >= 250, `slots ${k},${k + 2}`);
+    }
+});

@@ -2,6 +2,8 @@ import { haveMangroveTrees } from './MangroveTreeLayer.js';
 import { installRopeBatching } from '../fx/ropeBatch.js';
 import { createPool, poolSize } from './workerPool.js';
 import { shareOf } from '../quality.js';
+import { musicClock, nowSeconds } from '../audio.js';
+import { gridLoop } from '../music/clock.js';
 import { rescueSpots } from '../rescues.js';
 import Phaser from 'phaser';
 import { makeCritter } from './critters.js';
@@ -1414,9 +1416,11 @@ export default class LevelGenerator {
             if (i >= shown) continue;
             const b = s.textures.exists('bubble') ? s.add.image(f.x, f.y, 'bubble') : s.add.circle(f.x, f.y, 16, 0xffffff, 0.4);
             b.setDisplaySize(size, size).setDepth(6).setAlpha(0.75);
+            // Each bubble leaves on an eighth note and loops a whole number of eighths (spec 5.0z): the column breathes with the music.
+            const loop = gridLoop(musicClock, nowSeconds(), height * slow / 1000, i);      // one eighth apart (was 330 ms)
             s.tweens.add({
-                targets: b, y: f.y - height, x: f.x + drift, alpha: 0, duration: height * slow,
-                delay: i * 330, repeat: -1, ease: 'Sine.easeIn'
+                targets: b, y: f.y - height, x: f.x + drift, alpha: 0, duration: loop.period * 1000,
+                delay: loop.delay * 1000, repeat: -1, ease: 'Sine.easeIn'
             });
             chunk.objects.push(b);
         }

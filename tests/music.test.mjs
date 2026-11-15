@@ -163,3 +163,12 @@ test('where two biomes blend, the pads cross from one key into the next: gains a
         }
     }
 });
+
+test('gridLoop: a loop starts on an eighth and lasts a whole number of eighths', async () => {
+    const { createClock, gridLoop } = await import('../game/music/clock.js');
+    const c = createClock({ bpm: 120 });      // an eighth = 0.25 s
+    const { delay, period } = gridLoop(c, 0.1, 3.1, 2);
+    assert.ok(Math.abs(delay - (0.15 + 0.5)) < 1e-9, `delay ${delay}`);
+    assert.ok(Math.abs(period - 3.0) < 1e-9, `period ${period}`);
+    assert.ok(gridLoop(c, 0, 0.01).period >= 0.25);
+});

@@ -5,13 +5,14 @@ import { heartRow, textStyle, softText, pillImage } from '../game/ui/kit.js';
 import { CONTROL_SCHEMES } from '../game/controls/index.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES } from '../game/level/biomes.js';
-import { soundMenuItem } from '../game/audio.js';
+import { soundMenuItem, musicClock, nowSeconds } from '../game/audio.js';
 import { keepInSafeArea, canFullscreen, isFullscreen, toggleFullscreen } from '../game/orientation.js';
 import { SCENE_KEYS } from './keys.js';
 
 export const HUD_KEY = `${SCENE_KEYS.MAIN}_Hud`;
 
 export const HUD = {
+    coinPop: 1.22,          // the coin count's pop when coins come in, on the next eighth note
     switcherFirstMs: 14000,   // the control-scheme row stays this long on the very first run
     switcherMenuMs: 12000,    // ... and this long when called from the menu
     depthHz: 4,               // how often the depth line may change per second
@@ -213,7 +214,16 @@ export default class HudScene extends Phaser.Scene {
         // A text that changes is painted and sent to the graphics card again: the coin count only when it
         // changes, the depth line at most HUD.depthHz times a second (it cost 17 ms in one jump on a slow phone).
         const coins = m.mp ? m.teamCoins() : m.coins, tick = performance.now();
-        if (coins !== this.shownCoins) { this.shownCoins = coins; this.coinText.setText(String(coins)); }
+        if (coins !== this.shownCoins) {
+            const more = coins > (this.shownCoins ?? coins);
+            this.shownCoins = coins; this.coinText.setText(String(coins));
+            // A gain pops the count on the next eighth note (spec 5.0z): the number lands with the music.
+            if (more && !this.popping) {
+                this.popping = this.time.delayedCall(musicClock.untilGrid(nowSeconds(), 2) * 1000, () => {
+                    this.tweens.add({ targets: this.coinText, scale: HUD.coinPop, duration: 90, yoyo: true, ease: 'Quad.easeOut', onComplete: () => { this.popping = null; } });
+                });
+            }
+        }
         if (tick - (this.depthAt || 0) > 1000 / HUD.depthHz) {
             this.depthAt = tick;
             // Where am I (tester: 'it used to say where I am'): the place stays next to the depth.
