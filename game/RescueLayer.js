@@ -50,7 +50,8 @@ export const RESCUE_LOOK = {
     alongOff: [-150, -110],   // ... the first at this place beside the fish (px behind, px above) ...
     alongStep: [-78, 46],     // ... each further one this much further behind, in turn above and below the line ...
     alongEase: 0.09,     // ... easing there by this share per step (keeps up with a sprinting fish)
-    leaveMs: 1800        // and fades as it swims off
+    leaveMs: 1800,       // and fades as it swims off
+    big: 1.9             // a big rescue (a turtle in a large ghost net, a landmark) is drawn this much larger
 };
 
 /**
@@ -72,15 +73,19 @@ export default class RescueLayer {
     build(spot) {
         const s = this.scene, L = RESCUE_LOOK, x = spot.x, ry = this.routeY(x), ground = spot.ground ? this.groundY(x, ry) : null;
         const y = ground === null ? ry : ground - L.size * (0.5 - L.sunk) * 0.6;
-        const glow = s.add.image(x, y, rescueHalo(s)).setDisplaySize(L.glow * 2, L.glow * 2).setTint(RESCUE_HALO.tint).setDepth(4.4);
+        const k = spot.big ? L.big : 1;
+        const glow = s.add.image(x, y, rescueHalo(s)).setDisplaySize(L.glow * 2 * k, L.glow * 2 * k).setTint(RESCUE_HALO.tint).setDepth(4.4);
         const key = `rescue_${spot.trap}`, painted = s.textures.exists(key);
         const img = painted ? s.add.image(x, y, key) : s.add.circle(x, y, 40, 0xffb36b);
-        img.setDepth(4.5).setScale(L.size / Math.max(img.width, img.height));
+        img.setDepth(4.5).setScale(L.size * k / Math.max(img.width, img.height));
+        // A big rescue hangs in a large ghost net, draped behind the animal.
+        const ghost = spot.big && s.textures.exists('hazard_net') ? s.add.image(x, y - L.size * 0.2, 'hazard_net').setDepth(4.45).setAlpha(0.9) : null;
+        ghost?.setScale(L.size * k * 1.7 / Math.max(ghost.width, ghost.height));
         const net = painted ? null : s.add.image(x, y, 'beat_net').setDepth(4.6).setDisplaySize(L.net, L.net);
         const shadow = net ? netShadow(s, net) : null;
         // A trap on the seabed lies below the view from the route: a trail of coins leads down to it.
         const n = L.trail, trail = ground === null ? null : new BonusCoins(s, Array.from({ length: n }, (_, i) => ({ x: x - 120 + 120 * i / (n - 1), y: ry + 130 + (y - 260 - ry) * i / (n - 1) })), 2, this.onCoin);
-        return { spot, x, y, px: x, py: y, img, glow, net, shadow, trail, state: 'caught', left: 0, seed: x * 0.013, lying: ground !== null, call: 0 };
+        return { spot, x, y, px: x, py: y, img, glow, net, ghost, shadow, trail, state: 'caught', left: 0, seed: x * 0.013, lying: ground !== null, call: 0 };
     }
 
     /** The nearest animal still in its trap within calling distance of the fish, or null (for the edge pointer). */
@@ -91,7 +96,7 @@ export default class RescueLayer {
     }
 
     remove(a) {
-        a.img.destroy(); a.glow.destroy(); a.net?.destroy(); a.shadow?.destroy(); a.trail?.destroy();
+        a.img.destroy(); a.glow.destroy(); a.net?.destroy(); a.ghost?.destroy(); a.shadow?.destroy(); a.trail?.destroy();
         this.actors.delete(a.spot.id);
     }
 
@@ -100,7 +105,10 @@ export default class RescueLayer {
         a.state = 'happy'; a.left = RESCUE_LOOK.happyMs;
         this.done.add(a.spot.id);
         const free = `rescue_${a.spot.trap}_free`;
-        if (this.scene.textures.exists(free) && a.img.setTexture) a.img.setTexture(free).setScale(RESCUE_LOOK.size / Math.max(a.img.width, a.img.height));
+        if (this.scene.textures.exists(free) && a.img.setTexture) a.img.setTexture(free).setScale(RESCUE_LOOK.size * (a.spot.big ? RESCUE_LOOK.big : 1) / Math.max(a.img.width, a.img.height));
+        // The ghost net sinks away slowly: the place is clean again.
+        const ghost = a.ghost; a.ghost = null;
+        if (ghost) this.scene.tweens.add({ targets: ghost, y: ghost.y + 420, alpha: 0, angle: -25, duration: 2600, ease: 'Sine.easeIn', onComplete: () => ghost.destroy() });
         const net = a.net; a.net = null; a.shadow?.destroy(); a.shadow = null;
         if (net) this.scene.tweens.add({ targets: net, y: net.y + 200, angle: 70, alpha: 0, scale: net.scale * 0.6, duration: 800, ease: 'Sine.easeIn', onComplete: () => net.destroy() });
         this.onFree(a.spot, a.x, a.y);

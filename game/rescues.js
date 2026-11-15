@@ -20,7 +20,11 @@ export const RESCUES = {
     // What it is caught in and who that is (the reef-book entry it stamps), taken in turn along the way.
     // `ground`: it lies on the seabed under the route (only along the islands: out at sea the bottom is far too deep).
     traps: [{ trap: 'ring', kind: 'friend_parrotfish' }, { trap: 'bottle', kind: 'hermit_crab', ground: true }, { trap: 'bag', kind: 'friend_turtle' }],
-    groundReach: 1300    // px below the route within which a ground trap finds its seabed (else it hangs on the route)
+    groundReach: 1300,   // px below the route within which a ground trap finds its seabed (else it hangs on the route)
+    // Big rescues (spec 5.0t, landmark gaps): where the way between two landmarks is longest, the nearest small rescue
+    // moves to the middle and becomes a big one: the same animal, caught in a large ghost net, a landmark of its own.
+    big: [160700, 196200, 439200, 465800, 613000],
+    bigReach: 13000      // px a small rescue may move to become a big one
 };
 
 /** Stretches of the world [x0, x1] where no small rescue stands. */
@@ -49,6 +53,16 @@ export function rescueSpots(cfg = RESCUES) {
         if (b.zone === 'sea' && cfg.traps[turn % cfg.traps.length].ground) turn++;      // nothing lies on the bottom of the open sea
         out.push({ id: `r${i}`, x, ...cfg.traps[turn++ % cfg.traps.length], biome: b.id });
     }
+    for (const bx of cfg.big || []) {
+        let best = null;
+        for (const r of out) if (!r.big && Math.abs(r.x - bx) < cfg.bigReach && (!best || Math.abs(r.x - bx) < Math.abs(best.x - bx))) best = r;
+        // The middle of the gap, or the nearest free place within 6 000 px of it (never by a nest, chapter or set piece).
+        const free = x => !keep.some(([x0, x1]) => x > x0 && x < x1);
+        let x = null;
+        for (let d = 0; d <= 6000 && x === null; d += 500) x = free(bx + d) ? bx + d : free(bx - d) ? bx - d : null;
+        if (best && x !== null) Object.assign(best, { x, big: true, biome: BIOMES[biomeIndexAt(x)].id });
+    }
+    out.sort((a, b) => a.x - b.x);
     if (cfg === RESCUES) SPOTS = out;
     return out;
 }

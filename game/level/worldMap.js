@@ -65,7 +65,7 @@ export const SCENERY_KINDS = ['colony', 'arch'];
  * Kinds that are a landmark (spec 5.0n): what moves or answers the child (animals that act, toys,
  * rides, rescues, weather). Still scenery, however big, is not.
  */
-export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion', 'otter', 'ferry', 'seal', 'gannets', 'surge', 'garden_eels', 'stingray', 'nudibranchs'].filter(k => !SCENERY_KINDS.includes(k));
+export const LANDMARK_KINDS = [...SET_PIECE_KINDS, 'bigrescue', 'dolphins', 'octopus', 'sandbar', 'meadow', 'containers', 'vents', 'storm', 'current', 'bloom', 'manta', 'bigshark', 'nursery', 'jelly_garden', 'archerfish', 'siphonophore', 'sealion', 'otter', 'ferry', 'seal', 'gannets', 'surge', 'garden_eels', 'stingray', 'nudibranchs'].filter(k => !SCENERY_KINDS.includes(k));
 
 
 /** Landmarks merged into moments (those closer than `merge` play as one): [{ x0, x1, kinds }], west to east. */
@@ -120,7 +120,7 @@ export function worldMap() {
         }
     }
     for (const x of nestSpots()) spot('nest', x);
-    for (const r of rescueSpots()) spot('rescue', r.x);
+    for (const r of rescueSpots()) spot(r.big ? 'bigrescue' : 'rescue', r.x);
     for (const c of chapters()) {
         if (c.friend) spot('friend', c.x);
         if (c.event) span(c.event.id, c.event.x, c.event.endX);

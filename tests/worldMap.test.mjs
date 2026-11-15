@@ -46,7 +46,7 @@ test('still scenery is a small beat, not a landmark (spec 5.0n)', () => {
 
 // Expected to fail until the last long stretches have a sight that acts (spec 5.0o): five ways
 // between landmarks are still over 25 000 px (the longest, 31 400 px, is the mangrove's end).
-test('landmarks (spec 5.0o): no way between two of them is longer than 25 000 px', { todo: 'five stretches are still 25 200-31 400 px' }, () => {
+test('landmarks (spec 5.0o): no way between two of them is longer than 25 000 px', () => {
     const r = rhythm(map);
     assert.ok(r.landmark.max <= RHYTHM.gap, `longest way between two landmarks: ${Math.round(r.landmark.max)} px (${Math.round(r.seconds(r.landmark.max))} s)`);
 });
@@ -63,6 +63,7 @@ test('the fillers stand where they belong: coral colonies along the islands, adu
     for (const s of spotsOf('bigshark', map)) assert.ok(isSea(s.x0), `shark at ${Math.round(s.x0)}`);
     const blue = map.zones.find(z => z.biome === 'blue');
     assert.ok(spotsOf('bigshark', map).filter(s => s.x0 > blue.x0 && s.x0 < blue.x1).length >= Math.floor((blue.x1 - blue.x0) / RHYTHM.sharks));
-    assert.ok(spotsOf('colony', map).length >= 10 && spotsOf('treat', map).length >= 100);
+    // Fewer colonies since the big rescues fill the longest gaps with real landmarks (2026-11-15): the floor only checks fillers exist.
+    assert.ok(spotsOf('colony', map).length >= 5 && spotsOf('treat', map).length >= 100);
     assert.ok(moments(map.features, RHYTHM, [...LANDMARK_KINDS, ...SCENERY_KINDS]).length >= 45, 'sights of any kind');
 });
