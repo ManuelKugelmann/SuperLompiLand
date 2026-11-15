@@ -1,6 +1,9 @@
 import { splashShape, dropVelocity } from './splash.js';
 import { ensureFoam, SURF_ART } from './SurfLayer.js';
 
+/** The painted foam patch (loaded by the title screen): wide and flat, made to lie on the wave line. Missing: the surf's foam puffs. */
+export const SPLASH_ART = { key: 'splash_foam', file: 'img/fx/splash_foam.webp' };
+
 /** Foam patches left on the water by splashes: how many at once, where they sit, how opaque. */
 export const SPLASH_LOOK = { patches: 4, depth: 6.07, alpha: 0.85, height: 0.22 };
 
@@ -13,10 +16,11 @@ export default class SplashLayer {
     constructor(scene, surface) {
         this.scene = scene; this.surface = surface;
         ensureFoam(scene);
-        const frames = scene.textures.get(SURF_ART.puffs.key).frameTotal - 1;
+        const painted = scene.textures.exists(SPLASH_ART.key), key = painted ? SPLASH_ART.key : SURF_ART.puffs.key;
+        const frames = painted ? 1 : scene.textures.get(key).frameTotal - 1;
         // Each patch: its picture and its own state (kept apart: a game object has fields of its own, `w` among them).
         this.patches = Array.from({ length: SPLASH_LOOK.patches }, (_, i) =>
-            ({ img: scene.add.image(0, 0, SURF_ART.puffs.key, frames > 1 ? i % frames : undefined).setDepth(SPLASH_LOOK.depth).setVisible(false), age: 0, life: 0, width: 0, grow: 1, x: 0 }));
+            ({ img: scene.add.image(0, 0, key, frames > 1 ? i % frames : undefined).setDepth(SPLASH_LOOK.depth).setVisible(false), age: 0, life: 0, width: 0, grow: 1, x: 0 }));
         this.next = 0;
         this.v = {};
     }
