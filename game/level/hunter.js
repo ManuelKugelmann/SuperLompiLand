@@ -12,7 +12,7 @@ export const HUNTER = {
     window: 4000,        // ... until this far past it: it starts only where cover is near (see findCover), else not at all
     cover: [200, 1100],  // px ahead of Lompi in which a hiding place behind rock is looked for ...
     coverDepth: [-500, 900],   // ... from this far above to this far below him
-    coverStep: 60,       // px between the places tried
+    coverStep: 120,      // px between the places tried (coarse: the search runs on slow phones too)
     room: 70,            // px of open water a hiding place needs around it
     warnS: 2,            // s between the warning and the hunter setting off
     chaseS: 7,           // s it chases at most

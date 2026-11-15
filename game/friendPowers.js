@@ -38,11 +38,12 @@ export function powersOf(ids, cfg = FRIEND_POWERS) {
  * One step of a coin pulled by the magnet: the coin at (cx, cy), Lompi at (fx, fy), `age` = steps
  * it has been flying already (0 = not caught yet). Returns the new { x, y }, or null when a coin
  * not yet caught is out of reach. Once caught it keeps coming, faster every step, never past him:
- * no coin hovers at the edge of the reach or falls behind a fast swimmer.
+ * no coin hovers at the edge of the reach or falls behind a fast swimmer. `steps` = 60ths of a second
+ * since the last call (age then grows by the same), so a slow phone pulls coins in as fast.
  */
-export function magnetStep(cx, cy, fx, fy, magnet, age = 0) {
+export function magnetStep(cx, cy, fx, fy, magnet, age = 0, steps = 1) {
     const dx = fx - cx, dy = fy - cy, d = Math.hypot(dx, dy);
     if (!magnet || d < 1e-6 || (age === 0 && d > magnet.reach)) return null;
-    const speed = magnet.pull + age * magnet.gain, k = Math.min(1, speed / d);
+    const speed = (magnet.pull + age * magnet.gain) * steps, k = Math.min(1, speed / d);      // steps: 60ths of a second since the last call
     return { x: cx + dx * k, y: cy + dy * k };
 }

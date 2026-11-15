@@ -82,7 +82,7 @@ export default class OpeningLayer {
         this.t += dt;
         for (const f of this.friends) {
             const ox = f.x, oy = f.y;
-            if (this.fleeing) { f.x += L.scatterSpeed * dt; f.y += Math.sin(this.t * 3 + f.phase) * 2; }
+            if (this.fleeing) { f.x += L.scatterSpeed * dt; f.y += Math.sin(this.t * 3 + f.phase) * 120 * dt; }
             else {
                 const tx = fish.x + Math.cos(this.t * 0.7 + f.phase) * L.ring[0], ty = fish.y + Math.sin(this.t * 0.9 + f.phase) * L.ring[1];
                 f.x += (tx - f.x) * Math.min(1, dt * 1.5); f.y += (ty - f.y) * Math.min(1, dt * 1.5);

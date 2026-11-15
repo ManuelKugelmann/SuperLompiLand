@@ -139,10 +139,11 @@ export default class WaterLight {
         if (this.grade || this.gradeQuad?.visible) {
             // Ease the light so camera bobbing never pumps the colours, and update in tiny
             // steps (no visible jumps between quantised levels).
-            this.smooth = this.smooth === undefined ? light : this.smooth + (light - this.smooth) * 0.03;
+            const ease = 1 - Math.pow(0.97, Math.min(10, scene.game.loop.delta / (1000 / 60)));      // 3 % per 60th of a second, at any frame rate
+            this.smooth = this.smooth === undefined ? light : this.smooth + (light - this.smooth) * ease;
             // Darker the deeper the middle of the view is (spec 5.0w), eased the same way.
             const b = depthLight(depthMeters(Math.max(0, cam.scrollY + H / 2)));
-            this.bright = this.bright === undefined ? b : this.bright + (b - this.bright) * 0.03;
+            this.bright = this.bright === undefined ? b : this.bright + (b - this.bright) * ease;
             const q = this.smooth;
             if (Math.abs(q - this.lastLight) > 0.002 || Math.abs(this.bright - this.lastBright) > 0.002) {
                 this.lastLight = q; this.lastBright = this.bright;

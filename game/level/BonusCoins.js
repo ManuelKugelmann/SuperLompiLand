@@ -36,10 +36,11 @@ export default class BonusCoins {
     /** Per frame. `fish` = { x, y }, `radius` its radius, `t` s. */
     update(fish, radius, t) {
         let left = 0;
+        const steps = Math.min(4, this.blitter.scene.game.loop.delta / (1000 / 60));      // coins fly by time, not by frame
         for (const c of this.coins) {
             if (!c.visible) continue;
-            const m = BonusCoins.magnet && magnetStep(c.cx, c.cy, fish.x, fish.y, BonusCoins.magnet, c.age || 0);      // a friend's power (spec 5.0r)
-            if (m) { c.age = (c.age || 0) + 1; c.cx = m.x; c.cy = m.y; c.x = m.x - BONUS_COIN.size / 2; c.y = m.y - BONUS_COIN.size / 2; }
+            const m = BonusCoins.magnet && magnetStep(c.cx, c.cy, fish.x, fish.y, BonusCoins.magnet, c.age || 0, steps);      // a friend's power (spec 5.0r)
+            if (m) { c.age = (c.age || 0) + steps; c.cx = m.x; c.cy = m.y; c.x = m.x - BONUS_COIN.size / 2; c.y = m.y - BONUS_COIN.size / 2; }
             if (Math.hypot(c.cx - fish.x, c.cy - fish.y) < radius + BONUS_COIN.reach) { c.visible = false; this.onCoin(c.cx, c.cy); } else left++;
         }
         if (this.backAfter === null) return;

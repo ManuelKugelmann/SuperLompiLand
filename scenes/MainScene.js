@@ -1496,13 +1496,13 @@ export default class MainScene extends Phaser.Scene {
     }
 
     collect() {
-        const p = this.fish.pos, fr = this.fish.radius, mag = this.powers().magnet;
+        const p = this.fish.pos, fr = this.fish.radius, mag = this.powers().magnet, steps = Math.min(4, this.game.loop.delta / (1000 / 60));      // by time, not by frame
         BonusCoins.magnet = mag;      // the set pieces' and the route's coins feel it too
         for (const c of this.level.coins) {
             if (mag && c.img.active) {      // coins in reach fly to Lompi (everyone's pull, Hüpfi's from further away)
-                const s = magnetStep(c.img.x, c.img.y, p.x, p.y, mag, c.pullAge || 0);
+                const s = magnetStep(c.img.x, c.img.y, p.x, p.y, mag, c.pullAge || 0, steps);
                 // The coin's stored place moves too: the bob sets img.y from c.y every frame.
-                if (s) { if (!c.pullAge) this.tweens.killTweensOf(c.img); c.pullAge = (c.pullAge || 0) + 1; const lift = c.y - c.img.y; c.img.setPosition(s.x, s.y); c.x = s.x; c.y = s.y + lift; }
+                if (s) { if (!c.pullAge) this.tweens.killTweensOf(c.img); c.pullAge = (c.pullAge || 0) + steps; const lift = c.y - c.img.y; c.img.setPosition(s.x, s.y); c.x = s.x; c.y = s.y + lift; }
             }
             if (!c.img.active || p.distance(c.img) > fr + c.r) continue;
             const { x, y } = c.img;

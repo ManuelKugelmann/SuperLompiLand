@@ -152,7 +152,7 @@ export default class RescueLayer {
                 const heard = Math.abs(a.x - fish.x) < L.callNear;
                 // Heard for the first time on this approach: a soft "here!" (spec 5.0t 4, rescue calls).
                 if (heard && !a.heard) play('call');
-                a.heard = heard;
+                if (heard) a.heard = true; else if (Math.abs(a.x - fish.x) > L.callNear * 1.25) a.heard = false;      // calls again only after the fish was well away
                 if ((heard || a.lying) && (a.call -= delta / 1000) <= 0) {
                     a.call = L.callEvery; a.wave = heard ? 1 : 0;
                     s.particles?.mark('bubble', a.x, a.y - L.size * 0.3, heard ? 4 : 2, { radius: 10, spread: 30, vy: -260 });

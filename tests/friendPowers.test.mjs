@@ -35,3 +35,11 @@ test('a caught coin always arrives, also behind a fast swimmer, and never hovers
     }
     assert.ok(steps < 120, `took ${steps} steps`);
 });
+
+test('the pull is by time: one call of four 60ths of a second moves as far as four calls of one', () => {
+    const m = COIN_PULL;
+    let x = -100, age = 1;
+    for (let i = 0; i < 4; i++) { x = magnetStep(x, 0, 0, 0, m, age, 1).x; age += 1; }
+    const once = magnetStep(-100, 0, 0, 0, m, 1, 4).x;
+    assert.ok(Math.abs(once - x) < 12, `slow phone ${once.toFixed(1)} vs fast ${x.toFixed(1)}`);
+});
