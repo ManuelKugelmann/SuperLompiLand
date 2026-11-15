@@ -2,6 +2,12 @@
 
 Screenshots from development, newest first. Each entry links to the commit it was taken from.
 
+## New neighbours: angelfish in pairs, a grumpy rockfish, a flying squid near the light, a nautilus in the deep
+
+[`f08920f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/f08920f) · 2026-11-15 10:00
+
+![New neighbours: angelfish in pairs, a grumpy rockfish, a flying squid near the light, a nautilus in the deep](32-new-neighbours-angelfish-in-pairs-a-grumpy-rockf.jpg)
+
 ## World events: a longline to thread, a trawl net to rise over, splashes by speed, islands on rock
 
 [`fec55ef`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/fec55ef) · 2026-11-15 07:25

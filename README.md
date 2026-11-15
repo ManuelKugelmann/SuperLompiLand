@@ -5,6 +5,10 @@
 <!-- devlog:start -->
 ## Dev log
 
+**New neighbours: angelfish in pairs, a grumpy rockfish, a flying squid near the light, a nautilus in the deep** — [`f08920f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/f08920f) · 2026-11-15 10:00
+
+![New neighbours: angelfish in pairs, a grumpy rockfish, a flying squid near the light, a nautilus in the deep](docs/devlog/32-new-neighbours-angelfish-in-pairs-a-grumpy-rockf.jpg)
+
 **World events: a longline to thread, a trawl net to rise over, splashes by speed, islands on rock** — [`fec55ef`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/fec55ef) · 2026-11-15 07:25
 
 ![World events: a longline to thread, a trawl net to rise over, splashes by speed, islands on rock](docs/devlog/31-world-events-a-longline-to-thread-a-trawl-net-to.jpg)
@@ -12,10 +16,6 @@
 **The story plays in the real lagoon, depth you can see, a barracuda to hide from** — [`d24d39f`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/d24d39f) · 2026-11-15 01:30
 
 ![The story plays in the real lagoon, depth you can see, a barracuda to hide from](docs/devlog/30-the-story-plays-in-the-real-lagoon.jpg)
-
-**Smooth shoals, quality that follows the phone** — [`8c36b7a`](https://github.com/ManuelKugelmann/SuperLompiLand/commit/8c36b7a) · 2026-11-14 22:34
-
-![Smooth shoals, quality that follows the phone](docs/devlog/29-smooth-shoals-quality-that-follows-the-phone.png)
 
 [All dev log entries →](docs/devlog/README.md)
 <!-- devlog:end -->
