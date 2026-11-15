@@ -516,7 +516,13 @@ export default class LevelGenerator {
         // Only what can be on screen is bent and drawn: chunks are loaded well beyond the view.
         const vw = this.scene.scale.width * LEVEL.liveView, vh = this.scene.scale.height * LEVEL.liveView;
         const inView = o => !fish || (Math.abs(o.x - fish.x) < vw && Math.abs(o.y - fish.y) < vh);
+        // On the slow tiers a plant is bent anew only every few frames, the plants taking turns (animEvery; QUALITY): it sways
+        // by the clock, so it is where it should be whenever it is drawn anew. Those behind the play plane half as often.
+        const every = this.animEvery || 1, frame = this.scene.game.loop.frame;
+        let k = 0;
         for (const o of this.animated) {
+            k++;
+            if (every > 1 && (k + frame) % (o.isPlant ? every : every * 2) !== 0) continue;
             if (!o.active || !inView(o)) continue;
             if (o.isPlant && fish) {
                 // In the surf zone the plants lean with every push of the surge and swing back with the backwash.

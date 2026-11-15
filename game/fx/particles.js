@@ -6,7 +6,8 @@
 
 export const PARTICLES = {
     capacity: 900,     // simulated particles at most (one budget constant, spec 14)
-    maxDt: 0.05,       // larger frame gaps are split so nothing tunnels through rock
+    maxDt: 0.1,        // larger frame gaps are split so nothing tunnels through rock
+    flowEvery: 3,      // each particle asks the water how it moves every this many steps (it changes slowly; staggered: the particles take turns)
     agedDt: 0.1        // the step a set born in the past is brought up to now with (spawnAged): coarser, it is done in one frame
 };
 
@@ -63,8 +64,8 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
     const size0 = new Float32Array(capacity), heat = new Float32Array(capacity);
     const kind = new Uint8Array(capacity), alive = new Uint8Array(capacity);
     const presets = PRESET_IDS.map(id => PRESETS[id]);
-    const flow = { x: 0, y: 0 };
-    let next = 0, count = 0;
+    const flow = { x: 0, y: 0 }, flx = new Float32Array(capacity), fly = new Float32Array(capacity);
+    let next = 0, count = 0, tick = 0;
 
     /** Particle i, h seconds on: ages, drifts with the water, rises or sinks, rests against rock, spreads on the surface. */
     function advance(i, h, env) {
@@ -74,11 +75,10 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
         if (age[i] >= life[i]) { alive[i] = 0; count--; return; }
         if (p.cool > 0) heat[i] *= Math.exp(-p.cool * h);
         const rise = p.rise * lerp(p.coldRise, 1, heat[i]);
-        flow.x = 0; flow.y = 0;
-        if (flowAt) flowAt(x[i], y[i], flow);
+        if (flowAt && (i + tick) % PARTICLES.flowEvery === 0) { flow.x = 0; flow.y = 0; flowAt(x[i], y[i], flow); flx[i] = flow.x; fly[i] = flow.y; }
         const d = Math.min(1, p.drag * h);
-        vx[i] += (flow.x - vx[i]) * d;
-        vy[i] += (flow.y - rise - vy[i]) * d;
+        vx[i] += (flx[i] - vx[i]) * d;
+        vy[i] += (fly[i] - rise - vy[i]) * d;
         if (p.diffuse) {                        // eddies pull a plume apart, more the older it is
             const k = p.diffuse * (age[i] / life[i]) * Math.min(1, 3 * h);
             vx[i] += (random() * 2 - 1) * k;
@@ -137,6 +137,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
                 size0[i] = lerp(p.size[0], p.size[1], random());
                 heat[i] = h;
                 kind[i] = k;
+                flx[i] = 0; fly[i] = 0;
                 alive[i] = 1;
                 count++;
             }
@@ -153,6 +154,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
             for (let left = ageS; left > 1e-6;) {
                 const h = Math.min(left, PARTICLES.agedDt);
                 left -= h;
+                tick++;
                 for (const i of mine) if (alive[i]) advance(i, h, env);
             }
             return n;
@@ -164,6 +166,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
             while (left > 1e-6) {
                 const h = Math.min(left, PARTICLES.maxDt);
                 left -= h;
+                tick++;
                 for (let i = 0; i < capacity; i++) if (alive[i]) advance(i, h, env);
             }
         },
