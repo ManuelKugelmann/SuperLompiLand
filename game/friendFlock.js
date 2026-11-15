@@ -11,7 +11,10 @@ export const FLOCK = {
     align: 1.4,       // 1/s: how strongly it takes on its place's velocity
     maxSpeed: 1100,   // px/s: the fastest a friend swims (it can always catch a sprinting Lompi)
     maxDt: 0.05,      // s: a long frame is taken in steps of at most this
-    minGap: 150       // px: closer than this two friends are pushed apart at once (hard limit, e.g. in a sharp U-turn)
+    minGap: 150,      // px: closer than this two friends are eased apart (firm limit, e.g. in a sharp U-turn) ...
+    share: 0.4,       // ... this share of the overlap per step ...
+    floor: 0.8,       // ... and never closer than this x minGap
+    fixedGap: 170     // px friends keep from Lompi himself (they never cover him)
 };
 
 /**
@@ -41,17 +44,32 @@ export function flockStep(a, target, others, lead, dt, cfg = FLOCK) {
 }
 
 /**
- * The hard limit under the soft separation (techartist review: in a sharp U-turn friends on the same side
- * met head-on): every other friend closer than `minGap` to `a` and `a` itself each move half the overlap
- * apart. Moves them; returns `a`.
+ * The firm limit under the soft separation (techartist review: in a sharp U-turn friends on the same side
+ * met head-on). For every other friend closer than `minGap` to `a`: their approach along the line between
+ * them stops (an inelastic touch, so the spring cannot push them back in) and `share` of the overlap is
+ * taken out this step, but never closer than `floor` x minGap. Smooth: no one-frame pops. `fixed` ({ x, y })
+ * is Lompi: friends keep `fixedGap` from him, and he is never moved. Moves `a` (and the others); returns `a`.
  */
-export function keepApart(a, others, cfg = FLOCK) {
+export function keepApart(a, others, fixed = null, cfg = FLOCK) {
     for (const o of others) {
         if (o === a) continue;
         const dx = a.x - o.x, dy = a.y - o.y, d = Math.hypot(dx, dy);
         if (d >= cfg.minGap) continue;
-        const half = (cfg.minGap - d) / 2, nx = d > 1e-6 ? dx / d : 0, ny = d > 1e-6 ? dy / d : 1;
+        const nx = d > 1e-6 ? dx / d : 0, ny = d > 1e-6 ? dy / d : 1;
+        const closing = ((a.vx || 0) - (o.vx || 0)) * nx + ((a.vy || 0) - (o.vy || 0)) * ny;
+        if (closing < 0) { a.vx -= nx * closing / 2; a.vy -= ny * closing / 2; o.vx += nx * closing / 2; o.vy += ny * closing / 2; }
+        const half = Math.max((cfg.minGap - d) * cfg.share, cfg.minGap * cfg.floor - d, 0) / 2;
         a.x += nx * half; a.y += ny * half; o.x -= nx * half; o.y -= ny * half;
+    }
+    if (fixed) {
+        const dx = a.x - fixed.x, dy = a.y - fixed.y, d = Math.hypot(dx, dy);
+        if (d < cfg.fixedGap) {
+            const nx = d > 1e-6 ? dx / d : 0, ny = d > 1e-6 ? dy / d : 1;
+            const closing = (a.vx || 0) * nx + (a.vy || 0) * ny;
+            if (closing < 0) { a.vx -= nx * closing; a.vy -= ny * closing; }
+            const move = Math.max((cfg.fixedGap - d) * cfg.share, cfg.fixedGap * cfg.floor - d, 0);
+            a.x += nx * move; a.y += ny * move;
+        }
     }
     return a;
 }

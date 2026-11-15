@@ -54,13 +54,23 @@ test('when its place turns round, the friend turns once, not back and forth', ()
     assert.equal(flips, 1);
 });
 
-test('keepApart: two friends on one spot or close are set exactly minGap apart', () => {
-    const a = { x: 0, y: 0 }, b = { x: 30, y: 0 }, c = { x: 0, y: 0 }, d = { x: 0, y: 0 };
+test('keepApart: close friends ease apart without a pop, never past the floor, and stop closing in', () => {
+    const a = { x: 0, y: 0, vx: 300, vy: 0 }, b = { x: 140, y: 0, vx: -300, vy: 0 };
     keepApart(a, [a, b]);
-    assert.ok(Math.abs(Math.hypot(a.x - b.x, a.y - b.y) - FLOCK.minGap) < 1e-9);
-    keepApart(c, [d]);
-    assert.ok(Math.abs(Math.hypot(c.x - d.x, c.y - d.y) - FLOCK.minGap) < 1e-9);
-    const far = { x: 500, y: 0 }, e = { x: 0, y: 0 };
-    keepApart(e, [far]);
-    assert.equal(e.x, 0);
+    const d = b.x - a.x;
+    assert.ok(d > 140 && d < FLOCK.minGap, `eased to ${d.toFixed(1)}`);
+    assert.ok(b.vx - a.vx >= -1e-9, 'no longer closing');
+    const c = { x: 0, y: 0, vx: 0, vy: 0 }, e = { x: 10, y: 0, vx: 0, vy: 0 };
+    keepApart(c, [e]);
+    assert.ok(Math.hypot(c.x - e.x, c.y - e.y) >= FLOCK.minGap * FLOCK.floor - 1e-9, 'the floor holds');
+    const far = { x: 500, y: 0 }, f = { x: 0, y: 0, vx: 0, vy: 0 };
+    keepApart(f, [far]);
+    assert.equal(f.x, 0);
+});
+
+test('keepApart: friends move off Lompi, and he is never moved', () => {
+    const lompi = { x: 0, y: 0 }, a = { x: 20, y: 0, vx: -200, vy: 0 };
+    keepApart(a, [], lompi);
+    assert.equal(lompi.x, 0);
+    assert.ok(a.x >= FLOCK.fixedGap * FLOCK.floor - 1e-9 && a.vx >= 0);
 });

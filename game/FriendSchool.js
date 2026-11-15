@@ -60,7 +60,7 @@ export default class FriendSchool {
                 const pv = f.place && dt > 0 ? { vx: (to.x - f.place.x) / dt, vy: (ty + sway - f.place.y) / dt } : { vx: 0, vy: 0 };
                 f.place = { x: to.x, y: ty + sway };
                 flockStep(f, f.place, this.scene.flockMates || [], pv, dt);
-                keepApart(f, this.scene.flockMates || []);      // never through each other, even in a sharp U-turn
+                keepApart(f, this.scene.flockMates || [], fish);      // never through each other or over Lompi, even in a sharp U-turn
             } else escortStep(f, k, to.x, ty, fish.x, dir, dt);
             // Never in rock (it follows the fish's path, which may cut a corner): pushed out along the terrain's slope.
             if (this.scene.level?.rock) { const q = keepOut(f.x, f.y, SCHOOL_LOOK.clear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); f.x = q.x; f.y = q.y; }
