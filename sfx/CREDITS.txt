@@ -5,3 +5,15 @@ splash_a.mp3, splash_b.mp3  "Water splash and sand footsteps" by Peludo, https:/
 coin_glass.mp3              "Wine Glass Bottle Tap" by Foxfire-, https://freesound.org/s/844259/
 nest_chord.mp3              "Chime" (a glockenspiel chord) by schreibsel, https://freesound.org/s/539915/
 boom_thunder.mp3            "Thunder 12" by LukaCafuka, https://freesound.org/s/795412/
+
+Animal calls (trimmed, faded, filtered, levelled, mono, re-encoded):
+call_sea_lion.mp3  "Lobo Marino Grunendo - Growling Sea Lion" by Diim_1, https://freesound.org/s/849186/ (CC0)
+call_seal.mp3      "hungry Grey Seal-Pup" by schaarsen, https://freesound.org/s/662556/ (CC0)
+call_dolphin.mp3   "Atlantic Spotted Dolphins off the coast of La Gomera, Canary Islands" by geraldfiebig, https://freesound.org/s/385796/ (CC0)
+call_whale.mp3     humpback whale, iNaturalist observation 301130821, sound by stevestevens (steve b), https://www.inaturalist.org/observations/301130821 (CC0)
+
+Under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), edited as above:
+call_otter.mp3     "Otters Squeaking.wav" by Motion_S, https://freesound.org/people/Motion_S/sounds/221761/
+call_dugong.mp3    a manatee call from Galor A, Ramos EA, Faran M, Mishelashvili MM, Castelblanco-Martinez N, Tellez M, Brady B.,
+                   "Using neural networks to improve the detection of vocalizations of Greater Caribbean manatees across habitats",
+                   figshare dataset, https://doi.org/10.6084/m9.figshare.29856548 (file Acoustic_recordings/211127_0066.wav)
