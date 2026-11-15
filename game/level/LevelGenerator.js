@@ -831,7 +831,7 @@ export default class LevelGenerator {
             // A sub-zone can ask for more ground cover (open sand flats would be bare without it).
             const cover = biome.cover || 1, microCfg = cover === 1 ? MICRO : { ...MICRO, rate: Math.min(1, MICRO.rate * cover) };
             for (const f of floors) {
-                if (placed >= Math.round(MICRO.max * cover)) break;
+                if (placed >= Math.round(MICRO.max * cover * shareOf(s, 'micro'))) break;      // fewer on the slower tiers (quality.js)
                 if (f.prop || reefCrest(f.x) > 0 && f.y < 400) continue;      // not under a prop; the crest's top belongs to the corals
                 const m = microAt(biome.id, f.angle, next, microCfg);
                 if (!m || this.nests.some(n => Math.abs(n.x - f.x) < LEVEL.nestClear && Math.abs(n.y - f.y) < LEVEL.nestClear)) continue;
