@@ -97,3 +97,16 @@ export function createJourney(saved = [], list = chapters()) {
         toJSON: () => [...freed]
     };
 }
+
+/**
+ * Who the player may swap to (user 2026-11-15: "switch to rescued friend possible"): Lompi and every friend
+ * freed so far (`freed` = character ids, journey.friends()), in that order, the one played now left out.
+ * The next one after `current` comes first, so one button steps round them all.
+ */
+export function swapOrder(current, freed, home = JOURNEY.standIn) {
+    // In the cast's own order with the one played now in it, so stepping on always comes round to everyone.
+    const rank = id => CHARACTERS.findIndex(c => c.id === id);
+    const all = [...new Set([home, current, ...freed])].sort((a, b) => rank(a) - rank(b));
+    const i = all.indexOf(current);
+    return [...all.slice(i + 1), ...all.slice(0, i)];
+}

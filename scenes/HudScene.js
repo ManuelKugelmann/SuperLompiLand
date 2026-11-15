@@ -120,6 +120,7 @@ export default class HudScene extends Phaser.Scene {
         new GameMenu(this, this.scale.height * MENU.button * 0.6 + MENU.corner, this.scale.height * MENU.button * 0.6 + MENU.corner, [
             { label: de ? 'ENDE' : 'END', color: 0x2e7d32, callback: () => main.finish() },
             { label: de ? 'RIFFBUCH' : 'REEF BOOK', color: 0x1d6f9a, callback: () => main.openBook() },
+            ...(main.mp ? [] : [{ label: de ? 'FREUND TAUSCHEN' : 'SWAP FRIEND', color: 0x8e24aa, callback: () => main.swapCharacter() }]),      // play as a rescued friend
             { label: de ? 'STEUERUNG' : 'CONTROLS', color: 0x1d6f9a, callback: () => showSwitcher(HUD.switcherMenuMs) },
             { label: de ? 'NEU ANFANGEN' : 'START OVER', color: 0x6d4c41, callback: () => main.startOver() },
             main.relaxed

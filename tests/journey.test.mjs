@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { JOURNEY, chapters, createJourney } from '../game/journey.js';
+import { JOURNEY, chapters, createJourney, swapOrder } from '../game/journey.js';
 import { BIOMES, WORLD_WEST, WORLD_END } from '../game/level/biomes.js';
 import { CHARACTERS } from '../game/characters.js';
 
@@ -107,4 +107,14 @@ test('a rescue belongs to its chapter: a net that was emptied stays empty whoeve
     const again = createJourney([kelp.friend.id], chapters(undefined, undefined, kelp.friend.id));
     assert.ok(again.has(JOURNEY.standIn));
     assert.equal(again.count, 1);
+});
+
+test('swap: Lompi and the freed friends, the next one first, never the one played now', () => {
+    assert.deepEqual(swapOrder('lompi', []), []);
+    // Stepping on from Lompi with two friends freed comes round to each and back to Lompi.
+    const seen = [];
+    let now = 'lompi';
+    for (let i = 0; i < 3; i++) { now = swapOrder(now, ['seahorse', 'turtle'].filter(id => id !== now).concat(now === 'lompi' ? [] : ['lompi']))[0]; seen.push(now); }
+    assert.deepEqual([...seen].sort(), ['lompi', 'seahorse', 'turtle']);
+    assert.ok(!swapOrder('turtle', ['seahorse', 'turtle']).includes('turtle'));
 });

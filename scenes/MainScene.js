@@ -20,7 +20,7 @@ import { glowShare } from '../game/level/deepGlow.js';
 import FarLayers from '../game/level/FarLayers.js';
 import RockLayers from '../game/level/RockLayers.js';
 import { makeController, CONTROL_SCHEMES, BOT_SCHEME } from '../game/controls/index.js';
-import { getCharacter, loadSelectedId } from '../game/characters.js';
+import { getCharacter, loadSelectedId, saveSelectedId } from '../game/characters.js';
 import { WaterSurface } from '../game/level/surface.js';
 import { FLOW, createFlow, streamY, carry } from '../game/level/flow.js';
 import { play, nowSeconds, musicClock, updateMusic, updateWeatherSound } from '../game/audio.js';
@@ -31,7 +31,7 @@ import SpeedLines from '../game/fx/SpeedLines.js';
 import { createAutopilot } from '../game/ambient/autopilot.js';
 import { createGuide } from '../game/guide.js';
 import { createBook } from '../game/reefbook.js';
-import { JOURNEY, chapters, createJourney } from '../game/journey.js';
+import { JOURNEY, chapters, createJourney, swapOrder } from '../game/journey.js';
 import StoryBeats from '../game/StoryBeats.js';
 import SetPieceLayer from '../game/level/SetPieceLayer.js';
 import BranchLayer from '../game/level/BranchLayer.js';
@@ -965,7 +965,8 @@ export default class MainScene extends Phaser.Scene {
     }
 
     /** The powers of the friends in the school (spec 5.0r). */
-    powers() { return powersOf(this.school ? this.school.friends.map(f => f.character.id) : []); }
+    /** The school's powers; playing together the other players are friends too (user: "multiplayer = friend, too"). */
+    powers() { return powersOf([...(this.school ? this.school.friends.map(f => f.character.id) : []), ...(this.mp?.characters() || [])]); }
 
     /** A friend has joined: say once what it can do. */
     powerNews(id) {
@@ -1098,6 +1099,19 @@ export default class MainScene extends Phaser.Scene {
         if (this.relaxed) this.chainEnd(this.chain.end());
         if (this.scene.isActive(HUD_KEY)) this.scene.get(HUD_KEY).scene.restart({ main: this });
         this.scene.resume();
+    }
+
+    /**
+     * Menu: play as the next rescued friend (journey.swapOrder); the one played until now joins the school
+     * (the journey puts the stand-in where the new one waited). Carries on right here, like after a reshape.
+     */
+    swapCharacter() {
+        const de = this.lang === 'de', next = swapOrder(this.character.id, this.journey.friends())[0];
+        if (!next) { this.announce(de ? 'Rette erst einen Freund!' : 'Rescue a friend first!', de ? 'Dann kannst du mit ihm tauschen' : 'Then you can swap with them'); return; }
+        this.registry.set('character', next);
+        saveSelectedId(next);
+        const sp = this.fish.sprite;
+        this.scene.restart({ resume: { x: sp.x, y: sp.y, coins: this.coins, health: this.health } });
     }
 
     /** Menu: forget the saved nest and coins and begin at the home reef again. */

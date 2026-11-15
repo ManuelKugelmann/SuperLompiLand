@@ -139,6 +139,13 @@ export default class Multiplayer {
 
     get players() { return this.ghosts.size + 1; }
 
+    /** The characters the others play: playing together they count as friends, their powers too (user 2026-11-15). */
+    characters() {
+        const out = [];
+        for (const g of this.ghosts.values()) if (g.char && g.pos) out.push(g.char.id);
+        return out;
+    }
+
     /** How many friends are within `r` of (x, y) right now — for the school boost. */
     nearFriends(x, y, r) {
         let n = 0;
