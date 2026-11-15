@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gridStrip, makeCard, posedBuffers, poseBody, posePart, project, turnPose, heightAt } from '../game/rig/cards.js';
+import { CARDS, gridStrip, makeCard, posedBuffers, poseBody, posePart, project, turnPose, heightAt } from '../game/rig/cards.js';
 
 const SIZE = [200, 100];
 const flat = { cols: 4, rows: 2, data: new Array(8).fill(0.5) };
@@ -35,14 +35,18 @@ test('the bulge map is sampled smoothly', () => {
     assert.ok(heightAt(map, 0.5, 0.5) > 0.4 && heightAt(map, 0.5, 0.5) < 0.6);
 });
 
-test('a turn-around is continuous where the picture mirrors', () => {
+test('a turn-around stays within the viewing angles of the mesh and mirrors with the same width', () => {
     const card = makeCard({ rect: [0, 0, 200, 100], pivot: [100, 50], size: SIZE, height: flat, bulgePx: 30, cols: 4, rows: 2 });
     const posed = posedBuffers(card.n);
     poseBody(card, still, SIZE, posed);
+    let most = 0;
+    for (let t = 0; t <= 1; t += 0.01) most = Math.max(most, Math.abs(turnPose(t, 1).yaw));
+    assert.ok(most <= CARDS.turnMax + 1e-9 && most < Math.PI / 2 - 0.3, `never edge-on: ${most}`);
     const a = turnPose(0.4999, 1), b = turnPose(0.5001, 1);
     assert.equal(a.facing, 1); assert.equal(b.facing, -1);
-    const va = run(card, posed, { ...atRest, ...a }).verts, vb = run(card, posed, { ...atRest, ...b }).verts;
-    for (let k = 0; k < va.length; k++) assert.ok(Math.abs(va[k] - vb[k]) < 1.5, `vertex ${k}: ${va[k]} vs ${vb[k]}`);
+    const span = v => { let lo = Infinity, hi = -Infinity; for (let k = 0; k < v.length; k += 2) { lo = Math.min(lo, v[k]); hi = Math.max(hi, v[k]); } return hi - lo; };
+    const wa = span(run(card, posed, { ...atRest, ...a }).verts), wb = span(run(card, posed, { ...atRest, ...b }).verts);
+    assert.ok(Math.abs(wa - wb) < 2, `width at the mirror: ${wa} vs ${wb}`);
     assert.ok(Math.abs(turnPose(1, 1).yaw) < 1e-9);
 });
 

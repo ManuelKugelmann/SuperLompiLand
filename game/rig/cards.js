@@ -36,7 +36,10 @@ export const CARDS = {
     backside: 0.78,         // a fin seen from behind (through it) is a little darker
     twin: { shift: [-0.035, -0.05], dark: 0.66, z: -0.6 },   // far twin of a paired fin
     spreadRate: 0.12,       // share per 60 Hz step by which wings open or fold
-    turnMs: 300,            // a turn-around (nose swings toward the viewer, through edge-on)
+    turnMs: 300,            // a turn-around (nose swings toward the viewer, then over to the other side)
+    turnMax: 1.0,           // rad: the 2.5D mesh is seen only this far from the side view (user 2026-11-15: "2.5d mesh, 3d mesh for
+                            // limited viewing angles"): a turn swings the nose this far toward the viewer, the picture mirrors
+                            // there (both halves show the nose toward the viewer) and it swings back; never edge-on
     turnMin: [0.3, 0.12],   // in a turn the body keeps this share of its width (user: "when turning, creatures look too flat") until |cos yaw| is under the second number: only there, at the mirror, it thins out (a frame or two)
     sway: 0.012,            // idle yaw rocking (radians) ...
     swayMore: 0.03,         // ... plus this much at full effort
@@ -379,12 +382,12 @@ function smooth(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
 
 /**
  * Yaw (radians) and facing during a turn-around that started `t` (0..1) ago from `from`
- * facing: the nose swings toward the viewer to edge-on, the picture mirrors there, and it
- * swings on to rest on the other side, nose still leading toward the viewer. At the mirror
- * both halves agree (project() lets the depth's share of the width fade out near edge-on).
+ * facing: the nose swings toward the viewer up to CARDS.turnMax, the picture mirrors there
+ * (the 2.5D mesh only holds up for limited angles, so it is never seen edge-on), and it
+ * swings back to rest on the other side, nose still leading toward the viewer.
  */
-export function turnPose(t, from) {
+export function turnPose(t, from, max = CARDS.turnMax) {
     const e = t * t * (3 - 2 * t);
-    if (e < 0.5) return { yaw: -Math.PI / 2 * (e / 0.5), facing: from };
-    return { yaw: -Math.PI / 2 * (1 - (e - 0.5) / 0.5), facing: -from };
+    if (e < 0.5) return { yaw: -max * (e / 0.5), facing: from };
+    return { yaw: -max * (1 - (e - 0.5) / 0.5), facing: -from };
 }
