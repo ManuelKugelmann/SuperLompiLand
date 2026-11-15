@@ -42,6 +42,7 @@ function prey(p, b, env) {
 }
 
 function pickTarget(b, env) {
+    if (b.c.soarOnly) return null;      // a gull: it soars and never dives
     if (b.cooldown <= 0 && env.mayHunt !== false) {
         const players = env.players || (env.player ? [env.player] : []);
         let best = null, bd = Infinity;

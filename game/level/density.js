@@ -225,9 +225,11 @@ export function createField(seed, islands = 'own') {
         }
         // The reef crest: solid coral from just under the surface down, whatever the noise says.
         // Its upper face is lumpy, slopes away to both sides and has grooves: no flat top, no cut faces.
-        const crestTop = Math.abs(x - CREST_X) > CREST_REACH ? Infinity      // nowhere near it: nothing to work out
-            : reefCrestTop(x) + REEF_CREST.lump * (vnoise(x / 170, 3.7, seed + 21) * 2 - 1) + REEF_CREST.knobs * (vnoise(x / 55, 9.1, seed + 22) * 2 - 1);
-        const crest = crestTop < fy ? reefCrest(x) : 0;
+        // (Its faces wander with depth like the drop-off wall's: `bend`, so no side of it is one straight cut; its top keeps its outline.)
+        const xc = x + bend * smooth01((y - REEF_CREST.top - 200) / 500);
+        const crestTop = Math.abs(xc - CREST_X) > CREST_REACH ? Infinity      // nowhere near it: nothing to work out
+            : reefCrestTop(xc) + REEF_CREST.lump * (vnoise(xc / 170, 3.7, seed + 21) * 2 - 1) + REEF_CREST.knobs * (vnoise(xc / 55, 9.1, seed + 22) * 2 - 1);
+        const crest = crestTop < fy ? reefCrest(xc) : 0;
         if (crestTop < fy && y > crestTop) n += (FIELD.crestRock - n) * smooth01((y - crestTop) / 120);
         if (x < WORLD_WEST + 900) n += (WORLD_WEST + 900 - x) / 500;     // western shore
         if (x > WORLD_END + 900) n += (x - WORLD_END - 900) / 500;       // wall behind the grand nest

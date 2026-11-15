@@ -8,7 +8,10 @@ import { createSeabird, stepSeabird, shadowX } from './seabird.js';
 // patch just under the water surface that follows a hunting bird.
 
 export const SEABIRDS = {
-    perCoast: 2,         // birds per island coast
+    perCoast: 2,         // gannets per island coast (they hunt) ...
+    gulls: 2,            // ... and gulls (they only soar, higher and wider: variety in the sky; playtest "birds: variety")
+    gullW: 120,          // px wide a gull is drawn
+    gull: { height: 420, speed: 140, loop: 0.8, swoop: 110, soarOnly: true },
     coastCooldownS: 6,   // s between dives at the player per coast (birds take turns)
     near: 2600,          // px: birds of a coast exist while the camera is this close to it
     depth: 3.55,         // draw depth (with the swarms)
@@ -23,7 +26,7 @@ export const SEABIRDS = {
     bank: 0.35           // radians it tips into a climb or a sink
 };
 
-export const SEABIRD_ART = ['gannet_glide', 'gannet_flap', 'gannet_dive', 'gannet_float'];
+export const SEABIRD_ART = ['gannet_glide', 'gannet_flap', 'gannet_dive', 'gannet_float', 'gull_glide', 'gull_flap'];
 
 /** x of every island coast that faces open sea. */
 export function coasts(biomes = BIOMES) {
@@ -73,17 +76,22 @@ export default class SeabirdLayer {
 
     spawn(coast) {
         const s = this.scene;
-        coast.birds = Array.from({ length: SEABIRDS.perCoast }, (_, k) => {
+        const gulls = Array.from({ length: SEABIRDS.gulls }, (_, k) => {
+            const mind = createSeabird(coast.x + (k - 0.5) * 900, this.env.surfaceY, SEABIRDS.gull, coast.i * 5.3 + k * 2.7 + 11);
+            mind.homeX = coast.x;
+            return { mind, gull: true, size: 0.85 + 0.3 * ((k * 0.618 + coast.i * 0.37) % 1), sprite: s.add.image(mind.x, mind.y, art(s, 'gull_glide')).setDepth(SEABIRDS.depth), shadow: null };
+        });
+        coast.birds = gulls.concat(Array.from({ length: SEABIRDS.perCoast }, (_, k) => {
             const mind = createSeabird(coast.x + (k - 0.5) * 500, this.env.surfaceY, {}, coast.i * 3.7 + k * 1.9);
             mind.homeX = coast.x;
             const size = SEABIRDS.sizes[0] + (SEABIRDS.sizes[1] - SEABIRDS.sizes[0]) * ((Math.sin(mind.seed * 12.9898) * 43758.5453 % 1 + 1) % 1);
             return { mind, size, sprite: s.add.image(mind.x, mind.y, art(s, 'gannet_glide')).setDepth(SEABIRDS.depth),
                 shadow: s.add.image(mind.x, 0, SHADOW).setDepth(SEABIRDS.depth - 0.01).setAlpha(0) };
-        });
+        }));
     }
 
     drop(coast) {
-        for (const b of coast.birds) { b.sprite.destroy(); b.shadow.destroy(); }
+        for (const b of coast.birds) { b.sprite.destroy(); b.shadow?.destroy(); }
         coast.birds = null;
     }
 
@@ -109,6 +117,13 @@ export default class SeabirdLayer {
 
     draw(b, dt) {
         const m = b.mind, s = this.scene, sp = b.sprite, C = SEABIRDS;
+        if (b.gull) {
+            const flap = m.vy < -15 || Math.sin(m.timer * 0.8 + m.seed) > 0.4;
+            const key = art(s, flap && Math.sin((m.timer + m.seed) * 8) > 0 ? 'gull_flap' : 'gull_glide');
+            const tilt = Math.max(-C.bank, Math.min(C.bank, Math.atan2(m.vy, Math.abs(m.vx) + 1))) * (m.vx < 0 ? -1 : 1);
+            sp.setTexture(key).setRotation(tilt).setScale(C.gullW * b.size / sp.width).setFlipX(m.vx < 0).setPosition(m.x, m.y);
+            return;
+        }
         if (m.state === 'dive' || (m.state === 'rise' && m.vy > 0)) {
             const key = art(s, 'gannet_dive');
             sp.setTexture(key).setRotation(key === FALLBACK ? Math.atan2(m.vy, m.vx) : Math.atan2(m.vy, m.vx) - Math.PI / 2);
