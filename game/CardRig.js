@@ -62,7 +62,8 @@ export default class CardRig {
         this.pt = {};
         this.pointAt = (k, out) => {
             const P = this.pt, ox = k.dx * P.sx * P.flip * P.wide, oy = k.dy * P.sy;
-            out.x = P.x + P.verts[k.s * 2] + ox * P.cr - oy * P.sr; out.y = P.y + P.verts[k.s * 2 + 1] + ox * P.sr + oy * P.cr;
+            const v = k.e.rope.vertices;
+            out.x = P.x + v[k.s * 2] + ox * P.cr - oy * P.sr; out.y = P.y + v[k.s * 2 + 1] + ox * P.sr + oy * P.cr;
             out.sx = P.sx * P.wide; out.sy = P.sy;
         };
         this.placeEye = (a, out) => this.pointAt(this.pt.set.eyeAt[this.pt.set.eyes.spec.at.indexOf(a)], out);
@@ -101,9 +102,15 @@ export default class CardRig {
 
     buildSet(scene, st, x, y) {
         const R = partsFor(scene, st.key);
-        // A hero's eyes are cut out of its body card; the living eyeballs are drawn behind it (rig/eyeHoles.js).
-        const [fx, fy] = R.body.frame, [bx, by] = R.body.rect;
-        const texKey = holedTexture(scene, PARTS.texture(st.key), faceOf(st)?.eyes, (x, y) => [fx + x - bx, fy + y - by]), tex = scene.textures.get(texKey);
+        // A face point (eye, mouth) belongs to the frontmost card painted there: the body, or a front part
+        // over it (a turtle's eyes and mouth are on its head card). A hero's eyes are cut out of that card;
+        // the living eyeballs are drawn just behind it (rig/eyeHoles.js).
+        const inside = (r, a) => a.x >= r[0] && a.x < r[0] + r[2] && a.y >= r[1] && a.y < r[1] + r[3];
+        const holder = a => R.parts.reduce((h, p) => p.front && inside(p.rect, a) ? p : h, R.body);
+        const texKey = holedTexture(scene, PARTS.texture(st.key), faceOf(st)?.eyes, (x, y, a) => {
+            const h = holder(a);
+            return [h.frame[0] + x - h.rect[0], h.frame[1] + y - h.rect[1]];
+        }), tex = scene.textures.get(texKey);
         const [W, H] = R.size, bulgePx = CARDS.bulge * W;
         const frame = (name, f) => tex.has(name) ? tex.get(name) : tex.add(name, 0, f[0], f[1], f[2], f[3]);
         const entries = [];
@@ -118,13 +125,13 @@ export default class CardRig {
         };
         const [bc, br] = CARDS.bodyGrid;
         add(makeCard({ rect: R.body.rect, pivot: [W / 2, H / 2], size: R.size, height: R.height, bulgePx, cols: bc, rows: br }),
-            frame('body', R.body.frame), { body: true, order: 0 });
+            frame('body', R.body.frame), { body: true, src: R.body, order: 0 });
         R.parts.forEach((p, i) => {
             const [, , w, h] = p.rect, [a, b] = CARDS.partGrid, long = w >= h;
             const card = makeCard({ rect: p.rect, pivot: p.pivot, size: R.size, cols: long ? a : b, rows: long ? b : a });
             const part = { role: p.role, axis: hingeAxis(p), amp: p.amp ?? 1, phase: p.phase ?? 0, z: (p.z ?? 0) * bulgePx };
             const fr = frame(p.name || `p${i}`, p.frame);
-            add(card, fr, { part, name: p.name, parent: p.parent, order: p.front ? 1 + i * 0.01 : -1 + (p.z ?? 0) * 0.1 + i * 0.001 });
+            add(card, fr, { part, name: p.name, parent: p.parent, src: p, order: p.front ? 1 + i * 0.01 : -1 + (p.z ?? 0) * 0.1 + i * 0.001 });
             if (p.pair) {
                 const t = CARDS.twin;
                 const twin = { ...part, z: Math.abs(part.z) * -t.z, phase: part.phase + 0.08 };
@@ -139,9 +146,9 @@ export default class CardRig {
         view.wiggle = st.wiggle;
         this.views[Object.keys(this.char.states).find(k => this.char.states[k] === st)] = view;
         const set = { entries, poseOrder, size: R.size, view };
-        // Points on the body (eyes, mouth) ride the body vertex nearest to them.
-        const body = entries.find(e => e.body), c = body.card;
+        // Points on the face (eyes, mouth) ride the nearest vertex of the card that holds them.
         const anchor = a => {
+            const e = entries.find(o => o.src === holder(a) && !o.mirror), c = e.card;
             const ex = a.x - W / 2, ey = a.y - H / 2;
             let best = 0, d = Infinity;
             for (let s = 0; s < c.strip.length; s++) {
@@ -149,9 +156,8 @@ export default class CardRig {
                 if (dd < d) { d = dd; best = s; }
             }
             const i = c.strip[best];
-            return { s: best, dx: ex - (c.pivot[0] + c.lx[i]), dy: ey - (c.pivot[1] + c.ly[i]) };
+            return { e, s: best, dx: ex - (c.pivot[0] + c.lx[i]), dy: ey - (c.pivot[1] + c.ly[i]) };
         };
-        set.bodyEntry = body;
         set.waveEntry = this.char.wave ? entries.find(e => e.name === this.char.wave.part && !e.mirror) || null : null;
         const face = faceOf(st);
         if (face?.eyes) {
@@ -192,8 +198,8 @@ export default class CardRig {
         this.depth = d;
         for (const set of Object.values(this.sets)) {
             set.entries.forEach((e, i) => e.rope.setDepth(d + i * 0.001));
-            set.eyes?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 - 0.0005);      // just behind the body, whose cut-out eyes frame them
-            set.mouth?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 + 0.0004);
+            if (set.eyes) set.eyes.setDepth(d + set.entries.indexOf(set.eyeAt[0].e) * 0.001 - 0.0005);      // just behind the card whose cut-out eyes frame them
+            if (set.mouth) set.mouth.setDepth(d + set.entries.indexOf(set.mouthAt.e) * 0.001 + 0.0004);
         }
         return this;
     }
@@ -346,7 +352,7 @@ export default class CardRig {
         // Points on the body (projected just now): each rides its body vertex, offset by its distance from it.
         // (the offset squashed, swollen and narrowed in a turn, as project() does the body).
         const P = this.pt;
-        P.verts = set.bodyEntry.rope.vertices; P.cr = Math.cos(rotation); P.sr = Math.sin(rotation);
+        P.cr = Math.cos(rotation); P.sr = Math.sin(rotation);
         P.x = x; P.y = y; P.sx = sx; P.sy = sy; P.flip = flip; P.wide = turnWidth(yaw); P.set = set;
         if (br.blub && set.mouthAt && this.shown && spread < 0.5) { this.pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); set.mouth.blub(); }
         if (set.mouth) { this.pointAt(set.mouthAt, MOUTH); set.mouth.update(MOUTH, H, rotation, this.shown ? view.alpha : 0, frames / 60, flip, hello.happy); }
