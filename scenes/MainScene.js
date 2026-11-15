@@ -373,14 +373,14 @@ export default class MainScene extends Phaser.Scene {
             floor: x => this.seabedBelow(x, this.level.field.routeY(x)) ?? floorY(x), route: x => this.level.field.routeY(x), surface: x => this.surface.heightAt(x, this.time.now / 1000)
         }, {
             warn: (x, y) => {
-                play('rumble'); this.swarms.startle(x, y);
+                this.swarms.startle(x, y);
                 this.announce(this.lang === 'de' ? 'Ein Schleppnetz!' : 'A trawl net!', this.lang === 'de' ? 'Schwimm schnell nach oben, über das Netz!' : 'Swim up quickly, over the net!');
                 this.bookEntry('trawl');
             },
             tow: () => {},
             caught: (x, y) => { if (!this.relaxed) this.hurt(x, y, 1); this.announce('', this.lang === 'de' ? 'Gefangen! Gleich bist du wieder frei.' : 'Caught! You will be free in a moment.'); },
             released: () => { play('nest'); this.announce('', this.lang === 'de' ? 'Frei! Puh!' : 'Free! Phew!'); },
-            rumble: () => play('rumble')
+            rumble: near => play('engine', near)
         });
         this.dugong = new DugongLayer(this, x => this.seabedBelow(x, this.level.field.routeY(x)), kind => this.bookEntry(kind));
         // Three pearls hidden in clams in every area (spec 5.0r): a small reason to dive down and look.

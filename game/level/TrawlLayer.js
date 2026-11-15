@@ -9,7 +9,7 @@ export const TRAWL_LOOK = {
     boat: [900, 300],    // px of the boat picture; its waterline at `boatLine` of its height
     boatLine: 0.58,
     warpTint: 0x2a3236,
-    rumbleEvery: 1.6,    // s between two engine rumbles while it is near
+    rumbleEvery: 1.6,    // s between two plays of the engine (audio.js ENGINE: each lasts longer, they cross-fade into one drone)
     hear: 3200           // px within which the engine is heard
 };
 
@@ -62,7 +62,7 @@ function ensureTextures(scene) {
 /**
  * The trawl event (trawl.js is the rule). Nothing exists until a fish sets it off; the net, the boat and its warp
  * are made when the net comes and dropped when it has lifted away. `world` = { floor(x), route(x), surface(x) };
- * `on`: { warn(x, y), tow(), caught(x, y), released(), rumble() }.
+ * `on`: { warn(x, y), tow(), caught(x, y), released(), rumble(near 0..1) }.
  */
 export default class TrawlLayer {
     constructor(scene, world, on) {
@@ -96,7 +96,8 @@ export default class TrawlLayer {
         if (s.event === 'gone') this.drop();
         if ((s.phase === 'warn' || s.phase === 'tow') && (this.rumble -= dt) <= 0) {
             this.rumble = TRAWL_LOOK.rumbleEvery;
-            if (s.phase === 'warn' || Math.abs(s.mouthX - sp.x) < TRAWL_LOOK.hear) this.on.rumble();
+            const d = s.phase === 'warn' ? TRAWL.behind : Math.abs(s.mouthX + TRAWL.boatAhead - sp.x);      // the engine is the boat's
+            if (d < TRAWL_LOOK.hear) this.on.rumble(1 - d / TRAWL_LOOK.hear);
         }
         if (this.parts) this.draw();
     }

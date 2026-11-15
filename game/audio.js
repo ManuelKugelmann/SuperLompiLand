@@ -6,6 +6,7 @@
 import { createClock } from './music/clock.js';
 import { SCORE, chordMix, arpAt } from './music/score.js';
 import { creakSamples } from './music/creak.js';
+import { splashSize } from './fx/splash.js';
 
 /**
  * The one music clock (spec ch.12): visual animation may lock to its beat via
@@ -41,6 +42,8 @@ const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51];
  * then, or if a file is missing, the synthesized version plays instead. Paths are relative (base per branch).
  */
 const SAMPLE_FILES = { splash_a: 'sfx/splash_a.mp3', splash_b: 'sfx/splash_b.mp3' };
+/** The recorded splash's gain from a gentle plop to a full dive (under the master's make-up: the top stays under -1 dBFS). */
+const SPLASH_SAMPLE = { gain: [0.12, 0.34] };
 const samples = {};
 function loadSamples() {
     for (const [name, url] of Object.entries(SAMPLE_FILES)) {
@@ -359,9 +362,10 @@ const SOUNDS = {
     cry() { [0, 0.16].forEach((at, i) => { tone({ f: 980 - i * 120, to: 620 - i * 80, type: 'sawtooth', dur: 0.13, vol: 0.07, at }); noise({ dur: 0.12, vol: 0.05, from: 1800, to: 900, q: 2, at }); }); },
     splash(strength = 1) {
         // A recorded splash (CC0; tester: the synthesized one popped like bubble wrap), one of two at
-        // random, a little higher or lower each time; a hard dive a little louder. Synthesized below as the fallback.
-        const pick = Math.random() < 0.5 ? 'splash_a' : 'splash_b', gain = Math.min(0.7, 0.3 + strength * 0.035);
-        if (playSample(pick, gain, 0.9 + Math.random() * 0.2)) return;
+        // random, a little higher or lower each time. Its size follows the splash you see (fx/splash.js splashSize): a gentle plop
+        // soft and bright, a full dive loud and deep (earshot 2026-11-15: before, 3.8 dB from plop to dive, peaks at 0 dBFS). Synthesized below as the fallback.
+        const pick = Math.random() < 0.5 ? 'splash_a' : 'splash_b', size = splashSize(strength);
+        if (playSample(pick, SPLASH_SAMPLE.gain[0] + (SPLASH_SAMPLE.gain[1] - SPLASH_SAMPLE.gain[0]) * size, 1.12 - 0.24 * size + (Math.random() - 0.5) * 0.1)) return;
         // A real splash (tester: the old one "popped like bubble wrap"): a soft body of water noise and a
         // dense cloud of tiny bubbles (dozens in a few tenths of a second, each a quick rising chirp), so
         // no single pop stands out. Every part fades in; a hard dive is a little louder and fuller.
@@ -430,6 +434,27 @@ const SOUNDS = {
         tone({ f: f * 1.5, type: 'sine', at: 0.02, dur: 1.1, vol: 0.008, rise: 0.12 });
         tone({ f: f / 2, type: 'sine', at: 0.04, dur: 1.9, vol: 0.013, rise: 0.2 });
     },
+    // A boat's engine heard through the water (the trawl, spec 5.0t 2): a diesel's chug (ENGINE.chug firings a second)
+    // over a low, muffled drone; its body sits above ~150 Hz, where phone speakers still play. `arg` = how near (0..1).
+    engine(near = 1) {
+        const E = ENGINE, t = ctx.currentTime, out = ctx.createGain(), lp = ctx.createBiquadFilter(), am = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();
+        lp.type = 'lowpass'; lp.frequency.value = E.muffle; lp.Q.value = 0.7;
+        lfo.type = 'sine'; lfo.frequency.value = E.chug; depth.gain.value = E.chugDepth / 2;
+        const wob = ctx.createOscillator(), wobG = ctx.createGain();      // the firing rate wanders a little, as a real engine's does
+        wob.frequency.value = E.wander[0]; wobG.gain.value = E.wander[1]; wob.connect(wobG).connect(lfo.frequency); wob.start(t); wob.stop(t + E.dur + 0.05);
+        am.gain.value = 1 - E.chugDepth / 2; lfo.connect(depth).connect(am.gain);
+        const vol = E.vol * (0.35 + 0.65 * Math.max(0, Math.min(1, near)));
+        // Linear fades: overlapping plays cross-fade to a steady level (exponential ones dip and pump).
+        out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(vol, t + E.fade); out.gain.setValueAtTime(vol, t + E.dur - E.fade); out.gain.linearRampToValueAtTime(0, t + E.dur);
+        for (const [f, type, v] of E.voices) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f; g.gain.value = v; o.connect(g).connect(am); o.start(t); o.stop(t + E.dur + 0.05); }
+        for (const [fc, q, v] of E.hiss) {
+            const src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
+            src.buffer = noiseBuf; src.loop = true; src.loopStart = Math.random(); bp.type = 'bandpass'; bp.frequency.value = fc; bp.Q.value = q; ng.gain.value = v;
+            src.connect(bp).connect(ng).connect(am); src.start(t, Math.random()); src.stop(t + E.dur + 0.05);
+        }
+        am.connect(lp).connect(out).connect(master);
+        lfo.start(t); lfo.stop(t + E.dur + 0.05);
+    },
     rumble() { tone({ f: 55, to: 38, type: 'sawtooth', dur: 1.6, vol: 0.3 }); noise({ dur: 1.6, vol: 0.25, from: 180, to: 70, q: 0.4 }); },
     boom() { noise({ dur: 1.2, vol: 0.5, from: 900, to: 60, q: 0.3 }); tone({ f: 90, to: 30, type: 'sine', dur: 0.9, vol: 0.4 }); }
 };
@@ -440,6 +465,16 @@ const SOUNDS = {
  * tap (browsers need that), fades in, follows the biome (new key at the next bar) and
  * darkens with depth (the deeper, the lower the filter and the louder the hum).
  */
+/** The trawl's engine (SOUNDS.engine): one play lasts `dur` s and overlaps the next by its fades (TrawlLayer plays it every 1.6 s). */
+export const ENGINE = {
+    dur: 2.2, fade: 0.45, vol: 0.22,
+    chug: 7.5, chugDepth: 0.65,      // firings a second, and how much each one pulses the level
+    wander: [0.7, 1.2],            // the firing rate drifts this often (Hz) by this much (Hz)
+    muffle: 700,                   // Hz: the water takes the highs
+    voices: [[82, 'triangle', 0.22], [164, 'sawtooth', 0.08]],   // Hz, wave, level: a faint hum under the noise
+    hiss: [[180, 0.6, 1.4], [520, 1.1, 0.7], [1100, 2, 0.15]]   // band-passed noise: centre Hz, Q, level (the churn and the clatter of the cylinders)
+};
+
 export const MUSIC = {
     vol: 0.16,            // music bus level under the effects
     padVol: 0.05,         // each pad voice
