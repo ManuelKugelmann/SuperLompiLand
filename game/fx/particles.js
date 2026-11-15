@@ -17,7 +17,7 @@ export const PARTICLES = {
  * a particle takes on the water's velocity (1/s); cool = how fast heat fades (1/s,
  * hot particles rise with `rise`, cold ones with `rise * coldRise`); surface: what
  * happens at the waterline ('pop' ends it, 'slick' spreads it along the surface,
- * 'pass' ignores it); blend: 'normal', 'add' or 'glow' (additive above the scene's darkness); soft: drawn as one blurred, merged
+ * 'pass' ignores it, 'fall' ends it where it falls back into the water); blend: 'normal', 'add' or 'glow' (additive above the scene's darkness); soft: drawn as one blurred, merged
  * cloud instead of separate dots: 'wisp' (smoke, ash: fades out softly) or 'goo'
  * (oil: overlapping blobs fuse into one body with a defined edge). Optional: diffuse = turbulent
  * spreading (px/s of random drift, growing with age) and thin = how much of its alpha a particle
@@ -40,6 +40,8 @@ export const PRESETS = {
     // An octopus's ink: a dark, soft cloud that hangs and spreads (spec 5.0k).
     ink:    { life: [2.5, 4], size: [24, 44], grow: 3, drag: 1.4, rise: 0, coldRise: 1, cool: 0, alpha: 0.7, color: 0x1c1a26, colorEnd: 0x2c2a36, surface: 'pass', blend: 'normal', soft: 'wisp' },
     // Spray thrown up where a surf crest breaks: white droplets that fly up and fall back.
+    // Splash droplets (splash.js): water thrown up that falls back and is gone where it meets the water again. Sea blue, not white: they must read against the pale sky at the horizon.
+    drop:   { life: [0.6, 1.3], size: [8, 18], grow: 0.6, drag: 0.55, rise: -1900, coldRise: 1, cool: 0, alpha: 1, color: 0x6fcdec, colorEnd: 0x3fa9d6, surface: 'fall', blend: 'normal' },
     spray:  { life: [0.45, 0.85], size: [4, 9], grow: 0.6, drag: 0.4, rise: -520, coldRise: 1, cool: 0, alpha: 0.85, color: 0xffffff, colorEnd: 0xe6fbff, surface: 'pass', blend: 'normal' },
     smoke:  { life: [4, 7], size: [20, 40], grow: 3.2, drag: 0.7, rise: 60, coldRise: 0.7, cool: 0.2, alpha: 0.4, color: 0x9a9ea4, colorEnd: 0xd5d8dc, surface: 'pass', blend: 'normal', soft: 'wisp' }
 };
@@ -92,6 +94,7 @@ export function createParticles({ capacity = PARTICLES.capacity, random = Math.r
         x[i] = nx; y[i] = ny;
         if (surfaceY && p.surface !== 'pass') {
             const sy = surfaceY(x[i]);
+            if (p.surface === 'fall') { if (vy[i] > 0 && y[i] > sy) { alive[i] = 0; count--; } return; }
             if (y[i] <= sy) {
                 if (p.surface === 'pop') { alive[i] = 0; count--; return; }
                 y[i] = sy;                       // slick: spread along the surface

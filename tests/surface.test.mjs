@@ -57,3 +57,10 @@ test('a crossing breaks the surface line: gone inside, soft back in at both ends
     s.removeCrossing(id);
     assert.equal(s.lineAt(1200), 1);
 });
+
+test('the swell peaks: its crests rise further above the mean than its troughs sink below it', () => {
+    let min = Infinity, max = -Infinity, sum = 0, n = 0;
+    for (let x = 40000; x < 60000; x += 3) { const y = waveY(x, 1.7); min = Math.min(min, y); max = Math.max(max, y); sum += y; n++; }
+    const mean = sum / n;
+    assert.ok(mean - min > max - mean, `crest ${mean - min} trough ${max - mean}`);
+});

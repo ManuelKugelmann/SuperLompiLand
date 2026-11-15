@@ -8,10 +8,16 @@
 import { surfAt } from './biomes.js';
 import { WEATHER, stormShare } from './weather.js';
 
+/** Wave shape: how much sharper the crests are than the troughs (0 = plain sine; real sea waves peak, todo "better waves"). */
+export const WAVES = { peak: 0.3 };
+
+/** A peaked wave: sin(a) with its tops pulled up and its troughs flattened (second-order Stokes), y down. */
+const peaked = a => Math.sin(a) + WAVES.peak * Math.cos(2 * a);
+
 /** The swell alone: height (world y) at world x and time t (seconds). */
 export function waveY(x, t) {
     // Long swell, medium waves, and a short chop on top (the chop gives the line its lively, sea-like edge).
-    return (Math.sin(x / 190 + t * 1.5) * 15 + Math.sin(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10
+    return (peaked(x / 190 + t * 1.5) * 15 + peaked(x / 73 - t * 2.2) * 6 + Math.sin(x / 510 + t * 0.6) * 10
         + Math.sin(x / 31 - t * 3.4) * 2.2 + Math.sin(x / 17 + t * 4.1) * 1) * surfAt(x) * (1 + WEATHER.storm.waves * stormShare(x));
 }
 

@@ -97,6 +97,7 @@ import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics, catchCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
 import SurfLayer from '../game/fx/SurfLayer.js';
+import SplashLayer from '../game/fx/SplashLayer.js';
 import { lightAt, murkAt, nightShare, sunAt } from '../game/level/light.js';
 import { WEATHER, stormShare, stormAt, downAt, weatherNear, weatherZones } from '../game/level/weather.js';
 import WhaleSharkLayer from '../game/level/WhaleSharkLayer.js';
@@ -248,7 +249,8 @@ export default class MainScene extends Phaser.Scene {
         this.streams = new StreamLayer(this, this.flow);
         this.mangroves = new MangroveTreeLayer(this, LEVEL.seed, x => this.seabedBelow(x, 200) ?? floorY(x));      // the mangrove's whole trees      // the big currents, shown as bands of streaks running with the water
         this.flowAt = { x: 0, y: 0 };
-        this.particles = new ParticleLayer(this, this.particleEnv());   // silt, bubbles, oil... (spec 6.1b)
+        this.particles = new ParticleLayer(this, this.particleEnv());
+        this.splashes = new SplashLayer(this, this.surface);   // silt, bubbles, oil... (spec 6.1b)
         this.swarms = new SwarmLayer(this, {   // shoals of small fish around the view (spec 6.2)
             isOpen: (x, y) => this.level.isOpen(x, y, OPEN_SLACK),
             flowAt: this.particles.env.flowAt,
@@ -495,32 +497,12 @@ export default class MainScene extends Phaser.Scene {
                 this.rafts.skim(x, this.fish.sprite.body.velocity.x, this.time.now / 1000);
             }
             else if (entering && this.airAt && this.time.now - this.airAt >= CHAIN.minAir) { this.airAt = 0; this.chainMove('landing'); }
-            if (speed < 2 || this.time.now - (this.lastSplash || -999) < 180) return; // no plop for a gentle bob
+            if (this.time.now - (this.lastSplash || -999) < 180) return;
+            const sv = this.fish.sprite.body.velocity, splash = this.splashes.hit(x, y, speed, entering, sv.x * 60);   // splash.js: size by speed; none for a gentle bob
+            if (!splash) return;
             this.lastSplash = this.time.now;
             play('splash', speed);
-            // Kick the surface springs: a dent going in, a small bulge coming out (ripples of ~10-35 px).
-            this.surface.splash(x, (entering ? 1 : -0.7) * Math.min(5.5, 1.2 + speed * 0.3), 2.5);
             this.fish.squash = entering ? 0.28 : -0.2;
-            // Droplets: water-coloured with a bright rim so they read against sky and sea.
-            const n = Phaser.Math.Clamp(Math.round(6 + speed), 8, 26);
-            for (let i = 0; i < n; i++) {
-                const d = this.add.circle(x + Phaser.Math.Between(-46, 46), y, Phaser.Math.Between(6, 15), 0x7fd6f0, 0.95)
-                    .setStrokeStyle(3, 0xffffff, 1).setDepth(9);
-                const up = Phaser.Math.Between(70, 110 + speed * 12);
-                this.tweens.add({ targets: d, x: d.x + Phaser.Math.Between(-170, 170), duration: 720, ease: 'Linear' });
-                this.tweens.add({ targets: d, y: y - up, duration: 360, ease: 'Quad.easeOut', yoyo: true, onComplete: () => d.destroy() });
-                this.tweens.add({ targets: d, scale: 0.4, duration: 720 });
-            }
-            // Foam ring on the surface and a burst of bubbles underneath.
-            const ring = this.add.ellipse(x, y, 90, 22, 0xffffff, 0.85).setDepth(9);
-            this.tweens.add({ targets: ring, scaleX: 5.5, scaleY: 1.6, alpha: 0, duration: 650, onComplete: () => ring.destroy() });
-            if (entering) {
-                for (let i = 0; i < 9; i++) {
-                    const bub = this.add.circle(x + Phaser.Math.Between(-60, 60), y + Phaser.Math.Between(20, 90), Phaser.Math.Between(6, 16), 0xffffff, 0.35)
-                        .setStrokeStyle(2, 0xffffff, 0.8).setDepth(6);
-                    this.tweens.add({ targets: bub, y: y + 6, alpha: 0, duration: Phaser.Math.Between(500, 1000), onComplete: () => bub.destroy() });
-                }
-            }
         });
 
         // Keyboard (always on, alongside the touch scheme): arrows / WASD swim, space puffs.
@@ -1720,6 +1702,7 @@ export default class MainScene extends Phaser.Scene {
             this.particles.spawn('bubble', this.fish.sprite.x, this.fish.sprite.y, 6, { radius: 10, spread: 60 });
         }
         this.particles.update(delta / 1000);
+        this.splashes.update(delta / 1000, this.time.now / 1000);
         const pl = this.swarmPlayer;   // swarms think in px/s, the body in px per step
         pl.x = view.x; pl.y = view.y; pl.vx = v.x * 60; pl.vy = v.y * 60; pl.fright = this.character.fright || 1;
         // In a room, friends are players for the shoals too (spec ch.13 "Creatures in a room").
