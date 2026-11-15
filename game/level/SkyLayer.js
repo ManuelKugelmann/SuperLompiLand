@@ -242,8 +242,10 @@ export default class SkyLayer {
         f.x += f.dir * SKY.birdSpeed * this.scene.game.loop.delta / 1000;
         if (f.x > W + 500) f.dir = -1; else if (f.x < -500) f.dir = 1;
         for (const b of this.birds) {
-            b.setVisible(show).setPosition(f.x - f.dir * b.ox, f.y + b.oy + Math.sin(t * 0.6 + b.phase) * 14)
-                .setScale(f.dir * 0.8, 0.5 + 0.5 * Math.sin(t * 7 + b.phase));   // wing beat
+            // A loose line that rises and falls; each bird beats its wings in its own bursts and glides between them, each its own size.
+            const flapping = Math.sin(t * 0.45 + b.phase * 2.3) > -0.2, size = 0.62 + ((b.phase * 0.37) % 0.4);
+            b.setVisible(show).setPosition(f.x - f.dir * b.ox, f.y + b.oy + Math.sin(t * 0.6 + b.phase) * 14 + Math.sin(t * 0.22) * 36)
+                .setScale(f.dir * size, size * (flapping ? 0.55 + 0.45 * Math.sin(t * 7 + b.phase) : 0.85));   // wing beat, or a glide
         }
     }
 }

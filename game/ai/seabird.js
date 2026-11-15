@@ -20,7 +20,9 @@ export const SEABIRD = {
     hitR: 70,          // px: touching distance during the dive
     restS: 2.5,        // s floating on the surface after a dive
     climbS: 1.4,       // s taking off back to circling height
-    playerCooldownS: 6 // s between dives at a player (per bird)
+    playerCooldownS: 6, // s between dives at a player (per bird)
+    loop: 0.6,         // share of `range` the soaring loop reaches either side of home ...
+    swoop: 70          // ... and px it climbs and sinks on it (a figure of eight, as gannets soar: playtest "birds: flight path")
 };
 
 /** A bird circling above `homeX`; `seed` varies its loop. */
@@ -70,11 +72,16 @@ export function stepSeabird(b, dt, env) {
     b.cooldown = Math.max(0, b.cooldown - dt);
 
     if (b.state === 'circle') {
-        // A lazy loop over the home coast: turn back at the edge of its range.
-        if (b.x > b.homeX + c.range * 0.6) b.vx = -c.speed;
-        else if (b.x < b.homeX - c.range * 0.6) b.vx = c.speed;
-        b.x += b.vx * dt;
-        b.y = sy - c.height + Math.sin(b.timer * 0.9 + b.seed) * 30;
+        // A lazy figure of eight over the home coast: it slows into each end and swings round, climbing and sinking.
+        const A = c.range * c.loop;
+        if (b.loop === undefined) b.loop = Math.asin(Math.max(-1, Math.min(1, (b.x - b.homeX) / A)));      // joined where it is
+        b.loop += c.speed / A * dt;
+        const nx = b.homeX + Math.sin(b.loop) * A;
+        b.vx = (nx - b.x) / Math.max(dt, 1e-6);
+        b.x = nx;
+        const ny = sy - c.height + Math.sin(b.loop * 2 + b.seed) * c.swoop;
+        b.vy = (ny - b.y) / Math.max(dt, 1e-6);
+        b.y = ny;
         const t = pickTarget(b, env);
         if (t) { b.target = t; b.state = 'aim'; b.timer = 0; event = 'aim'; }
     } else if (b.state === 'aim') {
@@ -82,7 +89,7 @@ export function stepSeabird(b, dt, env) {
         const p = b.target.ref;
         b.x += Math.max(-c.speed * 2 * dt, Math.min(c.speed * 2 * dt, p.x - b.x));
         b.y = sy - c.height;
-        if (b.target.kind === 'player' && !prey(p, b, env)) { b.target = null; b.state = 'circle'; b.timer = 0; }
+        if (b.target.kind === 'player' && !prey(p, b, env)) { b.target = null; b.state = 'circle'; b.timer = 0; b.loop = undefined; }
         else if (b.timer >= c.aimS) {
             b.aim.x = p.x; b.aim.y = Math.min(p.y, env.surfaceY(p.x) + c.depth);
             const dx = b.aim.x - b.x, dy = b.aim.y - b.y, d = Math.hypot(dx, dy) || 1;
@@ -123,7 +130,7 @@ export function stepSeabird(b, dt, env) {
     } else if (b.state === 'climb') {
         b.x += b.vx * dt;
         b.y = sy - c.height * Math.min(1, b.timer / c.climbS);
-        if (b.timer >= c.climbS) { b.state = 'circle'; b.timer = 0; b.target = null; }
+        if (b.timer >= c.climbS) { b.state = 'circle'; b.timer = 0; b.target = null; b.loop = undefined; }
     }
     return event;
 }

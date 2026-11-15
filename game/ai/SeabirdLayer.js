@@ -17,7 +17,10 @@ export const SEABIRDS = {
     floatW: 95,          // px wide resting on the water
     shadowW: 170,        // px wide shadow patch
     shadowAlpha: 0.28,   // at its darkest (the moment before the dive)
-    shadowDepth: 40      // px under the surface
+    shadowDepth: 40,     // px under the surface
+    sizes: [0.85, 1.2],  // each bird its own size (seeded): not a row of copies
+    flap: { every: 4.5, beats: 1.3, rate: 13, depth: 0.32 },   // wing beats in short bursts (every so many s, lasting `beats` s, beats per s, how far the wings fold) between long glides
+    bank: 0.35           // radians it tips into a climb or a sink
 };
 
 export const SEABIRD_ART = ['gannet_glide', 'gannet_flap', 'gannet_dive', 'gannet_float'];
@@ -73,7 +76,8 @@ export default class SeabirdLayer {
         coast.birds = Array.from({ length: SEABIRDS.perCoast }, (_, k) => {
             const mind = createSeabird(coast.x + (k - 0.5) * 500, this.env.surfaceY, {}, coast.i * 3.7 + k * 1.9);
             mind.homeX = coast.x;
-            return { mind, sprite: s.add.image(mind.x, mind.y, art(s, 'gannet_glide')).setDepth(SEABIRDS.depth),
+            const size = SEABIRDS.sizes[0] + (SEABIRDS.sizes[1] - SEABIRDS.sizes[0]) * ((Math.sin(mind.seed * 12.9898) * 43758.5453 % 1 + 1) % 1);
+            return { mind, size, sprite: s.add.image(mind.x, mind.y, art(s, 'gannet_glide')).setDepth(SEABIRDS.depth),
                 shadow: s.add.image(mind.x, 0, SHADOW).setDepth(SEABIRDS.depth - 0.01).setAlpha(0) };
         });
     }
@@ -108,17 +112,28 @@ export default class SeabirdLayer {
         if (m.state === 'dive' || (m.state === 'rise' && m.vy > 0)) {
             const key = art(s, 'gannet_dive');
             sp.setTexture(key).setRotation(key === FALLBACK ? Math.atan2(m.vy, m.vx) : Math.atan2(m.vy, m.vx) - Math.PI / 2);
-            sp.setScale(C.diveH / (key === FALLBACK ? sp.width : sp.height));
+            sp.setScale(C.diveH * b.size / (key === FALLBACK ? sp.width : sp.height));
         } else if (m.state === 'rest' || m.state === 'rise') {
             const key = art(s, 'gannet_float');
-            sp.setTexture(key).setRotation(0).setScale(C.floatW / sp.width).setFlipX(m.vx < 0);
+            sp.setTexture(key).setRotation(0).setScale(C.floatW * b.size / sp.width).setFlipX(m.vx < 0);
         } else {
+<<<<<<< Updated upstream
             // Side view (both pictures face right): it beats its wings while it climbs on its circle and
             // glides on the way down; wings held still in the hover before the dive.
             const climbing = m.state !== 'aim' && Math.cos(m.timer * 0.9 + m.seed) < 0;
             const key = art(s, climbing && Math.sin(m.timer * 9 + m.seed) > 0 ? 'gannet_flap' : 'gannet_glide');
             const rock = m.state === 'aim' ? 0 : Math.sin(m.timer * 2.2 + m.seed) * 0.12;
             sp.setTexture(key).setRotation(rock).setScale(C.glideW / sp.width).setFlipX(m.vx < 0);
+=======
+            const key = art(s, 'gannet_glide');
+            // Soaring: tipped into its climb or sink, a short burst of wing beats now and then between long glides;
+            // wings held still in the hover before the dive.
+            const F = C.flap, k = m.state === 'aim' ? -1 : ((m.timer + m.seed * 3) % F.every);
+            const beat = k >= 0 && k < F.beats ? Math.abs(Math.sin(k * F.rate * Math.PI)) * F.depth : 0;
+            const tilt = m.state === 'aim' ? 0 : Math.max(-C.bank, Math.min(C.bank, Math.atan2(m.vy, Math.abs(m.vx) + 1))) * (m.vx < 0 ? -1 : 1);
+            const w = C.glideW * b.size / sp.width;
+            sp.setTexture(key).setRotation(tilt).setScale(w, w * (1 - beat)).setFlipX(m.vx < 0);
+>>>>>>> Stashed changes
         }
         sp.setPosition(m.x, m.state === 'rest' ? m.y - sp.displayHeight * 0.3 : m.y);
         // The shadow: faint while circling, darkest during the hover above the prey.
