@@ -130,9 +130,10 @@ for key, s in spec.items():
             hint = poly_mask(p['poly'], W, H)
             if core is not None: hint *= core
             # The part's own pixels (segmented), plus the hint's overlap on the body side of the
-            # root: hidden under the body, so the card has no straight cut where it swings.
+            # root: hidden under the body, so the card has no straight cut where it swings. A front
+            # part is drawn over the body, so it gets no overlap (it showed as shards of body on it).
             m = refine(src, hint, p.get('band', BAND))
-            on_body = hint * (1 - beyond(p['root'], centre, W, H))
+            on_body = 0 if p.get('front') else hint * (1 - beyond(p['root'], centre, W, H))
             part = src.copy(); part[..., 3] *= np.maximum(m, on_body)
             c, (x0, y0) = crop(part)
             cards.append(c)
@@ -142,10 +143,16 @@ for key, s in spec.items():
             # behind the body only loses what reaches beyond its root line.
             rm = m if p.get('front') or core is not None else m * beyond(p['root'], centre, W, H)
             if p.get('front') and 'under' in p:
+                # Every pixel the part touches at all is filled (its faint soft edge kept the part's colours:
+                # light shards at the manta's head), and the filled body is as opaque as the picture there
+                # (the soft mask left a half-clear seam through it).
                 region = poly_mask(p['under'], W, H) * (src[..., 3] > 0.5)
-                known = (body[..., 3] > 0.95) * (1 - np.clip(m * 4, 0, 1))
-                body[..., :3] = synth(fill(body[..., :3], known.astype(np.float32), region * m), known, region * m)
-                body[..., 3] = np.maximum(body[..., 3] * (1 - rm), region * m * src[..., 3])
+                touched = (m > 0.02).astype(np.float32)
+                known = (body[..., 3] > 0.95) * (1 - touched)
+                body[..., :3] = synth(fill(body[..., :3], known.astype(np.float32), region * touched), known, region * touched)
+                body[..., 3] = np.maximum(body[..., 3] * (1 - rm), region * touched * src[..., 3])
+                # Faint leftovers of the part outside the filled area (its soft edge, half removed) go entirely.
+                body[..., 3] = np.where((rm > 0.02) & (region == 0) & (body[..., 3] < 0.6), 0, body[..., 3])
             else:
                 body[..., 3] *= 1 - rm
         meta[-1].update({k: p[k] for k in ('name', 'role', 'parent') if k in p})

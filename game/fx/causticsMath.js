@@ -92,7 +92,7 @@ export const SURFACE_CAUSTICS = {
     warmth: 0.5,          // 0 = the net has the water's hue, 1 = it is white sunlight
     // Things in the water (props, plants, creatures, the swimmer; CausticsPipeline catchCaustics) catch the net on
     // their sides too, not only on their top skin: real caustics play over every lit face, softer where it turns away.
-    sides: { skin: 0.35, gain: 1.8, lit: 0.12, creature: 0.2 }   // how much of the top-skin rule they keep, how strong the net is on them, from which brightness they catch it; share of that on creatures (ropes: a hard web on a big pale body read as cracks)
+    sides: { skin: 0.35, gain: 1.8, lit: 0.12, creature: 0.12 }   // how much of the top-skin rule they keep, how strong the net is on them, from which brightness they catch it; share of that on creatures (ropes: a hard web on a big pale body read as cracks)
 };
 
 const smooth01 = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };

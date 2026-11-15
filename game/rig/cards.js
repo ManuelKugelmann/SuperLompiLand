@@ -139,7 +139,7 @@ export const ROLES = {
     // Ray wings seen from the side beat up and down in the picture plane. The beat is a bend that grows
     // from root to tip (wave; the tips lag) with only a little turn of the whole wing (sweep), so the
     // root stays attached to the body (user: no gap at the wing roots); about 0.4 Hz at a manta's effort.
-    flap:      { swing: 0.1, sweep: 0.08, wave: 0.5, k: 1.0, speed: 0.32, idle: 0.85 }
+    flap:      { swing: 0.1, sweep: 0, wave: 0.58, k: 1.0, speed: 0.32, idle: 0.85 }      // no sweep: turning the whole wing in the plane moved its root and bared the body under it (torn shards at the manta's head); the wave bends it from a still root
 };
 
 /** Triangle strip over a (cols x rows)-cell grid (rows joined by degenerate triangles): node index per strip vertex. */
