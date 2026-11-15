@@ -107,6 +107,7 @@ function paintedHearts(scene, x, y, max, size) {
             hearts.forEach((h, i) => {
                 const fill = Math.max(0, Math.min(1, value - i));         // supports half hearts
                 h.front.setVisible(fill > 0).setTexture(fill >= 1 ? 'heart_full' : 'heart_half').setDisplaySize(size, size);
+                h.back.setVisible(fill < 1);      // a full heart covers its glass one: one picture per heart (fewer draws on slow phones)
             });
             const changed = hearts[Math.max(0, Math.min(hearts.length - 1, Math.ceil(value < shown ? value : value - 1)))];
             if (changed && value !== shown) {
