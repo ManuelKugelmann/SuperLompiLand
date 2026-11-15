@@ -16,20 +16,20 @@ export const MAT = {
     share: 0.38         // rough share of the second material
 };
 
-/** Material per file under public/img/mat/ (colour `<name>.jpg`, height `<name>_h.jpg`); `reef` and `sand` (the sand skin's rippled sand) are made by scripts/mat/reef.py, sand.py. Eight fill the shader's 4 x 2 atlas. */
-export const MATERIALS = ['limestone', 'sandstone', 'granite', 'mudstone', 'basalt', 'rust', 'reef', 'sand'];
+/** Material per file under public/img/mat/ (colour `<name>.jpg`, height `<name>_h.jpg`); `reef`, `mud`, `ironstone` and `sand` (the sand skin's rippled sand) are procedural (scripts/mat/<name>.py; mud and ironstone replaced photo sets whose large shapes repeated and whose 'rust' read as a steel plate). Eight fill the shader's 4 x 2 atlas. */
+export const MATERIALS = ['limestone', 'sandstone', 'granite', 'mud', 'basalt', 'ironstone', 'reef', 'sand'];
 
 /** [main, second] material per biome. */
 export const BIOME_MATERIALS = {
     beach: ['limestone', 'sandstone'],
     reef: ['reef', 'limestone'],     // coral-encrusted limestone (procedural: scripts/mat/reef.py)
-    mangrove: ['mudstone', 'limestone'],
+    mangrove: ['mud', 'limestone'],
     kelp: ['granite', 'basalt'],
     blue: ['granite', 'limestone'],
-    wreck: ['sandstone', 'rust'],
+    wreck: ['sandstone', 'ironstone'],
     shore: ['granite', 'basalt'],
-    harbour: ['granite', 'rust'],
-    trench: ['basalt', 'mudstone']
+    harbour: ['granite', 'ironstone'],
+    trench: ['basalt', 'mud']
 };
 
 /**
