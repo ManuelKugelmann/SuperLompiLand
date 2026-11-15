@@ -54,8 +54,9 @@ export default class SteerAssist {
         // A climb is a steady pull, not a launch: once the fish rises fast enough it gets no more.
         fish.thrust(this.v.set(d.x, d.y).scale((d.climbing ? climbForce(vy) : strength) * gain));
         if (fish.inAir || d.climbing) return;
-        // Pointing sideways means "go there", not "and keep flying up": speed up or down that came from a slope or a current is damped.
-        const level = levelThrust(d.y, vy);
+        // Pointing sideways means "go there", not "and keep flying up": speed up or down that came from a slope is damped.
+        // A current's own push is not (playtest: "no jarring slowdowns without a clear cause": a slanting stream must carry).
+        const level = levelThrust(d.y, vy - (fish.water?.y || 0));
         if (level) fish.thrust(this.v.set(0, level));
         // A level pull keeps the held depth too.
         const lift = this.dived || this.restY === null || Math.abs(d.y) >= ASSIST.lane.level ? 0 : holdLift(fish.pos.y, this.restY);

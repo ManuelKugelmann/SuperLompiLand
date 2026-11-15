@@ -76,6 +76,7 @@ export default class Player {
         this.guard = 0;         // ms fully protected (not even pushed)
         this.invulnerable = 0;  // ms without damage
         this.inAir = false;
+        this.water = { x: 0, y: 0 };   // how the water moves where the fish is (px per step; the scene sets it): the steering assist leaves the current's push alone
         // Velocity of the water around the player (currents, bubble columns), set by
         // the scene. Being carried by the water must never turn the body around:
         // it points where it SWIMS, i.e. along its velocity relative to the water.

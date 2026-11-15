@@ -1618,6 +1618,7 @@ export default class MainScene extends Phaser.Scene {
         // Currents: the water takes the player up to its own speed and never brakes it,
         // so a stream entered fast is left faster (flow.js).
         const water = this.waterAt(fsp.x, fsp.y, this.flowAt);
+        this.fish.water.x = water.x; this.fish.water.y = water.y;      // the controls' assist leaves what the water does alone (SteerAssist)
         // A breaking wave tumbles the fish: a squash and a burst of bubbles (spec 5.0d).
         const br = breakerAt(fsp.x, fsp.y, this.wavePhase(), this.coastPush || (this.coastPush = { x: 0, y: 0 }));
         if (Math.hypot(br.x, br.y) > WORLD.tumbleAt && this.time.now > (this.tumbleUntil || 0)) {
