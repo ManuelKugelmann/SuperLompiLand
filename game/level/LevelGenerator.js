@@ -1,3 +1,4 @@
+import { haveMangroveTrees } from './MangroveTreeLayer.js';
 import { installRopeBatching } from '../fx/ropeBatch.js';
 import { createPool, poolSize } from './workerPool.js';
 import { shareOf } from '../quality.js';
@@ -218,6 +219,7 @@ export default class LevelGenerator {
         this.chunks = new Map(); // "cx,cy" -> { objects[], bodies[] }
         this.coins = [];
         this.blockers = new Set();      // solid boats and decks there now (addBlocker)
+        this.wholeTrees = haveMangroveTrees(scene);      // the mangrove's painted whole trees stand instead of the split roots
         this.rock = (x, y) => this.density(x, y) - LEVEL.threshold;      // > 0 inside rock: the distance field that keeps creatures out (ai/keepOut.js)
         this.hazards = [];
         this.friends = [];
@@ -948,6 +950,8 @@ export default class LevelGenerator {
                 rng.frac();      // (this draw once chose front trees: kept, so every other tree stays where it is)
                 const art = rng.between(1, 3), width = 0.9 + rng.frac() * 0.2;
                 if (!ground) continue;
+                // With the painted whole trees (MangroveTreeLayer) these split roots are not drawn; their draws are, so nothing else moves.
+                if (this.wholeTrees) { rng.frac(); continue; }
                 // root_2's painted crown is a barnacled beam cut off at the picture's edge (it read as a glass pane under the
                 // surface): its draw uses root_1 (the same random draws, so nothing else moves).
                 const root = keep(s.add.image(x, -40, `root_${art === 2 ? 1 : art}`).setOrigin(0.5, 0));
