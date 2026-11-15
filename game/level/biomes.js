@@ -65,7 +65,7 @@ export const BIOMES = [
         backRock: 400,
         rockWall: 0.6,
         coral: 0.25, kelp: 0.3, coins: 3, friendRate: 0.55, hazardRate: 0.1, roots: 4, spot: 'surface',
-        wallRate: 0.12, wallLife: { anemone: 1 },
+        wallRate: 0.25, wallLife: { mussel: 3, anemone: 1 },
         props: { boulder: 1, barrel: 1, seagrass: 3, rowboat: 1 }, propRate: 1.3,
         friends: { friend_seahorse: 2, friend_nudibranch: 2, friend_turtle: 1, friend_starfish: 1, urchin: 1 },
         hazards: { hazard_net: 1 }
@@ -97,7 +97,7 @@ export const BIOMES = [
         backRock: 1200,
         rockWall: 0.75,
         coral: 0, kelp: 0.85, coins: 2, friendRate: 0.35, hazardRate: 0.28,
-        wallRate: 0.3, wallLife: { anemone: 3, seafan: 1 },
+        wallRate: 0.3, wallLife: { anemone: 3, seafan: 1, mussel: 1 },
         props: { boulder: 3, kelpclump: 3, anemone: 2, seafan: 1 }, propRate: 1.8,
         friends: { friend_seahorse: 3, friend_nudibranch: 3, urchin: 1 },
         hazards: { hazard_net: 2, spikes: 1 }
@@ -108,7 +108,7 @@ export const BIOMES = [
         backRock: 1200,
         rockWall: 0.7,
         coral: 0.05, kelp: 0.1, coins: 3, friendRate: 0.2, hazardRate: 0.65,
-        wallRate: 0.1, wallLife: { anemone: 1 },
+        wallRate: 0.35, wallLife: { mussel: 4, anemone: 1 },
         props: { pier: 1, trawler: 4, rowboat: 2, barrel: 2, crate: 2, boulder: 1 }, propRate: 1.8,
         landmark: 'pier', spot: 'surface',   // the pier stands at the waterline
         friends: { friend_nudibranch: 1 },
@@ -133,7 +133,7 @@ export const BIOMES = [
         backRock: 1300,
         rockWall: 0.8,
         coral: 0.1, kelp: 0.3, coins: 3, friendRate: 0.4, hazardRate: 0.2,
-        wallRate: 0.35, wallLife: { seafan: 3, anemone: 2, coral: 1 },
+        wallRate: 0.4, wallLife: { seafan: 3, anemone: 2, mussel: 3, coral: 1 },
         props: { boulder: 4, seafan: 2, anemone: 2, kelpclump: 1 }, propRate: 1.8,
         friends: { friend_starfish: 2, friend_seahorse: 1, friend_nudibranch: 2, urchin: 3 },
         hazards: { spikes: 1, hazard_net: 1 }

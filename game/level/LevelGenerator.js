@@ -125,8 +125,8 @@ const HULL = { top: -6, keel: 330, scale: SIZES.hullBeam / 582, min: 0.75, clear
 // What grows on steep rock faces (biomes.js wallRate / wallLife): picture keys and width range
 // (px) per kind; at most `max` per chunk; `dropBoost` = extra rate at an island's drop-off.
 const WALL_LIFE = {
-    keys: { coral: ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5'], seafan: ['seafan_1'], anemone: ['anemone_1'] },
-    width: { coral: [90, 170], seafan: [140, 240], anemone: [80, 140] },
+    keys: { coral: ['coral_1', 'coral_2', 'coral_3', 'coral_4', 'coral_5'], seafan: ['seafan_1'], anemone: ['anemone_1'], mussel: [0, 1, 2].map(v => microKey('mussels', v)) },      // mussel clusters: the floor scatter's painted ones (MicroArt draws them while missing)
+    width: { coral: [90, 170], seafan: [140, 240], anemone: [80, 140], mussel: [60, 110] },
     max: 7, dropBoost: 1.6
 };
 // `place`: floor = sits on rock, water = floats in open water. Enemy art faces left.
