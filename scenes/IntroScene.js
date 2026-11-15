@@ -7,7 +7,7 @@ import HudScene, { HUD_KEY } from './HudScene.js';
 import ReefBookScene, { BOOK_KEY } from './ReefBookScene.js';
 import PlayStyleScene, { STYLE_KEY } from './PlayStyleScene.js';
 import { pwaMenuItems, VERSION_TAG, setPlaying } from '../game/pwa.js';
-import { CHARACTERS, getCharacter, loadSelectedId, saveSelectedId } from '../game/characters.js';
+import { CHARACTERS, getCharacter, loadSelectedId, saveSelectedId, isPlayable, loadUnlocked } from '../game/characters.js';
 import ProgressionManager from '../systems/ProgressionManager.js';
 import { QUALITY, startTier } from '../game/quality.js';
 import { setRenderScale } from '../game/renderScale.js';
@@ -88,6 +88,7 @@ export const gameMeta = {
 /** Title screen idle time before the ambient reef starts by itself (spec ch.12). */
 const AMBIENT_IDLE_MS = 120000;
 const TITLE = {
+    lockedTint: 0x123247,     // a friend not yet rescued: a dark shape in the carousel
     refitAt: 0.04,    // the title is laid out again when the window's shape is off by more than this share ...
     refitMs: 350,     // ... and has stayed so for this long
     shown: 2.2,       // carousel places to either side of the chosen fish that are drawn
@@ -262,12 +263,15 @@ export default class IntroScene extends Phaser.Scene {
     buildCarousel(lang) {
         const W = this.scale.width, H = this.scale.height;
         const cy = H * 0.52, SPACING = 430, ARROW_OFF = 292;
-        this.index = Math.max(0, CHARACTERS.findIndex(c => c.id === loadSelectedId()));
+        // Friends not yet rescued wait as dark shapes: playable once freed in a game, or playing together.
+        this.unlocked = loadUnlocked();
+        this.index = Math.max(0, CHARACTERS.findIndex(c => c.id === loadSelectedId() && isPlayable(c.id, this.unlocked)));
         this.slot = this.index; // animated, fractional position
 
         this.cards = CHARACTERS.map((c, i) => {
             // The same animated rig as in the game, over an invisible tap area.
             const rig = createRig(this, c, W / 2, cy, 1);
+            if (!isPlayable(c.id, this.unlocked)) rig.setTint(TITLE.lockedTint);      // still in its net: a dark shape
             const frame = rig.view.frame;
             rig.fit = Math.min(360 / frame.width, 300 / frame.height) / rig.view.baseScale;
             rig.hit = this.add.zone(W / 2, cy, 360, 300).setInteractive({ useHandCursor: true });
@@ -329,7 +333,7 @@ export default class IntroScene extends Phaser.Scene {
         try { saves = fromCookie(document.cookie); } catch { /* cookies blocked */ }
         if (!saves.length) return;
         const W = this.scale.width, de = lang === 'de';
-        const btn = this.add.text(W - 40, 50, de ? 'Spielstände' : 'Saves', {
+        const btn = this.add.text(W - 40 - MENU.corner, 50 + MENU.corner, de ? 'Spielstände' : 'Saves', {      // in from the rounded corner
             fontFamily: 'Arial', fontStyle: 'bold', fontSize: '34px', color: '#ffffff', backgroundColor: '#1d6f9a', padding: { x: 22, y: 10 }
         }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }).setDepth(20);
         btn.on('pointerdown', () => this.openSaves(de, saves));
@@ -386,7 +390,7 @@ export default class IntroScene extends Phaser.Scene {
      */
     buildAmbient(lang) {
         const H = this.scale.height, de = lang === 'de';
-        const btn = this.add.text(150, H * 0.905, de ? 'Aquarium' : 'Aquarium', {
+        const btn = this.add.text(150 + MENU.corner, H * 0.905 - MENU.corner / 2, de ? 'Aquarium' : 'Aquarium', {
             fontFamily: 'Arial', fontStyle: 'bold', fontSize: '40px', color: '#ffffff', backgroundColor: '#2a7f6f', padding: { x: 30, y: 14 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
         const go = () => {
@@ -408,11 +412,11 @@ export default class IntroScene extends Phaser.Scene {
         this.modal = false; // fresh title screen (the scene object is reused)
         const W = this.scale.width, H = this.scale.height, de = lang === 'de';
         const label = { fontFamily: 'Arial', fontStyle: 'bold' };
-        const btn = this.add.text(W - 180, H * 0.905, de ? 'Zusammen' : 'Together', {
+        const btn = this.add.text(W - 180 - MENU.corner, H * 0.905 - MENU.corner / 2, de ? 'Zusammen' : 'Together', {
             ...label, fontSize: '40px', color: '#ffffff', backgroundColor: '#1d8fb5', padding: { x: 30, y: 14 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
         // Offline: the button greys out and explains itself; solo play is unaffected (spec).
-        const offlineNote = this.add.text(W - 180, H * 0.905 - 62, de ? 'Kein Internet' : 'No internet', {
+        const offlineNote = this.add.text(W - 180 - MENU.corner, H * 0.905 - MENU.corner / 2 - 62, de ? 'Kein Internet' : 'No internet', {
             ...label, fontSize: '26px', color: '#ffd0d0', stroke: '#0a3f6e', strokeThickness: 5
         }).setOrigin(0.5).setVisible(false);
         const online = () => navigator.onLine !== false;
@@ -549,16 +553,18 @@ export default class IntroScene extends Phaser.Scene {
         if (this.modal) return;
         const n = CHARACTERS.length;
         this.index = ((i % n) + n) % n;
-        const c = CHARACTERS[this.index];
-        saveSelectedId(c.id);
-        this.registry.set('character', c.id);
+        const c = CHARACTERS[this.index], free = isPlayable(c.id, this.unlocked), de = this.lang === 'de';
+        this.registry.set('character', c.id);      // playing together, anyone may be chosen
+        if (free) saveSelectedId(c.id);
         if (this.nameText.text && this.nameText.text !== c.name) play('tap');
-        this.nameText.setText(c.name);
-        this.blurbText.setText(c.blurb[this.lang] || c.blurb.en);
+        this.nameText.setText(free ? c.name : '?');
+        this.blurbText.setText(free ? (c.blurb[this.lang] || c.blurb.en) : (de ? 'Noch im Netz: rette diesen Freund im Spiel!' : 'Still in a net: rescue this friend in the game!'));
     }
 
     start() {
         if (this.modal) return;
+        // Solo, a friend still in its net cannot play yet: back to Lompi, who can.
+        if (!isPlayable(CHARACTERS[this.index].id, this.unlocked)) { this.select(0); return; }
         this.registry.set('room', null); // plain start = solo
         this.registry.set('ambient', false);
         // First time: tell the story of the eruption before the journey begins.

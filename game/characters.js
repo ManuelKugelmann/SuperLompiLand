@@ -82,6 +82,27 @@ export function saveSelectedId(id) {
     try { window.localStorage.setItem(STORE_KEY, id); } catch { /* storage blocked */ }
 }
 
+// Friends become playable once rescued (user 2026-11-15: "no friend from start, only after rescue /
+// multiplayer"): Lompi always; every friend freed in any game stays playable; playing together, everyone.
+const UNLOCK_KEY = 'sll_unlocked';
+
+/** May `id` be played? `unlocked` = ids freed in any game so far; `together` = in a room. */
+export function isPlayable(id, unlocked, together = false) {
+    return together || id === CHARACTERS[0].id || unlocked.includes(id);
+}
+
+/** The ids freed in any game so far (kept on this device). */
+export function loadUnlocked() {
+    try { return JSON.parse(window.localStorage.getItem(UNLOCK_KEY) || '[]'); } catch { return []; }
+}
+
+/** A friend was freed: playable from now on. */
+export function unlockCharacter(id) {
+    const list = loadUnlocked();
+    if (list.includes(id)) return;
+    try { window.localStorage.setItem(UNLOCK_KEY, JSON.stringify([...list, id])); } catch { /* storage blocked */ }
+}
+
 /** Share of gravity (0..1) that a character's wings carry at this horizontal speed. */
 export function glideLift(character, vx) {
     const g = character.glide;
