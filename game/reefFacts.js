@@ -141,6 +141,12 @@ export const MORE_FACTS = {
     school_silverside: [
         f('Ihre silbernen Seiten spiegeln das Licht wie kleine Spiegel.', 'Their silver sides reflect the light like little mirrors.'),
         f('Jeder Fisch achtet nur auf seine Nachbarn. So entsteht der Schwarm.', 'Each fish only watches its neighbours. That is how the shoal forms.')],
+    school_jack: [
+        f('Am Schwanz haben sie eine Reihe harter Schuppen, wie eine kleine Säge.', 'Near the tail they have a row of hard scales, like a little saw.'),
+        f('Manche schwimmen neben großen Tieren her, zum Beispiel neben Haien.', 'Some swim alongside big animals, such as sharks.')],
+    school_sardine: [
+        f('Kommen Jäger, ziehen sie sich zu einer dichten, wirbelnden Kugel zusammen.', 'When hunters come, they pack into a tight, swirling ball.'),
+        f('Sie fressen winziges Plankton, das sie aus dem Wasser filtern.', 'They eat tiny plankton that they filter from the water.')],
     school_lantern: [
         f('Jede Nacht steigen sie aus der Tiefe nach oben, um zu fressen.', 'Every night they rise from the deep to feed.'),
         f('Es gibt mehr Laternenfische als fast jede andere Fischart.', 'There are more lanternfish than almost any other kind of fish.')],
