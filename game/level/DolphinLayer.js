@@ -84,7 +84,7 @@ export default class DolphinLayer {
         if (v.blowAt <= 0 && v.rings.length < DOLPHIN_RINGS.max) {
             v.blowAt = DOLPHIN_RINGS.every;
             const r = blowRing(ds[v.turn]); v.turn = 1 - v.turn;
-            if (Math.abs(r.x - fish.x) < 1100 && Math.abs(r.y - fish.y) < 700) play('whistle');
+            if (Math.abs(r.x - fish.x) < 1100 && Math.abs(r.y - fish.y) < 700) play('dolphin');
             r.img = this.scene.add.image(r.x, r.y, RING).setDepth(L.ringDepth).setAlpha(0);
             r.coin = this.scene.textures.exists('coin') ? this.scene.add.image(r.x, r.y, 'coin').setDepth(L.ringDepth - 0.01).setAlpha(0) : null;
             v.rings.push(r);

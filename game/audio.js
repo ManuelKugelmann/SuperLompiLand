@@ -47,13 +47,19 @@ const SAMPLE_FILES = {
     splash_a: 'sfx/splash_a.mp3', splash_b: 'sfx/splash_b.mp3',
     coin_glass: 'sfx/coin_glass.mp3',      // a tapped wine bottle (earshot: "a glass ting" z +4.1), rings at about 2104 Hz
     nest_chord: 'sfx/nest_chord.mp3',      // a glockenspiel chord ("a small bell" / "a success chime")
-    boom_thunder: 'sfx/boom_thunder.mp3'   // distant thunder for the eruption ("a distant thunder boom")
+    boom_thunder: 'sfx/boom_thunder.mp3',  // distant thunder for the eruption ("a distant thunder boom")
+    // Animal calls (user: "make sounds match animal type"): real recordings, the heralds and the whale and dolphins use them.
+    call_sea_lion: 'sfx/call_sea_lion.mp3', call_seal: 'sfx/call_seal.mp3', call_dugong: 'sfx/call_dugong.mp3',
+    call_otter: 'sfx/call_otter.mp3', call_dolphin: 'sfx/call_dolphin.mp3', call_whale: 'sfx/call_whale.mp3'
 };
 /** Gains and pitch of the recordings, set from earshot measurements (LUFS of the file -> the code-made sound's level). */
 const REAL = {
     coin: { gain: 0.093, hz: 2104, octaves: 2 },   // measured through the master: -23.6 LUFS like the old coin; two octaves above the melody note
     nest: { gain: 0.65 },                          // about -20 LUFS through the master (rare, may stand out a little)
-    boom: { gain: 0.39 }                           // about -18 LUFS through the master
+    boom: { gain: 0.39 },
+    call: { gain: 0.11 },                          // a herald's animal call: soft and a little far off (about -24 LUFS)
+    whale: { gain: 0.072 },                        // the humpback's call, about -20 LUFS through the mix
+    dolphin: { gain: 0.06 }                        // a dolphin's whistle, about -26 LUFS through the mix                           // about -18 LUFS through the master
 };
 /** The recorded splash's gain from a gentle plop to a full dive (under the master's make-up: the top stays under -1 dBFS). */
 const SPLASH_SAMPLE = { gain: [0.12, 0.34] };
@@ -324,7 +330,10 @@ const SOUNDS = {
     cannon() { tone({ f: 110, to: 320, type: 'sine', dur: 0.22, vol: 0.24 }); noise({ dur: 0.34, vol: 0.2, from: 400, to: 3200, q: 0.7 }); },
     boing() { tone({ f: 190, to: 560, type: 'triangle', dur: 0.2, vol: 0.2 }); tone({ f: 380, to: 300, type: 'sine', at: 0.16, dur: 0.14, vol: 0.1 }); },
     // Whale song: two long calls that slide, with a high answer.
-    whale() { tone({ f: 170, to: 330, dur: 1.5, vol: 0.24 }); tone({ f: 330, to: 150, at: 1.3, dur: 1.9, vol: 0.22 }); tone({ f: 660, to: 880, at: 2.2, dur: 0.9, vol: 0.08 }); },
+    /** A dolphin's whistle (real recording; the code-made whistle stays for other uses). */
+    dolphin() { if (!playSample('call_dolphin', REAL.dolphin.gain, 0.95 + Math.random() * 0.1)) SOUNDS.whistle(); },
+    whale() {
+        if (playSample('call_whale', REAL.whale.gain)) return; tone({ f: 170, to: 330, dur: 1.5, vol: 0.24 }); tone({ f: 330, to: 150, at: 1.3, dur: 1.9, vol: 0.22 }); tone({ f: 660, to: 880, at: 2.2, dur: 0.9, vol: 0.08 }); },
     hop() { tone({ f: 400, to: 800, type: 'sine', dur: 0.12, vol: 0.16 }); },
     // Old timbers groaning in the swell (the ghost ship, spec 5.0e; music/creak.js makes the samples).
     creak(k = 1) {
@@ -440,7 +449,9 @@ const SOUNDS = {
      * like the music noticing something big. Synthesized barks and chirps were tried and read as a snare
      * hit and an alarm clock (earshot), so real animal calls wait for recorded CC0 sounds.
      */
-    herald(notes = [392, 587.33]) {
+    herald(call = { notes: [392, 587.33] }) {
+        if (call.sample && playSample(call.sample, call.gain ?? REAL.call.gain)) return;
+        const notes = call.notes || [392, 587.33];
         notes.forEach((f, i) => tone({ f, type: 'sine', at: i * 0.12, dur: 2.2, vol: 0.022, rise: 0.6 }));
     },
     /** Going down past depth mark i (game/level/depthMeters.js): a soft bell, a step lower every mark. */

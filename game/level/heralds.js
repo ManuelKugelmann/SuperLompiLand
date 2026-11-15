@@ -1,6 +1,6 @@
 // Big animals are heard before they are seen (research 5.0x #14: "big animals announced by sound
 // first"). Pure, no Phaser: where each one lives and what is heard, once, a little before its place:
-// a soft musical swell, its two notes per animal (audio.js herald). Real recorded calls can replace it later.
+// the animal's own recorded call (a swell of two notes where it has none or the file is missing).
 
 import { whaleSharkSlot } from './whaleShark.js';
 import { seaLionSpot } from './seaLion.js';
@@ -12,8 +12,12 @@ import { DUGONG } from './DugongLayer.js';
 export const HERALDS = {
     lead: 2400,      // px before the animal's place at which it is heard (its picture is built from ~2600 on)
     late: 900,       // ... and not any more once the fish is closer than this (it is in view by then)
-    calls: {                      // the swell's two notes (Hz) per animal: big ones low, small ones higher
-        whale_shark: [392, 587.33], dugong: [349.23, 523.25], sea_lion: [440, 659.25], seal: [440, 554.37], sea_otter: [523.25, 783.99]
+    calls: {      // each animal's own recorded call (audio.js SAMPLE_FILES; gain measured through the game's mix to about -24 LUFS); the silent whale shark gets the swell
+        whale_shark: { notes: [392, 587.33] },
+        dugong: { sample: 'call_dugong', gain: 0.045, notes: [349.23, 523.25] },      // a manatee's chirp (close relative)
+        sea_lion: { sample: 'call_sea_lion', gain: 0.065, notes: [440, 659.25] },
+        seal: { sample: 'call_seal', gain: 0.067, notes: [440, 554.37] },             // a grey seal pup
+        sea_otter: { sample: 'call_otter', gain: 0.08, notes: [523.25, 783.99] }
     }
 };
 
