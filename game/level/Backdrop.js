@@ -202,14 +202,15 @@ export default class Backdrop {
             for (let j = Math.max(0, i - 3); j <= Math.min(n - 1, i + 3); j++) { sum += ys[j]; k++; }
             const crest = Math.min(1, Math.max(0, (sum / k - y) / C.crest));       // 0 in a trough, 1 on a crest
             rope.points[i].set(x, y + cfg.below);
+            const line = surface.lineAt ? surface.lineAt(x) : 1;
             if (cfg === C) {
-                A[i] = C.rest + (1 - C.rest) * crest * crest;
+                A[i] = (C.rest + (1 - C.rest) * crest * crest) * line;
                 const surf = surfAt(x);
                 if (surf > SP.surf && crest > SP.crest && Math.random() < SP.chance) {
                     const v = SP.speed[0] + Math.random() * (SP.speed[1] - SP.speed[0]);
                     this.scene.particles?.spawn('spray', x, y - 4, SP.n, { radius: 10, spread: 70, vy: -v });
                 }
-            } else A[i] = 0.4 + 0.6 * (1 - crest);      // streaks lie in the troughs between crests
+            } else A[i] = (0.4 + 0.6 * (1 - crest)) * line;      // streaks lie in the troughs between crests
         }
         rope.setAlphas(A).setDirty();
     }
@@ -258,6 +259,11 @@ export default class Backdrop {
                 if (i) { this.sea.fillTriangle(px, py, x, y, x, S.level + 1).fillTriangle(px, py, x, S.level + 1, px, S.level + 1); }
                 px = x; py = y;
             }
+            // Where something stands through the surface (surface.addCrossing: a pier) the line is broken, and a ring of foam sits there instead (foamRing.js).
+            const cut = this.lineCut || (this.lineCut = []);
+            cut.length = n;
+            for (let i = 0; i < n; i++) cut[i] = surface.lineAt ? surface.lineAt(this.foam.points[i].x) : 1;
+            this.foamBack.setAlphas(cut); this.foam.setAlphas(cut);
             this.foamBack.setDirty(); this.foam.setDirty();
             this.seaFade.setPosition(camX - 40, S.level).setDisplaySize(W + 80, S.fade);
             this.foamLine(this.caps, WATERLINE.caps, camX, t, 0, surface);

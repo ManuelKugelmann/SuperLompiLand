@@ -46,3 +46,14 @@ test('recentering keeps a ripple at its place in the world', () => {
     assert.ok(Math.abs(s.offsetAt(64) - before) < 1e-6);
     assert.equal(Math.abs(s.origin % SURFACE.spacing), 0);
 });
+
+test('a crossing breaks the surface line: gone inside, soft back in at both ends, whole again once removed', async () => {
+    const { WaterSurface, CROSSING } = await import('../game/level/surface.js');
+    const s = new WaterSurface(), id = s.addCrossing(1000, 1400);
+    assert.equal(s.lineAt(1200), 0);
+    assert.equal(s.lineAt(1000), 0);
+    assert.ok(s.lineAt(1000 - CROSSING.soft / 2) > 0 && s.lineAt(1000 - CROSSING.soft / 2) < 1);
+    assert.equal(s.lineAt(1400 + CROSSING.soft), 1);
+    s.removeCrossing(id);
+    assert.equal(s.lineAt(1200), 1);
+});

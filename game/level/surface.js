@@ -24,15 +24,35 @@ export const SURFACE = {
     maxOffset: 140
 };
 
+/** Where something stands through the surface (a pier, a trunk), the white line is broken: px over which it fades back in at each end. */
+export const CROSSING = { soft: 20 };
+
 export class WaterSurface {
     constructor(cfg = SURFACE) {
         this.cfg = cfg;
+        this.crossings = new Map();                // id -> [x0, x1]: stretches where something stands through the surface
+        this.nextCrossing = 1;
         this.h = new Float32Array(cfg.columns);   // offset from the swell (px, + = down)
         this.v = new Float32Array(cfg.columns);
         this.origin = 0;                           // world x of column 0 (multiple of spacing)
     }
 
     /** Keep the simulated window centred on `centerX`, carrying the ripples along. */
+    /** Something stands through the surface from x0 to x1 (world px): the surface line leaves that out. Returns an id for removeCrossing. */
+    addCrossing(x0, x1) { const id = this.nextCrossing++; this.crossings.set(id, [Math.min(x0, x1), Math.max(x0, x1)]); return id; }
+
+    removeCrossing(id) { this.crossings.delete(id); }
+
+    /** How much of the surface line shows at x: 0 inside a crossing, 1 away from all, soft in between (CROSSING.soft). */
+    lineAt(x, cfg = CROSSING) {
+        let k = 1;
+        for (const [x0, x1] of this.crossings.values()) {
+            const out = Math.max(x0 - x, x - x1);      // px outside the stretch (negative inside)
+            if (out < cfg.soft) k = Math.min(k, Math.max(0, out / cfg.soft));
+        }
+        return k;
+    }
+
     recenter(centerX) {
         const { spacing, columns } = this.cfg;
         const want = Math.round((centerX - (columns * spacing) / 2) / spacing) * spacing;
