@@ -297,9 +297,10 @@ export default class LevelGenerator {
         // for the chunks' own pictures follow right after the first view is built (update).
         ensureGrandArch(scene);
         if (scene.textures.exists('grand_garden')) ensureGardenGlow(scene);
-        this.atlases = LEVEL.atlas ? this.chunkAtlases() : null;
         // Tiles: one small density tile per chunk in a shared atlas, shaded by the graphics card (null: the painted pictures).
         this.tileAtlas = TILES && installTerrain(scene.game, mats) ? this.tileAtlasFor() : null;
+        // The painted pictures' atlases only where pictures are painted: with tiles they would hold ~74 MB of video memory for nothing.
+        this.atlases = LEVEL.atlas && !this.tileAtlas ? this.chunkAtlases() : null;
     }
 
     /** The atlas of density tiles (tileTerrain.js), made once per game like the picture atlases. */
@@ -498,7 +499,7 @@ export default class LevelGenerator {
             const [cx, cy] = key.split(',').map(Number);
             if (!wanted(cx, cy)) this.dropEarly(key);
         }
-        if (!this.started && !this.atlases) this.warmCanvasPool();      // after the first view has taken its canvases: the reserve for play
+        if (!this.started && !this.atlases && !this.tileAtlas) this.warmCanvasPool();      // after the first view has taken its canvases: the reserve for play
         this.started = true;
         this.viewReady = true;
         for (let cy = Math.max(0, Math.floor(camY / CH)); cy <= Math.floor((camY + H) / CH) && this.viewReady; cy++) {
