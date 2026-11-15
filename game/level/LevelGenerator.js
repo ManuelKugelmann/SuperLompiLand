@@ -11,6 +11,7 @@ import { docksSpot } from './docks.js';
 import { foamRing } from './foamRing.js';
 import { PROP_SKIRT, ensureSkirt, skirtTint } from './propSkirt.js';
 import { coinTooNear } from './coinClear.js';
+import { coinNearHook } from './longline.js';
 import { SET_PIECES, ghostShip } from './setPieces.js';
 import { MICRO, microAt, microKey } from './microScatter.js';
 import { makeMicroTextures, MICRO_ORIGIN_Y } from './MicroArt.js';
@@ -49,7 +50,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 42,
+    version: 43,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -1116,6 +1117,7 @@ export default class LevelGenerator {
         for (const c of this.storySpots) if ((c.x - x) ** 2 + (c.y - y) ** 2 < JOURNEY.clear ** 2) return;
         // Coins never lead into harm: none within reach of a hazard or along its chain (coinClear.js).
         for (const h of this.hazards) if (h.img.active && coinTooNear(x, y, h.x, h.y, h.chain)) return;
+        if (coinNearHook(x, y)) return;      // ... nor near a longline's hooks (longline.js)
         const s = this.scene;
         const img = s.textures.exists('coin')
             ? s.add.image(x, y, 'coin').setDisplaySize(72, 72)

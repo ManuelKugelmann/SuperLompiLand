@@ -27,6 +27,7 @@ export const LONGLINE = {
     far: 4600,           // ... and beyond which it is dropped
     turtleHang: 70,      // px the hooked turtle hangs below its hook
     hold: 1,             // s next to the turtle that nibble its line through
+    coinClear: 150,      // px round a hook's swing that stay free of coins (a coin trail is an invitation: never into a hook)
     seed: 5150
 };
 
@@ -93,6 +94,17 @@ export function longlineRescues(cfg = LONGLINE) {
     if (!span) return [];
     const b = branches(span, cfg).find(br => br.caught);
     return [{ id: 'longline', x: b.x, y: b.top + b.len + cfg.turtleHang, trap: 'hook', art: 'bag', kind: 'friend_turtle', hold: cfg.hold, event: 'longline' }];
+}
+
+let HOOKS = null;
+
+/** Whether a coin at (x, y) would lie within reach of a swinging hook (coins there are left out). */
+export function coinNearHook(x, y, cfg = LONGLINE) {
+    const span = longlineSpan(cfg);
+    if (!span || x < span.x0 - cfg.coinClear - cfg.sway || x > span.x1 + cfg.coinClear + cfg.sway) return false;
+    const list = cfg === LONGLINE ? (HOOKS ??= branches(span, cfg)) : branches(span, cfg), r = cfg.coinClear + cfg.sway;
+    for (const b of list) if (!b.caught && (x - b.x) ** 2 + (y - b.top - b.len) ** 2 < r * r) return true;
+    return false;
 }
 
 /** For the landmark map (worldMap.js): the line's middle. */

@@ -57,3 +57,12 @@ test('the turtle is a rescue to nibble free, and the line is the landmark of its
     assert.ok(LANDMARK_KINDS.includes('longline'));
     assert.ok(worldMap().features.some(f => f.kind === 'longline'));
 });
+
+test('no coin lies within reach of a swinging hook; elsewhere coins are left alone', async () => {
+    const { coinNearHook } = await import('../game/level/longline.js');
+    const b = branches(span).find(x => !x.caught);
+    assert.equal(coinNearHook(b.x, b.top + b.len), true);
+    assert.equal(coinNearHook(b.x + LONGLINE.sway + 60, b.top + b.len), true, 'its whole swing and a margin');
+    assert.equal(coinNearHook(b.x, b.top - 100), false, 'over the main line');
+    assert.equal(coinNearHook(span.x1 + 2000, 900), false, 'past the line');
+});
