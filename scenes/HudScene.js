@@ -36,6 +36,10 @@ export default class HudScene extends Phaser.Scene {
     }
 
     create({ main }) {
+        // A restarted HUD is the same scene object with new texts: forget what the old ones showed, or the coin count,
+        // depth line and hearts stay blank or stale until the value next changes (and a pending coin pop never ends).
+        this.shownCoins = this.shownDepth = this.shownHealth = undefined; this.popping = null; this.depthAt = 0; this.depthChanged = 0;
+        this.shownMark = main?.depthMarkAt;
         this.main = main;
         keepInSafeArea(this);     // the picture fills the whole screen; the HUD stays clear of notch and corners
         // Remember presses that landed on HUD elements, so the game scene can
