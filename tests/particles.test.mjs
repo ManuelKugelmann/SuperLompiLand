@@ -89,7 +89,7 @@ test('every preset is complete', () => {
         const p = PRESETS[id];
         for (const k of ['life', 'size', 'grow', 'drag', 'rise', 'coldRise', 'cool', 'alpha', 'color', 'colorEnd', 'surface', 'blend']) assert.ok(k in p, `${id}.${k}`);
         assert.ok(['pop', 'slick', 'pass', 'fall'].includes(p.surface), id);
-        assert.ok(['normal', 'add', 'glow'].includes(p.blend), id);
+        assert.ok(['normal', 'add', 'glow', 'front'].includes(p.blend), id);
     }
 });
 
