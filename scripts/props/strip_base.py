@@ -9,12 +9,13 @@ The base is everything reached from the picture's bottom, inside its lower part,
   grey  grey rock (little saturation): coral clusters of many colours on a stone
   dark  grey rock or a dark mossy disc
 It is faded out over a couple of pixels, crumbs left floating are dropped and the empty rows below trimmed.
-Originals are kept once under _ref/art_orig/ and always read from there, so a rerun is repeatable.
+Originals are kept once in the originals dir (outside public/) and always read from there, so a rerun is repeatable.
 
-    python -I scripts/props/strip_base.py
+    python -I scripts/props/strip_base.py <originals dir>      (e.g. ../_ref/art-src/bases)
 """
 import os
 import shutil
+import sys
 from collections import deque
 
 import numpy as np
@@ -22,7 +23,7 @@ from PIL import Image, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 IMG = os.path.join(ROOT, 'public', 'img')
-ORIG = os.path.join(ROOT, '_ref', 'art_orig')
+ORIG = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, '_ref', 'art-src', 'bases')
 
 # picture (under public/img): (share of the height from the top below which the base may lie, mode)
 PICTURES = {
