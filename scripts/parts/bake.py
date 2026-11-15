@@ -2,7 +2,8 @@
 # atlas per picture: public/img/parts/<key>.webp + public/img/parts/rig.json (frames, pivots,
 # roles, depth and the body's bulge map, read by game/rig/cards.js). Deterministic; re-run
 # after changing the spec or the art.
-# usage: python -I scripts/parts/bake.py <repo root> [<preview dir>]
+# usage: python -I scripts/parts/bake.py <repo root> [<preview dir>] [<key,key,...>]
+#   with keys: bakes only those and merges them into the existing rig.json (the others stay as they are)
 import sys, os, json
 sys.dont_write_bytecode = True
 import numpy as np
@@ -12,7 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from seg import poly_mask, refine, BAND
 
 ROOT = sys.argv[1]
-PREVIEW = sys.argv[2] if len(sys.argv) > 2 else None
+PREVIEW = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
+ONLY = set(sys.argv[3].split(',')) if len(sys.argv) > 3 else None
 IMG = os.path.join(ROOT, 'public', 'img')
 OUT = os.path.join(IMG, 'parts')
 spec = json.load(open(os.path.join(ROOT, 'scripts', 'parts', 'spec.json'), encoding='utf-8'))
@@ -112,10 +114,10 @@ def pack(items):
         pos.append((x, y)); x += w + PAD; shelf = max(shelf, h)
     return pos, y + shelf
 
-rig = {}
 os.makedirs(OUT, exist_ok=True)
+rig = json.load(open(os.path.join(OUT, 'rig.json'), encoding='utf-8')) if ONLY else {}
 for key, s in spec.items():
-    if key.startswith('_'): continue
+    if key.startswith('_') or (ONLY and key not in ONLY): continue
     src = load(key); H, W = src.shape[:2]
     body = load(s.get('body', key)).copy()
     centre = np.array(nd.center_of_mass(body[..., 3]))[::-1]
