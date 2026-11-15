@@ -5,6 +5,9 @@
 
 /** kind: 'creature' | 'place' | 'leftover'. `image` = texture key (places: the place's typical sight;
  *  a missing texture is drawn as a badge in the place's colours). */
+/** Pictures painted for the book only (loaded by the title screen); every other image is the game's own. */
+export const BOOK_ART = { open_blue: 'img/open_blue.webp' };      // scripts/fx/open_blue.py
+
 export const ENTRIES = [
     // Creatures (keys as in the level's friend table)
     { id: 'friend_turtle', kind: 'creature', image: 'friend_turtle',
@@ -171,7 +174,7 @@ export const ENTRIES = [
     { id: 'kelp', kind: 'place', image: 'kelp_stalk_1',
         name: { de: 'Tangwald', en: 'Seaweed forest' },
         fact: { de: 'Riesentang kann an einem einzigen Tag über 30 Zentimeter wachsen.', en: 'Giant kelp can grow more than 30 centimetres in a single day.' } },
-    { id: 'blue', kind: 'place', image: 'school_silverside',
+    { id: 'blue', kind: 'place', image: 'open_blue',
         name: { de: 'Blaues Meer', en: 'Open blue' },
         fact: { de: 'Das offene Meer bedeckt mehr von unserer Erde als alles Land zusammen.', en: 'The open ocean covers more of our planet than all the land together.' } },
     { id: 'wreck', kind: 'place', image: 'wreck_1',
