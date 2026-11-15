@@ -1,3 +1,4 @@
+import { installRopeBatching } from '../fx/ropeBatch.js';
 import { createPool, poolSize } from './workerPool.js';
 import { shareOf } from '../quality.js';
 import { rescueSpots } from '../rescues.js';
@@ -219,6 +220,7 @@ export default class LevelGenerator {
         this.lights = [];     // glows that follow a creature
         this.vents = [];      // bubble plants: columns of rising bubbles that lift the fish
         this.playerKey = getCharacter(scene.registry.get('character') || loadSelectedId())?.states.normal.key;      // the playable's picture
+        installRopeBatching();      // ropes join the shared batch (fx/ropeBatch.js)
         this.caustics = installCaustics(scene.game);      // false: no WebGL, or switched off
         this.causticsOn = true;     // the quality tier may take the caustics' shader off the world's pictures (setCaustics)
         this.buildMs = { last: 0, max: 0, count: 0 };   // ms a frame spent building chunks (last, worst) and how many frames did, shown by ?debug=perf
