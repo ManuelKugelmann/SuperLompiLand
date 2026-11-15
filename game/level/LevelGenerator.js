@@ -218,6 +218,7 @@ export default class LevelGenerator {
         this.chunks = new Map(); // "cx,cy" -> { objects[], bodies[] }
         this.coins = [];
         this.blockers = new Set();      // solid boats and decks there now (addBlocker)
+        this.rock = (x, y) => this.density(x, y) - LEVEL.threshold;      // > 0 inside rock: the distance field that keeps creatures out (ai/keepOut.js)
         this.hazards = [];
         this.friends = [];
         this.animated = [];

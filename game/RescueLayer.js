@@ -1,3 +1,4 @@
+import { keepOut } from './ai/keepOut.js';
 import { belowHud } from './escort.js';
 import Phaser from 'phaser';
 import { play } from './audio.js';
@@ -49,7 +50,8 @@ export const RESCUE_LOOK = {
     alongMax: 6,         // ... then it swims along with the fish for good (tester: "they follow, then vanish: strange"); only when more than this many follow, the one that has followed longest says goodbye ...
     alongOff: [-150, -110],   // ... the first at this place beside the fish (px behind, px above) ...
     alongStep: [-78, 46],     // ... each further one this much further behind, in turn above and below the line ...
-    alongEase: 0.09,     // ... easing there by this share per step (keeps up with a sprinting fish)
+    alongEase: 0.09,     // ... easing there by this share per step (keeps up with a sprinting fish) ...
+    alongClear: 36,      // ... and keeping this many px from rock (ai/keepOut.js)
     leaveMs: 1800,       // and fades as it swims off
     big: 1.9             // a big rescue (a turtle in a large ghost net, a landmark) is drawn this much larger
 };
@@ -167,6 +169,8 @@ export default class RescueLayer {
                     if (i >= L.alongMax) { a.state = 'leave'; a.left = L.leaveMs; continue; }
                     const ox = L.alongOff[0] + L.alongStep[0] * i, oy = L.alongOff[1] + (i % 2 ? L.alongStep[1] : 0);
                     a.px += (fish.x + ox - a.px) * k; a.py += (belowHud(fish.y + oy + Math.sin(t * 2.4 + a.seed) * 18, this.scene.cameras.main.worldView.y) - a.py) * k;      // never over the HUD's band
+                    // ... and never in rock (it follows the fish's path, which may cut a corner).
+                    if (this.scene.level?.rock) { const q = keepOut(a.px, a.py, L.alongClear, this.scene.level.rock, this.out || (this.out = { x: 0, y: 0 })); a.px = q.x; a.py = q.y; }
                 }
                 else { a.py -= 1.1 * frames; a.img.setAlpha(Math.max(0, a.left / L.leaveMs)); }
                 if (a.left <= 0) {
