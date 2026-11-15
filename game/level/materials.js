@@ -16,8 +16,8 @@ export const MAT = {
     share: 0.38         // rough share of the second material
 };
 
-/** Material per file under public/img/mat/ (colour `<name>.jpg`, height `<name>_h.jpg`); `reef` is made by scripts/mat/reef.py. */
-export const MATERIALS = ['limestone', 'sandstone', 'granite', 'mudstone', 'basalt', 'rust', 'reef'];
+/** Material per file under public/img/mat/ (colour `<name>.jpg`, height `<name>_h.jpg`); `reef` and `sand` (the sand skin's rippled sand) are made by scripts/mat/reef.py, sand.py. Eight fill the shader's 4 x 2 atlas. */
+export const MATERIALS = ['limestone', 'sandstone', 'granite', 'mudstone', 'basalt', 'rust', 'reef', 'sand'];
 
 /** [main, second] material per biome. */
 export const BIOME_MATERIALS = {
