@@ -8,6 +8,8 @@ export const SEA_FAR_LOOK = {
     socketTint: 0x04192c, // the island's socket: darker than the water around it, so it reads as rock
     snow: 44,            // flakes of marine snow
     snowFall: 22,        // px per second
+    snowFrom: 2250,      // world y (about 30 m: depthMeters.js) from which there is snow everywhere ...
+    snowFull: 1200,      // ... growing to full this many px deeper
     snowAlpha: 0.75,
     snowSizes: [18, 32, 50], // px across of a far, a middle and a near flake (the nearest are big and bright)
     passAlpha: 0.22,
@@ -165,15 +167,17 @@ export default class SeaFarLayer {
                 .setDisplaySize(w.size, w.size * o.frame.height / o.frame.width).setAlpha(L.wreckAlpha * sea);
         });
 
-        // Marine snow: sinks slowly, slides against the camera's movement, wraps round the screen.
-        const show = sea > 0.05 && camY > 60;
-        if (show && !this.snow.length) this.makeSnow();
-        this.snowLayer?.setVisible(show);
+        // Marine snow: sinks slowly, slides against the camera's movement, wraps round the screen. Out at sea, and anywhere
+        // from about 30 m down, more the deeper (spec 5.0w "depth must be felt": the water itself shows the depth).
+        const show = sea > 0.05 && camY > 60, deep = Math.min(1, Math.max(0, (camY + H / 2 - L.snowFrom) / L.snowFull));
+        const snow = Math.max(show ? sea : 0, deep), snowShow = snow > 0.02;
+        if (snowShow && !this.snow.length) this.makeSnow();
+        this.snowLayer?.setVisible(snowShow);
         for (const f of this.snow) {
-            if (!show) break;
+            if (!snowShow) break;
             f.x = ((f.x - dx * 0.6 * f.drift) % W + W) % W;
             f.y = ((f.y + (L.snowFall * dt - dy * 0.6) * f.drift) % H + H) % H;
-            f.setAlpha(L.snowAlpha * sea * (0.35 + 0.65 * (f.drift - 0.5)));
+            f.setAlpha(L.snowAlpha * snow * (0.35 + 0.65 * (f.drift - 0.5)));
         }
 
         // One big shape at a time, far away: it waits out of sight, crosses, and the next one is drawn.
