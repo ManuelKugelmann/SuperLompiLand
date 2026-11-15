@@ -40,3 +40,12 @@ test('the water darkens with depth, gently: as painted to 15 m, darker by 60 m, 
     let last = 1;
     for (let m = 0; m <= 3000; m += 5) { const b = depthLight(m); assert.ok(b <= last + 1e-12 && b >= 0.4, String(m)); last = b; }
 });
+
+test('light zones: sunlit to 200 m, twilight to 1000 m, midnight below; every depth mark of a zone border rings', async () => {
+    const { bandAt, DEPTH_BANDS, DEPTH_MARKS } = await import('../game/level/depthMeters.js');
+    assert.equal(bandAt(0).id, 'sunlit');
+    assert.equal(bandAt(199).id, 'sunlit');
+    assert.equal(bandAt(200).id, 'twilight');
+    assert.equal(bandAt(4000).id, 'midnight');
+    for (const b of DEPTH_BANDS.slice(1)) assert.ok(DEPTH_MARKS.at.includes(b.from), `a bell at ${b.from} m`);
+});

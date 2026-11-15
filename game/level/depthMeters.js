@@ -55,3 +55,20 @@ export function depthLight(m, table = DEPTH_LIGHT) {
     }
     return table.at(-1)[1];
 }
+
+/**
+ * The ocean's real light zones (spec 5.0w (5) and (6)): from `from` metres down. The HUD names the zone once
+ * Lompi is below the sunlit one, and entering a zone is announced with what is real about it.
+ */
+export const DEPTH_BANDS = [
+    { id: 'sunlit', from: 0, name: { de: 'Sonnenlichtzone', en: 'Sunlight zone' }, fact: { de: 'Hier wachsen Pflanzen im Licht', en: 'Plants grow here in the light' } },
+    { id: 'twilight', from: 200, name: { de: 'Dämmerlichtzone', en: 'Twilight zone' }, fact: { de: 'Hierher kommt kaum noch Sonnenlicht', en: 'Hardly any sunlight gets down here' } },
+    { id: 'midnight', from: 1000, name: { de: 'Mitternachtszone', en: 'Midnight zone' }, fact: { de: 'Ganz dunkel: hier leuchten die Tiere selbst', en: 'Pitch dark: the animals make their own light' } }
+];
+
+/** The light zone at `m` metres. */
+export function bandAt(m, bands = DEPTH_BANDS) {
+    let b = bands[0];
+    for (const x of bands) if (m >= x.from) b = x;
+    return b;
+}

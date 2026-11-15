@@ -90,7 +90,7 @@ import { seaArch } from '../game/level/seaArch.js';
 import { DOCKS, docksSpot } from '../game/level/docks.js';
 import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport, slowSteps, watchParts, splitFrame } from '../game/perfTour.js';
-import { depthMeters, createDepthBell } from '../game/level/depthMeters.js';
+import { depthMeters, createDepthBell, DEPTH_BANDS, DEPTH_MARKS } from '../game/level/depthMeters.js';
 import { heraldDue } from '../game/level/heralds.js';
 import OpeningLayer from '../game/OpeningLayer.js';
 import { openingSeen } from '../game/story/opening.js';
@@ -1979,7 +1979,12 @@ export default class MainScene extends Phaser.Scene {
         this.opening?.update(delta);
         // Depth is felt (spec 5.0w): past a depth mark a lower bell rings and the HUD's depth line glows.
         const mark = this.depthBell.step(this.depthMeters());
-        if (mark >= 0 && !this.ambientMode && !this.perfTour) { play('deeper', mark); this.depthMarkAt = time; }
+        if (mark >= 0 && !this.ambientMode && !this.perfTour) {
+            play('deeper', mark); this.depthMarkAt = time;
+            // Into a new light zone of the real ocean: its name and what is real about it (spec 5.0w).
+            const band = DEPTH_BANDS.find(b => b.from > 0 && b.from === DEPTH_MARKS.at[mark]);
+            if (band) this.announce(band.name[this.lang] || band.name.en, band.fact[this.lang] || band.fact.en);
+        }
         // Big animals are heard before they are seen (research 5.0x #14).
         const herald = this.ambientMode || this.perfTour ? null : heraldDue(this.fish.sprite.x, this.heard);
         if (herald) { this.heard.add(herald.id); play('herald', herald.call); }

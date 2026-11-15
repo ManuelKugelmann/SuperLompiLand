@@ -5,6 +5,7 @@ import { heartRow, textStyle, softText, pillImage } from '../game/ui/kit.js';
 import { CONTROL_SCHEMES } from '../game/controls/index.js';
 import { pwaMenuItems, VERSION_TAG } from '../game/pwa.js';
 import { BIOMES } from '../game/level/biomes.js';
+import { bandAt } from '../game/level/depthMeters.js';
 import { soundMenuItem, musicClock, nowSeconds } from '../game/audio.js';
 import { keepInSafeArea, canFullscreen, isFullscreen, toggleFullscreen } from '../game/orientation.js';
 import { SCENE_KEYS } from './keys.js';
@@ -227,8 +228,10 @@ export default class HudScene extends Phaser.Scene {
         if (tick - (this.depthAt || 0) > 1000 / HUD.depthHz) {
             this.depthAt = tick;
             // Where am I (tester: 'it used to say where I am'): the place stays next to the depth.
-            const place = BIOMES[m.biomeIndex]?.name?.[m.lang] || BIOMES[m.biomeIndex]?.name?.en || '';
-            const line = place ? `${this.depthLabel} ${m.depthMeters()} m · ${place}` : `${this.depthLabel} ${m.depthMeters()} m`;
+            // Below the sunlit water the line names the ocean's light zone instead (spec 5.0w).
+            const metres = m.depthMeters(), band = bandAt(metres);
+            const place = band.from > 0 ? (band.name[m.lang] || band.name.en) : (BIOMES[m.biomeIndex]?.name?.[m.lang] || BIOMES[m.biomeIndex]?.name?.en || '');
+            const line = place ? `${this.depthLabel} ${metres} m · ${place}` : `${this.depthLabel} ${metres} m`;
             if (line !== this.shownDepth) { this.shownDepth = line; this.depthText.setText(line); this.depthChanged = tick; }
             this.depthText.setAlpha(tick - (this.depthChanged || 0) > HUD.depthRest[0] ? HUD.depthRest[1] : 1);
         }
