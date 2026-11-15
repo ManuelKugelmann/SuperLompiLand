@@ -316,6 +316,10 @@ export default class LevelGenerator {
         this.tileAtlas = TILES && installTerrain(scene.game, mats) ? this.tileAtlasFor() : null;
         // The painted pictures' atlases only where pictures are painted: with tiles they would hold ~74 MB of video memory for nothing.
         this.atlases = LEVEL.atlas && !this.tileAtlas ? this.chunkAtlases() : null;
+        // A lost WebGL context comes back with empty textures (an Android PWA sent to the background; review): every chunk is
+        // dropped and the view built again, its pictures with it (else the terrain is gone while its collision stays).
+        const r = scene.game.renderer, restore = () => { for (const key of [...this.chunks.keys()]) this.drop(key); this.started = false; };
+        if (r?.on) { r.on(Phaser.Renderer.Events.RESTORE_WEBGL, restore); scene.events.once('shutdown', () => r.off(Phaser.Renderer.Events.RESTORE_WEBGL, restore)); }
     }
 
     /** The atlas of density tiles (tileTerrain.js), made once per game like the picture atlases. */

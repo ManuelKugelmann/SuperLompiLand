@@ -26,6 +26,9 @@ export default class RockLayers {
         this.scene = scene;
         this.layers = ROCK_LAYERS.map(def => ({ def, chunks: new Map(), atlas: this.atlasFor(def) }));   // "cx,cy" -> { img, key | place } | 'pending'
         this.ready = [];
+        // A lost WebGL context comes back with empty textures: the layers' chunks are dropped and asked for again.
+        const r = scene.game.renderer, restore = () => { for (const l of this.layers) { for (const c of l.chunks.values()) if (c !== 'pending') this.drop(l, c); l.chunks.clear(); } this.ready.length = 0; };
+        if (r?.on) { r.on('restorewebgl', restore); this.offRestore = () => r.off('restorewebgl', restore); }
         try {
             this.worker = new Worker(new URL('./terrainWorker.js', import.meta.url), { type: 'module' });
             this.worker.onmessage = e => this.ready.push(e.data);
@@ -134,6 +137,7 @@ export default class RockLayers {
     }
 
     destroy() {
+        this.offRestore?.();
         this.worker?.terminate();
         for (const l of this.layers) {
             for (const c of l.chunks.values()) if (c !== 'pending') this.drop(l, c);

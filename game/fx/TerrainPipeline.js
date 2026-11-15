@@ -266,16 +266,24 @@ export function installTerrain(game, materials) {
     if (materials && !p.matTexture) {
         const N = MAT.size;
         p.matTexture = r.createTexture2D(0, gl.LINEAR, gl.LINEAR, gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE, gl.RGBA, null, N * 4, N * 2, false, false, false);
-        gl.activeTexture(gl.TEXTURE0);
-        const before = gl.getParameter(gl.TEXTURE_BINDING_2D);
-        gl.bindTexture(gl.TEXTURE_2D, p.matTexture.webGLTexture);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);      // A is the stone's height, not a cover
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        MATERIALS.forEach((m, i) => gl.texSubImage2D(gl.TEXTURE_2D, 0, (i % 4) * N, Math.floor(i / 4) * N, N, N, gl.RGBA, gl.UNSIGNED_BYTE, materials[i]));
-        gl.bindTexture(gl.TEXTURE_2D, before);
+        uploadMaterials(gl, p.matTexture, materials);
+        // A lost WebGL context (an Android PWA sent to the background) comes back with empty textures: the stone tiles go up again.
+        r.on(Phaser.Renderer.Events.RESTORE_WEBGL, () => uploadMaterials(r.gl, p.matTexture, materials));
         for (const [name] of NAMES) pipes.get(name).matTexture = p.matTexture;
     }
     return true;
+}
+
+/** The material tiles into their texture (4 x 2 places), unit 0's binding put back. */
+function uploadMaterials(gl, tex, materials) {
+    const N = MAT.size;
+    gl.activeTexture(gl.TEXTURE0);
+    const before = gl.getParameter(gl.TEXTURE_BINDING_2D);
+    gl.bindTexture(gl.TEXTURE_2D, tex.webGLTexture);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);      // A is the stone's height, not a cover
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    MATERIALS.forEach((m, i) => gl.texSubImage2D(gl.TEXTURE_2D, 0, (i % 4) * N, Math.floor(i / 4) * N, N, N, gl.RGBA, gl.UNSIGNED_BYTE, materials[i]));
+    gl.bindTexture(gl.TEXTURE_2D, before);
 }
 
 /** Per frame: the view's top left in the world. */
