@@ -1525,6 +1525,7 @@ export default class MainScene extends Phaser.Scene {
         // A coin in a streak (x2, x3) or collected in flow really counts more (chain.js).
         this.coins += coinWorth(note.multiplier, !this.relaxed && this.chain.flow);
         play('coin', note);
+        this.fish.rig.blub?.();      // a little o of the mouth (rig/RigMouth.js)
         this.streakFx(x, y, note);
         this.particles.spawn('glint', x, y, 6, { spread: 70 });      // pooled sparkle: nothing of a taken coin stays behind
     }

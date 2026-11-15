@@ -2,6 +2,7 @@ import { SHEEN, sheenFor, sheenTint } from './rig/sheen.js';
 import Phaser from 'phaser';
 import Rig from './Rig.js';
 import RigEyes from './rig/RigEyes.js';
+import RigMouth from './rig/RigMouth.js';
 import { faceOf } from './rig/faces.js';
 import { Breath, BREATH } from './rig/breath.js';
 import { CHARACTERS } from './characters.js';
@@ -137,7 +138,7 @@ export default class CardRig {
             set.eyes = new RigEyes(scene, face.eyes, (this.char.id || st.key).length + Object.keys(this.sets).length);
             set.eyeAt = face.eyes.at.map(anchor);
         }
-        if (face?.mouth) set.mouthAt = anchor(face.mouth);
+        if (face?.mouth) { set.mouthAt = anchor(face.mouth); set.mouth = new RigMouth(scene); }
         return set;
     }
 
@@ -154,7 +155,7 @@ export default class CardRig {
     setVisible(on) {
         this.shown = on;
         for (const e of this.sets[this.state].entries) e.rope.setVisible(on && e.drawn);
-        if (!on) this.sets[this.state].eyes?.hide();
+        if (!on) { this.sets[this.state].eyes?.hide(); this.sets[this.state].mouth?.hide(); }
         return this;
     }
 
@@ -171,6 +172,7 @@ export default class CardRig {
         for (const set of Object.values(this.sets)) {
             set.entries.forEach((e, i) => e.rope.setDepth(d + i * 0.001));
             set.eyes?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 + 0.0005);      // on the body, under the fins in front
+            set.mouth?.setDepth(d + set.entries.indexOf(set.bodyEntry) * 0.001 + 0.0004);
         }
         return this;
     }
@@ -302,7 +304,8 @@ export default class CardRig {
             const ox = k.dx * sx * flip, oy = k.dy * sy;
             out.x = x + verts[k.s * 2] + ox * cr - oy * sr; out.y = y + verts[k.s * 2 + 1] + ox * sr + oy * cr; out.s = sc;
         };
-        if (br.blub && set.mouthAt && this.shown && spread < 0.5) { pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); }
+        if (br.blub && set.mouthAt && this.shown && spread < 0.5) { pointAt(set.mouthAt, MOUTH); this.scene.particles?.spawn('bubble', MOUTH.x, MOUTH.y, 1); set.mouth.blub(); }
+        if (set.mouth) { pointAt(set.mouthAt, MOUTH); set.mouth.update(MOUTH, H, rotation, this.shown ? view.alpha : 0, frames / 60); }
         if (set.eyes) {
             if (!this.shown) set.eyes.hide();
             else {
@@ -316,8 +319,11 @@ export default class CardRig {
     /** Where the eyes look (a world point; null: ahead), and how frightened they are (0..1). */
     lookAt(point, scared = 0) { this.look = point; this.scared = scared; return this; }
 
+    /** The mouth opens into a little o and closes (a coin taken, a breath's bubble). */
+    blub() { this.sets[this.state].mouth?.blub(); return this; }
+
     destroy() {
-        for (const set of Object.values(this.sets)) { for (const e of set.entries) e.rope.destroy(); set.eyes?.destroy(); }
+        for (const set of Object.values(this.sets)) { for (const e of set.entries) e.rope.destroy(); set.eyes?.destroy(); set.mouth?.destroy(); }
     }
 }
 
