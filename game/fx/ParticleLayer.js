@@ -133,6 +133,8 @@ export default class ParticleLayer {
         for (const k in C) {
             const { rt, dots } = C[k];
             if (rt.width !== want) rt.resize(want, Math.ceil(this.scene.scale.height * SOFT.scale));
+            // Empty, it is not drawn at all: its blur is several passes over the whole screen, every frame it is shown.
+            rt.setVisible(dots.used > 0);
             if (!dots.used && !rt.wasUsed) continue;
             rt.camera.setScroll(cam.scrollX, cam.scrollY);
             rt.clear();
