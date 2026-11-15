@@ -32,9 +32,14 @@ function ensureSocket(scene) {
     const T = SKY.socket.top / 2, bulge = [r(), r(), r(), r()];
     // Smooth noise only (low sines): per-vertex jitter read as stair steps once the texture is stretched.
     const edge = (v, side) => { const b = bulge[side > 0 ? 0 : 1] * 6, k = bulge[side > 0 ? 2 : 3] * 6; return side * W * (T + (0.47 - T) * Math.pow(v, 0.8) + 0.03 * Math.sin(v * 9 + b) + 0.012 * Math.sin(v * 23 + k) * (0.3 + v)); };
-    c.beginPath(); c.moveTo(W / 2 - T * W, 0); c.lineTo(W / 2 + T * W, 0);
-    for (let v = 0; v <= 1.0001; v += 0.04) c.lineTo(W / 2 + edge(v, 1), v * H);
-    for (let v = 1; v >= -0.0001; v -= 0.04) c.lineTo(W / 2 + edge(v, -1), v * H);
+    // Rounded shoulders at the top (square corners read blocky under the volcano): the top edge is a
+    // little narrower and curves out into the sides over the first SHOULDER of the height.
+    const SHOULDER = 0.07, inset = 0.8;
+    c.beginPath(); c.moveTo(W / 2 - T * W * inset, 0); c.lineTo(W / 2 + T * W * inset, 0);
+    c.quadraticCurveTo(W / 2 + T * W, 0, W / 2 + edge(SHOULDER, 1), SHOULDER * H);
+    for (let v = SHOULDER; v <= 1.0001; v += 0.04) c.lineTo(W / 2 + edge(v, 1), v * H);
+    for (let v = 1; v >= SHOULDER - 0.0001; v -= 0.04) c.lineTo(W / 2 + edge(v, -1), v * H);
+    c.quadraticCurveTo(W / 2 - T * W, 0, W / 2 - T * W * inset, 0);
     c.closePath();
     const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#3a4652'); g.addColorStop(0.5, '#2b3744'); g.addColorStop(1, '#1f2a36');
     c.fillStyle = g; c.shadowColor = '#2b3744'; c.shadowBlur = 18; c.fill(); c.shadowBlur = 0;      // a soft rim: far rock, out of focus
