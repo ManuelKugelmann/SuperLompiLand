@@ -13,8 +13,9 @@ const SEGMENTS = 10;      // points of a swaying strip (opts.segments: fewer on 
  */
 export function makeCritter(scene, key, x, y, width, anim = 'still', opts = {}) {
     const sways = anim === 'sway';
-    const obj = sways ? scene.add.rope(x, y, key, null, opts.segments ?? SEGMENTS, false) : scene.add.image(x, y, key);
-    const base = width / obj.frame.width;
+    const [tex, frame] = Array.isArray(key) ? key : [key];      // a texture key, or [texture, frame] (a picture in a shared atlas: art.js)
+    const obj = sways ? scene.add.rope(x, y, tex, frame ?? null, opts.segments ?? SEGMENTS, false) : scene.add.image(x, y, tex, frame);
+    const base = width / (sways ? obj.frame.width : obj.frame.realWidth);      // a strip spans its frame's cut; an image its untrimmed size
     const baseY = opts.scaleY ?? base;   // plants set their own height
     const phase = (Math.abs(x) * 0.013 + Math.abs(y) * 0.007) % 6.28; // desync neighbours
     const speed = opts.speed ?? 1;
