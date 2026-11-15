@@ -91,7 +91,10 @@ export default class RigEyes {
         this.E = E;
         this.spec = spec;
         this.depth = 0;
-        this.eyes = spec.at.map((at, i) => ({ at, gaze: new Gaze(seed * 13 + i * 7) }));
+        // One gaze for both eyes (user 2026-11-15: "both eyes need to look, the backside one too; sync blink"):
+        // they look the same way and blink together, as real eyes do.
+        this.gaze = new Gaze(seed * 13);
+        this.eyes = spec.at.map(at => ({ at }));
         this.parts = null;       // made while shown, given back when not (out of view the eyes cost nothing)
     }
 
@@ -132,16 +135,18 @@ export default class RigEyes {
         if (view.alpha <= 0.01) { this.hide(); return; }
         if (!this.parts) this.make();
         const cr = Math.cos(view.rotation), sr = Math.sin(view.rotation), W = E.tex;
+        // Where to look, from the first (nearest) eye, in its radii; every eye then follows the one gaze.
+        place(this.eyes[0].at, P);
+        let tx = 1, ty = 0;
+        if (look) {
+            const r0 = Math.min(this.eyes[0].at.rx, this.eyes[0].at.ry), dx = look.x - P.x, dy = look.y - P.y;
+            const ax = dx * cr + dy * sr, ay = -dx * sr + dy * cr;      // into the body's frame
+            tx = ax * view.facing / (r0 * P.sy) * E.look; ty = -ay / (r0 * P.sy) * E.look;
+        }
+        const g = this.gaze.update(dt, { x: tx, y: ty }, opts);
         for (const e of this.eyes) {
             place(e.at, P);
             const kx = P.sx, ky = P.sy, rx = e.at.rx * kx, ry = e.at.ry * ky, r = Math.min(e.at.rx, e.at.ry);
-            let tx = 1, ty = 0;
-            if (look) {
-                const dx = look.x - P.x, dy = look.y - P.y;
-                const ax = dx * cr + dy * sr, ay = -dx * sr + dy * cr;      // into the body's frame
-                tx = ax * view.facing / (r * ky) * E.look; ty = -ay / (r * ky) * E.look;
-            }
-            const g = e.gaze.update(dt, { x: tx, y: ty }, opts);
             const happy = opts?.happy || 0, lid = Math.max(g.lid, happy * E.squint);
             const shut = q.lids ? 1 : (1 - Math.max(0, (lid - EYES_REST) / (1 - EYES_REST))) * (1 - happy * E.smile * 0.6);
             const ox = g.x * E.travel * rx * view.facing, oy = -g.y * E.travel * ry;

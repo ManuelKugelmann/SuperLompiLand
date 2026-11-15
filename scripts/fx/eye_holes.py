@@ -12,14 +12,14 @@ from scipy.spatial import ConvexHull
 
 ROOT = sys.argv[1]
 EYES = {
-    'puffer_normal': [(372, 117, 50, 52)],
+    'puffer_normal': [(372, 117, 50, 52), (482, 118, 21, 32)],      # the far eye at the picture's edge too (user: "both eyes need to look")
     'puffer_inflated': [(232, 182, 52, 56), (405, 152, 38, 48)],
     'player_shark': [(350, 175, 33, 31)],
-    'player_flyingfish': [(432, 128, 30, 27)],
-    'player_firefish': [(402, 233, 41, 41)],
-    'friend_turtle': [(390, 63, 38, 38)],
+    'player_flyingfish': [(432, 128, 30, 27), (497, 122, 8, 16)],
+    'player_firefish': [(402, 233, 41, 41), (491, 224, 17, 28)],
+    'friend_turtle': [(390, 63, 38, 38), (490, 115, 17, 25)],
     'friend_jellyfish': [(70, 158, 21, 23), (151, 117, 25, 27)],
-    'friend_seahorse': [(192, 138, 30, 32)],
+    'friend_seahorse': [(192, 138, 30, 32), (257, 121, 10, 18)],
     'friend_parrotfish': [(404, 131, 38, 40)],
 }
 SEARCH = 1.3      # look this much beyond the listed half sizes
