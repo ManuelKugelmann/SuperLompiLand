@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { OPENING, captionOf } from './story/opening.js';
 import { createTimeline } from './timeline.js';
 import { createRig } from './CardRig.js';
+import { keepApart } from './friendFlock.js';
 import { play } from './audio.js';
 import { MENU } from './ui/GameMenu.js';
 
@@ -88,6 +89,7 @@ export default class OpeningLayer {
             else {
                 const tx = fish.x + Math.cos(this.t * 0.7 + f.phase) * L.ring[0], ty = fish.y + Math.sin(this.t * 0.9 + f.phase) * L.ring[1];
                 f.x += (tx - f.x) * Math.min(1, dt * 1.5); f.y += (ty - f.y) * Math.min(1, dt * 1.5);
+                keepApart(f, this.friends, fish);      // round him, never through him or each other (same rule as the flock)
             }
             const frames = Math.max(dt * 60, 0.01);
             f.rig.lookAt?.(this.fleeing ? null : { x: fish.x, y: fish.y });
