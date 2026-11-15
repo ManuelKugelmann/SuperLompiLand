@@ -6,7 +6,8 @@ import { createGrumpy, stepGrumpy, calmGrumpy } from './ai/grumpy.js';
 import { rigProfile, poseOf } from './ai/pose.js';
 
 export const CREATURE = {
-    grow: 0.18,        // share of the way to its new size per frame (curling in, puffing up)
+    grow: 0.18,        // share of the way to its new size per 60th of a second (curling in, puffing up)
+    idleEvery: 4,      // out of view it thinks only every so many frames (with all the time that passed: same pace, a quarter of the work)
     turn: 0.08,        // radians per step the nose may turn
     calmRadius: 320,   // px: a special this close calms a grumpy before it shoves
     lookWithin: 650,   // px: closer than this, its eyes follow the swimmer (rig/RigEyes.js)
@@ -58,6 +59,11 @@ export default class Creature {
      */
     step(t, dt, water, ground, seen = true) {
         let event = null;
+        if (!seen && this.seen === false) {      // out of view: its mind takes turns, the time it skipped added on
+            this.lag = (this.lag || 0) + dt;
+            if ((this.tick = (this.tick || 0) + 1) % CREATURE.idleEvery) return null;
+            dt = Math.min(this.lag, 0.2); this.lag = 0;
+        } else this.lag = 0;
         if (dt > 0) {
             if (this.crawler) stepCrawler(this.crawler, dt, ground);
             const g = this.grumpy;
@@ -73,7 +79,7 @@ export default class Creature {
         this.x = p.x; this.y = p.y;
         if (seen !== this.seen) { this.seen = seen; this.rig.setVisible(seen); }
         if (!seen) return event;
-        this.size += (p.size - this.size) * CREATURE.grow;
+        this.size += (p.size - this.size) * (1 - Math.pow(1 - CREATURE.grow, Math.max(0, dt) * 60));      // by time, not by frame
         this.rig.zoom = this.size;
         const pl = water?.player;
         this.rig.lookAt?.(pl && Math.hypot(pl.x - p.x, pl.y - p.y) < CREATURE.lookWithin ? pl : null);
