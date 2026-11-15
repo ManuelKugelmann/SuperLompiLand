@@ -52,7 +52,7 @@ export const CHARACTERS = [
         states: one('player_firefish', 210, 60, 18)
     },
     {
-        id: 'turtle', name: 'Schildi', blurb: { de: 'Langsam, hält viel aus · rollt als Panzer', en: 'Slow but tough · rolls as a shell' },
+        id: 'turtle', name: 'Schildi', blurb: { de: 'Langsam, hält viel aus · taucht ab wie ein Stein', en: 'Slow but tough · drops like a stone' },
         special: 'shell', thrust: 0.7, maxSpeed: 0.75, drag: 1.1, turn: 0.7, armor: 0.5, anim: 'paddle', soft: 0.35, wave: { part: 'flipper' },
         states: one('friend_turtle', 250, 70, 14)
     },

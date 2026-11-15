@@ -66,10 +66,11 @@ export const SPECIALS = {
             mode: { ms: 2300, drag: 3.5, flow: 3 }, burst: 'spines', color: 0xffd9c2, sound: 'fan'
         })
     },
-    // Schildi — shell: tucks in and becomes a heavy, bouncy stone that sinks and rolls;
-    // whatever it touches bounces off.
+    // Schildi — dive: a sea turtle cannot pull into its shell, but its heavy shell protects it and it can
+    // drop like a stone to the bottom (user 2026-11-15: "animal specialties oriented on real world");
+    // whatever it touches bounces off the hard shell.
     shell: {
-        label: { de: 'Panzer', en: 'shell' },
+        label: { de: 'abtauchen', en: 'dive' },
         cooldown: 4200, air: true,
         start: ({ vx, vy }) => ({
             vx, vy, shield: 2800, mode: { ms: 2800, drag: 0.45, sink: 5, bounce: 0.88, tuck: 0.2 }, burst: 'none', sound: 'shell'
