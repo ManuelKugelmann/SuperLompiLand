@@ -84,6 +84,14 @@ export default class DeepGlowLayer {
         });
     }
 
+    /** Glowing jellies and strings within `r` px of (x, y) (the music's glow layer listens to them). */
+    countNear(x, y, r) {
+        let n = 0;
+        const r2 = r * r;
+        for (const cell of this.live.values()) for (const { g } of cell) if (g.kind !== 'spark' && (g.x - x) ** 2 + (g.y - y) ** 2 < r2) n++;
+        return n;
+    }
+
     /** view = camera world view {x, y, width, height}; t = s; night = 0 day .. 1 full night (light.js nightShare). */
     update(view, t, night = 0) {
         const C = DEEP_GLOW.cell, m = GLOW_LOOK.margin;

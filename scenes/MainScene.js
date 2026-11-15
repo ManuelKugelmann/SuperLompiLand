@@ -1905,7 +1905,9 @@ export default class MainScene extends Phaser.Scene {
                 const life = this.level.lifeNear(sp.x, sp.y, MUSIC_NEAR.r), b = BIOMES[biomeIndexAt(sp.x)];
                 const floor = this.seabedBelow(sp.x, sp.y), nearFloor = floor === null ? 0 : Math.max(0, 1 - (floor - sp.y) / MUSIC_NEAR.floor);
                 const near = earshot(life, (b.coral || 0) + (b.kelp || 0), nearFloor, this.swarms.near(sp.x, sp.y, MUSIC_NEAR.r).length);
-                setMusicLayers(layerLevels({ ...near, friends: this.school.friends.length + (this.mp?.characters().length || 0) }));
+                near.glow += this.deepGlow?.countNear(sp.x, sp.y, MUSIC_NEAR.r) || 0;      // the deep's glowing jellies and strings
+                this.musicLayers = layerLevels({ ...near, friends: this.school.friends.length + (this.mp?.characters().length || 0) });      // kept for checks (?debug)
+                setMusicLayers(this.musicLayers);
             }
             // The storm rumbles overhead (loudest near the surface); strong moving water rushes past the fish.
             const p = this.soundProbe || (this.soundProbe = { x: 0, y: 0 }), waves = this.waves ?? this.wavePhase();
