@@ -124,7 +124,7 @@ export default class RigEyes {
         const cr = Math.cos(view.rotation), sr = Math.sin(view.rotation), W = E.tex, bead = this.spec.bead !== undefined;
         for (const e of this.eyes) {
             place(e.at, P);
-            const rx = e.at.rx * P.s, ry = e.at.ry * P.s, r = Math.min(rx, ry);
+            const rx = e.at.rx * P.s * Math.max(view.edge, 0.3), ry = e.at.ry * P.s, r = Math.min(rx, ry);      // narrows with the body in a turn
             // Where to look, in eye radii in the eye's own frame (x toward the nose, y up).
             let tx = 1, ty = 0;
             if (look) {

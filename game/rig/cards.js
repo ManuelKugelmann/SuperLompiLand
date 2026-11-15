@@ -29,6 +29,7 @@ export const CARDS = {
     twin: { shift: [-0.035, -0.05], dark: 0.66, z: -0.6 },   // far twin of a paired fin
     spreadRate: 0.12,       // share per 60 Hz step by which wings open or fold
     turnMs: 300,            // a turn-around (nose swings toward the viewer, through edge-on)
+    turnMin: [0.3, 0.12],   // in a turn the body keeps this share of its width (user: "when turning, creatures look too flat") until |cos yaw| is under the second number: only there, at the mirror, it thins out (a frame or two)
     sway: 0.012,            // idle yaw rocking (radians) ...
     swayMore: 0.03,         // ... plus this much at full effort
     driveCurve: 1.6,        // effort is eased in: light swimming moves little, only real effort moves a lot
@@ -334,13 +335,14 @@ const LIGHT = (() => { const [x, y, z] = CARDS.light, L = Math.hypot(x, y, z); r
  */
 export function project(card, posed, v, verts, bright, alpha, hue = null) {
     const cy = Math.cos(v.yaw), sy = Math.sin(v.yaw), cr = Math.cos(v.rotation), sr = Math.sin(v.rotation);
+    const wide = Math.max(cy, CARDS.turnMin[0] * smooth(0, CARDS.turnMin[1], Math.abs(cy)));      // never paper-thin, except right at the mirror
     const kx = v.sx * v.facing, ky = v.sy;
     const strip = card.strip;
     for (let s = 0; s < strip.length; s++) {
         const i = strip[s];
         const X = posed.x[i], Z = posed.z[i];
         // Near edge-on the depth's share of the width fades, so the mirror at edge-on is seamless.
-        const x1 = X * cy + Z * sy * Math.min(1, Math.abs(cy) * 3), z1 = -X * sy + Z * cy;
+        const x1 = X * wide + Z * sy * Math.min(1, Math.abs(cy) * 3), z1 = -X * sy + Z * cy;
         const rest = posed.rz[i];
         const p = v.dist / (v.dist - (z1 - rest));
         const lx = x1 * p * kx, ly = posed.y[i] * p * ky;
