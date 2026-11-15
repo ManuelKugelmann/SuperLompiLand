@@ -87,6 +87,8 @@ import { BRANCH, caveFlow } from '../game/level/branches.js';
 import { createPerfTour, perfReport, slowSteps, watchParts, splitFrame } from '../game/perfTour.js';
 import { depthMeters, createDepthBell } from '../game/level/depthMeters.js';
 import { heraldDue } from '../game/level/heralds.js';
+import OpeningLayer from '../game/OpeningLayer.js';
+import { openingSeen } from '../game/story/opening.js';
 import { ventSpot } from '../game/level/ventField.js';
 import { updateCaustics, catchCaustics } from '../game/fx/CausticsPipeline.js';
 import { surgeAt, breakerAt, ripAt, surfZones } from '../game/level/surf.js';
@@ -268,6 +270,8 @@ export default class MainScene extends Phaser.Scene {
         // indefinitely"): those freed before this start are there from the first frame, the newest nearest.
         this.school = new FriendSchool(this);
         for (const ch of this.journey.list) if (ch.friend && this.journey.has(ch.friend.id)) this.school.add(ch.friend);
+        this.wantOpening = !this.ambientMode && (this.registry.get('opening') || !openingSeen(window.localStorage));
+        this.registry.set('opening', false);
         this.beats = this.ambientMode ? null : new StoryBeats(this, this.journey, x => this.level.field.routeY(x), (ch, x, y) => this.freeFriend(ch, x, y),
             (ch, x, y) => { this.school.add(ch.friend, x, y); this.powerNews(ch.friend.id); });
         this.shellUsed = 0;      // hits Schildi's shell has taken since the last nest (spec 5.0r)
@@ -621,6 +625,7 @@ export default class MainScene extends Phaser.Scene {
 
     /** Big friendly line of text in the middle of the screen (shown by the HUD). */
     announce(title, subtitle = '') {
+        if (this.opening?.active && !this.opening.speaking) return;      // the opening story has the banner to itself
         if (this.scene.isActive(HUD_KEY)) this.scene.get(HUD_KEY).banner?.(title, subtitle);   // no HUD in ambient mode
     }
 
@@ -1051,6 +1056,12 @@ export default class MainScene extends Phaser.Scene {
 
     depthMeters() {
         return depthMeters(this.fish.sprite.y);
+    }
+
+    /** Start the steering scheme afresh (after the opening story, so its ghost-finger lesson plays now). */
+    restartController() {
+        this.controller.destroy();
+        this.controller = makeController(this.activeScheme, this, this.fish);
     }
 
     switchScheme(id) {
@@ -1555,7 +1566,8 @@ export default class MainScene extends Phaser.Scene {
             const p = this.fish.sprite;
             const f = this.autopilot.step(STEP_MS / 1000, p.x, p.y);
             if (f.x || f.y) this.fish.thrust(this.autoDir.set(f.x, f.y));
-        } else if (!this.downTimer) this.controller.update(STEP_MS);
+        } else if (this.opening?.active) this.fish.brake();      // the opening story plays: steering waits
+        else if (!this.downTimer) this.controller.update(STEP_MS);
         // Swimming close to friends makes everyone a little faster (a school).
         this.fish.boost = 1 + WORLD.schoolBoost * Math.min(2, this.mp?.nearFriends(this.fish.sprite.x, this.fish.sprite.y, WORLD.schoolRadius) ?? 0);
         if (this.keys) {
@@ -1859,6 +1871,9 @@ export default class MainScene extends Phaser.Scene {
         }
         this.collect();
         this.maxDepth = Math.max(this.maxDepth, this.depthMeters());
+        // The opening story starts on the first frame the HUD is up (its captions are HUD banners).
+        if (this.wantOpening && !this.perfTour && this.scene.isActive(HUD_KEY)) { this.wantOpening = false; this.opening = new OpeningLayer(this); }
+        this.opening?.update(delta);
         // Depth is felt (spec 5.0w): past a depth mark a lower bell rings and the HUD's depth line glows.
         this.depthBell ??= createDepthBell();
         const mark = this.depthBell.step(this.depthMeters());

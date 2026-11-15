@@ -4,7 +4,6 @@ import cardImg from '../assets/card_preview.png';
 import MainScene from './MainScene.js';
 import EndScene from './EndScene.js';
 import HudScene, { HUD_KEY } from './HudScene.js';
-import StoryScene, { STORY_KEY, storySeen } from './StoryScene.js';
 import ReefBookScene, { BOOK_KEY } from './ReefBookScene.js';
 import PlayStyleScene, { STYLE_KEY } from './PlayStyleScene.js';
 import { pwaMenuItems, VERSION_TAG, setPlaying } from '../game/pwa.js';
@@ -60,7 +59,6 @@ import { SANDBAR_ART } from '../game/level/SandbarLayer.js';
 import { MANTA_ART } from '../game/ai/MantaLayer.js';
 import { SKY_ART } from '../game/level/SkyLayer.js';
 import { NEAR_COAST } from '../game/level/skyline.js';
-import { STORY_ART } from './StoryScene.js';
 import { STORM_LOOK } from '../game/fx/StormLayer.js';
 import { MICRO, MICRO_KINDS, microKey } from '../game/level/microScatter.js';
 import { SEABIRD_ART } from '../game/ai/SeabirdLayer.js';
@@ -156,7 +154,7 @@ export default class IntroScene extends Phaser.Scene {
         for (const [key, file] of CLEANER_ART) if (!this.textures.exists(key)) this.load.image(key, file);
         // Painted ground cover (MicroArt.js paints the ones missing).
         for (const kind of MICRO_KINDS) for (let v = 0; v < MICRO.variants; v++) { const key = microKey(kind, v); if (!this.textures.exists(key)) this.load.image(key, `img/micro/${key}.webp`); }
-        for (const a of [STORY_ART.back, STORY_ART.ash, STORM_LOOK.clouds]) if (!this.textures.exists(a.key)) this.load.image(a.key, a.file);
+        for (const a of [STORM_LOOK.clouds]) if (!this.textures.exists(a.key)) this.load.image(a.key, a.file);
         for (const id of NEAR_COAST.biomes) if (!this.textures.exists(`sky_coast_${id}`)) this.load.image(`sky_coast_${id}`, `img/coast/${id}.webp`);   // each island's near coast
         for (const kind of SKY_ART) if (!this.textures.exists(`sky_${kind}`)) this.load.image(`sky_${kind}`, `img/sky/${kind}.webp`);
         // Painted shoal fish (game/ai/SwarmLayer.js); drawn procedurally while missing.
@@ -195,7 +193,6 @@ export default class IntroScene extends Phaser.Scene {
             this.scene.add(SCENE_KEYS.MAIN, MainScene, false);
             this.scene.add(SCENE_KEYS.END, EndScene, false);
             this.scene.add(HUD_KEY, HudScene, false);
-            this.scene.add(STORY_KEY, StoryScene, false);
             this.scene.add(BOOK_KEY, ReefBookScene, false);
             this.scene.add(STYLE_KEY, PlayStyleScene, false);
         }
@@ -227,7 +224,7 @@ export default class IntroScene extends Phaser.Scene {
         }
 
         new GameMenu(this, this.scale.height * MENU.button * 0.6, this.scale.height * MENU.button * 0.6, [
-            { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => this.scene.start(STORY_KEY) },
+            { label: lang === 'de' ? 'GESCHICHTE ANSEHEN' : 'WATCH THE STORY', color: 0x6d4c41, callback: () => { this.registry.set('opening', true); this.scene.start(SCENE_KEYS.MAIN); } },
             soundMenuItem(lang, () => this.scene.restart()),
             ...pwaMenuItems(this, lang),
             { label: lang === 'de' ? 'DANKE' : 'CREDITS', color: 0x00796b, callback: () => openCredits(lang) },
@@ -558,7 +555,7 @@ export default class IntroScene extends Phaser.Scene {
         this.registry.set('room', null); // plain start = solo
         this.registry.set('ambient', false);
         // First time: tell the story of the eruption before the journey begins.
-        this.scene.start(storySeen() ? SCENE_KEYS.MAIN : STORY_KEY);
+        this.scene.start(SCENE_KEYS.MAIN);      // the opening story plays inside the level (game/OpeningLayer.js)
     }
 
     update(time, delta) {
