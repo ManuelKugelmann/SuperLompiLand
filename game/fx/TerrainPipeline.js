@@ -8,12 +8,15 @@ import { WEB_GLSL, causticsView } from './CausticsPipeline.js';
 
 // The landscape shaded on the graphics card (level/tileTerrain.js). A chunk is drawn as two plain
 // quads (its back at depth -6, its rock at -2) whose texture is the shared atlas of density tiles;
-// this shader reads the chunk's tile round each pixel and works out what level/shade.js paints per
+// everything the shader needs to know about a chunk is in its tile (writeLook), so all chunks of a
+// kind are drawn in one batch. It reads the chunk's tile round each pixel and works out what level/shade.js paints per
 // pixel in the worker: the outline, the rounding of the rock toward its rim, the light, the palette
 // from rim to core, the sand skin on upward faces, the back rock and the shade next to rock. The
 // stone's grain comes from the shared material tiles (level/materials.js), repeated over the world.
 
 export const TERRAIN = 'TileTerrain';
+/** The chunks' backs (back rock, shade next to rock). */
+export const TERRAIN_BACK = 'TileTerrainBack';
 /** The same, lighter for the lowest tiers (a weak graphics chip): one stone, no ripples, no net of light, the slope from four reads. */
 export const TERRAIN_LITE = 'TileTerrainLite';
 const f = v => Number(v).toFixed(6), TAU = (Math.PI * 2).toFixed(6);
@@ -29,14 +32,17 @@ attribute float inTexId;
 attribute float inTintEffect;
 attribute vec4 inTint;
 varying vec2 outPos;
+varying vec2 outTex;
 void main () {
     gl_Position = uProjectionMatrix * vec4(inPosition, 1.0, 1.0);
     outPos = inPosition;
+    outTex = inTexCoord;
 }`;
 
-const frag = lite => `
+const frag = (lite, back) => `
 #define SHADER_NAME TILE_TERRAIN_FS
 ${lite ? '#define LITE' : ''}
+${back ? '#define BACK' : ''}
 #ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
 #else
@@ -47,41 +53,32 @@ uniform sampler2D uMat;           // the material tiles, 4 x 2 places of ${MAT.s
 uniform float uMatOn;
 uniform vec2 uAtlas;              // the density atlas, px
 uniform vec2 uScroll;             // the view's top left in the world
-uniform vec4 uChunk;              // ox, oy, span, mode (0 rock, 1 back)
-uniform vec2 uPlace;              // the chunk's place in the density atlas (its top left texel)
-uniform vec3 uPalL[5];
-uniform vec3 uPalR[5];
-uniform vec4 uSandL;              // colour, reach
-uniform vec4 uSandR;
-uniform vec2 uSandCover;          // left, right
-uniform vec3 uFogL;
-uniform vec3 uFogR;
-uniform vec4 uMats;               // main and second material, left and right
 uniform float uTime;              // the net of light (CausticsPipeline's numbers this frame)
 uniform float uStrength;
 uniform vec3 uTint;
 varying vec2 outPos;
+varying vec2 outTex;              // where in the density atlas: the quad's frame spans the chunk's own texels
 
 const float TH = ${f(FIELD.threshold)};
 const float STEP = ${f(texelStep(960))};
 const float BORDER = ${f(T.border)};
 const float RANGE = ${f(T.range)};
+const float CELL = ${f(T.size)};
+vec2 origin;                      // this chunk's place in the atlas (its top left texel)
 
 float dens(vec2 i) {
-    vec4 c = texture2D(uMainSampler, (uPlace + i + 0.5) / uAtlas);
+    vec4 c = texture2D(uMainSampler, (origin + i + 0.5) / uAtlas);
     return TH + ((c.r * 255.0 * 256.0 + c.g * 255.0) / 65535.0 - 0.5) * 2.0 * RANGE;
 }
-vec2 back(vec2 i) { return texture2D(uMainSampler, (uPlace + i + 0.5) / uAtlas).ba; }      // back rock cover, distance to rock (0..1 of occlusionReach)
+vec2 back(vec2 i) { return texture2D(uMainSampler, (origin + i + 0.5) / uAtlas).ba; }      // back rock cover, distance to rock (0..1 of occlusionReach)
 
+// The chunk's look (row 0 of its tile, writeLook): texel k.
+vec4 look(float k) { return texture2D(uMainSampler, (origin + vec2(k, 0.0) + 0.5) / uAtlas); }
+
+// The palette from rim (0) to core (4), blended across the chunk (texels 0-4 at its left edge, 5-9 at its right).
 vec3 pal(float k, float side) {
-    // the palette from rim (0) to core (4), blended across the chunk
-    vec3 a = uPalL[0], b = uPalL[1];
-    vec3 ra = uPalR[0], rb = uPalR[1];
-    float t = k;
-    if (k >= 3.0) { a = uPalL[3]; b = uPalL[4]; ra = uPalR[3]; rb = uPalR[4]; t = k - 3.0; }
-    else if (k >= 2.0) { a = uPalL[2]; b = uPalL[3]; ra = uPalR[2]; rb = uPalR[3]; t = k - 2.0; }
-    else if (k >= 1.0) { a = uPalL[1]; b = uPalL[2]; ra = uPalR[1]; rb = uPalR[2]; t = k - 1.0; }
-    return mix(mix(a, b, t), mix(ra, rb, t), side);
+    float i = min(floor(k), 3.0), t = k - i;
+    return mix(mix(look(i).rgb, look(i + 1.0).rgb, t), mix(look(i + 5.0).rgb, look(i + 6.0).rgb, t), side);
 }
 
 ${WEB_GLSL}
@@ -102,11 +99,15 @@ vec4 mat(float m, vec2 w) {
 
 void main () {
     vec2 world = outPos + uScroll;
+    vec2 tt = outTex * uAtlas - 0.5;               // atlas texels (texel i's middle at i)
+    origin = floor(tt / CELL) * CELL;
+    vec2 t = tt - origin;                          // texels into the tile: BORDER .. CELL - 1 - BORDER over the chunk
     // Each chunk draws exactly its own square: where two quads meet, no pixel is drawn twice (a see-through back would show a line).
-    if (world.x < uChunk.x || world.y < uChunk.y || world.x >= uChunk.x + uChunk.z || world.y >= uChunk.y + uChunk.z) discard;
-    vec2 t = (world - uChunk.xy) / STEP + BORDER;
+    if (t.x < BORDER || t.y < BORDER || t.x >= CELL - 1.0 - BORDER || t.y >= CELL - 1.0 - BORDER) discard;
     vec2 i0 = floor(t), fr = t - i0;
-    float side = clamp((world.x - uChunk.x) / uChunk.z, 0.0, 1.0);
+    float side = (t.x - BORDER) / (CELL - 1.0 - 2.0 * BORDER);
+    vec4 l14 = look(14.0), l15 = look(15.0);
+    vec4 mats = vec4(l14.ba, l15.rg) * 255.0;      // main and second material, left and right
     float deepK = clamp(world.y / ${f(FIELD.maxDepth)}, 0.0, 1.0);
     vec3 deepTint = vec3(${S.deepTint.map(v => f(v / 255)).join(', ')});
 
@@ -125,7 +126,8 @@ void main () {
 #endif
     float gl = max(1e-5, length(vec2(gx, gy)));
     float dist = (d - TH) / gl;
-    if (uChunk.w > 0.5) {
+#ifdef BACK
+    {
         // The back: shade gathering in the water next to rock, and back rock under overhangs.
         vec2 bk = mix(mix(back(i0), back(i0 + vec2(1.0, 0.0)), fr.x), mix(back(i0 + vec2(0.0, 1.0)), back(i0 + vec2(1.0, 1.0)), fr.x), fr.y);
         float cov = bk.x;
@@ -134,14 +136,14 @@ void main () {
         float rockA = ${f(S.backRockAlpha)} * cov;
         float a = occA + rockA * (1.0 - occA);
         if (a <= 0.004) discard;
-        float tone = 0.8 + 0.4 * (uMatOn > 0.5 ? mat(mix(uMats.x, uMats.z, step(0.5, side)), world).a : 0.5);
+        float tone = 0.8 + 0.4 * (uMatOn > 0.5 ? mat(mix(mats.x, mats.z, step(0.5, side)), world).a : 0.5);
         vec3 far = pal(2.0, side) * tone * (1.0 - ${f(1 - S.backRockDark)} * rockA / ${f(S.backRockAlpha)});
         far = mix(far, deepTint, ${f(S.deepMix)} * deepK);
-        far = mix(far, mix(uFogL, uFogR, side), ${f(S.backRockFog)});
+        far = mix(far, mix(look(12.0).rgb, look(13.0).rgb, side), ${f(S.backRockFog)});
         vec3 col = (vec3(${[4, 22, 42].map(v => f(v / 255)).join(', ')}) * occA + far * rockA * (1.0 - occA)) / a;
         gl_FragColor = vec4(col * a, a);
-        return;
     }
+#else
 
     // The rock.
     if (d < TH - 0.02) discard;
@@ -155,11 +157,11 @@ void main () {
     vec3 stone = vec3(1.0);
     vec2 bumpN = vec2(0.0);
 #ifdef LITE
-    if (uMatOn > 0.5) stone = mat(side < 0.5 ? uMats.x : uMats.z, world).rgb * ${f(255 / 128 * MAT.colour)};
+    if (uMatOn > 0.5) stone = mat(side < 0.5 ? mats.x : mats.z, world).rgb * ${f(255 / 128 * MAT.colour)};
 #else
     if (uMatOn > 0.5) {
         float m2 = smoothstep(${f(1 - MAT.share - 0.08)}, ${f(1 - MAT.share + 0.08)}, vnoise(world / ${f(MAT.maskScale)}));
-        vec2 ms = side < 0.5 ? uMats.xy : uMats.zw;
+        vec2 ms = side < 0.5 ? mats.xy : mats.zw;
         vec4 a = mat(ms.x, world), b = mat(ms.y, world.yx + vec2(151.0, 333.0));
         vec4 c = mix(a, b, m2);
         stone = c.rgb * ${f(255 / 128 * MAT.colour)};      // as shade.js: the stone's colour relative to its mean, times MAT.colour
@@ -182,12 +184,13 @@ void main () {
     float depthIn = sqrt(r * sqrt(r)) * ${f(S.coreShade * 3.9999)};
     vec3 col = pal(depthIn, side);
 
-    vec4 sand = mix(uSandL, uSandR, side);
+    vec4 sand = mix(look(10.0), look(11.0), side);
+    sand.w *= 255.0;      // reach in px
     float faceUp = outY > -0.25 ? 0.0 : smoothstep(0.25, 0.65, -outY) * smoothstep(${f(SAND_SKIN.flat[0])}, ${f(SAND_SKIN.flat[1])}, gl);
     float sandy = 0.0, under = 1.0;
     if (sand.w > 0.0 && faceUp > 0.0) {
         float deep = max(0.0, d - TH) / max(gl, ${f(SAND_SKIN.minSlope)}), fk = deep / sand.w;
-        if (fk < 1.0) sandy = faceUp * mix(uSandCover.x, uSandCover.y, side) * (1.0 - smoothstep(0.3, 1.0, fk));
+        if (fk < 1.0) sandy = faceUp * mix(l14.r, l14.g, side) * (1.0 - smoothstep(0.3, 1.0, fk));
         else if (deep < sand.w + ${f(SAND_SKIN.under[0])}) under = 1.0 - ${f(SAND_SKIN.under[1])} * faceUp * sin(3.14159265 * (deep - sand.w) / ${f(SAND_SKIN.under[0])});
     }
 #ifndef LITE
@@ -223,49 +226,40 @@ void main () {
     }
 #endif
     gl_FragColor = vec4(col * alpha, alpha);
+#endif
 }`;
 
 class TerrainPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
-    constructor(game, lite = false) {
-        super({ game, name: lite ? TERRAIN_LITE : TERRAIN, vertShader: VERT, fragShader: frag(lite) });
+    constructor(game, name, lite = false, back = false) {
+        super({ game, name, vertShader: VERT, fragShader: frag(lite, back) });
         this.view = { x: 0, y: 0 };
         this.matTexture = null;
-        this.current = null;
+        this.atlas = [1, 1];      // the density atlas's size, px (set with the atlas: setTerrainAtlas)
     }
 
     onPreRender() {
         this.set2f('uScroll', this.view.x, this.view.y);
+        this.set2f('uAtlas', this.atlas[0], this.atlas[1]);
         this.set1f('uMatOn', this.matTexture ? 1 : 0);
+        this.set1i('uMat', 1);
         const c = causticsView(this.game);
         this.set1f('uTime', c ? c.t : 0); this.set1f('uStrength', c ? c.strength : 0); this.set3f('uTint', c ? c.r : 1, c ? c.g : 1, c ? c.b : 1);
-        this.current = null;
     }
 
-    /** Each chunk's quad brings its own numbers (`gameObject.terrain`, see chunkTerrain): what was batched for the last one is drawn first. */
-    onBind(gameObject) {
-        const k = gameObject?.terrain;
-        if (!k || k === this.current) return;
-        this.flush();
-        this.current = k;
-        if (this.matTexture) { this.bindTexture(this.matTexture, 1); this.set1i('uMat', 1); }
-        this.set2f('uAtlas', k.atlas[0], k.atlas[1]);
-        this.set4f('uChunk', k.ox, k.oy, k.span, k.mode);
-        this.set2f('uPlace', k.place[0], k.place[1]);
-        this.set3fv('uPalL', k.palL); this.set3fv('uPalR', k.palR);
-        this.set4f('uSandL', ...k.sandL); this.set4f('uSandR', ...k.sandR);
-        this.set2f('uSandCover', k.sandCover[0], k.sandCover[1]);
-        this.set3f('uFogL', ...k.fogL); this.set3f('uFogR', ...k.fogR);
-        this.set4f('uMats', ...k.mats);
+    /** The material tiles on unit 1 for every quad (other pipelines use that unit too; binding it costs no batch). */
+    onBind() {
+        if (this.matTexture) this.bindTexture(this.matTexture, 1);
     }
 }
+
+const NAMES = [[TERRAIN, false, false], [TERRAIN_LITE, true, false], [TERRAIN_BACK, false, true]];
 
 /** Make the pipeline known (WebGL only); `materials` = the prepared material tiles (or null: plain stone). True when it can be used. */
 export function installTerrain(game, materials) {
     const r = game.renderer, pipes = r?.pipelines, gl = r?.gl;
     if (!pipes || !gl) return false;
-    if (!pipes.has(TERRAIN_LITE)) pipes.add(TERRAIN_LITE, new TerrainPipeline(game, true));
-    let p = pipes.get(TERRAIN);
-    if (!p) { p = new TerrainPipeline(game); pipes.add(TERRAIN, p); }
+    for (const [name, lite, back] of NAMES) if (!pipes.has(name)) pipes.add(name, new TerrainPipeline(game, name, lite, back));
+    const p = pipes.get(TERRAIN);
     if (materials && !p.matTexture) {
         const N = MAT.size;
         p.matTexture = r.createTexture2D(0, gl.LINEAR, gl.LINEAR, gl.CLAMP_TO_EDGE, gl.CLAMP_TO_EDGE, gl.RGBA, null, N * 4, N * 2, false, false, false);
@@ -276,15 +270,20 @@ export function installTerrain(game, materials) {
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         MATERIALS.forEach((m, i) => gl.texSubImage2D(gl.TEXTURE_2D, 0, (i % 4) * N, Math.floor(i / 4) * N, N, N, gl.RGBA, gl.UNSIGNED_BYTE, materials[i]));
         gl.bindTexture(gl.TEXTURE_2D, before);
-        pipes.get(TERRAIN_LITE).matTexture = p.matTexture;
+        for (const [name] of NAMES) pipes.get(name).matTexture = p.matTexture;
     }
     return true;
 }
 
 /** Per frame: the view's top left in the world. */
 export function updateTerrain(game, scrollX, scrollY) {
-    for (const name of [TERRAIN, TERRAIN_LITE]) {
+    for (const [name] of NAMES) {
         const p = game.renderer?.pipelines?.get(name);
         if (p) { p.view.x = scrollX; p.view.y = scrollY; }
     }
+}
+
+/** The density atlas's size (px), for every terrain pipeline. */
+export function setTerrainAtlas(game, w, h) {
+    for (const [name] of NAMES) { const p = game.renderer?.pipelines?.get(name); if (p) p.atlas = [w, h]; }
 }

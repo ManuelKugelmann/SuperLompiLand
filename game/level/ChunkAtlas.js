@@ -30,6 +30,18 @@ export default class ChunkAtlas {
         for (let i = 0; i < side * side; i++) { const p = this.slots.at(i); this.texture.add(String(i), 0, p.x + 0.5, p.y + 0.5, cell - 1, cell - 1); }
     }
 
+    /**
+     * Frames named `prefix + index` that cover each place less `inset` texels on every side, from the middle of the
+     * first texel to the middle of the last (a density tile's chunk: tileTerrain.js).
+     */
+    addInsetFrames(prefix, inset) {
+        for (let i = 0; i < this.side * this.side; i++) {
+            const p = this.slots.at(i);
+            this.texture.add(prefix + i, 0, p.x + inset + 0.5, p.y + inset + 0.5, this.cell - 2 * inset - 1, this.cell - 2 * inset - 1);
+        }
+        return this;
+    }
+
     /** A free place (its index, also its frame's name), or null when the atlas is full. */
     take() { return this.slots.take(); }
 

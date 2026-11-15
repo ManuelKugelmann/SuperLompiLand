@@ -89,3 +89,21 @@ export function chunkLook(ox, span) {
     return { palL: new Float32Array(L.pal), palR: new Float32Array(R.pal), sandL: L.sand, sandR: R.sand, sandCover: [L.cover, R.cover],
         fogL: L.fog, fogR: R.fog, mats: [...L.mats, ...R.mats] };
 }
+
+/**
+ * The chunk's look written into its tile (row 0, which the shader never reads as density: it reads one texel
+ * beyond the chunk at most), so every chunk is drawn by the same shader in one batch with no numbers of its own:
+ * texels 0-4 / 5-9 the palette (rim to core) at the left / right edge, 10 / 11 the sand (rgb, reach in px),
+ * 12 / 13 the back rock's fog, 14 (cover left, cover right, materials left), 15 (materials right).
+ */
+export const LOOK_TEXELS = 16;
+export function writeLook(tile, look) {
+    const put = (i, r, g, b, a = 1) => { const o = i * 4; tile[o] = Math.round(r * 255); tile[o + 1] = Math.round(g * 255); tile[o + 2] = Math.round(b * 255); tile[o + 3] = Math.round(a * 255); };
+    for (let k = 0; k < 5; k++) { put(k, ...look.palL.slice(k * 3, k * 3 + 3)); put(5 + k, ...look.palR.slice(k * 3, k * 3 + 3)); }
+    put(10, ...look.sandL.slice(0, 3), Math.min(255, look.sandL[3]) / 255);
+    put(11, ...look.sandR.slice(0, 3), Math.min(255, look.sandR[3]) / 255);
+    put(12, ...look.fogL); put(13, ...look.fogR);
+    put(14, look.sandCover[0], look.sandCover[1], look.mats[0] / 255, look.mats[1] / 255);
+    put(15, look.mats[2] / 255, look.mats[3] / 255, 0, 1);
+    return tile;
+}

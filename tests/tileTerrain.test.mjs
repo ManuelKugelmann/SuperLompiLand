@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TILE_TERRAIN, texelAt, texelStep, encodeDensity, tileDensity, densityTile, chunkLook } from '../game/level/tileTerrain.js';
+import { TILE_TERRAIN, texelAt, texelStep, encodeDensity, tileDensity, densityTile, chunkLook, writeLook, LOOK_TEXELS } from '../game/level/tileTerrain.js';
 import { createField, FIELD } from '../game/level/density.js';
 
 test('density keeps 16 bits round the threshold: the outline sits where the field puts it', () => {
@@ -39,4 +39,14 @@ test('what the shader is told about a chunk: palettes rim to core in 0..1, sand,
     assert.equal(k.mats.length, 4); assert.ok(k.mats.every(m => m >= 0));
     const next = chunkLook(241 * 960, 960);
     assert.deepEqual([...k.palR], [...next.palL], 'neighbours agree at their shared edge');
+});
+
+test('the look goes into row 0, which the shader never reads as density, and comes back out as written', () => {
+    const tile = new Uint8Array(TILE_TERRAIN.size * TILE_TERRAIN.size * 4), look = chunkLook(240 * 960, 960);
+    writeLook(tile, look);
+    assert.ok(LOOK_TEXELS <= TILE_TERRAIN.size);
+    assert.equal(TILE_TERRAIN.border, 2, 'the shader reads at most one texel beyond the chunk: row 0 is free');
+    assert.ok(Math.abs(tile[0] / 255 - look.palL[0]) < 0.003);
+    assert.equal(tile[10 * 4 + 3], Math.round(Math.min(255, look.sandL[3])));
+    assert.deepEqual([tile[14 * 4 + 2], tile[14 * 4 + 3], tile[15 * 4], tile[15 * 4 + 1]], look.mats);
 });

@@ -22,8 +22,8 @@ import { getCharacter, loadSelectedId } from '../characters.js';
 import { coralSize } from './coralSizes.js';
 import { SHADE, shadeChunk } from './shade.js';
 import ChunkAtlas from './ChunkAtlas.js';
-import { TILE_TERRAIN, densityTile, chunkLook } from './tileTerrain.js';
-import { TERRAIN, TERRAIN_LITE, installTerrain } from '../fx/TerrainPipeline.js';
+import { TILE_TERRAIN, densityTile, chunkLook, writeLook } from './tileTerrain.js';
+import { TERRAIN, TERRAIN_LITE, TERRAIN_BACK, installTerrain, setTerrainAtlas } from '../fx/TerrainPipeline.js';
 import { treatCoinNear } from './RhythmLayer.js';
 import { spotsOf } from './worldMap.js';
 import { FLOW, createFlow, inStreamPath } from './flow.js';
@@ -50,7 +50,7 @@ export const LEVEL = {
     spawn: FIELD.spawn,
     margin: 1,            // extra chunks generated around the view ...
     leadS: 2.5,           // ... and in the direction the view moves, as many more as it covers in this many seconds (a fast swimmer never meets a chunk being made) ...
-    leadMax: 3,           // ... at most this many
+    leadMax: 3,           // ... at most this many (the quality tier may set fewer: this.leadMax, QUALITY lead)
     leadEase: 0.1,        // share of the way the view's speed estimate moves to the newest frame's
     buildBudgetMs: 4,     // ms per frame spent on building chunks: a build is cut into steps and goes on next frame once this is used up
     buildRushMs: 9,       // ... and this much while a chunk in view is not complete yet (a hole in the picture is worse than a slower frame)
@@ -292,9 +292,10 @@ export default class LevelGenerator {
     tileAtlasFor() {
         const reg = this.scene.registry, t = this.scene.textures;
         let a = reg.get('tileAtlas');
-        if (a && t.exists(a.key)) { a.reset(); return a; }
-        a = ChunkAtlas.make(this.scene, 'chunk_atlas_tiles', TILE_TERRAIN.size, LEVEL.atlasChunks, false);
+        if (a && t.exists(a.key)) { a.reset(); setTerrainAtlas(this.scene.game, a.slots.size.w, a.slots.size.h); return a; }
+        a = ChunkAtlas.make(this.scene, 'chunk_atlas_tiles', TILE_TERRAIN.size, LEVEL.atlasChunks, false)?.addInsetFrames('c', TILE_TERRAIN.border);
         reg.set('tileAtlas', a);
+        if (a) setTerrainAtlas(this.scene.game, a.slots.size.w, a.slots.size.h);
         return a;
     }
 
@@ -314,7 +315,7 @@ export default class LevelGenerator {
     setTerrainLite(on) {
         if (!this.tileAtlas || on === this.terrainLite) return;
         this.terrainLite = on;
-        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.terrain && o.scene) o.setPipeline(on ? TERRAIN_LITE : TERRAIN);
+        for (const chunk of this.chunks.values()) for (const o of chunk.objects) if (o.terrain && !o.terrain.back && o.scene) o.setPipeline(on ? TERRAIN_LITE : TERRAIN);
     }
 
     /** The net of light on or off for every picture of the world, those there now and those to come (the lowest quality tier draws without its shader). */
@@ -395,7 +396,7 @@ export default class LevelGenerator {
             vel.x += ((camX - vel.at.x) / dt - vel.x) * LEVEL.leadEase; vel.y += ((camY - vel.at.y) / dt - vel.y) * LEVEL.leadEase;
         }
         vel.at = { x: camX, y: camY };
-        const lead = v => Math.min(LEVEL.leadMax, Math.ceil(Math.abs(v) * LEVEL.leadS / CH));
+        const lead = v => Math.min(this.leadMax ?? LEVEL.leadMax, Math.ceil(Math.abs(v) * LEVEL.leadS / CH));
         let ax = lead(vel.x), ay = lead(vel.y);
         // Ahead the view gets its margin and its lead; behind it, while it leads, no margin (it is moving away from there). The
         // whole set must fit the chunk atlases (else chunks fall back to a canvas each, a long step on a phone): the lead gives way first.
@@ -628,12 +629,13 @@ export default class LevelGenerator {
         const tileAt = pics.tile && this.tileAtlas?.slots.free ? this.tileAtlas.take() : null;
         if (pics.tile && tileAt !== null) {
             // Tiles: the chunk's shape goes up (16 KB), and two plain quads show it, shaded by the graphics card: its back and its rock.
-            const A2 = this.tileAtlas, p = A2.slots.at(tileAt), look = chunkLook(ox, CH);
+            const A2 = this.tileAtlas;
             chunk.places = [[A2, tileAt]];
-            A2.upload(tileAt, pics.tile, 0, TILE_TERRAIN.size);
-            for (const [mode, depth] of [[1, -6], [0, -2]]) {
-                const img = s.add.image(ox, oy, A2.key, String(tileAt)).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth).setPipeline(this.terrainLite ? TERRAIN_LITE : TERRAIN);
-                img.terrain = { ...look, mode, ox, oy, span: CH, place: [p.x, p.y], atlas: [A2.slots.size.w, A2.slots.size.h] };
+            A2.upload(tileAt, writeLook(pics.tile, chunkLook(ox, CH)), 0, TILE_TERRAIN.size);
+            // (All chunks share these two pipelines and the atlas: the backs are drawn in one batch, the rock in another.)
+            for (const [back, depth] of [[true, -6], [false, -2]]) {
+                const img = s.add.image(ox, oy, A2.key, `c${tileAt}`).setOrigin(0).setDisplaySize(CH, CH).setDepth(depth).setPipeline(back ? TERRAIN_BACK : this.terrainLite ? TERRAIN_LITE : TERRAIN);
+                img.terrain = { back };
                 chunk.objects.push(img);
             }
             yield 'tile'; if (chunk.dead) return;

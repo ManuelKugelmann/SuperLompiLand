@@ -577,6 +577,7 @@ export default class MainScene extends Phaser.Scene {
         this.quality.tier = tier;
         this.level.setCaustics(q.caustics > 0);
         this.level.setTerrainLite(q.liteTerrain);
+        this.level.leadMax = q.lead;
         this.particles.share = q.particles;
         this.swarms.share = q.shoals;
         SWARMS.simEvery = q.simEvery; SWARMS.midEvery = q.midEvery; SWARMS.perView = q.shoalsAround;

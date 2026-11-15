@@ -10,15 +10,16 @@ export const QUALITY = {
     // simEvery / midEvery: a shoal in sight is simulated every so many frames (near the middle / further out);
     // glow: share of the soft glow pictures that are drawn (fish light, deep glow, coin glows); far: share of the far scenery's single objects.
     // shoalsAround: how many roaming shoals are kept about the view; sheen: share of the rainbow sheen on the fish's rigs (0 = not worked out);
+    // lead: chunks the world is made ahead of a fast view at most (each chunk brings its plants, props and creatures: a slow phone gets fewer);
     // liteTerrain: the landscape's lighter shader (fx/TerrainPipeline.js TERRAIN_LITE);
     // resolution: share of the game's px the picture is drawn at, each way (renderScale.js): the graphics chip's work goes with its square.
     // eyes: px from the view's middle within which rigs show living eyes (beyond: the painted eye); lids: 1 = blinking lids, 0 = the eye's white squeezes shut instead.
     // micro: share of the small ground scatter (pebbles, shells, mussels, tufts, rubble) placed per chunk.
     // (A layer reads its share as QUALITY[scene.quality.tier].glow and the like, when it builds or each frame.)
-    basic: { caustics: 0, particles: 0.18, shoals: 0.25, shoalsAround: 1, simEvery: 4, midEvery: 8, glow: 0, far: 0.2, sheen: 0, resolution: 0.5, eyes: 600, lids: 0, liteTerrain: true, micro: 0.3 },
-    low: { caustics: 0, particles: 0.35, shoals: 0.45, shoalsAround: 2, simEvery: 3, midEvery: 5, glow: 0, far: 0.4, sheen: 1, resolution: 0.67, eyes: 1000, lids: 1, liteTerrain: true, micro: 0.6 },
-    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, shoalsAround: 2, simEvery: 2, midEvery: 4, glow: 1, far: 0.7, sheen: 1, resolution: 0.8, eyes: Infinity, lids: 1, liteTerrain: false, micro: 1 },
-    high: { caustics: 1, particles: 1, shoals: 1, shoalsAround: 2, simEvery: 2, midEvery: 3, glow: 1, far: 1, sheen: 1, resolution: 1, eyes: Infinity, lids: 1, liteTerrain: false, micro: 1 },
+    basic: { caustics: 0, particles: 0.18, shoals: 0.25, shoalsAround: 1, simEvery: 4, midEvery: 8, glow: 0, far: 0.2, sheen: 0, resolution: 0.5, eyes: 600, lids: 0, liteTerrain: true, micro: 0.3, lead: 1 },
+    low: { caustics: 0, particles: 0.35, shoals: 0.45, shoalsAround: 2, simEvery: 3, midEvery: 5, glow: 0, far: 0.4, sheen: 1, resolution: 0.67, eyes: 1000, lids: 1, liteTerrain: true, micro: 0.6, lead: 2 },
+    medium: { caustics: 0.7, particles: 0.6, shoals: 0.7, shoalsAround: 2, simEvery: 2, midEvery: 4, glow: 1, far: 0.7, sheen: 1, resolution: 0.8, eyes: Infinity, lids: 1, liteTerrain: false, micro: 1, lead: 3 },
+    high: { caustics: 1, particles: 1, shoals: 1, shoalsAround: 2, simEvery: 2, midEvery: 3, glow: 1, far: 1, sheen: 1, resolution: 1, eyes: Infinity, lids: 1, liteTerrain: false, micro: 1, lead: 3 },
     tune: {
         windowS: 2,       // the frame rate is the average over this many seconds
         lowFps: 30,       // under this for `lowS` seconds: a tier down
