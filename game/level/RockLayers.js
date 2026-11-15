@@ -155,8 +155,13 @@ export default class RockLayers {
         const scene = this.scene, L = LAYER_CHUNK, def = l.def, at = l.chunks.get(r.id).at;
         // The fog toward the water is baked in by the worker (fogLayer); a slight darkening on top.
         const img = scene.add.image(at[0] * L, at[1] * L, tex, frame).setOrigin(0).setScrollFactor(def.s)
-            .setDisplaySize(L + 1, L + 1).setDepth(def.depth).setTint(mix(0xffffff, 0x000000, 1 - def.dark)).setAlpha(0);
-        scene.tweens.add({ targets: img, alpha: 1, duration: FADE_IN_MS });
+            .setDisplaySize(L + 1, L + 1).setDepth(def.depth).setTint(mix(0xffffff, 0x000000, 1 - def.dark));
+        // A tile fades in only when it arrives on screen while playing. Off screen (the look-ahead's normal case) or while the
+        // first picture is still being built it is simply there: tiles fading in at different times, each with its baked fog,
+        // read as dark straight-edged rectangles (review 2026-11-15, beach and lagoon start view).
+        const cam = scene.cameras.main, x = at[0] * L - cam.scrollX * def.s, y = at[1] * L - cam.scrollY * def.s;
+        const seen = x < cam.width && x + L > 0 && y < cam.height && y + L > 0;
+        if (seen && scene.level?.viewReady) { img.setAlpha(0); scene.tweens.add({ targets: img, alpha: 1, duration: FADE_IN_MS }); }
         l.chunks.set(r.id, { img, at, ...out });
     }
 
