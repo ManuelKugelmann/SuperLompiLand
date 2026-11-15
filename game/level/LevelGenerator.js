@@ -12,6 +12,7 @@ import { foamRing } from './foamRing.js';
 import { PROP_SKIRT, ensureSkirt, skirtTint } from './propSkirt.js';
 import { coinTooNear } from './coinClear.js';
 import { coinNearHook } from './longline.js';
+import { dwellerBand } from './dwellers.js';
 import { SET_PIECES, ghostShip } from './setPieces.js';
 import { MICRO, microAt, microKey } from './microScatter.js';
 import { makeMicroTextures, MICRO_ORIGIN_Y } from './MicroArt.js';
@@ -50,7 +51,7 @@ export const LEVEL = {
     cell: 96,             // marching-squares cell size (world px) — smaller = rounder outlines
     cells: 10,            // cells per chunk side  -> chunk = 960 px
     seed: 1337,
-    version: 44,
+    version: 45,
     coralGap: 600,        // the same coral picture is never placed twice within this distance (px)           // bump when generation changes what index a coin or friend gets
     threshold: FIELD.threshold,
     maxDepth: FIELD.maxDepth,
@@ -94,7 +95,6 @@ export const LEVEL = {
     laneBand: 260,        // px: trails on the main route stay within this band around its middle
     ventClear: 80,        // px a bubble column ends below the calm route's lane ...
     ventMin: 320,         // ... and a column that would be shorter than this is not there at all
-    floorReach: 5000,     // px under its spot within which a floor dweller (FRIENDS `floor`) looks for the seabed
     coinTop: 250          // px under the surface above which no chunk coin lies: near the surface that part of the view is the HUD's band (counter, hearts)
 };
 const CH = LEVEL.cell * LEVEL.cells;
@@ -114,9 +114,9 @@ const FRIENDS = {
     friend_seahorse: { size: 120, every: 3, bob: 26, anim: 'sway', soft: 0.5, wiggle: 6, upright: true, ai: { speed: 0.6, range: 200, turn: 0.05, shy: 1.2, anchor: true } },
     // The extended cast (gamedesigner 2026-11-15; pictures 3669043, head to the right). Angelfish pair up by themselves
     // (loose groups, ai/swimmer.js flockWant); the rockfish guards a patch near the floor; the flying squid keeps
-    // near the surface (`surface`: its home is never deeper than this); the nautilus drifts slowly in the deep.
-    angelfish: { size: 200, swim: 380, bob: 12, anim: 'swim', soft: 0.35, wiggle: 14, ai: { speed: 0.8, range: 380, turn: 0.035, shy: 1 } },
-    rockfish: { size: 220, swim: 400, bob: 8, anim: 'swim', soft: 0.3, wiggle: 12, floor: 110, grumpy: { territory: 260 } },      // `floor`: its home is this many px over the seabed below where it was placed
+    // near the surface (`surface`: it lives no deeper than this); the nautilus drifts slowly in the deep (`floor`); `pair`: they come two by two.
+    angelfish: { size: 200, pair: true, swim: 380, bob: 12, anim: 'swim', soft: 0.35, wiggle: 14, ai: { speed: 0.8, range: 380, turn: 0.035, shy: 1 } },
+    rockfish: { size: 220, swim: 400, bob: 8, anim: 'swim', soft: 0.3, wiggle: 12, floor: 300, grumpy: { territory: 160 } },      // `floor`: it lives at most this many px over the seabed (dwellers.js)
     flying_squid: { size: 180, swim: 400, bob: 20, anim: 'swim', soft: 0.6, wiggle: 10, surface: 520, ai: { speed: 1.1, range: 600, turn: 0.04, shy: 1.3 } },
     nautilus: { size: 160, bob: 30, anim: 'pulse', soft: 0.3, wiggle: 4, upright: true, floor: 400, ai: { speed: 0.35, range: 240, turn: 0.02, shy: 0.8 } },
     // `crawl`: creatures on the rock move along its outline (game/ai/crawler.js): px per step, patch size.
@@ -1039,28 +1039,32 @@ export default class LevelGenerator {
 
         yield 'coins'; if (chunk.dead) return;
         // --- Swimmers ---------------------------------------------------------
-        const openSpot = (span = 0) => {
+        // `band` [y0, y1]: the depths a creature may live at in this chunk (dwellers.js); default the whole chunk.
+        const openSpot = (span = 0, band = null) => {
             for (let tries = 6; tries > 0; tries--) {
-                const x = ox + rng.between(120, CH - 120), y = oy + rng.between(120, CH - 120);
+                const x = ox + rng.between(120, CH - 120), y = band ? rng.between(band[0], band[1]) : oy + rng.between(120, CH - 120);
                 if (this.isOpen(x, y, 0.1) && this.isOpen(x - span, y, 0.08) && this.isOpen(x + span, y, 0.08) && this.reachable(x, y)) return { x, y };
             }
             return null;
         };
         if (rng.frac() < biome.friendRate) {
-            const key = pickWeighted(rng, only(biome.friends, k => FRIENDS[k] && !FRIENDS[k].ground), has);
-            const p = key && openSpot(FRIENDS[key].swim || 0);
-            if (p && FRIENDS[key].surface && p.y > FRIENDS[key].surface && this.isOpen(p.x, FRIENDS[key].surface, 0.1)) p.y = FRIENDS[key].surface;      // a surface dweller's home is up near the light
-            if (p && FRIENDS[key].floor) {      // a floor dweller's home is just over the seabed below (none within reach: it stays where it was)
-                let y = p.y;
-                while (y < p.y + LEVEL.floorReach && this.isOpen(p.x, y + 20, 0.1)) y += 20;
-                if (y < p.y + LEVEL.floorReach) p.y = Math.max(p.y, y - FRIENDS[key].floor);
-            }
+            // Surface and floor dwellers are offered only to the chunks that hold their depth (dwellers.js): every
+            // creature is made in the chunk that owns it, at a spot that passed the open-water checks.
+            const mid = ox + CH / 2, seabed = floorY(mid);
+            const bandOf = k => dwellerBand(FRIENDS[k], oy, CH, seabed, FRIENDS[k].grumpy ? this.field.routeY(mid) + ROUTE.clear + FRIENDS[k].grumpy.territory * 0.5 : -Infinity);
+            const key = pickWeighted(rng, only(biome.friends, k => FRIENDS[k] && !FRIENDS[k].ground && bandOf(k)), has);
+            const p = key && openSpot(FRIENDS[key].swim || 0, bandOf(key));
             // Grumpies never live on the calm main route (spec 5.2c): stress stays optional.
             const onRoute = p && FRIENDS[key].grumpy && Math.abs(p.y - this.field.routeY(p.x)) < ROUTE.clear + FRIENDS[key].grumpy.territory * 0.5;
             // A big friend is a sight, not a crowd: `every` = it lives only in every so many chunk columns, and there in one row
             // (a turtle per 2900 px at most, never two on one screen).
             const every = key && FRIENDS[key].every, rare = every && !(cx % every === 0 && cy === Math.floor(cx / every) % 2);
-            if (p && !onRoute && !rare) this.addFriend(chunk, key, p.x, p.y, rng);
+            if (p && !onRoute && !rare) {
+                this.addFriend(chunk, key, p.x, p.y, rng);
+                // Kinds that live in pairs come two by two: the mate beside it, if there is room (no rng: the chunk's draws stay as they were).
+                const mate = FRIENDS[key].pair && [[150, -40], [-150, 40], [0, 150]].map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy })).find(q => this.isOpen(q.x, q.y, 0.1) && this.reachable(q.x, q.y));
+                if (mate) this.addFriend(chunk, key, mate.x, mate.y, rng);
+            }
         }
         yield 'swimmer friend'; if (chunk.dead) return;
         if (!safe && rng.frac() < biome.hazardRate) {
@@ -1288,7 +1292,8 @@ export default class LevelGenerator {
         // two can be told apart at a glance.
         // The sheen is the friend's own picture once more, added on top in travelling
         // rainbow colours: it lies exactly on the body and bends with it.
-        const sheen = img.addOverlay(s, f.ground ? 1.05 : 4.05);
+        // (A grumpy is no friend: no sheen, and it is not greeted; see below.)
+        const sheen = f.grumpy ? null : img.addOverlay(s, f.ground ? 1.05 : 4.05);
         if (sheen && this.sheenOff) img.rig.setOverlay?.(false);
         if (sheen) {
             sheen.setBlendMode(Phaser.BlendModes.ADD).setAlpha(LEVEL.friendSheen);
@@ -1302,7 +1307,8 @@ export default class LevelGenerator {
         // Friends are numbered per chunk too. They greet you every time you come
         // back; only the coin bonus is given once per friend, for good.
         const index = chunk.friendCount = (chunk.friendCount ?? -1) + 1;
-        this.friends.push({ img, key, r: f.size * 0.38, chunkKey: chunk.key, index, greeted: false, rewarded: !!this.state?.has(chunk.key, 'friend', index) });
+        // A grumpy (rockfish, angler) keeps its number but is no friend to greet: bumping it must not cheer, heal or pay while it shoves.
+        if (!f.grumpy) this.friends.push({ img, key, r: f.size * 0.38, chunkKey: chunk.key, index, greeted: false, rewarded: !!this.state?.has(chunk.key, 'friend', index) });
         return img;
     }
 
